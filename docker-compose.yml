@@ -1,0 +1,11 @@
+services:
+  postgres:
+    image: postgres:16.1-alpine
+    restart: unless-stopped
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=workbit_dev_db
+      - POSTGRES_USER=dev
+      - POSTGRES_PASSWORD=dev

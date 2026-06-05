@@ -17,6 +17,6 @@ public record RegistrationRequest(
     @Override
     @NotNull
     public String toString() {
-        return "RegisterRequest{email=%s, password=*****}";
+        return "RegisterRequest{email=%s, password=*****}".formatted(email);
     }
 }

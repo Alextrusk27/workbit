@@ -17,6 +17,6 @@ public record LoginRequest(
     @Override
     @NotNull
     public String toString() {
-        return "LoginRequest{email=%s, password=*****}";
+        return "LoginRequest{email=%s, password=*****}".formatted(email);
     }
 }

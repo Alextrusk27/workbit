@@ -38,3 +38,6 @@ build/
 ### Claude Code ###
 CLAUDE.md
 *.claudeignore
+.claude/
+.agents/
+skills-lock.json

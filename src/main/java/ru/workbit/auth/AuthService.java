@@ -48,8 +48,6 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.newPassword()));
     }
 
-//    public void resetPassword() {}
-
     private void checkEmail(String email) {
         if (userRepository.existsByEmail(email)) {
             throw new BadCredentialsException("Email already in use");
@@ -60,6 +58,9 @@ public class AuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         verifyPassword(request.password(), user.getPassword());
+        if (!user.isActive()) {
+            throw new BadCredentialsException("User was deactivated");
+        }
         return user;
     }
 

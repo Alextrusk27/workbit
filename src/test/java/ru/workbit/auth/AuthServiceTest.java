@@ -1,5 +1,6 @@
 package ru.workbit.auth;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import ru.workbit.dto.auth.ChangePasswordRequest;
 import ru.workbit.dto.auth.LoginRequest;
 import ru.workbit.dto.auth.RegistrationRequest;
-import ru.workbit.dto.auth.TokenResponse;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,37 +42,46 @@ class AuthServiceTest {
     private static final String BEARER = "Bearer";
 
     @Mock
-    UserJPARepository userRepository;
+    private UserJPARepository userRepository;
     @Mock
-    JWTService jwtService;
+    private JWTService jwtService;
     @Mock
-    PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
     @InjectMocks
-    AuthService service;
+    private AuthService service;
 
     @Captor
-    ArgumentCaptor<User> userCaptor;
+    private ArgumentCaptor<User> userCaptor;
 
     @Nested
     @DisplayName("Register")
     class Register {
 
+        private RegistrationRequest request;
+
+        @BeforeEach
+        void setUp() {
+            request = new RegistrationRequest(EMAIL, RAW_PASSWORD);
+        }
+
         @Test
         @DisplayName("Кодирует пароль, сохраняет пользователя и возвращает токен")
-        void encodesPasswordSavesUserAndReturnsToken() {
-            var request = new RegistrationRequest(EMAIL, RAW_PASSWORD);
+        void shouldEncodePasswordSaveUserAndReturnToken() {
+            // given
             when(userRepository.existsByEmail(EMAIL)).thenReturn(false);
             when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
             when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
             when(jwtService.generateToken(any(User.class))).thenReturn(TOKEN);
 
-            TokenResponse response = service.register(request);
+            // when
+            var response = service.register(request);
 
+            // then
             assertThat(response.accessToken()).isEqualTo(TOKEN);
             assertThat(response.tokenType()).isEqualTo(BEARER);
 
             verify(userRepository).save(userCaptor.capture());
-            User saved = userCaptor.getValue();
+            var saved = userCaptor.getValue();
             assertThat(saved.getEmail()).isEqualTo(EMAIL);
             assertThat(saved.getPassword()).isEqualTo(ENCODED_PASSWORD);
             assertThat(saved.isActive()).isTrue();
@@ -79,15 +89,17 @@ class AuthServiceTest {
 
         @Test
         @DisplayName("Бросает BadCredentialsException, когда email уже занят")
-        void throwsWhenEmailAlreadyInUse() {
-            var request = new RegistrationRequest(EMAIL, RAW_PASSWORD);
+        void shouldThrowWhenEmailAlreadyInUse() {
+            // given
             when(userRepository.existsByEmail(EMAIL)).thenReturn(true);
 
+            // when / then
             assertThatThrownBy(() -> service.register(request))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("Email already in use");
 
             verify(userRepository, never()).save(any());
+            verifyNoInteractions(passwordEncoder, jwtService);
         }
     }
 
@@ -95,53 +107,71 @@ class AuthServiceTest {
     @DisplayName("Login")
     class Login {
 
+        private User user;
+
+        @BeforeEach
+        void setUp() {
+            user = User.builder().email(EMAIL).password(ENCODED_PASSWORD).build();
+        }
+
         @Test
         @DisplayName("Возвращает токен при верных учётных данных")
-        void returnsTokenForValidCredentials() {
+        void shouldReturnTokenForValidCredentials() {
+            // given
             var request = new LoginRequest(EMAIL, RAW_PASSWORD);
-            User user = User.builder().email(EMAIL).password(ENCODED_PASSWORD).build();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
             when(jwtService.generateToken(user)).thenReturn(TOKEN);
 
-            TokenResponse response = service.login(request);
+            // when
+            var response = service.login(request);
 
+            // then
             assertThat(response.accessToken()).isEqualTo(TOKEN);
             assertThat(response.tokenType()).isEqualTo(BEARER);
         }
 
         @Test
         @DisplayName("Бросает BadCredentialsException, когда пользователь не найден")
-        void throwsWhenUserNotFound() {
+        void shouldThrowWhenUserNotFound() {
+            // given
             var request = new LoginRequest(EMAIL, RAW_PASSWORD);
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
+            // when / then
             assertThatThrownBy(() -> service.login(request))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("Invalid credentials");
+
+            verifyNoInteractions(passwordEncoder, jwtService);
         }
 
         @Test
         @DisplayName("Бросает BadCredentialsException при неверном пароле")
-        void throwsWhenPasswordIsWrong() {
+        void shouldThrowWhenPasswordIsWrong() {
+            // given
             var request = new LoginRequest(EMAIL, "wrongPassword");
-            User user = User.builder().email(EMAIL).password(ENCODED_PASSWORD).build();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("wrongPassword", ENCODED_PASSWORD)).thenReturn(false);
 
+            // when / then
             assertThatThrownBy(() -> service.login(request))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("Invalid credentials");
+
+            verify(jwtService, never()).generateToken(any());
         }
 
         @Test
         @DisplayName("Бросает BadCredentialsException, когда пользователь деактивирован")
-        void throwsWhenUserIsNotActive() {
+        void shouldThrowWhenUserIsDeactivated() {
+            // given (проверка active стоит ПОСЛЕ verifyPassword, поэтому matches → true)
             var request = new LoginRequest(EMAIL, RAW_PASSWORD);
-            User user = User.builder().email(EMAIL).password(ENCODED_PASSWORD).active(false).build();
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            var inactiveUser = User.builder().email(EMAIL).password(ENCODED_PASSWORD).active(false).build();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(inactiveUser));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
 
+            // when / then
             assertThatThrownBy(() -> service.login(request))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("User was deactivated");
@@ -159,46 +189,61 @@ class AuthServiceTest {
         private static final String NEW_RAW = "newRawPassword";
         private static final String NEW_ENCODED = "newEncoded";
 
+        private UUID userId;
+        private User user;
+
+        @BeforeEach
+        void setUp() {
+            userId = UUID.randomUUID();
+            user = User.builder().email(EMAIL).password(OLD_ENCODED).build();
+        }
+
         @Test
         @DisplayName("Меняет пароль сущности на закодированный новый")
-        void updatesEncodedPasswordOnEntity() {
-            UUID userId = UUID.randomUUID();
+        void shouldUpdateEncodedPasswordOnEntity() {
+            // given
             var request = new ChangePasswordRequest(OLD_RAW, NEW_RAW);
-            User user = User.builder().email(EMAIL).password(OLD_ENCODED).build();
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(OLD_RAW, OLD_ENCODED)).thenReturn(true);
             when(passwordEncoder.encode(NEW_RAW)).thenReturn(NEW_ENCODED);
 
+            // when
             service.changePassword(request, userId);
 
+            // then (dirty checking в @Transactional: save не вызывается, проверяем состояние сущности)
             assertThat(user.getPassword()).isEqualTo(NEW_ENCODED);
         }
 
         @Test
         @DisplayName("Бросает NotFoundException, когда пользователь не найден")
-        void throwsWhenUserNotFound() {
-            UUID userId = UUID.randomUUID();
+        void shouldThrowWhenUserNotFound() {
+            // given
             var request = new ChangePasswordRequest(OLD_RAW, NEW_RAW);
             when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
+            // when / then
             assertThatThrownBy(() -> service.changePassword(request, userId))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("User not found");
+
+            verifyNoInteractions(passwordEncoder);
         }
 
         @Test
         @DisplayName("Бросает BadCredentialsException при неверном старом пароле и не меняет пароль")
-        void throwsWhenOldPasswordIsWrong() {
-            UUID userId = UUID.randomUUID();
+        void shouldThrowWhenOldPasswordIsWrong() {
+            // given
             var request = new ChangePasswordRequest("wrongOld", NEW_RAW);
-            User user = User.builder().email(EMAIL).password(OLD_ENCODED).build();
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("wrongOld", OLD_ENCODED)).thenReturn(false);
 
+            // when / then
             assertThatThrownBy(() -> service.changePassword(request, userId))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("Invalid credentials");
 
+            // guard порядка операций: encode не вызывается до проверки, пароль не затёрт
+            verify(passwordEncoder, never()).encode(any());
             assertThat(user.getPassword()).isEqualTo(OLD_ENCODED);
         }
     }

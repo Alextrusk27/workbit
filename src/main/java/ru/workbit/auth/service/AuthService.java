@@ -1,13 +1,13 @@
-package ru.workbit.auth;
+package ru.workbit.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.dto.auth.ChangePasswordRequest;
-import ru.workbit.dto.auth.LoginRequest;
-import ru.workbit.dto.auth.RegistrationRequest;
-import ru.workbit.dto.auth.TokenResponse;
+import ru.workbit.auth.dto.ChangePasswordRequest;
+import ru.workbit.auth.dto.LoginRequest;
+import ru.workbit.auth.dto.RegistrationRequest;
+import ru.workbit.auth.dto.TokenResponse;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;

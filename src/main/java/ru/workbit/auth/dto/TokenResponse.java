@@ -1,4 +1,4 @@
-package ru.workbit.dto.auth;
+package ru.workbit.auth.dto;
 
 public record TokenResponse(
         String accessToken,

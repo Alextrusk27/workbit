@@ -1,4 +1,4 @@
-package ru.workbit.auth;
+package ru.workbit.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -7,10 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import ru.workbit.dto.auth.ChangePasswordRequest;
-import ru.workbit.dto.auth.LoginRequest;
-import ru.workbit.dto.auth.RegistrationRequest;
-import ru.workbit.dto.auth.TokenResponse;
+import ru.workbit.auth.service.AuthService;
+import ru.workbit.auth.dto.ChangePasswordRequest;
+import ru.workbit.auth.dto.LoginRequest;
+import ru.workbit.auth.dto.RegistrationRequest;
+import ru.workbit.auth.dto.TokenResponse;
 import ru.workbit.security.model.CustomUserDetails;
 
 @RestController
@@ -35,5 +36,35 @@ public class AuthController {
 
         authService.changePassword(request, userDetails.getId());
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<@NotNull Void> refresh() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<@NotNull Void> logout() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<@NotNull Void> forgotPassword() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<@NotNull Void> resetPassword() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<@NotNull Void> verifyEmail() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<@NotNull Void> resendVerification() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
     }
 }

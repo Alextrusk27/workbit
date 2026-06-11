@@ -7,6 +7,10 @@ spring:
     password: dev
     url: jdbc:postgresql://localhost:5432/workbit_dev_db
 
+jwt:
+  secret: test-secret-key-not-used-in-production-123
+  expiration: 3600000
+
 management:
   endpoints:
     web:

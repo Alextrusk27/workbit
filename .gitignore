@@ -34,3 +34,10 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Claude Code ###
+CLAUDE.md
+*.claudeignore
+.claude/
+.agents/
+skills-lock.json

@@ -3,6 +3,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
+.env
 
 ### IntelliJ IDEA ###
 .idea/
@@ -40,4 +41,3 @@ CLAUDE.md
 *.claudeignore
 .claude/
 .agents/
-skills-lock.json

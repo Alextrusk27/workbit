@@ -41,3 +41,4 @@ CLAUDE.md
 *.claudeignore
 .claude/
 .agents/
+ai-workspace/

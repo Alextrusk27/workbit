@@ -28,6 +28,7 @@ public class AuthService {
     private final ApplicationEventPublisher eventPublisher;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public TokenResponse login(LoginRequest request) {
         User user = authenticate(request);
         return issueTokens(user);
@@ -50,6 +51,9 @@ public class AuthService {
     @Transactional
     public TokenResponse verifyEmail(String token) {
         User user = verificationTokenService.consume(token, VerificationToken.Type.EMAIL_VERIFICATION);
+        if (!user.isActive()) {
+            throw new BadCredentialsException("Invalid token");
+        }
         user.setEmailVerified(true);
         return issueTokens(user);
     }
@@ -60,6 +64,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("User not found"));
         verifyPassword(request.oldPassword(), user.getPassword());
         user.setPassword(passwordEncoder.encode(request.newPassword()));
+        refreshTokenService.revokeAll(user);
     }
 
     @Transactional
@@ -135,13 +140,13 @@ public class AuthService {
     private User authenticate(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
-        verifyPassword(request.password(), user.getPassword());
         if (!user.isActive()) {
-            throw new BadCredentialsException("User was deactivated");
+            throw new BadCredentialsException("Invalid credentials");
         }
         if (!user.isEmailVerified()) {
             throw new BadCredentialsException("Email not verified");
         }
+        verifyPassword(request.password(), user.getPassword());
         return user;
     }
 

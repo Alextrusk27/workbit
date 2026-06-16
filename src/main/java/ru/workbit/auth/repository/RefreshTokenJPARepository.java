@@ -1,18 +1,20 @@
 package ru.workbit.auth.repository;
 
+import jakarta.persistence.LockModeType;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.auth.model.RefreshToken;
 import ru.workbit.user.model.User;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface RefreshTokenJPARepository extends JpaRepository<@NotNull RefreshToken, @NotNull UUID> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     @Modifying

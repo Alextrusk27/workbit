@@ -45,13 +45,13 @@ public class RefreshTokenService {
 
         User user = token.getUser();
 
-        if (token.isRevoked()) {
-            revokeAll(user);
-            log.warn("Revoked token reuse detected for user '{}'. All sessions have been revoked.", user.getId());
+        if (token.getExpiresAt().isBefore(Instant.now())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
-        if (token.getExpiresAt().isBefore(Instant.now())) {
+        if (token.isRevoked()) {
+            revokeAll(user);
+            log.warn("Revoked token reuse detected for user '{}'. All sessions have been revoked.", user.getId());
             throw new BadCredentialsException("Invalid refresh token");
         }
 

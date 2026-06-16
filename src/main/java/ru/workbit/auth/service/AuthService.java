@@ -15,6 +15,7 @@ import ru.workbit.security.service.JWTService;
 import ru.workbit.user.model.User;
 import ru.workbit.user.repository.UserJPARepository;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -92,6 +93,17 @@ public class AuthService {
                 .ifPresent(user -> {
                     String rawToken = verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION);
                     eventPublisher.publishEvent(new VerificationEmailEvent(user.getEmail(), rawToken));
+                });
+    }
+
+    @Transactional
+    public void deactivateUser(UUID userId) {
+        userRepository.findById(userId)
+                .filter(User::isActive)
+                .ifPresent(user -> {
+                    user.setActive(false);
+                    user.setDeactivated(Instant.now());
+                    refreshTokenService.revokeAll(user);
                 });
     }
 

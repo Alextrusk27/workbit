@@ -27,6 +27,7 @@
 | PATCH | `/change-password` | смена пароля | Bearer |
 | POST | `/forgot-password` | запрос ссылки сброса пароля | — |
 | POST | `/reset-password` | установка нового пароля по токену из письма | — |
+| DELETE | `/delete` | деактивация аккаунта | Bearer |
 
 ## Запросы (DTO)
 
@@ -56,6 +57,7 @@ record TokenResponse(String accessToken, String refreshToken)
 `TokenResponse` возвращают `/login`, `/refresh`, `/verify-email`.
 `/register`, `/resend-verification`, `/forgot-password`, `/reset-password`, `/logout`,
 `/change-password` возвращают пустое тело со статусом `200`.
+`/delete` возвращает пустое тело со статусом `204`.
 
 ## Поведение
 
@@ -67,6 +69,9 @@ record TokenResponse(String accessToken, String refreshToken)
   refresh-токены пользователя отзываются.
 - **`/forgot-password`** и **`/resend-verification`** всегда возвращают `200` независимо от того,
   существует ли пользователь с таким email (не раскрывают наличие учётной записи).
+- **`/delete`** — soft delete: `active=false` + фиксация времени деактивации + отзыв всех
+  refresh-токенов пользователя. Физически запись из БД не удаляется. Зарегистрироваться
+  заново с тем же email после деактивации возможно.
 
 ## Ошибки
 

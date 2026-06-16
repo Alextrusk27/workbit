@@ -133,4 +133,19 @@ public class AuthController {
         authService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/delete")
+    @Operation(summary = "Удаление аккаунта",
+            description = "Деактивирует текущего пользователя (soft delete) и отзывает все его refresh-токены. Требует access-токен.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Аккаунт деактивирован"),
+            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull Void> deleteAccount(@Parameter(hidden = true)
+                                                       @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        authService.deactivateUser(userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
 }

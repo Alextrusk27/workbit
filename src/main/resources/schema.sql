@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS auth.verification_token (
     created     TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT chk_type
-        CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION')),
+        CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id

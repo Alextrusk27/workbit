@@ -5,10 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.NotNull;
 
-public record ChangePasswordRequest(
-        @Schema(description = "Текущий пароль", example = "P@ssw0rd123")
+public record ResetPasswordRequest(
+        @Schema(description = "Токен сброса пароля из письма")
         @NotBlank
-        String oldPassword,
+        String token,
 
         @Schema(description = "Новый пароль, минимум 8 символов", example = "N3wP@ssw0rd")
         @NotBlank
@@ -17,6 +17,6 @@ public record ChangePasswordRequest(
 ) {
     @Override
     public @NotNull String toString() {
-        return "ChangePasswordRequest{oldPassword=*****, newPassword=*****}";
+        return "ResetPasswordRequest{token=*****, newPassword=*****}";
     }
 }

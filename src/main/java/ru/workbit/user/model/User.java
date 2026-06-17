@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "auth")
 @Getter
 @Setter
 @Builder
@@ -26,15 +26,13 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    private String lastName;
-
-    private String firstName;
-
-    private String middleName;
-
     @Column(name = "pwd_hash", nullable = false)
     @ToString.Exclude
     private String password;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
 
     @Column(nullable = false)
     @Builder.Default

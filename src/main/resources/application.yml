@@ -1,17 +1,43 @@
+app:
+  name: "workbit-app"
+  mail:
+    from-name: Workbit
+    from-mail: noreply@workbit.ru
+    base-url: https://workbit.ru
+    reset-ttl-minutes: 15
+
 spring:
   application:
-    name: "workbit-app"
+    name: ${app.name}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  mail:
+    host: mail.workbit.ru
+    port: 465
+    username: ${app.mail.from-mail}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  expiration: ${JWT_EXPIRATION}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 management:
   endpoints:
     web:
       exposure:
         include: health, info
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [req:%X{requestId:-} ip:%X{ip:-} uid:%X{uid:-}] %logger{39} : %m%n"

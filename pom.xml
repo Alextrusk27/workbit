@@ -26,6 +26,7 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <jsonwebtoken.version>0.13.0</jsonwebtoken.version>
         <springdoc.version>3.0.3</springdoc.version>
+        <ulid.creator.version>5.2.4</ulid.creator.version>
     </properties>
 
     <dependencies>
@@ -62,6 +63,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <dependency>
@@ -123,6 +129,12 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.f4b6a3</groupId>
+            <artifactId>ulid-creator</artifactId>
+            <version>${ulid.creator.version}</version>
         </dependency>
 
         <!-- Тесты: версии управляются Spring Boot BOM -->

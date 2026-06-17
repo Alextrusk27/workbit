@@ -1,4 +1,4 @@
-package ru.workbit.email;
+package ru.workbit.email.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -11,6 +11,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import ru.workbit.email.properties.MailProperties;
+import ru.workbit.email.ResetPasswordEmailEvent;
+import ru.workbit.email.VerificationEmailEvent;
 import ru.workbit.exception.EmailSendException;
 
 @Service
@@ -53,8 +56,9 @@ public class EmailService {
             helper.setText(html, true);
 
             mailSender.send(mimeMessage);
+            log.info("Verification email sent");
         } catch (MessagingException e) {
-            log.error("Failed to send verification email to {}", to, e);
+            log.error("Failed to send verification email", e);
             throw new EmailSendException("Failed to send verification email", e);
         }
     }
@@ -75,8 +79,9 @@ public class EmailService {
             helper.setText(html, true);
 
             mailSender.send(mimeMessage);
+            log.info("Reset password email sent");
         } catch (MessagingException e) {
-            log.error("Failed to send reset password email to {}", to, e);
+            log.error("Failed to send reset password email", e);
             throw new EmailSendException("Failed to send reset password email", e);
         }
     }

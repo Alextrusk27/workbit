@@ -1,4 +1,4 @@
-package ru.workbit.email;
+package ru.workbit.email.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

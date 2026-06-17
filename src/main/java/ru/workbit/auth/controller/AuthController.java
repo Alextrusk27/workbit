@@ -18,6 +18,7 @@ import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.util.annotation.Loggable;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -27,6 +28,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @Loggable
     @Operation(summary = "Регистрация", description = "Создаёт пользователя и отправляет письмо для подтверждения email.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Пользователь создан, письмо отправлено"),
@@ -39,6 +41,7 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
+    @Loggable
     @Operation(summary = "Подтверждение email", description = "Подтверждает email по токену из письма и сразу выдаёт токены.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Email подтверждён, токены выданы"),
@@ -50,6 +53,7 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
+    @Loggable
     @Operation(summary = "Повторная отправка письма подтверждения",
             description = "Если активный пользователь с неподтверждённым email существует, отправляет письмо повторно. Ответ всегда 200.")
     @ApiResponses({
@@ -62,6 +66,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Loggable
     @Operation(summary = "Вход по email и паролю", description = "Возвращает пару access/refresh токенов.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Токены выданы"),
@@ -73,6 +78,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @Loggable
     @Operation(summary = "Обновление токенов", description = "Обменивает валидный refresh-токен на новую пару токенов.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Выдана новая пара токенов"),
@@ -84,6 +90,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @Loggable
     @Operation(summary = "Выход", description = "Отзывает переданный refresh-токен.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Refresh-токен отозван"),
@@ -95,6 +102,7 @@ public class AuthController {
     }
 
     @PatchMapping("/change-password")
+    @Loggable
     @Operation(summary = "Смена пароля", description = "Меняет пароль текущего пользователя. Требует access-токен.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -111,6 +119,7 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
+    @Loggable
     @Operation(summary = "Запрос сброса пароля",
             description = "Если активный пользователь с таким email существует, отправляет письмо со ссылкой сброса. Ответ всегда 200 (не раскрывает наличие email).")
     @ApiResponses({
@@ -123,6 +132,7 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
+    @Loggable
     @Operation(summary = "Сброс пароля", description = "Устанавливает новый пароль по токену из письма и отзывает все refresh-токены пользователя.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Пароль сброшен"),
@@ -135,6 +145,7 @@ public class AuthController {
     }
 
     @DeleteMapping("/delete")
+    @Loggable
     @Operation(summary = "Удаление аккаунта",
             description = "Деактивирует текущего пользователя (soft delete) и отзывает все его refresh-токены. Требует access-токен.")
     @SecurityRequirement(name = "bearerAuth")

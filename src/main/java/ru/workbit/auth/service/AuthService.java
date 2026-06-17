@@ -1,6 +1,7 @@
 package ru.workbit.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService {
     private final UserJPARepository userRepository;
@@ -31,11 +33,14 @@ public class AuthService {
     @Transactional
     public TokenResponse login(LoginRequest request) {
         User user = authenticate(request);
-        return issueTokens(user);
+        TokenResponse tokens = issueTokens(user);
+        log.info("Login success uid={}", user.getId());
+        return tokens;
     }
 
     public void logout(LogoutRequest request) {
         refreshTokenService.revoke(request.refreshToken());
+        log.info("Logout success");
     }
 
     @Transactional
@@ -46,6 +51,7 @@ public class AuthService {
 
         String verifyToken = verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION);
         eventPublisher.publishEvent(new VerificationEmailEvent(user.getEmail(), verifyToken));
+        log.info("Registration initiated uid={}", user.getId());
     }
 
     @Transactional
@@ -55,7 +61,9 @@ public class AuthService {
             throw new BadCredentialsException("Invalid token");
         }
         user.setEmailVerified(true);
-        return issueTokens(user);
+        TokenResponse tokens = issueTokens(user);
+        log.info("Email verified uid={}", user.getId());
+        return tokens;
     }
 
     @Transactional
@@ -65,12 +73,15 @@ public class AuthService {
         verifyPassword(request.oldPassword(), user.getPassword());
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         refreshTokenService.revokeAll(user);
+        log.info("Password changed uid={}", user.getId());
     }
 
     @Transactional
     public TokenResponse refresh(RefreshRequest request) {
         User user = refreshTokenService.consume(request.refreshToken());
-        return issueTokens(user);
+        TokenResponse tokens = issueTokens(user);
+        log.info("Token refreshed uid={}", user.getId());
+        return tokens;
     }
 
     @Transactional
@@ -80,6 +91,7 @@ public class AuthService {
                 .ifPresent(user -> {
                     String rawToken = verificationTokenService.issue(user, VerificationToken.Type.PASSWORD_RESET);
                     eventPublisher.publishEvent(new ResetPasswordEmailEvent(user.getEmail(), rawToken));
+                    log.info("Password reset requested uid={}", user.getId());
                 });
     }
 
@@ -88,6 +100,7 @@ public class AuthService {
         User user = verificationTokenService.consume(token, VerificationToken.Type.PASSWORD_RESET);
         user.setPassword(passwordEncoder.encode(newPassword));
         refreshTokenService.revokeAll(user);
+        log.info("Password reset uid={}", user.getId());
     }
 
     @Transactional
@@ -98,6 +111,7 @@ public class AuthService {
                 .ifPresent(user -> {
                     String rawToken = verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION);
                     eventPublisher.publishEvent(new VerificationEmailEvent(user.getEmail(), rawToken));
+                    log.info("Verification resent uid={}", user.getId());
                 });
     }
 
@@ -109,6 +123,7 @@ public class AuthService {
                     user.setActive(false);
                     user.setDeactivated(Instant.now());
                     refreshTokenService.revokeAll(user);
+                    log.info("User deactivated uid={}", user.getId());
                 });
     }
 

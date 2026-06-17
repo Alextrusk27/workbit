@@ -11,9 +11,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-import ru.workbit.email.properties.MailProperties;
 import ru.workbit.email.ResetPasswordEmailEvent;
 import ru.workbit.email.VerificationEmailEvent;
+import ru.workbit.email.properties.MailProperties;
 import ru.workbit.exception.EmailSendException;
 
 @Service

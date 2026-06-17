@@ -54,7 +54,9 @@ class AuthFlowIT extends AbstractPostgresIT {
         return "user-" + UUID.randomUUID() + "@example.com";
     }
 
-    /** Регистрирует пользователя и возвращает его email. */
+    /**
+     * Регистрирует пользователя и возвращает его email.
+     */
     private String register(String email) {
         var response = rest.postForEntity(
                 BASE + "/register",
@@ -64,7 +66,9 @@ class AuthFlowIT extends AbstractPostgresIT {
         return email;
     }
 
-    /** Регистрирует и верифицирует email, возвращает пару токенов. */
+    /**
+     * Регистрирует и верифицирует email, возвращает пару токенов.
+     */
     private TokenResponse registerAndVerify(String email) {
         register(email);
         String verifyToken = tokenCaptor.getVerificationToken(email);
@@ -77,7 +81,9 @@ class AuthFlowIT extends AbstractPostgresIT {
         return response.getBody();
     }
 
-    /** Строит заголовки с Bearer access-токеном. */
+    /**
+     * Строит заголовки с Bearer access-токеном.
+     */
     private HttpHeaders bearerHeaders(String accessToken) {
         var headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);

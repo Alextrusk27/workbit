@@ -22,7 +22,9 @@ public class VerificationTokenService {
     private final VerificationTokenJPARepository verificationRepository;
     private final TokenHasher tokenHasher;
 
-    /** Выпускает токен заданного типа для пользователя, возвращает сырое значение для письма. */
+    /**
+     * Выпускает токен заданного типа для пользователя, возвращает сырое значение для письма.
+     */
     @Transactional
     public String issue(User user, VerificationToken.Type type) {
         verificationRepository.findAllByUserAndTypeAndUsedAtIsNull(user, type)

@@ -22,7 +22,9 @@ public class RefreshTokenService {
     private final RefreshTokenJPARepository refreshRepository;
     private final TokenHasher tokenHasher;
 
-    /** Выпускает новый refresh-токен для пользователя, возвращает сырое значение для клиента. */
+    /**
+     * Выпускает новый refresh-токен для пользователя, возвращает сырое значение для клиента.
+     */
     @Transactional
     public String issue(User user) {
         String rawToken = tokenHasher.generate();

@@ -15,6 +15,7 @@ import ru.workbit.user.model.User;
 import java.time.Instant;
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -219,7 +220,7 @@ class RefreshTokenJPARepositoryIT extends AbstractPostgresIT {
             // состоянии removed, который Hibernate воспринимает как transient.
             em.flush();
             em.clear();
-            var managed = em.find(User.class, user.getId());
+            var managed = requireNonNull(em.find(User.class, user.getId()));
             em.remove(managed);
             em.flush();
             em.clear();

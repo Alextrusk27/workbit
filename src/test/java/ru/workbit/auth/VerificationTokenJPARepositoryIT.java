@@ -120,7 +120,7 @@ class VerificationTokenJPARepositoryIT extends AbstractPostgresIT {
 
             // then — ровно один токен: hash-1
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getTokenHash()).isEqualTo("hash-1");
+            assertThat(result.getFirst().getTokenHash()).isEqualTo("hash-1");
         }
 
         @Test
@@ -137,7 +137,7 @@ class VerificationTokenJPARepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getTokenHash()).isEqualTo("hash-pr");
+            assertThat(result.getFirst().getTokenHash()).isEqualTo("hash-pr");
         }
 
         @Test
@@ -260,7 +260,7 @@ class VerificationTokenJPARepositoryIT extends AbstractPostgresIT {
 
             // when — удаляем пользователя напрямую через EntityManager (минуем JPA-каскад)
             em.getEntityManager().createNativeQuery(
-                    "DELETE FROM auth.users WHERE id = :id")
+                            "DELETE FROM auth.users WHERE id = :id")
                     .setParameter("id", userId)
                     .executeUpdate();
             em.flush();

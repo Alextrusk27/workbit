@@ -46,14 +46,21 @@ class AuthServiceTest {
     private static final String VERIFY_TOKEN = "raw-verify-token";
     private static final UUID USER_ID = UUID.randomUUID();
 
-    @Mock UserJPARepository userRepository;
-    @Mock RefreshTokenService refreshTokenService;
-    @Mock VerificationTokenService verificationTokenService;
-    @Mock JWTService jwtService;
-    @Mock ApplicationEventPublisher eventPublisher;
-    @Mock PasswordEncoder passwordEncoder;
+    @Mock
+    UserJPARepository userRepository;
+    @Mock
+    RefreshTokenService refreshTokenService;
+    @Mock
+    VerificationTokenService verificationTokenService;
+    @Mock
+    JWTService jwtService;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
+    @Mock
+    PasswordEncoder passwordEncoder;
 
-    @InjectMocks AuthService authService;
+    @InjectMocks
+    AuthService authService;
 
     private User activeVerifiedUser() {
         return User.builder()

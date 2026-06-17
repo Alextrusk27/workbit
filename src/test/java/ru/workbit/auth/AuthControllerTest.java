@@ -1,4 +1,4 @@
-package ru.workbit.auth.controller;
+package ru.workbit.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.workbit.auth.controller.AuthController;
 import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.BadCredentialsException;

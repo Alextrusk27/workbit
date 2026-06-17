@@ -27,6 +27,7 @@
         <jsonwebtoken.version>0.13.0</jsonwebtoken.version>
         <springdoc.version>3.0.3</springdoc.version>
         <ulid.creator.version>5.2.4</ulid.creator.version>
+        <greenmail.version>2.1.4</greenmail.version>
     </properties>
 
     <dependencies>
@@ -171,6 +172,13 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.icegreen</groupId>
+            <artifactId>greenmail-junit5</artifactId>
+            <version>${greenmail.version}</version>
             <scope>test</scope>
         </dependency>
 

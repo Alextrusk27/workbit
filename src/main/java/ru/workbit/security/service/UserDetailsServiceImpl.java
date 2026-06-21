@@ -8,8 +8,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import ru.workbit.security.model.CustomUserDetails;
-import ru.workbit.user.model.User;
-import ru.workbit.user.repository.UserJPARepository;
+import ru.workbit.auth.model.User;
+import ru.workbit.auth.repository.UserJPARepository;
 
 import java.util.List;
 

@@ -8,8 +8,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
-import ru.workbit.user.model.User;
-import ru.workbit.user.repository.UserJPARepository;
+import ru.workbit.auth.model.User;
+import ru.workbit.auth.repository.UserJPARepository;
 
 import java.time.Instant;
 import java.util.Optional;

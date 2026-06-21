@@ -20,8 +20,8 @@ import ru.workbit.email.VerificationEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
-import ru.workbit.user.model.User;
-import ru.workbit.user.repository.UserJPARepository;
+import ru.workbit.auth.model.User;
+import ru.workbit.auth.repository.UserJPARepository;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

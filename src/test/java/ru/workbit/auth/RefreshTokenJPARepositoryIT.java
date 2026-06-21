@@ -10,7 +10,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.RefreshToken;
 import ru.workbit.auth.repository.RefreshTokenJPARepository;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import java.time.Instant;
 import java.util.Optional;

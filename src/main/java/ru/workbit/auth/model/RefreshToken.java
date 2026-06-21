@@ -3,7 +3,6 @@ package ru.workbit.auth.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
-import ru.workbit.user.model.User;
 
 import java.time.Instant;
 import java.util.UUID;

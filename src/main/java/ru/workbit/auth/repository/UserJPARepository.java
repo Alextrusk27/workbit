@@ -1,8 +1,8 @@
-package ru.workbit.user.repository;
+package ru.workbit.auth.repository;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import java.util.Optional;
 import java.util.UUID;

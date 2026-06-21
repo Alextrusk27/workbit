@@ -20,6 +20,8 @@ import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
 
+import java.util.HashMap;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor

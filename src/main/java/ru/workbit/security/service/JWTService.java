@@ -6,7 +6,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;

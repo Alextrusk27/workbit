@@ -1,4 +1,4 @@
-package ru.workbit.user.model;
+package ru.workbit.auth.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

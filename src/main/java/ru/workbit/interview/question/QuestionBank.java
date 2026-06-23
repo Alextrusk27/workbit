@@ -1,30 +1,29 @@
 package ru.workbit.interview.question;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import ru.workbit.interview.model.Category;
+import ru.workbit.interview.model.Level;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Готовый банк вопросов, загружаемый из ресурса один раз при старте и сгруппированный по категории.
+ * Готовый банк вопросов, загружаемый из ресурса один раз при старте и сгруппированный по уровням.
  */
 @Component
 public class QuestionBank {
 
     private static final String RESOURCE = "interview/questions-java.json";
 
-    private final Map<Category, List<BankQuestion>> byCategory;
+    private final Map<Level, List<BankQuestion>> byLevel;
 
     public QuestionBank(ObjectMapper objectMapper) {
         List<BankQuestion> all = load(objectMapper);
-        this.byCategory = all.stream().collect(Collectors.groupingBy(BankQuestion::category));
+        this.byLevel = all.stream().collect(Collectors.groupingBy(BankQuestion::level));
     }
 
     private static List<BankQuestion> load(ObjectMapper objectMapper) {
@@ -35,8 +34,12 @@ public class QuestionBank {
         }
     }
 
-    /** Все вопросы заданной категории (пустой список, если категории нет в банке). */
-    public List<BankQuestion> forCategory(Category category) {
-        return byCategory.getOrDefault(category, List.of());
+    public List<BankQuestion> forLevel(Level level, int quantity) {
+        List<BankQuestion> questions = new ArrayList<>(byLevel.getOrDefault(level, List.of()));
+        Collections.shuffle(questions);
+
+        return questions.stream()
+                .limit(quantity)
+                .toList();
     }
 }

@@ -1,4 +1,8 @@
 package ru.workbit.interview.dto;
 
-public record SessionResponse() {
+import java.util.UUID;
+
+public record SessionResponse(
+        UUID id
+) {
 }

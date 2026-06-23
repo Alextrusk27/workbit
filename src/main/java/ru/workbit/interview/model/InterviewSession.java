@@ -3,9 +3,9 @@ package ru.workbit.interview.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
-import ru.workbit.auth.model.User;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -20,9 +20,8 @@ public class InterviewSession {
     @UuidGenerator
     private UUID id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id", nullable = false, updatable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -38,7 +37,8 @@ public class InterviewSession {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SessionStatus status;
+    @Builder.Default
+    private SessionStatus status = SessionStatus.CREATED;
 
     @Column(name = "total_questions", nullable = false)
     private int totalQuestions;
@@ -49,4 +49,7 @@ public class InterviewSession {
 
     @Column(name = "completed_at")
     private Instant completedAt;
+
+    @OneToMany(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<InterviewQuestion> questions;
 }

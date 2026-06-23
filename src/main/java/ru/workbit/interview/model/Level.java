@@ -1,5 +1,6 @@
 package ru.workbit.interview.model;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 
 @Getter
@@ -9,6 +10,7 @@ public enum Level {
     SENIOR("Senior"),
     LEAD("Lead");
 
+    @JsonValue
     private final String name;
 
     Level(String name) {

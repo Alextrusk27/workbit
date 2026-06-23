@@ -1,5 +1,6 @@
 package ru.workbit.interview.model;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 
 @Getter
@@ -8,6 +9,7 @@ public enum Profession {
     PYTHON_DEV("Python-разработчик"),
     QA("Инженер по тестированию");
 
+    @JsonValue
     private final String name;
 
     Profession(String name) {

@@ -1,0 +1,17 @@
+package ru.workbit.interview.model.mapper;
+
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import ru.workbit.interview.model.InterviewQuestion;
+import ru.workbit.interview.model.InterviewSession;
+import ru.workbit.interview.question.BankQuestion;
+
+@Mapper(componentModel = "spring")
+public interface QuestionMapper {
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "session", source = "session")
+    @Mapping(target = "questionText", source = "question.text")
+    InterviewQuestion toEntity(BankQuestion question, InterviewSession session);
+
+}

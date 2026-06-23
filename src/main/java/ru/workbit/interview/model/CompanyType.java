@@ -1,5 +1,6 @@
 package ru.workbit.interview.model;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 
 @Getter
@@ -11,6 +12,7 @@ public enum CompanyType {
     OUTSOURCE("Аутсорс"),
     GOV("Государственная компания");
 
+    @JsonValue
     private final String name;
 
     CompanyType(String name) {

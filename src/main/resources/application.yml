@@ -38,6 +38,13 @@ management:
       exposure:
         include: health, info
 
+llm:
+  yandex-ai:
+    folder: ${YANDEX_FOLDER_ID}
+    api-key: ${YANDEX_API_KEY}
+    agents:
+      answer-evaluator: ${ANSWER_EVALUATOR}
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [req:%X{requestId:-} ip:%X{ip:-} uid:%X{uid:-}] %logger{39} : %m%n"

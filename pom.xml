@@ -28,6 +28,7 @@
         <springdoc.version>3.0.3</springdoc.version>
         <ulid.creator.version>5.2.4</ulid.creator.version>
         <greenmail.version>2.1.4</greenmail.version>
+        <openai.version>4.41.0</openai.version>
     </properties>
 
     <dependencies>
@@ -136,6 +137,12 @@
             <groupId>com.github.f4b6a3</groupId>
             <artifactId>ulid-creator</artifactId>
             <version>${ulid.creator.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java</artifactId>
+            <version>${openai.version}</version>
         </dependency>
 
         <!-- Тесты: версии управляются Spring Boot BOM -->

@@ -19,9 +19,9 @@ public class AnswerFeedback {
     @UuidGenerator
     private UUID id;
 
-    @OneToOne(optional = false)
-    @JoinColumn(name = "answer_id", nullable = false, updatable = false, unique = true)
-    private InterviewAnswer answer;
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "question_id", nullable = false, updatable = false)
+    private InterviewQuestion question;
 
     @Column(nullable = false)
     private int score;

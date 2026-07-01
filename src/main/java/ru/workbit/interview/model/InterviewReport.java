@@ -1,6 +1,7 @@
 package ru.workbit.interview.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
@@ -8,40 +9,33 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "question", schema = "interview")
-@Getter
+@Table(name = "report", schema = "interview")
 @Setter
+@Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InterviewQuestion {
+public class InterviewReport {
     @Id
     @UuidGenerator
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "session_id", nullable = false, updatable = false)
     private InterviewSession session;
 
-    @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
-    private AnswerFeedback feedback;
+    @Column(nullable = false, updatable = false)
+    private Double avgScore;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
-    private Category category;
+    private OfferProbability offerProbability;
 
     @Column(nullable = false, updatable = false)
-    private String questionText;
+    @Size(min = 10)
+    private String overallFeedback;
 
     @Column(nullable = false, updatable = false)
-    private int orderIndex;
-
     @Builder.Default
-    private boolean answered = false;
-
-    @Column
-    private String answerText;
-
-    @Column
-    private Instant answeredAt;
+    private Instant generatedAt = Instant.now();
 }

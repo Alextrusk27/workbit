@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS interview.session (
     level           VARCHAR(32) NOT NULL,
     status          VARCHAR(32) NOT NULL,
     total_questions INT NOT NULL,
-    created         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created         TIMESTAMPTZ NOT NULL,
     completed_at    TIMESTAMPTZ,
 
     CONSTRAINT chk_session_profession
@@ -57,7 +57,9 @@ CREATE TABLE IF NOT EXISTS interview.session (
     CONSTRAINT chk_session_level
         CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR', 'LEAD')),
     CONSTRAINT chk_session_status
-        CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED'))
+        CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
+    CONSTRAINT chk_session_completed_at
+        CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
 );
 
 CREATE TABLE IF NOT EXISTS interview.question (
@@ -66,6 +68,9 @@ CREATE TABLE IF NOT EXISTS interview.question (
     category      VARCHAR(32) NOT NULL,
     question_text TEXT NOT NULL,
     order_index   INT NOT NULL,
+    answered      BOOL DEFAULT FALSE,
+    answer_text   TEXT,
+    answered_at   TIMESTAMPTZ,
 
     CONSTRAINT chk_question_category
         CHECK (category IN (
@@ -76,24 +81,19 @@ CREATE TABLE IF NOT EXISTS interview.question (
             'REST_API', 'MICROSERVICES', 'DISTRIBUTED_SYSTEMS', 'CACHING', 'OBSERVABILITY',
             'NOSQL', 'SECURITY', 'CI_CD', 'COMPLIANCE', 'SOFT_SKILLS'
         )),
-
     CONSTRAINT chk_question_order_index
-        CHECK (order_index BETWEEN 1 AND 20)
+        CHECK (order_index BETWEEN 1 AND 20),
+    CONSTRAINT chk_answer_has_text_and_timestamp
+        CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL))
 );
 
-CREATE TABLE IF NOT EXISTS interview.answer (
-    id           UUID PRIMARY KEY,
-    question_id  UUID NOT NULL UNIQUE REFERENCES interview.question(id) ON DELETE CASCADE,
-    answer_text  TEXT NOT NULL,
-    submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
 
 CREATE TABLE IF NOT EXISTS interview.answer_feedback (
     id            UUID PRIMARY KEY,
-    answer_id     UUID NOT NULL UNIQUE REFERENCES interview.answer(id) ON DELETE CASCADE,
+    question_id   UUID NOT NULL UNIQUE REFERENCES interview.question(id) ON DELETE CASCADE,
     score         INT NOT NULL,
     feedback_text TEXT NOT NULL,
-    generated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    generated_at  TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT chk_feedback_score
         CHECK (score BETWEEN 1 AND 5)
@@ -102,15 +102,15 @@ CREATE TABLE IF NOT EXISTS interview.answer_feedback (
 CREATE TABLE IF NOT EXISTS interview.report (
     id                UUID PRIMARY KEY,
     session_id        UUID NOT NULL UNIQUE REFERENCES interview.session(id) ON DELETE CASCADE,
-    total_score       NUMERIC(3,1) NOT NULL,
-    offer_probability INT NOT NULL,
+    avg_score         DOUBLE PRECISION NOT NULL,
+    offer_probability VARCHAR(32) NOT NULL,
     overall_feedback  TEXT NOT NULL,
-    generated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    generated_at      TIMESTAMPTZ NOT NULL,
 
-    CONSTRAINT chk_report_total_score
-        CHECK (total_score BETWEEN 1.0 AND 5.0),
-    CONSTRAINT chk_report_offer_probability
-        CHECK (offer_probability BETWEEN 0 AND 100)
+    CONSTRAINT chk_report_avg_score
+        CHECK (avg_score BETWEEN 1.0 AND 5.0),
+    CONSTRAINT chk_offer_probability
+        CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id

@@ -1,5 +1,6 @@
 package ru.workbit.exception.controller;
 
+import ru.workbit.exception.*;
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolation;
@@ -14,9 +15,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import ru.workbit.exception.BadCredentialsException;
-import ru.workbit.exception.InternalServerException;
-import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.dto.ApiError;
 
 import java.util.Collections;
@@ -87,6 +85,30 @@ public class ExceptionController {
         log.warn("NotFound exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiError.of(HttpStatus.NOT_FOUND, "The required object was not found.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<@NotNull ApiError> handleForbidden(final ForbiddenException e) {
+        log.warn("Forbidden exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiError.of(HttpStatus.FORBIDDEN, "Forbidden.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<@NotNull ApiError> handleConflict(final ConflictException e) {
+        log.warn("Conflict exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(LlmException.class)
+    public ResponseEntity<@NotNull ApiError> handleLlm(final LlmException e) {
+        log.warn("LLM exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiError.of(HttpStatus.SERVICE_UNAVAILABLE, "AI service unavailable.",
                         Collections.singletonList(e.getMessage())));
     }
 

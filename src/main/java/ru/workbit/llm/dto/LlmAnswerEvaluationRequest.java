@@ -1,6 +1,6 @@
 package ru.workbit.llm.dto;
 
-public record AnswerEvaluationRequest(
+public record LlmAnswerEvaluationRequest(
         String profession,
         String question,
         String level,

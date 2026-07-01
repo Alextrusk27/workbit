@@ -36,4 +36,5 @@ management:
 
 logging:
   level:
-    root: INFO
+    root: DEBUG
+    com.zaxxer.hikari: INFO

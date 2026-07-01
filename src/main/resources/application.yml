@@ -50,6 +50,7 @@ llm:
     api-key: ${YANDEX_API_KEY}
     agents:
       answer-evaluator: ${ANSWER_EVALUATOR}
+      interview-reviewer: ${INTERVIEW_REVIEWER}
 
 logging:
   pattern:

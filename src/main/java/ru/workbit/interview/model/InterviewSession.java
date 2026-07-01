@@ -51,5 +51,8 @@ public class InterviewSession {
     private Instant completedAt;
 
     @OneToMany(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<InterviewQuestion> questions;
+    private List<InterviewQuestion> questions;
+
+    @OneToOne(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL)
+    private InterviewReport interviewReport;
 }

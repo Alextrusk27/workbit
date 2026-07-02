@@ -11,16 +11,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import ru.workbit.auth.dto.*;
+import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
 
-import java.util.HashMap;
+import static ru.workbit.auth.service.AuthCookieService.REFRESH_COOKIE_NAME;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -28,6 +30,7 @@ import java.util.HashMap;
 @Tag(name = "Auth", description = "Регистрация, вход, управление паролем и токенами")
 public class AuthController {
     private final AuthService authService;
+    private final AuthCookieService cookieService;
 
     @PostMapping("/register")
     @Loggable
@@ -44,14 +47,15 @@ public class AuthController {
 
     @PostMapping("/verify-email")
     @Loggable
-    @Operation(summary = "Подтверждение email", description = "Подтверждает email по токену из письма и сразу выдаёт токены.")
+    @Operation(summary = "Подтверждение email", description = "Подтверждает email по токену из письма и сразу выдаёт токены в HttpOnly-cookie access_token и refresh_token.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Email подтверждён, токены выданы"),
+            @ApiResponse(responseCode = "200", description = "Email подтверждён, токены выданы в cookie access_token и refresh_token"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Токен недействителен, истёк или уже использован", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull TokenResponse> verifyEmail(@RequestBody @Valid VerifyEmailRequest request) {
-        return ResponseEntity.ok(authService.verifyEmail(request.token()));
+    public ResponseEntity<@NotNull Void> verifyEmail(@RequestBody @Valid VerifyEmailRequest request) {
+        var tokens = authService.verifyEmail(request.token());
+        return withAuthCookies(ResponseEntity.ok(), tokens).build();
     }
 
     @PostMapping("/resend-verification")
@@ -69,43 +73,52 @@ public class AuthController {
 
     @PostMapping("/login")
     @Loggable
-    @Operation(summary = "Вход по email и паролю", description = "Возвращает пару access/refresh токенов.")
+    @Operation(summary = "Вход по email и паролю", description = "Выдаёт пару access/refresh токенов в HttpOnly-cookie access_token и refresh_token.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Токены выданы"),
+            @ApiResponse(responseCode = "200", description = "Токены выданы в cookie access_token и refresh_token"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Неверные учётные данные, email не подтверждён или пользователь деактивирован", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull TokenResponse> login(@RequestBody @Valid LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<@NotNull Void> login(@RequestBody @Valid LoginRequest request) {
+        var tokens = authService.login(request);
+        return withAuthCookies(ResponseEntity.ok(), tokens).build();
     }
 
     @PostMapping("/refresh")
     @Loggable
-    @Operation(summary = "Обновление токенов", description = "Обменивает валидный refresh-токен на новую пару токенов.")
+    @Operation(summary = "Обновление токенов", description = "Обменивает валидный refresh-токен из cookie refresh_token на новую пару токенов, выдаваемых в HttpOnly-cookie access_token и refresh_token.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Выдана новая пара токенов"),
+            @ApiResponse(responseCode = "200", description = "Выдана новая пара токенов в cookie access_token и refresh_token"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Refresh-токен недействителен или отозван", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull TokenResponse> refresh(@RequestBody @Valid RefreshRequest request) {
-        return ResponseEntity.ok(authService.refresh(request));
+    public ResponseEntity<@NotNull Void> refresh(
+            @Parameter(description = "Refresh-токен из HttpOnly-cookie refresh_token", required = false)
+            @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refreshToken
+    ) {
+        var tokens = authService.refresh(refreshToken);
+        return withAuthCookies(ResponseEntity.ok(), tokens).build();
     }
 
     @PostMapping("/logout")
     @Loggable
-    @Operation(summary = "Выход", description = "Отзывает переданный refresh-токен.")
+    @Operation(summary = "Выход", description = "Отзывает refresh-токен из cookie refresh_token и гасит обе cookie (access_token и refresh_token).")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Refresh-токен отозван"),
+            @ApiResponse(responseCode = "204", description = "Refresh-токен отозван, cookie access_token и refresh_token сброшены"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> logout(@RequestBody @Valid LogoutRequest request) {
-        authService.logout(request);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<@NotNull Void> logout(
+            @Parameter(description = "Refresh-токен из HttpOnly-cookie refresh_token")
+            @CookieValue(name = REFRESH_COOKIE_NAME) String refreshToken
+    ) {
+        authService.logout(refreshToken);
+
+        return withClearCookies(ResponseEntity.noContent()).build();
     }
 
     @PatchMapping("/change-password")
     @Loggable
-    @Operation(summary = "Смена пароля", description = "Меняет пароль текущего пользователя. Требует access-токен.")
+    @Operation(summary = "Смена пароля", description = "Меняет пароль текущего пользователя. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Пароль изменён"),
@@ -149,16 +162,29 @@ public class AuthController {
     @DeleteMapping("/delete")
     @Loggable
     @Operation(summary = "Удаление аккаунта",
-            description = "Деактивирует текущего пользователя (soft delete) и отзывает все его refresh-токены. Требует access-токен.")
+            description = "Деактивирует текущего пользователя (soft delete), отзывает все его refresh-токены и гасит cookie access_token и refresh_token. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Аккаунт деактивирован"),
             @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> deleteAccount(@Parameter(hidden = true)
-                                                       @AuthenticationPrincipal CustomUserDetails userDetails) {
-
+    public ResponseEntity<@NotNull Void> deleteAccount(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
         authService.deactivateUser(userDetails.getId());
-        return ResponseEntity.noContent().build();
+
+        return withClearCookies(ResponseEntity.noContent()).build();
+    }
+
+    private ResponseEntity.BodyBuilder withAuthCookies(ResponseEntity.BodyBuilder builder, TokenResponse tokens) {
+        return builder
+                .header(HttpHeaders.SET_COOKIE, cookieService.buildAccessCookie(tokens.accessToken()))
+                .header(HttpHeaders.SET_COOKIE, cookieService.buildRefreshCookie(tokens.refreshToken()));
+    }
+
+    private ResponseEntity.HeadersBuilder<?> withClearCookies(ResponseEntity.HeadersBuilder<?> builder) {
+        return builder
+                .header(HttpHeaders.SET_COOKIE, cookieService.clearAccessCookie())
+                .header(HttpHeaders.SET_COOKIE, cookieService.clearRefreshCookie());
     }
 }

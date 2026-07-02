@@ -2,6 +2,7 @@ package ru.workbit.security.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
 
@@ -34,15 +36,9 @@ public class JWTAuthFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
+        String token = extractToken(request);
 
-        if (header == null || !header.startsWith("Bearer ")) {
-            return;
-        }
-
-        String token = header.substring(7);
-
-        if (!jwtService.isTokenValid(token)) {
+        if (token == null || !jwtService.isTokenValid(token)) {
             return;
         }
 
@@ -59,5 +55,22 @@ public class JWTAuthFilter extends OncePerRequestFilter {
             }
         } catch (UsernameNotFoundException ignored) {
         }
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (AuthCookieService.ACCESS_COOKIE_NAME.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+
+        return null;
     }
 }

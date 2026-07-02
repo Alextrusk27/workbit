@@ -1,3 +1,8 @@
+app:
+  security:
+    cors:
+      allowed-origins: http://localhost:5173
+
 spring:
   sql:
     init:
@@ -36,5 +41,5 @@ management:
 
 logging:
   level:
-    root: DEBUG
+    root: INFO
     com.zaxxer.hikari: INFO

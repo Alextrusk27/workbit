@@ -38,8 +38,8 @@ public class AuthService {
         return tokens;
     }
 
-    public void logout(LogoutRequest request) {
-        refreshTokenService.revoke(request.refreshToken());
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
         log.info("Logout success");
     }
 
@@ -77,8 +77,9 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenResponse refresh(RefreshRequest request) {
-        User user = refreshTokenService.consume(request.refreshToken());
+    public TokenResponse refresh(String refreshToken) {
+        checkRefreshTokenNotNull(refreshToken);
+        User user = refreshTokenService.consume(refreshToken);
         TokenResponse tokens = issueTokens(user);
         log.info("Token refreshed uid={}", user.getId());
         return tokens;
@@ -168,6 +169,12 @@ public class AuthService {
     private void verifyPassword(String raw, String encoded) {
         if (!passwordEncoder.matches(raw, encoded)) {
             throw new BadCredentialsException("Invalid credentials");
+        }
+    }
+
+    private void checkRefreshTokenNotNull(String refreshToken) {
+        if (refreshToken == null) {
+            throw new BadCredentialsException("Refresh token missing");
         }
     }
 }

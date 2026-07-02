@@ -43,6 +43,13 @@ public class AuthService {
         log.info("Logout success");
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse getProfile(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        return new UserResponse(user.getEmail(), user.getCreated());
+    }
+
     @Transactional
     public void register(RegistrationRequest request) {
         User user = userRepository.findByEmail(request.email())

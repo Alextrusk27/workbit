@@ -102,16 +102,17 @@ public class AuthController {
 
     @PostMapping("/logout")
     @Loggable
-    @Operation(summary = "Выход", description = "Отзывает refresh-токен из cookie refresh_token и гасит обе cookie (access_token и refresh_token).")
+    @Operation(summary = "Выход", description = "Отзывает refresh-токен из cookie refresh_token и гасит обе cookie (access_token и refresh_token). Идемпотентен: без cookie тоже возвращает 204 и гасит cookie.")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Refresh-токен отозван, cookie access_token и refresh_token сброшены"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "204", description = "Refresh-токен отозван (если был), cookie access_token и refresh_token сброшены")
     })
     public ResponseEntity<@NotNull Void> logout(
             @Parameter(description = "Refresh-токен из HttpOnly-cookie refresh_token")
-            @CookieValue(name = REFRESH_COOKIE_NAME) String refreshToken
+            @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refreshToken
     ) {
-        authService.logout(refreshToken);
+        if (refreshToken != null) {
+            authService.logout(refreshToken);
+        }
 
         return withClearCookies(ResponseEntity.noContent()).build();
     }
@@ -174,6 +175,21 @@ public class AuthController {
         authService.deactivateUser(userDetails.getId());
 
         return withClearCookies(ResponseEntity.noContent()).build();
+    }
+
+    @GetMapping("/me")
+    @Loggable
+    @Operation(summary = "Текущий пользователь",
+            description = "Возвращает профиль аутентифицированного пользователя. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Профиль пользователя"),
+            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull UserResponse> me(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(authService.getProfile(userDetails.getId()));
     }
 
     private ResponseEntity.BodyBuilder withAuthCookies(ResponseEntity.BodyBuilder builder, TokenResponse tokens) {

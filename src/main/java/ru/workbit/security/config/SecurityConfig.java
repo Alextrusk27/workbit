@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/auth/change-password").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/delete").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()

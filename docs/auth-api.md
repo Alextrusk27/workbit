@@ -29,6 +29,7 @@
 | POST | `/verify-email` | подтверждение email по токену из письма | — |
 | POST | `/resend-verification` | повторная отправка письма подтверждения | — |
 | POST | `/login` | вход | — |
+| GET | `/me` | профиль текущего пользователя | cookie `access_token` |
 | POST | `/refresh` | обмен refresh-cookie на новую пару токенов | cookie `refresh_token` |
 | POST | `/logout` | отзыв refresh-токена и очистка cookie | cookie `refresh_token` |
 | PATCH | `/change-password` | смена пароля | cookie `access_token` |
@@ -56,7 +57,13 @@ record ResetPasswordRequest(String token, @Size(min = 8) String newPassword)
 
 ## Ответы
 
-Тело ответа всегда пустое; токены передаются в заголовках `Set-Cookie`.
+`/me` возвращает `200` с телом:
+
+```java
+record UserResponse(String email, Instant created)
+```
+
+У остальных эндпоинтов тело ответа пустое; токены передаются в заголовках `Set-Cookie`.
 
 - `/login`, `/verify-email`, `/refresh` — статус `200`, ставят cookie `access_token` и `refresh_token`.
 - `/register`, `/resend-verification`, `/forgot-password`, `/reset-password`, `/change-password` —

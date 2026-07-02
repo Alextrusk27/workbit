@@ -1,4 +1,4 @@
-package ru.workbit.email.service;
+package ru.workbit.email;
 
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
@@ -14,9 +14,8 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
-import ru.workbit.email.ResetPasswordEmailEvent;
-import ru.workbit.email.VerificationEmailEvent;
 import ru.workbit.email.properties.MailProperties;
+import ru.workbit.email.service.EmailService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,4 +1,4 @@
-package ru.workbit.email.service;
+package ru.workbit.email;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
@@ -15,9 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-import ru.workbit.email.ResetPasswordEmailEvent;
-import ru.workbit.email.VerificationEmailEvent;
 import ru.workbit.email.properties.MailProperties;
+import ru.workbit.email.service.EmailService;
 import ru.workbit.exception.EmailSendException;
 
 import static org.assertj.core.api.Assertions.*;

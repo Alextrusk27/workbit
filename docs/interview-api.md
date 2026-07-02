@@ -44,8 +44,8 @@ Enum'ы сериализуются не по имени константы, а �
   `Государственная компания`.
 - **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED` (без кастомного лейбла,
   сериализуется по имени константы).
-- **OfferProbability** — в модели лейблы `Низкая`/`Средняя`/`Высокая`; см. оговорку
-  в разделе «Отчёт».
+- **OfferProbability** — лейблы `Низкая`/`Средняя`/`Высокая` (поле `offerProbability`
+  в отчёте).
 
 ## Запросы (DTO)
 
@@ -91,7 +91,7 @@ record QuestionResponse(
 record SessionReport(
     UUID reportId, UUID sessionId, Profession profession, CompanyType companyType,
     Level level, Integer totalQuestions, Double avgScore, String overallFeedback,
-    String offerProbability, Instant generatedAt)
+    OfferProbability offerProbability, Instant generatedAt)
 ```
 
 - **`GET /options`** — `200`, `InterviewOptionsResponse`.

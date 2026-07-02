@@ -3,6 +3,7 @@ package ru.workbit.interview.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.Level;
+import ru.workbit.interview.model.OfferProbability;
 import ru.workbit.interview.model.Profession;
 
 import java.time.Instant;
@@ -34,7 +35,7 @@ public record SessionReport(
         String overallFeedback,
 
         @Schema(description = "Оценка вероятности получения оффера", example = "Средняя")
-        String offerProbability,
+        OfferProbability offerProbability,
 
         @Schema(description = "Момент формирования отчёта")
         Instant generatedAt

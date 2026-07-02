@@ -190,10 +190,46 @@ class AuthServiceTest {
         @DisplayName("Отзывает refresh-токен")
         void revokesRefreshToken() {
             // when
-            authService.logout(new LogoutRequest(REFRESH_TOKEN));
+            authService.logout(REFRESH_TOKEN);
 
             // then
             verify(refreshTokenService).revoke(REFRESH_TOKEN);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // getProfile
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetProfile")
+    class GetProfile {
+
+        @Test
+        @DisplayName("Возвращает email и дату регистрации для существующего пользователя")
+        void returnsEmailAndCreatedForExistingUser() {
+            // given
+            var user = activeVerifiedUser();
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+            // when
+            var result = authService.getProfile(USER_ID);
+
+            // then
+            assertThat(result.email()).isEqualTo(EMAIL);
+            assertThat(result.created()).isEqualTo(user.getCreated());
+        }
+
+        @Test
+        @DisplayName("Бросает NotFoundException, когда пользователь не найден")
+        void throwsWhenUserNotFound() {
+            // given
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> authService.getProfile(USER_ID))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("User not found");
         }
     }
 
@@ -393,7 +429,7 @@ class AuthServiceTest {
             when(refreshTokenService.issue(user)).thenReturn("new-refresh-token");
 
             // when
-            var result = authService.refresh(new RefreshRequest(REFRESH_TOKEN));
+            var result = authService.refresh(REFRESH_TOKEN);
 
             // then
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
@@ -408,12 +444,23 @@ class AuthServiceTest {
                     .thenThrow(new BadCredentialsException("Invalid refresh token"));
 
             // when / then
-            assertThatThrownBy(() -> authService.refresh(new RefreshRequest(REFRESH_TOKEN)))
+            assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                     .isInstanceOf(BadCredentialsException.class)
                     .hasMessage("Invalid refresh token");
 
             verifyNoInteractions(jwtService);
             verify(refreshTokenService, never()).issue(any());
+        }
+
+        @Test
+        @DisplayName("Бросает BadCredentialsException, когда refresh-токен null")
+        void throwsWhenRefreshTokenNull() {
+            // when / then
+            assertThatThrownBy(() -> authService.refresh(null))
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("Refresh token missing");
+
+            verifyNoInteractions(refreshTokenService, jwtService);
         }
     }
 

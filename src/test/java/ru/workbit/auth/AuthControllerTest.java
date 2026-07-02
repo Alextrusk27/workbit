@@ -1,18 +1,21 @@
 package ru.workbit.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.workbit.auth.controller.AuthController;
 import ru.workbit.auth.dto.*;
+import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.controller.ExceptionController;
@@ -20,19 +23,22 @@ import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, ExceptionController.class})
+@Import({SecurityConfig.class, ExceptionController.class, AuthCookieService.class})
 @DisplayName("AuthControllerTest")
 class AuthControllerTest {
 
@@ -156,19 +162,31 @@ class AuthControllerTest {
     class VerifyEmail {
 
         @Test
-        @DisplayName("Возвращает 200 и токены при успешном подтверждении")
+        @DisplayName("Возвращает 200 и токены в cookie при успешном подтверждении")
         void returnsTokensOnSuccess() throws Exception {
             // given
             var request = new VerifyEmailRequest(TOKEN);
             when(authService.verifyEmail(TOKEN)).thenReturn(tokenResponse());
 
-            // when / then
-            mvc.perform(post(BASE + "/verify-email")
+            // when
+            var result = mvc.perform(post(BASE + "/verify-email")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
-                    .andExpect(jsonPath("$.refreshToken").value(REFRESH_TOKEN));
+                    .andExpect(jsonPath("$").doesNotExist())
+                    .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
+                    .andExpect(cookie().httpOnly(AuthCookieService.ACCESS_COOKIE_NAME, true))
+                    .andExpect(cookie().secure(AuthCookieService.ACCESS_COOKIE_NAME, true))
+                    .andExpect(cookie().path(AuthCookieService.ACCESS_COOKIE_NAME, "/"))
+                    .andExpect(cookie().value(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN))
+                    .andExpect(cookie().httpOnly(AuthCookieService.REFRESH_COOKIE_NAME, true))
+                    .andExpect(cookie().secure(AuthCookieService.REFRESH_COOKIE_NAME, true))
+                    .andExpect(cookie().path(AuthCookieService.REFRESH_COOKIE_NAME, BASE))
+                    .andReturn();
+
+            // then
+            var setCookieHeaders = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+            assertThat(setCookieHeaders).allMatch(h -> h.contains("SameSite=Lax"));
         }
 
         @Test
@@ -250,7 +268,7 @@ class AuthControllerTest {
     class Login {
 
         @Test
-        @DisplayName("Возвращает 200 и токены при успешном входе")
+        @DisplayName("Возвращает 200 и токены в cookie при успешном входе")
         void returnsTokensOnSuccess() throws Exception {
             // given
             var request = new LoginRequest(EMAIL, PASSWORD);
@@ -261,8 +279,11 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
-                    .andExpect(jsonPath("$.refreshToken").value(REFRESH_TOKEN));
+                    .andExpect(jsonPath("$").doesNotExist())
+                    .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
+                    .andExpect(cookie().path(AuthCookieService.ACCESS_COOKIE_NAME, "/"))
+                    .andExpect(cookie().value(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN))
+                    .andExpect(cookie().path(AuthCookieService.REFRESH_COOKIE_NAME, BASE));
         }
 
         @Test
@@ -320,47 +341,45 @@ class AuthControllerTest {
     class Refresh {
 
         @Test
-        @DisplayName("Возвращает 200 и новые токены при валидном refresh-токене")
+        @DisplayName("Возвращает 200 и новые токены в cookie при валидном refresh-токене из cookie")
         void returnsNewTokensOnSuccess() throws Exception {
             // given
-            var request = new RefreshRequest(REFRESH_TOKEN);
-            when(authService.refresh(any())).thenReturn(tokenResponse());
+            when(authService.refresh(REFRESH_TOKEN)).thenReturn(tokenResponse());
 
             // when / then
             mvc.perform(post(BASE + "/refresh")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
+                            .cookie(new Cookie(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN));
+                    .andExpect(jsonPath("$").doesNotExist())
+                    .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
+                    .andExpect(cookie().value(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN));
+
+            verify(authService).refresh(REFRESH_TOKEN);
         }
 
         @Test
         @DisplayName("Возвращает 401, когда refresh-токен отозван или невалиден")
         void returns401WhenTokenRevoked() throws Exception {
             // given
-            var request = new RefreshRequest(REFRESH_TOKEN);
-            when(authService.refresh(any())).thenThrow(new BadCredentialsException("Token revoked"));
+            when(authService.refresh(REFRESH_TOKEN)).thenThrow(new BadCredentialsException("Token revoked"));
 
             // when / then
             mvc.perform(post(BASE + "/refresh")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
+                            .cookie(new Cookie(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN)))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда refreshToken пустой")
-        void returns400WhenTokenBlank() throws Exception {
+        @DisplayName("Вызывает сервис с null, когда cookie refresh_token отсутствует")
+        void callsServiceWithNullWhenCookieMissing() throws Exception {
             // given
-            var request = new RefreshRequest("  ");
+            when(authService.refresh(null)).thenThrow(new BadCredentialsException("Token revoked"));
 
-            // when / then
-            mvc.perform(post(BASE + "/refresh")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
+            // when / then — cookie не обязательна (required=false), сервис сам решает, что делать с null
+            mvc.perform(post(BASE + "/refresh"))
+                    .andExpect(status().isUnauthorized());
 
-            verifyNoInteractions(authService);
+            verify(authService).refresh(null);
         }
     }
 
@@ -373,32 +392,30 @@ class AuthControllerTest {
     class Logout {
 
         @Test
-        @DisplayName("Возвращает 200 при успешном выходе")
-        void returnsOkOnSuccess() throws Exception {
+        @DisplayName("Возвращает 204 и гасит обе cookie при успешном выходе")
+        void returnsNoContentOnSuccess() throws Exception {
             // given
-            var request = new LogoutRequest(REFRESH_TOKEN);
-            doNothing().when(authService).logout(any());
+            doNothing().when(authService).logout(REFRESH_TOKEN);
 
             // when / then
             mvc.perform(post(BASE + "/logout")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
+                            .cookie(new Cookie(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN)))
+                    .andExpect(status().isNoContent())
+                    .andExpect(cookie().maxAge(AuthCookieService.ACCESS_COOKIE_NAME, 0))
+                    .andExpect(cookie().maxAge(AuthCookieService.REFRESH_COOKIE_NAME, 0));
 
-            verify(authService).logout(any());
+            verify(authService).logout(REFRESH_TOKEN);
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда refreshToken пустой")
-        void returns400WhenTokenBlank() throws Exception {
-            // given
-            var request = new LogoutRequest("");
-
-            // when / then
-            mvc.perform(post(BASE + "/logout")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
+        @DisplayName("Возвращает 204 и гасит обе cookie, когда cookie refresh_token отсутствует (идемпотентный logout)")
+        void clearsCookiesAndReturns204WhenCookieMissing() throws Exception {
+            // when / then — @CookieValue необязательная; без cookie сервис не вызывается,
+            // но обе cookie всё равно гасятся и ответ 204
+            mvc.perform(post(BASE + "/logout"))
+                    .andExpect(status().isNoContent())
+                    .andExpect(cookie().maxAge(AuthCookieService.ACCESS_COOKIE_NAME, 0))
+                    .andExpect(cookie().maxAge(AuthCookieService.REFRESH_COOKIE_NAME, 0));
 
             verifyNoInteractions(authService);
         }
@@ -614,6 +631,41 @@ class AuthControllerTest {
         void returns401WithoutAuthentication() throws Exception {
             // эндпоинт защищён (.authenticated()), без токена -> 401
             mvc.perform(delete(BASE + "/delete"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(authService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /me  (требует аутентификации)
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Me")
+    class Me {
+
+        @Test
+        @DisplayName("Возвращает 200 и профиль, когда передан валидный принципал")
+        void returnsProfileWithPrincipal() throws Exception {
+            // given
+            var profile = new UserResponse(EMAIL, Instant.parse("2026-01-01T00:00:00Z"));
+            when(authService.getProfile(USER_ID)).thenReturn(profile);
+
+            // when / then
+            mvc.perform(get(BASE + "/me")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.email").value(EMAIL));
+
+            verify(authService).getProfile(USER_ID);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.authenticated()), без токена -> 401
+            mvc.perform(get(BASE + "/me"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(authService);

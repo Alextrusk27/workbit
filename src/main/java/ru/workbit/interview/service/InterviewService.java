@@ -43,6 +43,16 @@ public class InterviewService {
     private final QuestionRepository questionRepository;
     private final FeedbackRepository feedbackRepository;
 
+    public InterviewOptionsResponse getOptions() {
+        return new InterviewOptionsResponse(
+                List.of(Profession.values()),
+                List.of(Level.values()),
+                List.of(CompanyType.values()),
+                CreateSessionRequest.MIN_QUESTIONS,
+                CreateSessionRequest.MAX_QUESTIONS
+        );
+    }
+
     @Transactional
     public SessionResponse createSession(CreateSessionRequest request, UUID userId) {
 

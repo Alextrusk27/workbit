@@ -32,6 +32,17 @@ import java.util.UUID;
 public class InterviewController {
     private final InterviewService interviewService;
 
+    @GetMapping("/options")
+    @Loggable(logResult = true)
+    @Operation(summary = "Справочник значений для создания сессии", description = "Возвращает допустимые профессии, уровни и типы компании, чтобы фронт не хардкодил лейблы enum'ов.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Справочник значений")
+    })
+    public ResponseEntity<@NotNull InterviewOptionsResponse> getOptions() {
+        return ResponseEntity.ok(interviewService.getOptions());
+    }
+
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
     @Operation(summary = "Создать сессию собеседования", description = "Создаёт новую сессию с набором вопросов по выбранной профессии, уровню и типу компании.")

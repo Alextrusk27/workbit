@@ -23,7 +23,9 @@ public record CreateSessionRequest(
 
         @Schema(description = "Количество вопросов в сессии", example = "10")
         @NotNull
-        @Min(10) @Max(20)
+        @Min(MIN_QUESTIONS) @Max(MAX_QUESTIONS)
         Integer totalQuestions
 ) {
+    public static final int MIN_QUESTIONS = 10;
+    public static final int MAX_QUESTIONS = 20;
 }

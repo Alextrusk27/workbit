@@ -17,6 +17,9 @@ import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
+import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
+import { ReportPage } from '@/pages/interview/ReportPage'
 
 export const router = createBrowserRouter([
   {
@@ -57,7 +60,18 @@ export const router = createBrowserRouter([
         children: [
           {
             element: <AppLayout />,
-            children: [{ index: true, element: <DashboardPage /> }],
+            children: [
+              { index: true, element: <DashboardPage /> },
+              { path: 'interview/new', element: <NewInterviewPage /> },
+              {
+                path: 'interview/:sessionId',
+                element: <InterviewSessionPage />,
+              },
+              {
+                path: 'interview/:sessionId/report',
+                element: <ReportPage />,
+              },
+            ],
           },
         ],
       },

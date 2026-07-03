@@ -4,6 +4,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { MarginNote } from '@/components/ui/MarginNote'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Textarea } from '@/components/ui/Textarea'
 import type { SessionResponse } from '@/features/interview/api'
 import {
@@ -22,8 +23,14 @@ export function InterviewSessionPage() {
 
   if (isLoading) {
     return (
-      <Container className="py-16">
-        <p className="text-muted text-sm">Загрузка…</p>
+      <Container className="py-10 sm:py-14">
+        <div role="status" className="mx-auto max-w-2xl">
+          <span className="sr-only">Загрузка интервью…</span>
+          <Skeleton className="h-3 w-48" />
+          <Skeleton className="mt-3 h-1 w-full" />
+          <Skeleton className="mt-8 h-8 w-3/4" />
+          <Skeleton className="mt-6 h-32 w-full" />
+        </div>
       </Container>
     )
   }
@@ -152,7 +159,13 @@ function QuestionStep({
   } | null>(null)
 
   if (isLoading) {
-    return <p className="text-muted mt-10 text-sm">Загрузка вопроса…</p>
+    return (
+      <div role="status" className="mt-8">
+        <span className="sr-only">Загрузка вопроса…</span>
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="mt-6 h-32 w-full" />
+      </div>
+    )
   }
 
   if (isError || !question) {

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { cn } from '@/lib/cn'
 import type { SessionResponse } from '@/features/interview/api'
@@ -39,7 +40,7 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-10">
-        {isLoading && <p className="text-muted text-sm">Загрузка…</p>}
+        {isLoading && <SessionListSkeleton />}
 
         {isError && <Alert>{getErrorMessage(error)}</Alert>}
 
@@ -47,13 +48,28 @@ export function DashboardPage() {
 
         {sessions && sessions.length > 0 && (
           <ul className="space-y-4">
-            {sessions.map((s) => (
-              <SessionCard key={s.id} session={s} />
+            {sessions.map((s, i) => (
+              <SessionCard key={s.id} session={s} index={i} />
             ))}
           </ul>
         )}
       </div>
     </Container>
+  )
+}
+
+function SessionListSkeleton() {
+  return (
+    <div role="status" className="space-y-4">
+      <span className="sr-only">Загрузка списка интервью…</span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="border-rule rounded-lg border p-5">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="mt-3 h-4 w-28" />
+          <Skeleton className="mt-4 h-4 w-56" />
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -75,7 +91,13 @@ function EmptyState() {
   )
 }
 
-function SessionCard({ session }: { session: SessionResponse }) {
+function SessionCard({
+  session,
+  index,
+}: {
+  session: SessionResponse
+  index: number
+}) {
   const del = useDeleteSession()
   const completed = session.status === 'COMPLETED'
 
@@ -85,7 +107,10 @@ function SessionCard({ session }: { session: SessionResponse }) {
   }
 
   return (
-    <li className="border-rule hover:border-ink/20 rounded-lg border p-5 transition-colors">
+    <li
+      className="border-rule hover:border-ink/20 animate-rise rounded-lg border p-5 transition-colors"
+      style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-ink font-display text-lg">

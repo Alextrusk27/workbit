@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
 import { MarginNote } from '@/components/ui/MarginNote'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { useReport, useTranscript } from '@/features/interview/useInterview'
 import { getErrorMessage } from '@/lib/api'
@@ -15,8 +16,18 @@ export function ReportPage() {
 
   if (isLoading) {
     return (
-      <Container className="py-16">
-        <p className="text-muted text-sm">Загрузка отчёта…</p>
+      <Container className="py-12 sm:py-16">
+        <div role="status" className="mx-auto max-w-2xl">
+          <span className="sr-only">Загрузка отчёта…</span>
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-4 h-9 w-64" />
+          <Skeleton className="mt-3 h-4 w-48" />
+          <div className="mt-8 grid grid-cols-2 gap-4">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+          <Skeleton className="mt-8 h-24" />
+        </div>
       </Container>
     )
   }
@@ -69,7 +80,16 @@ export function ReportPage() {
         <div className="mt-12">
           <h2 className="text-ink font-display text-xl">Ответы с пометками</h2>
           {transcript.isLoading ? (
-            <p className="text-muted mt-4 text-sm">Загрузка ответов…</p>
+            <div role="status" className="mt-6 space-y-8">
+              <span className="sr-only">Загрузка ответов…</span>
+              {[0, 1].map((i) => (
+                <div key={i}>
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="mt-2 h-5 w-3/4" />
+                  <Skeleton className="mt-3 h-4 w-full" />
+                </div>
+              ))}
+            </div>
           ) : (
             <ol className="mt-6 space-y-8">
               {transcript.questions.map((q) => (

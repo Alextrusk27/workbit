@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
 
 const links = [
   { label: 'AI-интервью', to: '/#how' },
-  { label: 'FAQ', to: '/#faq' },
+  { label: 'FAQ', to: '/faq' },
   { label: 'Тарифы', to: '/pricing' },
 ]
 

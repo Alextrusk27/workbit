@@ -170,7 +170,7 @@ export function HomePage() {
                     )}
                   </div>
                   <p className="mt-4">
-                    <span className="text-ink font-display text-3xl">
+                    <span className="text-ink font-display text-3xl tabular-nums">
                       {p.price}
                     </span>
                     <span className="text-muted ml-2 text-sm">{p.note}</span>

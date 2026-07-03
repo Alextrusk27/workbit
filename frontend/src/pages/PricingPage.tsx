@@ -55,7 +55,7 @@ export function PricingPage() {
                 )}
               </div>
               <p className="mt-5">
-                <span className="text-ink font-display text-4xl">
+                <span className="text-ink font-display text-4xl tabular-nums">
                   {p.price}
                 </span>
                 <span className="text-muted ml-2 text-sm">{p.note}</span>

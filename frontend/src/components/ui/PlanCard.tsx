@@ -28,7 +28,7 @@ export function PlanCard({
         }
       }}
       className={cn(
-        'flex h-full cursor-pointer flex-col rounded-lg border transition-colors',
+        'flex h-full cursor-pointer touch-manipulation flex-col rounded-lg border transition-colors',
         'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
         selected
           ? 'border-accent bg-paper-2/50 ring-accent ring-1'

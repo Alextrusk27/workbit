@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -71,7 +71,9 @@ function SessionRunner({ session }: { session: SessionResponse }) {
   if (finish.isPending) {
     return (
       <Container className="py-16 text-center">
-        <p className="text-ink font-display text-xl">Формируем разбор…</p>
+        <p role="status" className="text-ink font-display text-xl">
+          Формируем разбор…
+        </p>
         <p className="text-muted mx-auto mt-2 max-w-md text-sm">
           Рецензент читает ваши ответы и готовит итоговую оценку. Это может
           занять несколько секунд.
@@ -87,14 +89,14 @@ function SessionRunner({ session }: { session: SessionResponse }) {
           <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
             {session.profession} · {session.level}
           </p>
-          <p className="text-muted font-mono text-xs">
+          <p aria-live="polite" className="text-muted font-mono text-xs">
             {Math.min(index, total)} / {total}
           </p>
         </div>
         <div className="bg-rule mt-3 h-1 w-full overflow-hidden rounded-full">
           <div
-            className="bg-accent h-full transition-[width] duration-500"
-            style={{ width: `${(Math.min(index - 1, total) / total) * 100}%` }}
+            className="bg-accent h-full origin-left transition-transform duration-500"
+            style={{ transform: `scaleX(${Math.min(index - 1, total) / total})` }}
           />
         </div>
 
@@ -158,6 +160,16 @@ function QuestionStep({
     feedback: string | null
   } | null>(null)
 
+  useEffect(() => {
+    if (reviewed || !answer.trim()) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [answer, reviewed])
+
   if (isLoading) {
     return (
       <div role="status" className="mt-8">
@@ -202,10 +214,10 @@ function QuestionStep({
       </h1>
 
       {reviewed ? (
-        <div className="mt-6 space-y-6">
+        <div aria-live="polite" className="mt-6 space-y-6">
           <div className="border-rule bg-paper-2/60 rounded-md border p-4">
             <p className="text-muted mb-1 text-xs">Ваш ответ</p>
-            <p className="text-ink whitespace-pre-wrap">{answer}</p>
+            <p className="text-ink break-words whitespace-pre-wrap">{answer}</p>
           </div>
           {reviewed.feedback ? (
             <MarginNote score={reviewed.score ?? undefined}>

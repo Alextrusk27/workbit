@@ -31,7 +31,7 @@ export function Footer() {
           </div>
 
           {columns.map((col) => (
-            <nav key={col.title}>
+            <nav key={col.title} aria-label={col.title}>
               <h2 className="text-muted mb-3 font-mono text-xs tracking-[0.2em] uppercase">
                 {col.title}
               </h2>

@@ -16,6 +16,12 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <a
+        href="#main"
+        className="focus:bg-paper focus:text-ink sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:not-sr-only focus:rounded-md focus:px-4 focus:py-2 focus:shadow-lg"
+      >
+        Перейти к содержимому
+      </a>
       <header className="border-rule bg-paper/85 sticky top-0 z-40 border-b backdrop-blur">
         <Container>
           <div className="flex h-16 items-center justify-between gap-4">
@@ -36,7 +42,7 @@ export function AppLayout() {
           </div>
         </Container>
       </header>
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
     </div>
@@ -76,11 +82,11 @@ function UserMenu({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded={open}
-        className="text-ink/75 hover:text-ink flex max-w-[60vw] items-center gap-1.5 text-sm transition-colors sm:max-w-none"
+        className="text-ink/75 hover:text-ink flex max-w-[60vw] touch-manipulation items-center gap-1.5 text-sm transition-colors sm:max-w-none"
       >
-        <span className="truncate">{email}</span>
+        <span className="min-w-0 truncate">{email}</span>
         <svg
           viewBox="0 0 12 12"
           className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -94,13 +100,9 @@ function UserMenu({
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className="border-rule bg-paper absolute right-0 z-50 mt-2 w-48 rounded-md border py-1 shadow-lg"
-        >
+        <div className="border-rule bg-paper absolute right-0 z-50 mt-2 w-48 rounded-md border py-1 shadow-lg">
           <Link
             to="/app"
-            role="menuitem"
             onClick={() => setOpen(false)}
             className="text-ink hover:bg-paper-2 block px-3 py-2 text-sm transition-colors"
           >
@@ -108,7 +110,6 @@ function UserMenu({
           </Link>
           <Link
             to="/app/settings"
-            role="menuitem"
             onClick={() => setOpen(false)}
             className="text-ink hover:bg-paper-2 block px-3 py-2 text-sm transition-colors"
           >
@@ -116,7 +117,6 @@ function UserMenu({
           </Link>
           <button
             type="button"
-            role="menuitem"
             onClick={() => {
               setOpen(false)
               onLogout()

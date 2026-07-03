@@ -50,8 +50,8 @@ export function ReportPage() {
           {report.profession}
         </h1>
         <p className="text-muted mt-2 text-sm">
-          {report.level} · {report.companyType} · {report.totalQuestions}{' '}
-          вопросов
+          {report.level} · {report.companyType} · {report.totalQuestions}
+          {' '}вопросов
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-4">
@@ -97,10 +97,10 @@ export function ReportPage() {
                   <p className="text-muted font-mono text-xs">
                     Вопрос {q.orderIndex}
                   </p>
-                  <h3 className="text-ink font-display mt-1 text-lg leading-snug">
+                  <h3 className="text-ink font-display mt-1 text-lg leading-snug break-words">
                     {q.questionText}
                   </h3>
-                  <p className="text-ink mt-3 whitespace-pre-wrap">
+                  <p className="text-ink mt-3 break-words whitespace-pre-wrap">
                     {q.answerText || (
                       <span className="text-muted italic">Без ответа</span>
                     )}

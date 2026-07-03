@@ -31,8 +31,14 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <ScrollManager />
+      <a
+        href="#main"
+        className="focus:bg-paper focus:text-ink sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:not-sr-only focus:rounded-md focus:px-4 focus:py-2 focus:shadow-lg"
+      >
+        Перейти к содержимому
+      </a>
       <Header />
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
       <Footer />

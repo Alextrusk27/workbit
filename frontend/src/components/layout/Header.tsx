@@ -46,7 +46,10 @@ export function Header() {
             <Logo />
           </Link>
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <nav
+            aria-label="Основная навигация"
+            className="hidden items-center gap-8 md:flex"
+          >
             {links.map((l) =>
               l.to.includes('#') ? (
                 <Link key={l.to} to={l.to} className={desktopLinkClass(false)}>
@@ -75,7 +78,7 @@ export function Header() {
 
           <button
             type="button"
-            className="text-ink -mr-2 inline-flex h-10 w-10 items-center justify-center rounded-md md:hidden"
+            className="text-ink -mr-2 inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-md md:hidden"
             aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
             aria-expanded={open}
             aria-controls="mobile-nav"
@@ -108,6 +111,7 @@ export function Header() {
       {open && (
         <nav
           id="mobile-nav"
+          aria-label="Мобильная навигация"
           className="border-rule bg-paper border-t md:hidden"
         >
           <Container>

@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import type { FormEvent, KeyboardEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
@@ -23,11 +23,26 @@ function ChipGroup({
   value: string | null
   onChange: (v: string) => void
 }) {
+  const activeIndex = Math.max(0, value ? options.indexOf(value) : 0)
+
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown'
+    const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+    if (!forward && !back) return
+    e.preventDefault()
+    const next = forward
+      ? (i + 1) % options.length
+      : (i - 1 + options.length) % options.length
+    onChange(options[next])
+    const group = e.currentTarget.parentElement
+    ;(group?.children[next] as HTMLElement | undefined)?.focus()
+  }
+
   return (
     <fieldset>
       <legend className="text-ink text-sm font-medium">{label}</legend>
       <div className="mt-3 flex flex-wrap gap-2" role="radiogroup">
-        {options.map((opt) => {
+        {options.map((opt, i) => {
           const selected = opt === value
           return (
             <button
@@ -35,9 +50,11 @@ function ChipGroup({
               type="button"
               role="radio"
               aria-checked={selected}
+              tabIndex={i === activeIndex ? 0 : -1}
               onClick={() => onChange(opt)}
+              onKeyDown={(e) => onKeyDown(e, i)}
               className={cn(
-                'rounded-md border px-4 py-2 text-sm transition-colors',
+                'rounded-md border px-4 py-2 text-sm transition-colors touch-manipulation',
                 'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
                 selected
                   ? 'border-accent bg-accent text-paper'

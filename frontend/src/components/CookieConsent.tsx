@@ -21,9 +21,9 @@ export function CookieConsent() {
 
   return (
     <div
-      role="dialog"
+      role="region"
       aria-label="Согласие на использование cookie"
-      className="border-rule bg-paper/95 fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur"
+      className="border-rule bg-paper/95 fixed inset-x-0 bottom-0 z-50 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <Container className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-ink/85 text-sm">

@@ -277,6 +277,10 @@ public class InterviewService {
                 .filter(q -> q.getFeedback() == null)
                 .forEach(q -> {
                     LlmAnswerReview review = answersMap.get(q.getId());
+                    if (review == null || review.score() == null) {
+                        log.warn("LLM returned no score for question {}, skipping feedback", q.getId());
+                        return;
+                    }
                     q.setFeedback(AnswerFeedback.builder()
                             .question(q)
                             .score(review.score())

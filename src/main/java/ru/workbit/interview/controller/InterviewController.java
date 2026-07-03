@@ -212,7 +212,7 @@ public class InterviewController {
             @ApiResponse(responseCode = "204", description = "Сессия удалена"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> getSessionReport(
+    public ResponseEntity<@NotNull Void> deleteSession(
             @PathVariable UUID sessionId,
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {

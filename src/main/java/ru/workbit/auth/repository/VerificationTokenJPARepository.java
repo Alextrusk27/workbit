@@ -3,7 +3,7 @@ package ru.workbit.auth.repository;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import ru.workbit.auth.model.VerificationToken;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import java.util.List;
 import java.util.Optional;

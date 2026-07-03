@@ -12,10 +12,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.dto.*;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +41,8 @@ class AuthFlowIT extends AbstractPostgresIT {
     private static final String BASE = "/api/v1/auth";
     private static final String PASSWORD = "P@ssw0rd123";
     private static final String NEW_PASSWORD = "N3wP@ssw0rd!";
+    private static final String ACCESS_COOKIE = "access_token";
+    private static final String REFRESH_COOKIE = "refresh_token";
 
     @Autowired
     TestRestTemplate rest;
@@ -50,8 +54,59 @@ class AuthFlowIT extends AbstractPostgresIT {
     // Вспомогательные методы
     // -------------------------------------------------------------------------
 
+    /**
+     * Значения auth-cookie, извлечённые из Set-Cookie заголовков ответа.
+     * Поля nullable — не каждый ответ выставляет обе cookie.
+     */
+    private record AuthCookies(String access, String refresh) {
+    }
+
     private String uniqueEmail() {
         return "user-" + UUID.randomUUID() + "@example.com";
+    }
+
+    /**
+     * Извлекает значение cookie с заданным именем из заголовков Set-Cookie ответа.
+     */
+    private String extractCookieValue(ResponseEntity<?> response, String cookieName) {
+        List<String> setCookieHeaders = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+        if (setCookieHeaders == null) {
+            return null;
+        }
+        return setCookieHeaders.stream()
+                .filter(header -> header.startsWith(cookieName + "="))
+                .map(header -> header.substring(cookieName.length() + 1, header.indexOf(';')))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Достаёт из ответа Max-Age заданной cookie (для проверки очистки cookie при logout/delete).
+     */
+    private String extractCookieMaxAge(ResponseEntity<?> response, String cookieName) {
+        List<String> setCookieHeaders = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+        if (setCookieHeaders == null) {
+            return null;
+        }
+        return setCookieHeaders.stream()
+                .filter(header -> header.startsWith(cookieName + "="))
+                .findFirst()
+                .map(header -> {
+                    int idx = header.toLowerCase().indexOf("max-age=");
+                    if (idx < 0) {
+                        return null;
+                    }
+                    int start = idx + "max-age=".length();
+                    int end = header.indexOf(';', start);
+                    return end < 0 ? header.substring(start) : header.substring(start, end);
+                })
+                .orElse(null);
+    }
+
+    private AuthCookies extractAuthCookies(ResponseEntity<?> response) {
+        return new AuthCookies(
+                extractCookieValue(response, ACCESS_COOKIE),
+                extractCookieValue(response, REFRESH_COOKIE));
     }
 
     /**
@@ -67,26 +122,35 @@ class AuthFlowIT extends AbstractPostgresIT {
     }
 
     /**
-     * Регистрирует и верифицирует email, возвращает пару токенов.
+     * Регистрирует и верифицирует email, возвращает cookie access/refresh из ответа verify-email.
      */
-    private TokenResponse registerAndVerify(String email) {
+    private AuthCookies registerAndVerify(String email) {
         register(email);
         String verifyToken = tokenCaptor.getVerificationToken(email);
         assertThat(verifyToken).isNotNull();
         var response = rest.postForEntity(
                 BASE + "/verify-email",
                 new VerifyEmailRequest(verifyToken),
-                TokenResponse.class);
+                Void.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return response.getBody();
+        return extractAuthCookies(response);
     }
 
     /**
-     * Строит заголовки с Bearer access-токеном.
+     * Строит заголовки с access-токеном в cookie.
      */
-    private HttpHeaders bearerHeaders(String accessToken) {
+    private HttpHeaders accessCookieHeaders(String accessToken) {
         var headers = new HttpHeaders();
-        headers.setBearerAuth(accessToken);
+        headers.add(HttpHeaders.COOKIE, ACCESS_COOKIE + "=" + accessToken);
+        return headers;
+    }
+
+    /**
+     * Строит заголовки с refresh-токеном в cookie.
+     */
+    private HttpHeaders refreshCookieHeaders(String refreshToken) {
+        var headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, REFRESH_COOKIE + "=" + refreshToken);
         return headers;
     }
 
@@ -137,11 +201,11 @@ class AuthFlowIT extends AbstractPostgresIT {
         void reactivatesDeactivatedUser() {
             // given — зарегистрировать, верифицировать, залогиниться, удалить
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
             rest.exchange(
                     BASE + "/delete",
                     HttpMethod.DELETE,
-                    new HttpEntity<>(bearerHeaders(tokens.accessToken())),
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // when — повторная регистрация с тем же email
@@ -165,8 +229,8 @@ class AuthFlowIT extends AbstractPostgresIT {
     class VerifyEmail {
 
         @Test
-        @DisplayName("Подтверждает email и выдаёт пару токенов")
-        void verifiesEmailAndReturnsTokens() {
+        @DisplayName("Подтверждает email и выдаёт cookie access_token и refresh_token")
+        void verifiesEmailAndSetsCookies() {
             // given
             var email = uniqueEmail();
             register(email);
@@ -176,13 +240,14 @@ class AuthFlowIT extends AbstractPostgresIT {
             var response = rest.postForEntity(
                     BASE + "/verify-email",
                     new VerifyEmailRequest(token),
-                    TokenResponse.class);
+                    Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().accessToken()).isNotBlank();
-            assertThat(response.getBody().refreshToken()).isNotBlank();
+            assertThat(response.getBody()).isNull();
+            var cookies = extractAuthCookies(response);
+            assertThat(cookies.access()).isNotBlank();
+            assertThat(cookies.refresh()).isNotBlank();
         }
 
         @Test
@@ -205,7 +270,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             var email = uniqueEmail();
             register(email);
             var token = tokenCaptor.getVerificationToken(email);
-            rest.postForEntity(BASE + "/verify-email", new VerifyEmailRequest(token), TokenResponse.class);
+            rest.postForEntity(BASE + "/verify-email", new VerifyEmailRequest(token), Void.class);
 
             // when — пытаемся использовать тот же токен снова
             var response = rest.postForEntity(
@@ -267,8 +332,8 @@ class AuthFlowIT extends AbstractPostgresIT {
     class Login {
 
         @Test
-        @DisplayName("Выдаёт токены при корректных учётных данных")
-        void returnsTokensOnSuccess() {
+        @DisplayName("Выдаёт cookie access_token и refresh_token при корректных учётных данных")
+        void setsCookiesOnSuccess() {
             // given
             var email = uniqueEmail();
             registerAndVerify(email);
@@ -277,13 +342,14 @@ class AuthFlowIT extends AbstractPostgresIT {
             var response = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, PASSWORD),
-                    TokenResponse.class);
+                    Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().accessToken()).isNotBlank();
-            assertThat(response.getBody().refreshToken()).isNotBlank();
+            assertThat(response.getBody()).isNull();
+            var cookies = extractAuthCookies(response);
+            assertThat(cookies.access()).isNotBlank();
+            assertThat(cookies.refresh()).isNotBlank();
         }
 
         @Test
@@ -325,11 +391,11 @@ class AuthFlowIT extends AbstractPostgresIT {
         void returns401ForDeactivatedUser() {
             // given — зарегистрирован, верифицирован, затем деактивирован
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
             rest.exchange(
                     BASE + "/delete",
                     HttpMethod.DELETE,
-                    new HttpEntity<>(bearerHeaders(tokens.accessToken())),
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // when — пытаемся войти
@@ -352,37 +418,43 @@ class AuthFlowIT extends AbstractPostgresIT {
     class Refresh {
 
         @Test
-        @DisplayName("Выдаёт новую пару токенов по валидному refresh-токену")
-        void returnsNewTokensOnSuccess() {
+        @DisplayName("Выдаёт новую пару cookie по валидному refresh-токену из cookie")
+        void setsNewCookiesOnSuccess() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when
-            var response = rest.postForEntity(
+            var response = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
-                    TokenResponse.class);
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
+                    Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().accessToken()).isNotBlank();
-            assertThat(response.getBody().refreshToken()).isNotBlank();
+            var newCookies = extractAuthCookies(response);
+            assertThat(newCookies.access()).isNotBlank();
+            assertThat(newCookies.refresh()).isNotBlank();
         }
 
         @Test
         @DisplayName("Возвращает 401 при использовании отозванного refresh-токена")
         void returns401ForRevokedToken() {
-            // given — получаем токены, используем refresh (ротация: старый отзывается)
+            // given — получаем cookie, используем refresh (ротация: старый отзывается)
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
-            rest.postForEntity(BASE + "/refresh", new RefreshRequest(tokens.refreshToken()), TokenResponse.class);
+            var cookies = registerAndVerify(email);
+            rest.exchange(
+                    BASE + "/refresh",
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
+                    Void.class);
 
             // when — пытаемся использовать уже отозванный старый refresh
-            var response = rest.postForEntity(
+            var response = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
 
             // then
@@ -393,10 +465,21 @@ class AuthFlowIT extends AbstractPostgresIT {
         @DisplayName("Возвращает 401 для полностью невалидного refresh-токена")
         void returns401ForInvalidToken() {
             // when
-            var response = rest.postForEntity(
+            var response = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest("completely-invalid-refresh-token"),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders("completely-invalid-refresh-token")),
                     Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда refresh-cookie отсутствует")
+        void returns401WhenCookieMissing() {
+            // when
+            var response = rest.postForEntity(BASE + "/refresh", HttpEntity.EMPTY, Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -412,27 +495,74 @@ class AuthFlowIT extends AbstractPostgresIT {
     class Logout {
 
         @Test
-        @DisplayName("Отзывает refresh-токен, после чего refresh по нему даёт 401")
-        void revokesRefreshTokenAndPreventsSubsequentRefresh() {
+        @DisplayName("Отзывает refresh-токен, гасит cookie, после чего refresh по нему даёт 401")
+        void revokesRefreshTokenAndClearsCookies() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when — выходим
-            var logoutResponse = rest.postForEntity(
+            var logoutResponse = rest.exchange(
                     BASE + "/logout",
-                    new LogoutRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
 
-            // then — logout прошёл
-            assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            // then — logout прошёл, 204, куки погашены
+            assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            assertThat(extractCookieMaxAge(logoutResponse, ACCESS_COOKIE)).isEqualTo("0");
+            assertThat(extractCookieMaxAge(logoutResponse, REFRESH_COOKIE)).isEqualTo("0");
 
             // and — refresh отозванным токеном даёт 401
-            var refreshResponse = rest.postForEntity(
+            var refreshResponse = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
             assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    // =========================================================================
+    // GET /me
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Me")
+    class Me {
+
+        @Test
+        @DisplayName("Возвращает профиль пользователя по валидной access-cookie")
+        void returnsProfileWithValidAccessCookie() {
+            // given
+            var email = uniqueEmail();
+            var cookies = registerAndVerify(email);
+
+            // when
+            var response = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    UserResponse.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().email()).isEqualTo(email);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401 без access-cookie")
+        void returns401WithoutAccessCookie() {
+            // when
+            var response = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 
@@ -449,24 +579,26 @@ class AuthFlowIT extends AbstractPostgresIT {
         void changesPasswordAndRevokesRefreshTokens() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when
+            var headers = accessCookieHeaders(cookies.access());
             var changeResponse = rest.exchange(
                     BASE + "/change-password",
                     HttpMethod.PATCH,
                     new HttpEntity<>(
                             new ChangePasswordRequest(PASSWORD, NEW_PASSWORD),
-                            bearerHeaders(tokens.accessToken())),
+                            headers),
                     Void.class);
 
             // then — смена пароля прошла
             assertThat(changeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
             // and — старый refresh отозван
-            var refreshResponse = rest.postForEntity(
+            var refreshResponse = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
             assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
@@ -474,7 +606,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             var loginResponse = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, NEW_PASSWORD),
-                    TokenResponse.class);
+                    Void.class);
             assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
@@ -483,7 +615,7 @@ class AuthFlowIT extends AbstractPostgresIT {
         void returns401ForWrongOldPassword() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when
             var response = rest.exchange(
@@ -491,7 +623,7 @@ class AuthFlowIT extends AbstractPostgresIT {
                     HttpMethod.PATCH,
                     new HttpEntity<>(
                             new ChangePasswordRequest("WrongOld123!", NEW_PASSWORD),
-                            bearerHeaders(tokens.accessToken())),
+                            accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // then
@@ -499,7 +631,7 @@ class AuthFlowIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Возвращает 401 без access-токена")
+        @DisplayName("Возвращает 401 без access-cookie")
         void returns401WithoutToken() {
             // when — запрос без авторизации
             var response = rest.exchange(
@@ -566,7 +698,7 @@ class AuthFlowIT extends AbstractPostgresIT {
         void resetsPasswordAndAllowsLoginWithNewPassword() {
             // given — получаем токен сброса
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
             rest.postForEntity(BASE + "/forgot-password", new ForgotPasswordRequest(email), Void.class);
             var resetToken = tokenCaptor.getResetToken(email);
             assertThat(resetToken).isNotNull();
@@ -581,9 +713,10 @@ class AuthFlowIT extends AbstractPostgresIT {
             assertThat(resetResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
             // and — старый refresh отозван
-            var refreshResponse = rest.postForEntity(
+            var refreshResponse = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
             assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
@@ -591,7 +724,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             var loginResponse = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, NEW_PASSWORD),
-                    TokenResponse.class);
+                    Void.class);
             assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
@@ -638,21 +771,23 @@ class AuthFlowIT extends AbstractPostgresIT {
     class DeleteAccount {
 
         @Test
-        @DisplayName("Деактивирует пользователя (soft delete) и возвращает 204")
-        void deactivatesUserAndReturns204() {
+        @DisplayName("Деактивирует пользователя (soft delete), возвращает 204 и гасит cookie")
+        void deactivatesUserAndClearsCookies() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when
             var response = rest.exchange(
                     BASE + "/delete",
                     HttpMethod.DELETE,
-                    new HttpEntity<>(bearerHeaders(tokens.accessToken())),
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            assertThat(extractCookieMaxAge(response, ACCESS_COOKIE)).isEqualTo("0");
+            assertThat(extractCookieMaxAge(response, REFRESH_COOKIE)).isEqualTo("0");
         }
 
         @Test
@@ -660,11 +795,11 @@ class AuthFlowIT extends AbstractPostgresIT {
         void afterDeleteLoginReturns401() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
             rest.exchange(
                     BASE + "/delete",
                     HttpMethod.DELETE,
-                    new HttpEntity<>(bearerHeaders(tokens.accessToken())),
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // when
@@ -678,7 +813,7 @@ class AuthFlowIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Возвращает 401 без access-токена")
+        @DisplayName("Возвращает 401 без access-cookie")
         void returns401WithoutToken() {
             // when
             var response = rest.exchange(
@@ -696,19 +831,20 @@ class AuthFlowIT extends AbstractPostgresIT {
         void afterDeleteAllRefreshTokensRevoked() {
             // given
             var email = uniqueEmail();
-            var tokens = registerAndVerify(email);
+            var cookies = registerAndVerify(email);
 
             // when
             rest.exchange(
                     BASE + "/delete",
                     HttpMethod.DELETE,
-                    new HttpEntity<>(bearerHeaders(tokens.accessToken())),
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
             // then — refresh по старому токену даёт 401
-            var refreshResponse = rest.postForEntity(
+            var refreshResponse = rest.exchange(
                     BASE + "/refresh",
-                    new RefreshRequest(tokens.refreshToken()),
+                    HttpMethod.POST,
+                    new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
             assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
@@ -723,8 +859,8 @@ class AuthFlowIT extends AbstractPostgresIT {
     class FullLifecycleFlow {
 
         @Test
-        @DisplayName("Регистрация -> верификация -> логин -> смена пароля -> логин с новым паролем")
-        void registerVerifyLoginChangePasswordLogin() {
+        @DisplayName("Регистрация -> верификация -> /me -> смена пароля -> логин с новым паролем")
+        void registerVerifyMeChangePasswordLogin() {
             // given
             var email = uniqueEmail();
 
@@ -740,19 +876,21 @@ class AuthFlowIT extends AbstractPostgresIT {
             var verifyResponse = rest.postForEntity(
                     BASE + "/verify-email",
                     new VerifyEmailRequest(verifyToken),
-                    TokenResponse.class);
+                    Void.class);
             assertThat(verifyResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-            var tokens = verifyResponse.getBody();
-            assertThat(tokens).isNotNull();
+            var cookies = extractAuthCookies(verifyResponse);
+            assertThat(cookies.access()).isNotBlank();
+            assertThat(cookies.refresh()).isNotBlank();
 
-            // login
-            var loginResponse = rest.postForEntity(
-                    BASE + "/login",
-                    new LoginRequest(email, PASSWORD),
-                    TokenResponse.class);
-            assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-            var loginTokens = loginResponse.getBody();
-            assertThat(loginTokens).isNotNull();
+            // me
+            var meResponse = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    UserResponse.class);
+            assertThat(meResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(meResponse.getBody()).isNotNull();
+            assertThat(meResponse.getBody().email()).isEqualTo(email);
 
             // change password
             var changeResponse = rest.exchange(
@@ -760,7 +898,7 @@ class AuthFlowIT extends AbstractPostgresIT {
                     HttpMethod.PATCH,
                     new HttpEntity<>(
                             new ChangePasswordRequest(PASSWORD, NEW_PASSWORD),
-                            bearerHeaders(loginTokens.accessToken())),
+                            accessCookieHeaders(cookies.access())),
                     Void.class);
             assertThat(changeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -768,7 +906,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             var newLoginResponse = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, NEW_PASSWORD),
-                    TokenResponse.class);
+                    Void.class);
             assertThat(newLoginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
@@ -795,7 +933,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             var loginResponse = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, NEW_PASSWORD),
-                    TokenResponse.class);
+                    Void.class);
             assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
     }

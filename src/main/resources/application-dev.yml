@@ -1,7 +1,20 @@
+app:
+  security:
+    cors:
+      allowed-origins: http://localhost:5173
+
 spring:
   sql:
     init:
       mode: always
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+        generate_statistics: true
+      properties:
+        hibernate:
+          generate_statistics: true
   datasource:
     username: dev
     password: dev
@@ -25,3 +38,8 @@ management:
     web:
       exposure:
         include: "*"
+
+logging:
+  level:
+    root: INFO
+    com.zaxxer.hikari: INFO

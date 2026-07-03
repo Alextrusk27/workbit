@@ -1,18 +1,25 @@
 # Auth API — `/api/v1/auth`
 
 Аутентификация по email/паролю с двухтокенной схемой (access + refresh).
-Все запросы и ответы — JSON.
+Оба токена доставляются в **HttpOnly-cookie** — клиентский JS их не видит и не хранит.
+Все тела запросов и ответов — JSON.
 
 ## Аутентификация
 
-- **access** — короткоживущий JWT (минуты). Передаётся в каждом защищённом запросе:
-  `Authorization: Bearer <accessToken>`.
-- **refresh** — долгоживущий токен (дни). Хранится у клиента, передаётся только в теле на
-  `/refresh` и `/logout`.
+Токены выдаются заголовками `Set-Cookie` (не в теле ответа) и приходят обратно автоматически.
+Браузер-клиент должен слать запросы с `credentials: 'include'`.
+
+- **access** — короткоживущий JWT (минуты). Cookie `access_token`
+  (`Path=/`, `HttpOnly`, `Secure`, `SameSite=Lax`). Уходит с каждым запросом к API;
+  по нему аутентифицируются защищённые ручки. Fallback `Authorization: Bearer <accessToken>`
+  поддержан для Swagger в dev.
+- **refresh** — долгоживущий токен (30 дней). Cookie `refresh_token`
+  (`Path=/api/v1/auth`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Max-Age=30д`).
+  Уходит только на `/refresh` и `/logout`.
 
 Рекомендуемый клиентский флоу: при `401` на защищённой ручке вызвать `/refresh`, получить новую
-пару токенов и повторить запрос. Refresh **одноразовый** — после `/refresh` старое значение
-становится недействительным; в ответе всегда приходит новый refresh.
+пару cookie и повторить запрос. Refresh **одноразовый** — после `/refresh` старое значение
+становится недействительным; в ответе всегда приходит новый refresh (обе cookie перезаписываются).
 
 ## Эндпоинты
 
@@ -22,12 +29,13 @@
 | POST | `/verify-email` | подтверждение email по токену из письма | — |
 | POST | `/resend-verification` | повторная отправка письма подтверждения | — |
 | POST | `/login` | вход | — |
-| POST | `/refresh` | обмен refresh на новую пару токенов | — |
-| POST | `/logout` | отзыв refresh-токена | — |
-| PATCH | `/change-password` | смена пароля | Bearer |
+| GET | `/me` | профиль текущего пользователя | cookie `access_token` |
+| POST | `/refresh` | обмен refresh-cookie на новую пару токенов | cookie `refresh_token` |
+| POST | `/logout` | отзыв refresh-токена и очистка cookie | cookie `refresh_token` |
+| PATCH | `/change-password` | смена пароля | cookie `access_token` |
 | POST | `/forgot-password` | запрос ссылки сброса пароля | — |
 | POST | `/reset-password` | установка нового пароля по токену из письма | — |
-| DELETE | `/delete` | деактивация аккаунта | Bearer |
+| DELETE | `/delete` | деактивация аккаунта | cookie `access_token` |
 
 ## Запросы (DTO)
 
@@ -38,9 +46,6 @@ record LoginRequest(@Email String email, @Size(min = 8) String password)
 record VerifyEmailRequest(String token)
 record ResendVerificationRequest(@Email String email)
 
-record RefreshRequest(String refreshToken)
-record LogoutRequest(String refreshToken)
-
 record ChangePasswordRequest(String oldPassword, @Size(min = 8) String newPassword)
 record ForgotPasswordRequest(@Email String email)
 record ResetPasswordRequest(String token, @Size(min = 8) String newPassword)
@@ -48,16 +53,22 @@ record ResetPasswordRequest(String token, @Size(min = 8) String newPassword)
 
 Все строковые поля обязательны и непустые. `password` / `newPassword` — минимум 8 символов.
 
+`/refresh` и `/logout` тела не принимают — refresh-токен берётся из cookie `refresh_token`.
+
 ## Ответы
 
+`/me` возвращает `200` с телом:
+
 ```java
-record TokenResponse(String accessToken, String refreshToken)
+record UserResponse(String email, Instant created)
 ```
 
-`TokenResponse` возвращают `/login`, `/refresh`, `/verify-email`.
-`/register`, `/resend-verification`, `/forgot-password`, `/reset-password`, `/logout`,
-`/change-password` возвращают пустое тело со статусом `200`.
-`/delete` возвращает пустое тело со статусом `204`.
+У остальных эндпоинтов тело ответа пустое; токены передаются в заголовках `Set-Cookie`.
+
+- `/login`, `/verify-email`, `/refresh` — статус `200`, ставят cookie `access_token` и `refresh_token`.
+- `/register`, `/resend-verification`, `/forgot-password`, `/reset-password`, `/change-password` —
+  пустое тело со статусом `200`.
+- `/logout`, `/delete` — статус `204`, гасят обе cookie (`Set-Cookie` с `Max-Age=0`).
 
 ## Поведение
 

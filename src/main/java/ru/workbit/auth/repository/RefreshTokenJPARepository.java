@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.auth.model.RefreshToken;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import java.util.Optional;
 import java.util.UUID;

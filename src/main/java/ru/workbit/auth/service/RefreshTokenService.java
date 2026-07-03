@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.auth.model.RefreshToken;
 import ru.workbit.auth.repository.RefreshTokenJPARepository;
 import ru.workbit.exception.BadCredentialsException;
-import ru.workbit.user.model.User;
+import ru.workbit.auth.model.User;
 
 import java.time.Instant;
 

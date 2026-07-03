@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { Field } from '@/components/ui/Field'
 import { useRegister } from '@/features/auth/useAuth'
 import { getErrorMessage } from '@/lib/api'
@@ -13,9 +14,14 @@ export function RegisterPage() {
   const register = useRegister()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [acceptTerms, setAcceptTerms] = useState(false)
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false)
+
+  const consentGiven = acceptTerms && acceptPrivacy
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (!consentGiven) return
     register.mutate({ email, password })
   }
 
@@ -67,11 +73,41 @@ export function RegisterPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+
+        <div className="space-y-3">
+          <Checkbox checked={acceptTerms} onChange={setAcceptTerms} required>
+            Принимаю{' '}
+            <Link
+              to="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:text-accent-hover underline underline-offset-2"
+            >
+              Условия сервиса
+            </Link>
+          </Checkbox>
+          <Checkbox
+            checked={acceptPrivacy}
+            onChange={setAcceptPrivacy}
+            required
+          >
+            Даю согласие на обработку персональных данных в соответствии с{' '}
+            <Link
+              to="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:text-accent-hover underline underline-offset-2"
+            >
+              Политикой конфиденциальности
+            </Link>
+          </Checkbox>
+        </div>
+
         <Button
           type="submit"
           size="lg"
           className="w-full"
-          disabled={register.isPending}
+          disabled={register.isPending || !consentGiven}
         >
           {register.isPending ? 'Создаём…' : 'Создать аккаунт'}
         </Button>

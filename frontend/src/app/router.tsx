@@ -9,6 +9,7 @@ import { HomePage } from '@/pages/HomePage'
 import { FaqPage } from '@/pages/FaqPage'
 import { PricingPage } from '@/pages/PricingPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
+import { TermsPage } from '@/pages/TermsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ErrorPage } from '@/pages/ErrorPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: 'faq', element: <FaqPage /> },
           { path: 'pricing', element: <PricingPage /> },
           { path: 'privacy', element: <PrivacyPage /> },
+          { path: 'terms', element: <TermsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

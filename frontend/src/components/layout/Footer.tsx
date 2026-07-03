@@ -59,6 +59,12 @@ export function Footer() {
           >
             Политика конфиденциальности
           </Link>
+          <Link
+            to="/terms"
+            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+          >
+            Условия сервиса
+          </Link>
         </div>
       </Container>
     </footer>

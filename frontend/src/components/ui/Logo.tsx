@@ -9,7 +9,7 @@ export function Logo({ className }: LogoProps) {
   return (
     <span
       className={cn(
-        'font-display text-ink text-xl font-semibold tracking-tight',
+        'font-display text-ink text-[1.5625rem] font-semibold tracking-tight',
         className,
       )}
     >

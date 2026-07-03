@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
 
 const links = [
@@ -21,6 +22,12 @@ function desktopLinkClass(isActive: boolean): string {
 export function Header() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
+
+  // Залогинен — ведём в ЛК, иначе на вход (иначе кнопка гнала на повторный логин).
+  const account = isAuthenticated
+    ? { to: '/app', label: 'Личный кабинет' }
+    : { to: '/login', label: 'Войти' }
 
   // Закрывать меню при смене роута и по Escape.
   useEffect(() => setOpen(false), [location])
@@ -59,10 +66,10 @@ export function Header() {
 
           <div className="hidden md:block">
             <Link
-              to="/login"
+              to={account.to}
               className={buttonClasses({ variant: 'secondary' })}
             >
-              Войти
+              {account.label}
             </Link>
           </div>
 
@@ -114,13 +121,13 @@ export function Header() {
               ))}
               <li className="py-3">
                 <Link
-                  to="/login"
+                  to={account.to}
                   className={buttonClasses({
                     variant: 'secondary',
                     className: 'w-full',
                   })}
                 >
-                  Войти
+                  {account.label}
                 </Link>
               </li>
             </ul>

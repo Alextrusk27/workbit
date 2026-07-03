@@ -51,8 +51,14 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="border-rule text-muted mt-10 border-t pt-6 font-mono text-xs">
-          © {new Date().getFullYear()} workbit
+        <div className="border-rule text-muted mt-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-6 font-mono text-xs">
+          <span>© {new Date().getFullYear()} workbit. Все права защищены.</span>
+          <Link
+            to="/privacy"
+            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+          >
+            Политика конфиденциальности
+          </Link>
         </div>
       </Container>
     </footer>

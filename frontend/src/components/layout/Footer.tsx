@@ -65,6 +65,14 @@ export function Footer() {
           >
             Условия сервиса
           </Link>
+          {import.meta.env.DEV && (
+            <Link
+              to="/brand"
+              className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+            >
+              Брендбук
+            </Link>
+          )}
         </div>
       </Container>
     </footer>

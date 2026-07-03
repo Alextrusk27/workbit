@@ -31,7 +31,7 @@ export function PlanCard({
         'flex h-full cursor-pointer flex-col rounded-lg border transition-colors',
         'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
         selected
-          ? 'border-accent bg-paper-2 ring-accent ring-1'
+          ? 'border-accent bg-paper-2/50 ring-accent ring-1'
           : 'border-rule hover:border-ink/30',
         className,
       )}

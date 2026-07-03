@@ -12,6 +12,7 @@ import { PrivacyPage } from '@/pages/PrivacyPage'
 import { TermsPage } from '@/pages/TermsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ErrorPage } from '@/pages/ErrorPage'
+import { BrandPage } from '@/pages/BrandPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: '*', element: <NotFoundPage /> },
         ],
       },
+      { path: 'brand', element: <BrandPage />, errorElement: <ErrorPage /> },
       {
         element: <AuthLayout />,
         errorElement: <ErrorPage />,

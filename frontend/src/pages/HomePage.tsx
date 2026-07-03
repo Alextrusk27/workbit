@@ -81,7 +81,7 @@ export function HomePage() {
 
           {/* Артефакт-сигнатура: лист с ответом и пометкой на полях. */}
           <figure
-            className="border-rule bg-paper-2 animate-rise rounded-lg border p-6 sm:p-8"
+            className="border-rule bg-paper-2/50 animate-rise rounded-lg border p-6 sm:p-8"
             style={{ animationDelay: '320ms' }}
           >
             <figcaption className="text-muted mb-4 font-mono text-xs tracking-wide">

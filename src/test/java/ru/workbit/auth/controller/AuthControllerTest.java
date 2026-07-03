@@ -1,4 +1,4 @@
-package ru.workbit.auth;
+package ru.workbit.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -13,7 +13,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import ru.workbit.auth.controller.AuthController;
 import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;

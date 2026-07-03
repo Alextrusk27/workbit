@@ -1,4 +1,4 @@
-package ru.workbit.auth;
+package ru.workbit.auth.repository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -9,7 +9,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
-import ru.workbit.auth.repository.UserJPARepository;
 
 import java.time.Instant;
 import java.util.Optional;

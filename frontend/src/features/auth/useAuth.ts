@@ -77,3 +77,20 @@ export function useResetPassword() {
       authApi.resetPassword(vars.token, vars.newPassword),
   })
 }
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (vars: { oldPassword: string; newPassword: string }) =>
+      authApi.changePassword(vars),
+  })
+}
+
+/** Удаление аккаунта: бэк чистит куки, сбрасываем `['me']`. Навигацию прочь с
+ *  защищённого роута делает страница (иначе `RequireAuth` успеет кинуть на /login). */
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => authApi.deleteAccount(),
+    onSuccess: () => qc.setQueryData(ME_KEY, null),
+  })
+}

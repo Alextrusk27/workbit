@@ -42,4 +42,9 @@ export const authApi = {
       method: 'POST',
       body: { token, newPassword },
     }),
+
+  changePassword: (data: { oldPassword: string; newPassword: string }) =>
+    apiFetch<void>('/auth/change-password', { method: 'PATCH', body: data }),
+
+  deleteAccount: () => apiFetch<void>('/auth/delete', { method: 'DELETE' }),
 }

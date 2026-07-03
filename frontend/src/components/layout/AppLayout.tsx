@@ -104,7 +104,15 @@ function UserMenu({
             onClick={() => setOpen(false)}
             className="text-ink hover:bg-paper-2 block px-3 py-2 text-sm transition-colors"
           >
-            Личный кабинет
+            Мои интервью
+          </Link>
+          <Link
+            to="/app/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="text-ink hover:bg-paper-2 block px-3 py-2 text-sm transition-colors"
+          >
+            Настройки
           </Link>
           <button
             type="button"

@@ -18,6 +18,7 @@ import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
 import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
 import { ReportPage } from '@/pages/interview/ReportPage'
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
             element: <AppLayout />,
             children: [
               { index: true, element: <DashboardPage /> },
+              { path: 'settings', element: <SettingsPage /> },
               { path: 'interview/new', element: <NewInterviewPage /> },
               {
                 path: 'interview/:sessionId',

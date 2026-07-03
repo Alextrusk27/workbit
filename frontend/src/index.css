@@ -21,11 +21,26 @@
   --font-display: 'Literata Variable', Georgia, 'Times New Roman', serif;
   --font-sans: 'Golos Text Variable', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --text-body-sm: 0.95rem; /* мелкий текст карточек и описаний */
 
   /* Скругления — сдержанные, редакционные */
   --radius-sm: 2px;
   --radius-md: 4px;
   --radius-lg: 8px;
+
+  /* Единственная анимация: сдержанный вход контента при загрузке.
+     reduced-motion гасится глобальным правилом ниже. */
+  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer base {
@@ -76,6 +91,7 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important; /* иначе fill-mode both держит opacity: 0 всю задержку */
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

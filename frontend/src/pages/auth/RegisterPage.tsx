@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -16,12 +16,21 @@ export function RegisterPage() {
   const [password, setPassword] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [acceptPrivacy, setAcceptPrivacy] = useState(false)
+  const [consentError, setConsentError] = useState(false)
+  const consentRef = useRef<HTMLDivElement>(null)
 
   const consentGiven = acceptTerms && acceptPrivacy
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!consentGiven) return
+    if (!consentGiven) {
+      setConsentError(true)
+      consentRef.current
+        ?.querySelector<HTMLInputElement>('input:not(:checked)')
+        ?.focus()
+      return
+    }
+    setConsentError(false)
     register.mutate({ email, password })
   }
 
@@ -74,7 +83,7 @@ export function RegisterPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <div className="space-y-3">
+        <div ref={consentRef} className="space-y-3">
           <Checkbox checked={acceptTerms} onChange={setAcceptTerms} required>
             Принимаю{' '}
             <Link
@@ -101,13 +110,18 @@ export function RegisterPage() {
               Политикой конфиденциальности
             </Link>
           </Checkbox>
+          {consentError && !consentGiven && (
+            <p role="alert" className="text-accent text-sm">
+              Отметьте оба пункта, чтобы продолжить.
+            </p>
+          )}
         </div>
 
         <Button
           type="submit"
           size="lg"
           className="w-full"
-          disabled={register.isPending || !consentGiven}
+          disabled={register.isPending}
         >
           {register.isPending ? 'Создаём…' : 'Создать аккаунт'}
         </Button>

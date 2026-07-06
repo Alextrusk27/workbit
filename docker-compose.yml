@@ -9,3 +9,14 @@ services:
       - POSTGRES_DB=workbit_dev_db
       - POSTGRES_USER=dev
       - POSTGRES_PASSWORD=dev
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1

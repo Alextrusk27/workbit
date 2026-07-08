@@ -88,7 +88,7 @@ class EmailServiceGreenMailTest {
     class SendVerificationMail {
 
         private static final String SUBJECT = "Подтверждение электронной почты";
-        private static final String EXPECTED_URL = BASE_URL + "/api/v1/auth/verify-email?token=" + TOKEN;
+        private static final String EXPECTED_URL = BASE_URL + "/verify-email?token=" + TOKEN;
 
         @Test
         @DisplayName("Доставляет письмо с корректными заголовками на SMTP-сервер")
@@ -120,7 +120,7 @@ class EmailServiceGreenMailTest {
     class SendResetPasswordMail {
 
         private static final String SUBJECT = "Изменение пароля для аккаунта";
-        private static final String EXPECTED_URL = BASE_URL + "/api/v1/auth/reset-password?token=" + TOKEN;
+        private static final String EXPECTED_URL = BASE_URL + "/reset-password?token=" + TOKEN;
 
         @Test
         @DisplayName("Доставляет письмо с корректными заголовками на SMTP-сервер")

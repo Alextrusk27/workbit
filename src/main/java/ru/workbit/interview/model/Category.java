@@ -24,7 +24,9 @@ public enum Category {
     TEST_AUTOMATION("Автоматизация тестирования", Domain.QA),
     MANUAL_TESTING("Ручное тестирование", Domain.QA),
     API_TESTING("Тестирование API", Domain.QA),
-    PERFORMANCE_TESTING("Нагрузочное тестирование", Domain.QA);
+        PERFORMANCE_TESTING("Нагрузочное тестирование", Domain.QA),
+
+    VACANCY("Вакансия", Domain.VACANCY);
 
     private final String name;
     private final Domain domain;
@@ -37,6 +39,7 @@ public enum Category {
     public enum Domain {
         JAVA,
         PYTHON,
-        QA
+        QA,
+        VACANCY
     }
 }

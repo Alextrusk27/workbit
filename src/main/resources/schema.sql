@@ -1,5 +1,6 @@
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS interview;
+CREATE SCHEMA IF NOT EXISTS vacancy;
 
 CREATE TABLE IF NOT EXISTS auth.users (
     id             UUID PRIMARY KEY,
@@ -39,12 +40,29 @@ CREATE TABLE IF NOT EXISTS auth.verification_token (
         CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION'))
 );
 
+CREATE TABLE IF NOT EXISTS vacancy.snapshot (
+    id            UUID PRIMARY KEY,
+    hh_vacancy_id BIGINT,
+    url           TEXT,
+    name          VARCHAR(255) NOT NULL,
+    employer      VARCHAR(255),
+    experience    VARCHAR(64),
+    key_skills    TEXT[],
+    description   TEXT NOT NULL,
+    fetched_at    TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_snapshot_hh_pair
+        CHECK ((hh_vacancy_id IS NULL) = (url IS NULL))
+);
+
 CREATE TABLE IF NOT EXISTS interview.session (
     id              UUID PRIMARY KEY,
     user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    profession      VARCHAR(32) NOT NULL,
-    company_type    VARCHAR(32) NOT NULL,
-    level           VARCHAR(32) NOT NULL,
+    profession      VARCHAR(32),
+    company_type    VARCHAR(32),
+    level           VARCHAR(32),
+    source          VARCHAR(32) NOT NULL DEFAULT 'CATALOG',
+    vacancy_snapshot_id UUID REFERENCES vacancy.snapshot(id),
     status          VARCHAR(32) NOT NULL,
     total_questions INT NOT NULL,
     created         TIMESTAMPTZ NOT NULL,
@@ -59,7 +77,16 @@ CREATE TABLE IF NOT EXISTS interview.session (
     CONSTRAINT chk_session_status
         CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
     CONSTRAINT chk_session_completed_at
-        CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
+        CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL),
+    CONSTRAINT chk_session_source
+        CHECK (source IN ('CATALOG', 'VACANCY')),
+    CONSTRAINT chk_session_source_fields
+        CHECK (
+            (source = 'CATALOG' AND profession IS NOT NULL AND company_type IS NOT NULL
+                AND level IS NOT NULL AND vacancy_snapshot_id IS NULL)
+         OR (source = 'VACANCY' AND profession IS NULL AND company_type IS NULL
+                AND level IS NULL AND vacancy_snapshot_id IS NOT NULL)
+        )
 );
 
 CREATE TABLE IF NOT EXISTS interview.question (
@@ -79,7 +106,8 @@ CREATE TABLE IF NOT EXISTS interview.question (
             'PYTHON_CORE', 'ASYNCIO', 'DJANGO', 'FASTAPI', 'ORM_SQL', 'DATA_PROCESSING',
             'TEST_DESIGN', 'TEST_AUTOMATION', 'MANUAL_TESTING', 'API_TESTING', 'PERFORMANCE_TESTING',
             'REST_API', 'MICROSERVICES', 'DISTRIBUTED_SYSTEMS', 'CACHING', 'OBSERVABILITY',
-            'NOSQL', 'SECURITY', 'CI_CD', 'COMPLIANCE', 'SOFT_SKILLS'
+            'NOSQL', 'SECURITY', 'CI_CD', 'COMPLIANCE', 'SOFT_SKILLS',
+            'VACANCY'
         )),
     CONSTRAINT chk_question_order_index
         CHECK (order_index BETWEEN 1 AND 20),
@@ -127,3 +155,6 @@ CREATE INDEX IF NOT EXISTS idx_interview_session_user_id
     ON interview.session(user_id);
 CREATE INDEX IF NOT EXISTS idx_interview_question_session_id
     ON interview.question(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_vacancy_snapshot_hh_id
+    ON vacancy.snapshot(hh_vacancy_id);

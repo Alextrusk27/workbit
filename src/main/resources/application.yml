@@ -13,6 +13,10 @@ app:
 spring:
   application:
     name: ${app.name}
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 10s
   jpa:
     open-in-view: false
     hibernate:
@@ -55,6 +59,13 @@ llm:
     agents:
       answer-evaluator: ${ANSWER_EVALUATOR}
       interview-reviewer: ${INTERVIEW_REVIEWER}
+      vacancy-questions-generator: ${VACANCY_QUESTIONS_GENERATOR}
+
+hh:
+  api:
+    base-url: https://api.hh.ru
+    user-agent: ${HH_USER_AGENT}
+    app-token: ${HH_APP_TOKEN}
 
 logging:
   pattern:

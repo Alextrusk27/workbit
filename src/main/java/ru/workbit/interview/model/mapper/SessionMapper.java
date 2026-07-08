@@ -18,6 +18,8 @@ public interface SessionMapper {
     @Mapping(target = "questions", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "interviewReport", ignore = true)
+    @Mapping(target = "source", ignore = true)
+    @Mapping(target = "vacancySnapshotId", ignore = true)
     InterviewSession toEntity(CreateSessionRequest request);
 
     @Mapping(target = "answeredCount", source = "answeredCount")

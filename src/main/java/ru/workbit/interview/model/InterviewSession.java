@@ -24,16 +24,24 @@ public class InterviewSession {
     private UUID userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column
     private Profession profession;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "company_type", nullable = false)
+    @Column(name = "company_type")
     private CompanyType companyType;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column
     private Level level;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private SessionSource source = SessionSource.CATALOG;
+
+    @Column(name = "vacancy_snapshot_id")
+    private UUID vacancySnapshotId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

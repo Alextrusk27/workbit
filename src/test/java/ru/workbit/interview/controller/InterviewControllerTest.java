@@ -88,7 +88,7 @@ class InterviewControllerTest {
         return new SessionResponse(
                 SESSION_ID, null, null, null,
                 SessionSource.VACANCY,
-                new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123456"),
+                new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123456", "От 1 года до 3 лет"),
                 SessionStatus.CREATED, 10, 0,
                 Instant.parse("2026-01-01T00:00:00Z"), null);
     }
@@ -303,7 +303,8 @@ class InterviewControllerTest {
                     .andExpect(header().string(HttpHeaders.LOCATION, "/sessions/" + SESSION_ID))
                     .andExpect(jsonPath("$.id").value(SESSION_ID.toString()))
                     .andExpect(jsonPath("$.source").value("VACANCY"))
-                    .andExpect(jsonPath("$.vacancy.name").value("Java-разработчик"));
+                    .andExpect(jsonPath("$.vacancy.name").value("Java-разработчик"))
+                    .andExpect(jsonPath("$.vacancy.experience").value("От 1 года до 3 лет"));
 
             verify(interviewService).createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID));
         }

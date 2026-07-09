@@ -52,7 +52,10 @@ public record SessionResponse(
             String employer,
 
             @Schema(description = "Ссылка на вакансию hh.ru; null при текстовом вводе", example = "https://hh.ru/vacancy/123456")
-            String url
+            String url,
+
+            @Schema(description = "Требуемый опыт работы; null при текстовом вводе или если не указан в вакансии", example = "От 1 года до 3 лет")
+            String experience
     ) {
     }
 }

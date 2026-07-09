@@ -103,7 +103,7 @@ record SessionResponse(
     SessionStatus status, int totalQuestions, int answeredCount,
     Instant created, Instant completedAt)
 
-record VacancyInfo(String name, String employer, String url) // вложен в SessionResponse
+record VacancyInfo(String name, String employer, String url, String experience) // вложен в SessionResponse
 
 record QuestionResponse(
     UUID questionId, int orderIndex, String questionText,
@@ -121,7 +121,9 @@ record SessionReport(
 (`source = CATALOG`), для сессий по вакансии (`source = VACANCY`) они `null`. И наоборот:
 `vacancy` заполнен только у сессий по вакансии, для каталожных — `null`. У `VacancyInfo`
 `employer` и `url` — `null`, если вакансия была задана вставленным текстом (`vacancyText`),
-а не ссылкой на hh.ru: у текста нет ни работодателя, ни канонической ссылки. По той же
+а не ссылкой на hh.ru: у текста нет ни работодателя, ни канонической ссылки. `experience` —
+требуемый опыт работы в формулировке hh.ru (например `"От 1 года до 3 лет"`); `null` при
+текстовом вводе, а также если опыт в вакансии не указан. По той же
 причине `profession`, `companyType` и `level` в `SessionReport` (`finish`, `.../report`)
 для сессий по вакансии тоже `null` — отчёт строится без каталожной связки.
 

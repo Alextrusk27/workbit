@@ -231,7 +231,7 @@ class InterviewServiceTest {
             SessionResponse expectedResponse = new SessionResponse(
                     SESSION_ID, null, null, null,
                     SessionSource.VACANCY,
-                    new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123"),
+                    new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет"),
                     SessionStatus.CREATED, 3, 0, null, null);
             when(sessionMapper.toResponse(persistedSession, 0,
                     new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет")))
@@ -265,7 +265,7 @@ class InterviewServiceTest {
             SessionResponse expectedResponse = new SessionResponse(
                     SESSION_ID, null, null, null,
                     SessionSource.VACANCY,
-                    new SessionResponse.VacancyInfo("Заголовок из LLM", null, null),
+                    new SessionResponse.VacancyInfo("Заголовок из LLM", null, null, null),
                     SessionStatus.CREATED, 2, 0, null, null);
             when(sessionMapper.toResponse(persistedSession, 0,
                     new VacancySnapshotView("Заголовок из LLM", null, null, null)))

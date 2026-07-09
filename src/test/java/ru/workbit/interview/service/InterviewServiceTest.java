@@ -1247,6 +1247,75 @@ class InterviewServiceTest {
             verify(llmService).createReport(captor.capture());
             assertThat(captor.getValue().level()).isEqualTo("не указан");
         }
+
+        @Test
+        @DisplayName("Бросает LlmException, когда все отзывы LLM без score")
+        void throwsWhenAllReviewsHaveNullScore() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            UUID q2Id = UUID.randomUUID();
+
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            InterviewQuestion q2 = InterviewQuestion.builder()
+                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
+
+            session.setQuestions(List.of(q1, q2));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(
+                            new LlmAnswerReview(q1Id, "Не удалось оценить", null),
+                            new LlmAnswerReview(q2Id, "Не удалось оценить", null)
+                    ),
+                    "Отчёт",
+                    "LOW"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview report has no usable scores");
+
+            assertThat(session.getInterviewReport()).isNull();
+            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(feedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Бросает LlmException, когда LLM вернула пустой список отзывов")
+        void throwsWhenLlmReturnsEmptyAnswersList() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(List.of(), "Отчёт", "LOW");
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview report has no usable scores");
+
+            assertThat(session.getInterviewReport()).isNull();
+            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(feedbackRepository);
+        }
     }
 
     // -------------------------------------------------------------------------

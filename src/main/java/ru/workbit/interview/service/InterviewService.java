@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -231,8 +232,14 @@ public class InterviewService {
         Map<UUID, LlmAnswerReview> answersMap = llmReport.answers().stream()
                 .collect(Collectors.toMap(LlmAnswerReview::id, Function.identity()));
 
+        OptionalDouble avgScore = calculateAvgScore(answersMap);
+        if (avgScore.isEmpty()) {
+            log.error("Cannot finish session {}: LLM report contains no usable scores", sessionId);
+            throw new LlmException("Interview report has no usable scores");
+        }
+
         saveFeedbacks(session, answersMap);
-        attachReport(session, llmReport, calculateAvgScore(answersMap));
+        attachReport(session, llmReport, avgScore.getAsDouble());
         markCompleted(session);
 
         sessionRepository.save(session);
@@ -377,13 +384,12 @@ public class InterviewService {
                 });
     }
 
-    private double calculateAvgScore(Map<UUID, LlmAnswerReview> answersMap) {
+    private OptionalDouble calculateAvgScore(Map<UUID, LlmAnswerReview> answersMap) {
         return answersMap.values().stream()
                 .map(LlmAnswerReview::score)
                 .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
-                .average()
-                .orElse(0.0);
+                .average();
     }
 
     private SessionContext resolveContext(InterviewSession session) {

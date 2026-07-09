@@ -98,9 +98,9 @@ public class InterviewService {
 
     private LlmQuestionGenerationRequest toGenerationRequest(VacancyData data, int questionCount) {
         return new LlmQuestionGenerationRequest(
-                nvl(data.name()),
-                nvl(data.employer()),
-                nvl(data.experience()),
+                Objects.requireNonNullElse(data.name(), ""),
+                Objects.requireNonNullElse(data.employer(), ""),
+                Objects.requireNonNullElse(data.experience(), ""),
                 data.keySkills() == null ? "" : String.join(", ", data.keySkills()),
                 data.description(),
                 questionCount);
@@ -132,10 +132,6 @@ public class InterviewService {
 
     private static String clampName(String name) {
         return name.length() > MAX_VACANCY_NAME_LENGTH ? name.substring(0, MAX_VACANCY_NAME_LENGTH) : name;
-    }
-
-    private static String nvl(String value) {
-        return value == null ? "" : value;
     }
 
     public List<SessionResponse> getAllSessions(UUID userId) {
@@ -259,7 +255,7 @@ public class InterviewService {
 
     private void checkUserSession(UUID sessionId, UUID userId) {
         if (!sessionRepository.existsByIdAndUserId(sessionId, userId)) {
-            log.error("User {} has no session with Id {}", userId, sessionId);
+            log.warn("User {} has no session with Id {}", userId, sessionId);
             throw new NotFoundException("Session not found");
         }
     }
@@ -281,7 +277,7 @@ public class InterviewService {
                 .toList();
     }
 
-    public LlmReport createLlmReport(InterviewSession session) {
+    private LlmReport createLlmReport(InterviewSession session) {
         SessionContext context = resolveContext(session);
         return llmService.createReport(
                 new LlmReportRequest(

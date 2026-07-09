@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
@@ -892,6 +893,21 @@ class InterviewServiceTest {
             assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
                     .isInstanceOf(ForbiddenException.class)
                     .hasMessage("Access denied");
+
+            verifyNoInteractions(llmService, interviewWriter);
+        }
+
+        @Test
+        @DisplayName("Бросает ConflictException и не зовёт LLM, когда сессия уже завершена")
+        void throwsWhenSessionAlreadyCompleted() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.COMPLETED).build();
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
 
             verifyNoInteractions(llmService, interviewWriter);
         }

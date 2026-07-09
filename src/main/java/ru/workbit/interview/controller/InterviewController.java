@@ -193,7 +193,8 @@ public class InterviewController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Отчёт сформирован"),
             @ApiResponse(responseCode = "403", description = "Сессия принадлежит другому пользователю", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull SessionReport> finishSession(
             @PathVariable UUID sessionId,

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
@@ -214,6 +215,7 @@ public class InterviewService {
                 .orElseThrow(() -> new NotFoundException("Session not found"));
 
         checkSessionOwnership(session, userId);
+        checkSessionNotCompleted(session);
 
         LlmReport llmReport = createLlmReport(session);
 
@@ -236,6 +238,13 @@ public class InterviewService {
         if (!session.getUserId().equals(userId)) {
             log.warn("Cannot finish session {}, because {} is not the owner", session.getId(), userId);
             throw new ForbiddenException("Access denied");
+        }
+    }
+
+    private void checkSessionNotCompleted(InterviewSession session) {
+        if (session.getStatus() == SessionStatus.COMPLETED) {
+            log.warn("Cannot finish session {}, because it is already completed", session.getId());
+            throw new ConflictException("Session already finished");
         }
     }
 

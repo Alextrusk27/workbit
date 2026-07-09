@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
@@ -15,7 +14,6 @@ import ru.workbit.interview.model.mapper.QuestionMapper;
 import ru.workbit.interview.model.mapper.SessionMapper;
 import ru.workbit.interview.question.BankQuestion;
 import ru.workbit.interview.question.QuestionBank;
-import ru.workbit.interview.repository.FeedbackRepository;
 import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
 import ru.workbit.llm.dto.*;
@@ -24,13 +22,10 @@ import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalDouble;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -48,7 +43,8 @@ public class InterviewService {
 
     private final SessionRepository sessionRepository;
     private final QuestionRepository questionRepository;
-    private final FeedbackRepository feedbackRepository;
+
+    private final InterviewWriter interviewWriter;
 
     public InterviewOptionsResponse getOptions() {
         return new InterviewOptionsResponse(
@@ -196,31 +192,23 @@ public class InterviewService {
                 );
     }
 
-    @Transactional
     public QuestionResponse submitAnswer(SubmitAnswerRequest request) {
-        InterviewQuestion question = questionRepository.findWithSessionById(request.questionId())
-                .orElseThrow(() -> new NotFoundException("Question not found"));
-
-        checkQuestionOwnership(question, request.userId());
-        checkQuestionSession(question, request.sessionId());
-        checkQuestionNotAnswered(question);
-
-        question.setAnswerText(request.answerText());
-        question.setAnsweredAt(Instant.now());
-        question.setAnswered(true);
-
-        if (request.evaluate()) {
-            saveEvaluation(question, request.answerText());
+        InterviewWriter.AnswerContext context = interviewWriter.saveAnswer(request);
+        if (!request.evaluate()) {
+            return context.response();
         }
 
-        if (question.getSession().getStatus().equals(SessionStatus.CREATED)) {
-            question.getSession().setStatus(SessionStatus.IN_PROGRESS);
-        }
+        SessionContext sessionContext = resolveContext(context.session());
+        LlmAnswerEvaluation evaluation = llmService.evaluateAnswer(
+                new LlmAnswerEvaluationRequest(
+                        sessionContext.profession(),
+                        context.questionText(),
+                        sessionContext.level(),
+                        request.answerText()));
 
-        return questionMapper.toDto(question);
+        return interviewWriter.saveFeedback(request.questionId(), evaluation);
     }
 
-    @Transactional
     public SessionReport finishSession(UUID sessionId, UUID userId) {
         InterviewSession session = sessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
@@ -229,23 +217,7 @@ public class InterviewService {
 
         LlmReport llmReport = createLlmReport(session);
 
-        List<LlmAnswerReview> reviews = llmReport.answers() != null ? llmReport.answers() : List.of();
-        Map<UUID, LlmAnswerReview> answersMap = reviews.stream()
-                .collect(Collectors.toMap(LlmAnswerReview::id, Function.identity(), (a, b) -> a));
-
-        OptionalDouble avgScore = calculateAvgScore(answersMap);
-        if (avgScore.isEmpty()) {
-            log.error("Cannot finish session {}: LLM report contains no usable scores", sessionId);
-            throw new LlmException("Interview report has no usable scores");
-        }
-
-        saveFeedbacks(session, answersMap);
-        attachReport(session, llmReport, avgScore.getAsDouble());
-        markCompleted(session);
-
-        sessionRepository.save(session);
-
-        return sessionMapper.toSessionReport(session);
+        return interviewWriter.completeReport(sessionId, llmReport);
     }
 
     public SessionReport getSessionReport(UUID sessionId, UUID userId) {
@@ -267,83 +239,12 @@ public class InterviewService {
         }
     }
 
-    private void attachReport(InterviewSession session, LlmReport llmReport, double avgScore) {
-        session.setInterviewReport(InterviewReport.builder()
-                .session(session)
-                .avgScore(Math.round(avgScore * 10) / 10.0)
-                .offerProbability(resolveOfferProbability(llmReport.offerProbability()))
-                .overallFeedback(llmReport.overallFeedback())
-                .build());
-    }
-
-    private OfferProbability resolveOfferProbability(String raw) {
-        return OfferProbability.fromString(raw)
-                .orElseThrow(() -> {
-                    log.error("LLM returned unrecognized offerProbability '{}'", raw);
-                    return new LlmException("Interview report has an invalid offer probability");
-                });
-    }
-
-    private void markCompleted(InterviewSession session) {
-        session.setStatus(SessionStatus.COMPLETED);
-        session.setCompletedAt(Instant.now());
-    }
-
     private void checkUserSession(UUID sessionId, UUID userId) {
         if (!sessionRepository.existsByIdAndUserId(sessionId, userId)) {
             log.error("User {} has no session with Id {}", userId, sessionId);
             throw new NotFoundException("Session not found");
         }
     }
-
-    private void checkQuestionOwnership(InterviewQuestion question, UUID userId) {
-        if (!question.getSession().getUserId().equals(userId)) {
-            log.warn("IDOR attempt: user {} tried to access question {} owned by user {}",
-                    userId, question.getId(), question.getSession().getUserId());
-            throw new ForbiddenException("Access denied");
-        }
-    }
-
-    private void checkQuestionSession(InterviewQuestion question, UUID sessionId) {
-        if (!question.getSession().getId().equals(sessionId)) {
-            log.warn("Question {} belongs to session {}, but request came with session {}",
-                    question.getId(), question.getSession().getId(), sessionId);
-            throw new ConflictException("Invalid session");
-        }
-    }
-
-    private void checkQuestionNotAnswered(InterviewQuestion question) {
-        if (question.isAnswered()) {
-            throw new ConflictException("Question already answered");
-        }
-    }
-
-    private void saveEvaluation(InterviewQuestion question, String answerText) {
-        SessionContext context = resolveContext(question.getSession());
-        LlmAnswerEvaluation evaluation = llmService.evaluateAnswer(
-                new LlmAnswerEvaluationRequest(
-                        context.profession(),
-                        question.getQuestionText(),
-                        context.level(),
-                        answerText));
-
-        if (!isPersistableFeedback(evaluation.score(), evaluation.feedback())) {
-            log.warn("LLM returned invalid evaluation for question {} (score={}), skipping feedback",
-                    question.getId(), evaluation.score());
-            return;
-        }
-
-        AnswerFeedback feedback = feedbackRepository.save(
-                AnswerFeedback.builder()
-                        .question(question)
-                        .score(evaluation.score())
-                        .feedbackText(evaluation.feedback())
-                        .build()
-        );
-
-        question.setFeedback(feedback);
-    }
-
 
     private List<InterviewQuestion> createQuestions(CreateSessionRequest request, InterviewSession session) {
         List<BankQuestion> questions = questionBank.forLevel(request.level(), request.totalQuestions());
@@ -380,39 +281,6 @@ public class InterviewService {
                                 .toList()
                 )
         );
-    }
-
-    private void saveFeedbacks(InterviewSession session, Map<UUID, LlmAnswerReview> answersMap) {
-        session.getQuestions().stream()
-                .filter(q -> q.getFeedback() == null)
-                .forEach(q -> {
-                    LlmAnswerReview review = answersMap.get(q.getId());
-                    if (review == null || !isPersistableFeedback(review.score(), review.evaluation())) {
-                        log.warn("LLM returned no valid feedback for question {}, skipping feedback", q.getId());
-                        return;
-                    }
-                    q.setFeedback(AnswerFeedback.builder()
-                            .question(q)
-                            .score(review.score())
-                            .feedbackText(review.evaluation())
-                            .build());
-                });
-    }
-
-    private OptionalDouble calculateAvgScore(Map<UUID, LlmAnswerReview> answersMap) {
-        return answersMap.values().stream()
-                .map(LlmAnswerReview::score)
-                .filter(InterviewService::isValidScore)
-                .mapToInt(Integer::intValue)
-                .average();
-    }
-
-    private static boolean isPersistableFeedback(Integer score, String feedbackText) {
-        return isValidScore(score) && feedbackText != null && !feedbackText.isBlank();
-    }
-
-    private static boolean isValidScore(Integer score) {
-        return score != null && score >= 1 && score <= 5;
     }
 
     private SessionContext resolveContext(InterviewSession session) {

@@ -8,7 +8,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
@@ -20,7 +19,6 @@ import ru.workbit.interview.dto.QuestionResponse;
 import ru.workbit.interview.dto.SessionReport;
 import ru.workbit.interview.dto.SessionResponse;
 import ru.workbit.interview.dto.SubmitAnswerRequest;
-import ru.workbit.interview.model.AnswerFeedback;
 import ru.workbit.interview.model.Category;
 import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.InterviewQuestion;
@@ -34,7 +32,6 @@ import ru.workbit.interview.model.mapper.QuestionMapper;
 import ru.workbit.interview.model.mapper.SessionMapper;
 import ru.workbit.interview.question.BankQuestion;
 import ru.workbit.interview.question.QuestionBank;
-import ru.workbit.interview.repository.FeedbackRepository;
 import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
 import ru.workbit.llm.dto.LlmAnswerEvaluation;
@@ -84,7 +81,7 @@ class InterviewServiceTest {
     @Mock
     QuestionRepository questionRepository;
     @Mock
-    FeedbackRepository feedbackRepository;
+    InterviewWriter interviewWriter;
 
     @InjectMocks
     InterviewService interviewService;
@@ -738,45 +735,32 @@ class InterviewServiceTest {
 
         private final UUID questionId = UUID.randomUUID();
 
-        private InterviewQuestion aQuestion(InterviewSession session) {
-            return InterviewQuestion.builder()
-                    .id(questionId)
-                    .session(session)
-                    .questionText("Что такое JVM?")
-                    .answered(false)
-                    .build();
+        private QuestionResponse aQuestionResponse() {
+            return new QuestionResponse(questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", null, null);
         }
 
         @Test
-        @DisplayName("Сохраняет ответ, вызывает оценку LLM и переводит сессию CREATED -> IN_PROGRESS")
-        void savesAnswerEvaluatesAndTransitionsStatus() {
+        @DisplayName("Оценивает ответ через LLM и возвращает результат interviewWriter.saveFeedback, когда evaluate=true")
+        void evaluatesAnswerAndReturnsSavedFeedbackWhenEvaluateTrue() {
             // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            InterviewSession session = aSessionBuilder().build();
+            InterviewWriter.AnswerContext context =
+                    new InterviewWriter.AnswerContext(aQuestionResponse(), session, "Что такое JVM?");
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
+            when(interviewWriter.saveAnswer(request)).thenReturn(context);
 
-            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(4, "Хороший ответ"));
-            when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
+            LlmAnswerEvaluation evaluation = new LlmAnswerEvaluation(4, "Хороший ответ");
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class))).thenReturn(evaluation);
 
             QuestionResponse expectedResponse = new QuestionResponse(
                     questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", 4, "Хороший ответ");
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
+            when(interviewWriter.saveFeedback(questionId, evaluation)).thenReturn(expectedResponse);
 
             // when
             var result = interviewService.submitAnswer(request);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            assertThat(question.isAnswered()).isTrue();
-            assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
-            assertThat(question.getAnsweredAt()).isNotNull();
-            assertThat(question.getFeedback()).isNotNull();
-            assertThat(question.getFeedback().getScore()).isEqualTo(4);
-            assertThat(question.getFeedback().getFeedbackText()).isEqualTo("Хороший ответ");
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
 
             var evalRequestCaptor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
             verify(llmService).evaluateAnswer(evalRequestCaptor.capture());
@@ -784,101 +768,28 @@ class InterviewServiceTest {
             assertThat(evalRequestCaptor.getValue().question()).isEqualTo("Что такое JVM?");
             assertThat(evalRequestCaptor.getValue().level()).isEqualTo("MIDDLE");
             assertThat(evalRequestCaptor.getValue().answer()).isEqualTo("JVM - виртуальная машина");
+
+            verify(interviewWriter).saveFeedback(questionId, evaluation);
         }
 
         @Test
-        @DisplayName("Не вызывает оценку LLM, когда evaluate=false")
+        @DisplayName("Не вызывает оценку LLM и возвращает ответ из контекста, когда evaluate=false")
         void doesNotEvaluateWhenEvaluateFalse() {
             // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "Ответ без оценки", null, null);
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, false, "Ответ без оценки");
+            InterviewSession session = aSessionBuilder().build();
+            QuestionResponse contextResponse = aQuestionResponse();
+            InterviewWriter.AnswerContext context =
+                    new InterviewWriter.AnswerContext(contextResponse, session, "Что такое JVM?");
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, false, "JVM - виртуальная машина");
+            when(interviewWriter.saveAnswer(request)).thenReturn(context);
 
             // when
             var result = interviewService.submitAnswer(request);
 
             // then
-            assertThat(result).isEqualTo(expectedResponse);
-            assertThat(question.isAnswered()).isTrue();
-            assertThat(question.getFeedback()).isNull();
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
-            verifyNoInteractions(llmService, feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Бросает NotFoundException, когда вопрос не найден")
-        void throwsWhenQuestionNotFound() {
-            // given
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "answer");
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.submitAnswer(request))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Question not found");
-
-            verifyNoInteractions(llmService, feedbackRepository, questionMapper);
-        }
-
-        @Test
-        @DisplayName("Бросает ForbiddenException, когда вопрос принадлежит другому пользователю")
-        void throwsWhenQuestionOwnedByAnotherUser() {
-            // given
-            InterviewSession session = aSessionBuilder().userId(UUID.randomUUID()).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "answer");
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.submitAnswer(request))
-                    .isInstanceOf(ForbiddenException.class)
-                    .hasMessage("Access denied");
-
-            verifyNoInteractions(llmService, feedbackRepository, questionMapper);
-        }
-
-        @Test
-        @DisplayName("Бросает ConflictException, когда вопрос принадлежит другой сессии")
-        void throwsWhenQuestionBelongsToAnotherSession() {
-            // given
-            InterviewSession session = aSessionBuilder().id(UUID.randomUUID()).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "answer");
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.submitAnswer(request))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Invalid session");
-
-            verifyNoInteractions(llmService, feedbackRepository, questionMapper);
-        }
-
-        @Test
-        @DisplayName("Бросает ConflictException, когда вопрос уже отвечен")
-        void throwsWhenQuestionAlreadyAnswered() {
-            // given
-            InterviewSession session = aSessionBuilder().build();
-            InterviewQuestion question = aQuestion(session);
-            question.setAnswered(true);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "answer");
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.submitAnswer(request))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Question already answered");
-
-            verifyNoInteractions(llmService, feedbackRepository, questionMapper);
+            assertThat(result).isEqualTo(contextResponse);
+            verifyNoInteractions(llmService);
+            verify(interviewWriter, never()).saveFeedback(any(), any());
         }
 
         @Test
@@ -891,20 +802,19 @@ class InterviewServiceTest {
                     .source(SessionSource.VACANCY)
                     .vacancySnapshotId(vacancySnapshotId)
                     .build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            InterviewWriter.AnswerContext context =
+                    new InterviewWriter.AnswerContext(aQuestionResponse(), session, "Что такое JVM?");
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+            when(interviewWriter.saveAnswer(request)).thenReturn(context);
 
             when(vacancyService.getSnapshotView(vacancySnapshotId))
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет"));
-            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(4, "Неплохо"));
-            when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "ответ", 4, "Неплохо");
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
+            LlmAnswerEvaluation evaluation = new LlmAnswerEvaluation(4, "Неплохо");
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class))).thenReturn(evaluation);
 
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+            QuestionResponse expectedResponse = aQuestionResponse();
+            when(interviewWriter.saveFeedback(questionId, evaluation)).thenReturn(expectedResponse);
 
             // when
             var result = interviewService.submitAnswer(request);
@@ -927,20 +837,17 @@ class InterviewServiceTest {
                     .source(SessionSource.VACANCY)
                     .vacancySnapshotId(vacancySnapshotId)
                     .build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            InterviewWriter.AnswerContext context =
+                    new InterviewWriter.AnswerContext(aQuestionResponse(), session, "Что такое JVM?");
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+            when(interviewWriter.saveAnswer(request)).thenReturn(context);
 
             when(vacancyService.getSnapshotView(vacancySnapshotId))
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", null));
-            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(4, "Неплохо"));
-            when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "ответ", 4, "Неплохо");
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+            LlmAnswerEvaluation evaluation = new LlmAnswerEvaluation(4, "Неплохо");
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class))).thenReturn(evaluation);
+            when(interviewWriter.saveFeedback(eq(questionId), eq(evaluation))).thenReturn(aQuestionResponse());
 
             // when
             interviewService.submitAnswer(request);
@@ -949,63 +856,6 @@ class InterviewServiceTest {
             var captor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
             verify(llmService).evaluateAnswer(captor.capture());
             assertThat(captor.getValue().level()).isEqualTo("не указан");
-        }
-
-        @Test
-        @DisplayName("Не создаёт фидбэк, но сохраняет ответ, когда LLM вернула оценку вне диапазона 1..5")
-        void skipsFeedbackWhenLlmReturnsOutOfRangeScore() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(6, "Отлично"));
-
-            QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", null, null);
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
-
-            // when
-            var result = interviewService.submitAnswer(request);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            assertThat(question.isAnswered()).isTrue();
-            assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
-            assertThat(question.getAnsweredAt()).isNotNull();
-            assertThat(question.getFeedback()).isNull();
-            verify(feedbackRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("Не создаёт фидбэк, но сохраняет ответ, когда LLM вернула валидную оценку без текста фидбэка")
-        void skipsFeedbackWhenLlmReturnsBlankFeedbackText() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
-            InterviewQuestion question = aQuestion(session);
-            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(4, "  "));
-
-            QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", null, null);
-            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
-
-            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
-
-            // when
-            var result = interviewService.submitAnswer(request);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            assertThat(question.isAnswered()).isTrue();
-            assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
-            assertThat(question.getFeedback()).isNull();
-            verify(feedbackRepository, never()).save(any());
         }
     }
 
@@ -1018,185 +868,6 @@ class InterviewServiceTest {
     class FinishSession {
 
         @Test
-        @DisplayName("Формирует отчёт, сохраняет фидбэки только для неоцененных вопросов и завершает сессию")
-        void createsReportSavesFeedbacksForUnreviewedQuestionsAndCompletesSession() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-            UUID q3Id = UUID.randomUUID();
-            UUID q4Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-            InterviewQuestion q3 = InterviewQuestion.builder()
-                    .id(q3Id).session(session).questionText("Q3").answerText("A3").build();
-            InterviewQuestion q4 = InterviewQuestion.builder()
-                    .id(q4Id).session(session).questionText("Q4").answerText("A4").build();
-            AnswerFeedback existingFeedback = AnswerFeedback.builder()
-                    .question(q4).score(5).feedbackText("Уже оценено ранее").build();
-            q4.setFeedback(existingFeedback);
-
-            session.setQuestions(List.of(q1, q2, q3, q4));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Хорошо", 4),
-                            new LlmAnswerReview(q2Id, "Хорошо", 4),
-                            new LlmAnswerReview(q3Id, "Отлично", 5),
-                            new LlmAnswerReview(q4Id, "Уже оценено ранее", null)
-                    ),
-                    "В целом уверенное собеседование.",
-                    "MEDIUM"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.3, "В целом уверенное собеседование.", OfferProbability.MEDIUM, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            var result = interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedReport);
-
-            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Хорошо");
-            assertThat(q2.getFeedback().getScore()).isEqualTo(4);
-            assertThat(q3.getFeedback().getScore()).isEqualTo(5);
-            assertThat(q3.getFeedback().getFeedbackText()).isEqualTo("Отлично");
-            // фидбэк уже отвеченного вопроса не перезаписывается
-            assertThat(q4.getFeedback()).isSameAs(existingFeedback);
-
-            assertThat(session.getInterviewReport()).isNotNull();
-            // (4 + 4 + 5) / 3 = 4.333..., округление до 0.1 -> 4.3; null-скор q4 отфильтрован
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.3);
-            assertThat(session.getInterviewReport().getOfferProbability()).isEqualTo(OfferProbability.MEDIUM);
-            assertThat(session.getInterviewReport().getOverallFeedback())
-                    .isEqualTo("В целом уверенное собеседование.");
-
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-            assertThat(session.getCompletedAt()).isNotNull();
-
-            verify(sessionRepository).save(session);
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Не падает с NPE и не создаёт фидбэк, когда LLM вернула отзыв без score")
-        void skipsFeedbackWhenLlmReturnsNullScore() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-
-            session.setQuestions(List.of(q1, q2));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Хорошо", 4),
-                            new LlmAnswerReview(q2Id, "Не удалось оценить", null)
-                    ),
-                    "Собеседование пройдено.",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.0, "Собеседование пройдено.", OfferProbability.LOW, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            var result = interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedReport);
-
-            assertThat(q1.getFeedback()).isNotNull();
-            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            // вопрос с null score от LLM не получает фидбэк, а не падает с NPE
-            assertThat(q2.getFeedback()).isNull();
-
-            assertThat(session.getInterviewReport()).isNotNull();
-            // null-скор q2 отфильтрован, средний балл считается только по q1
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
-
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-            assertThat(session.getCompletedAt()).isNotNull();
-
-            verify(sessionRepository).save(session);
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Не падает с NPE и не создаёт фидбэк, когда LLM вообще не вернула отзыв на вопрос")
-        void skipsFeedbackWhenLlmReturnsNoReviewForQuestion() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-
-            session.setQuestions(List.of(q1, q2));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            // LLM вернула отзыв только на q1, про q2 в ответе нет записи вовсе
-            LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
-                    "Собеседование пройдено.",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.0, "Собеседование пройдено.", OfferProbability.LOW, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            var result = interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedReport);
-
-            assertThat(q1.getFeedback()).isNotNull();
-            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            // на вопрос без отзыва от LLM (нет записи в answersMap) фидбэк не создаётся
-            assertThat(q2.getFeedback()).isNull();
-
-            assertThat(session.getInterviewReport()).isNotNull();
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
-
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-            assertThat(session.getCompletedAt()).isNotNull();
-
-            verify(sessionRepository).save(session);
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
         @DisplayName("Бросает NotFoundException, когда сессия не найдена")
         void throwsWhenSessionNotFound() {
             // given
@@ -1207,8 +878,7 @@ class InterviewServiceTest {
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
 
-            verifyNoInteractions(llmService, feedbackRepository);
-            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(llmService, interviewWriter);
         }
 
         @Test
@@ -1223,8 +893,35 @@ class InterviewServiceTest {
                     .isInstanceOf(ForbiddenException.class)
                     .hasMessage("Access denied");
 
-            verifyNoInteractions(llmService, feedbackRepository);
-            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(llmService, interviewWriter);
+        }
+
+        @Test
+        @DisplayName("Строит отчёт через LLM и делегирует его сборку и сохранение interviewWriter.completeReport")
+        void delegatesReportCompletionToInterviewWriter() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            session.setQuestions(List.of(q1));
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)), "Отчёт", "MEDIUM");
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    UUID.randomUUID(), SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    10, 4.0, "Отчёт", OfferProbability.MEDIUM, null);
+            when(interviewWriter.completeReport(SESSION_ID, llmReport)).thenReturn(expectedReport);
+
+            // when
+            var result = interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedReport);
+            verify(interviewWriter).completeReport(SESSION_ID, llmReport);
         }
 
         @Test
@@ -1252,9 +949,8 @@ class InterviewServiceTest {
                     List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)), "Отчёт", "HIGH");
             when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
 
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, null, null, null, 10, 4.0, "Отчёт", OfferProbability.HIGH, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+            SessionReport expectedReport = mock(SessionReport.class);
+            when(interviewWriter.completeReport(SESSION_ID, llmReport)).thenReturn(expectedReport);
 
             // when
             var result = interviewService.finishSession(SESSION_ID, USER_ID);
@@ -1292,9 +988,8 @@ class InterviewServiceTest {
                     List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)), "Отчёт", "HIGH");
             when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
 
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, null, null, null, 10, 4.0, "Отчёт", OfferProbability.HIGH, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+            SessionReport expectedReport = mock(SessionReport.class);
+            when(interviewWriter.completeReport(SESSION_ID, llmReport)).thenReturn(expectedReport);
 
             // when
             interviewService.finishSession(SESSION_ID, USER_ID);
@@ -1303,313 +998,6 @@ class InterviewServiceTest {
             var captor = ArgumentCaptor.forClass(LlmReportRequest.class);
             verify(llmService).createReport(captor.capture());
             assertThat(captor.getValue().level()).isEqualTo("не указан");
-        }
-
-        @Test
-        @DisplayName("Бросает LlmException, когда все отзывы LLM без score")
-        void throwsWhenAllReviewsHaveNullScore() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-
-            session.setQuestions(List.of(q1, q2));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Не удалось оценить", null),
-                            new LlmAnswerReview(q2Id, "Не удалось оценить", null)
-                    ),
-                    "Отчёт",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Interview report has no usable scores");
-
-            assertThat(session.getInterviewReport()).isNull();
-            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository, never()).save(any());
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Пропускает фидбэк вопроса с оценкой вне диапазона 1..5, а средний балл считает только по валидным")
-        void skipsFeedbackForOutOfRangeScoreAndAveragesOnlyValidOnes() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-
-            session.setQuestions(List.of(q1, q2));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Хорошо", 4),
-                            new LlmAnswerReview(q2Id, "Отлично", 6)
-                    ),
-                    "Отчёт",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.0, "Отчёт", OfferProbability.LOW, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            var result = interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedReport);
-
-            assertThat(q1.getFeedback()).isNotNull();
-            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            // оценка вне диапазона 1..5 не сохраняется в фидбэк
-            assertThat(q2.getFeedback()).isNull();
-
-            assertThat(session.getInterviewReport()).isNotNull();
-            // средний балл считается только по валидным оценкам (q2 со score=6 отфильтрован)
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
-
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-            verify(sessionRepository).save(session);
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Бросает LlmException, когда все отзывы LLM вне диапазона 1..5")
-        void throwsWhenAllReviewsHaveOutOfRangeScore() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            UUID q2Id = UUID.randomUUID();
-
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-            InterviewQuestion q2 = InterviewQuestion.builder()
-                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
-
-            session.setQuestions(List.of(q1, q2));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Отлично", 6),
-                            new LlmAnswerReview(q2Id, "Плохо", 0)
-                    ),
-                    "Отчёт",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Interview report has no usable scores");
-
-            assertThat(q1.getFeedback()).isNull();
-            assertThat(q2.getFeedback()).isNull();
-            assertThat(session.getInterviewReport()).isNull();
-            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository, never()).save(any());
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Бросает LlmException, когда LLM вернула пустой список отзывов")
-        void throwsWhenLlmReturnsEmptyAnswersList() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-
-            session.setQuestions(List.of(q1));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(List.of(), "Отчёт", "LOW");
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Interview report has no usable scores");
-
-            assertThat(session.getInterviewReport()).isNull();
-            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository, never()).save(any());
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Бросает LlmException, когда offerProbability от LLM не распознан")
-        void throwsWhenOfferProbabilityUnrecognized() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-
-            session.setQuestions(List.of(q1));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
-                    "Отчёт",
-                    "unknown"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Interview report has an invalid offer probability");
-
-            assertThat(session.getInterviewReport()).isNull();
-            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository, never()).save(any());
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Распознаёт русский лейбл offerProbability от LLM и завершает сессию")
-        void resolvesOfferProbabilityFromRussianLabel() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-
-            session.setQuestions(List.of(q1));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
-                    "Отчёт",
-                    "Средняя"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.0, "Отчёт", OfferProbability.MEDIUM, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(session.getInterviewReport()).isNotNull();
-            assertThat(session.getInterviewReport().getOfferProbability()).isEqualTo(OfferProbability.MEDIUM);
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository).save(session);
-        }
-
-        @Test
-        @DisplayName("Бросает LlmException и не падает с NPE, когда LLM вернула null вместо списка отзывов")
-        void throwsWhenLlmReturnsNullAnswersList() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-
-            session.setQuestions(List.of(q1));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(null, "Отчёт", "LOW");
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Interview report has no usable scores");
-
-            assertThat(session.getInterviewReport()).isNull();
-            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
-
-            verify(sessionRepository, never()).save(any());
-            verifyNoInteractions(feedbackRepository);
-        }
-
-        @Test
-        @DisplayName("Не падает с дублирующимися id вопросов от LLM и дедуплицирует отзывы")
-        void deduplicatesReviewsWithDuplicateQuestionIds() {
-            // given
-            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
-
-            UUID q1Id = UUID.randomUUID();
-            InterviewQuestion q1 = InterviewQuestion.builder()
-                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
-
-            session.setQuestions(List.of(q1));
-
-            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
-
-            LlmReport llmReport = new LlmReport(
-                    List.of(
-                            new LlmAnswerReview(q1Id, "Первый", 4),
-                            new LlmAnswerReview(q1Id, "Второй", 2)
-                    ),
-                    "Отчёт",
-                    "LOW"
-            );
-            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
-
-            SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 4.0, "Отчёт", OfferProbability.LOW, null);
-            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
-
-            // when
-            var result = interviewService.finishSession(SESSION_ID, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedReport);
-
-            assertThat(q1.getFeedback()).isNotNull();
-            // при дубликате id merge-функция оставляет первый отзыв
-            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Первый");
-
-            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
-            verify(sessionRepository).save(session);
         }
     }
 

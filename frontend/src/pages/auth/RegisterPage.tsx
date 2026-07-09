@@ -5,8 +5,12 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Field } from '@/components/ui/Field'
+import { ResendVerification } from '@/components/auth/ResendVerification'
+import {
+  authErrorMessage,
+  isEmailRegisteredUnverified,
+} from '@/features/auth/errors'
 import { useRegister } from '@/features/auth/useAuth'
-import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function RegisterPage() {
@@ -43,6 +47,7 @@ export function RegisterPage() {
           <span className="text-ink">{email}</span>. Перейдите по ней, чтобы
           завершить регистрацию.
         </p>
+        <ResendVerification email={email} initialCooldown={60} />
         <p className="mt-8 text-sm">
           <Link to="/login" className="text-accent hover:text-accent-hover">
             Вернуться ко входу
@@ -63,7 +68,15 @@ export function RegisterPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
-        {register.isError && <Alert>{getErrorMessage(register.error)}</Alert>}
+        {register.isError &&
+          (isEmailRegisteredUnverified(register.error) ? (
+            <div>
+              <Alert>{authErrorMessage(register.error)}</Alert>
+              <ResendVerification email={email} />
+            </div>
+          ) : (
+            <Alert>{authErrorMessage(register.error)}</Alert>
+          ))}
         <Field
           label="Email"
           type="email"

@@ -765,9 +765,9 @@ class InterviewServiceTest {
 
             var evalRequestCaptor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
             verify(llmService).evaluateAnswer(evalRequestCaptor.capture());
-            assertThat(evalRequestCaptor.getValue().profession()).isEqualTo("JAVA_DEV");
+            assertThat(evalRequestCaptor.getValue().profession()).isEqualTo("Java-разработчик");
             assertThat(evalRequestCaptor.getValue().question()).isEqualTo("Что такое JVM?");
-            assertThat(evalRequestCaptor.getValue().level()).isEqualTo("MIDDLE");
+            assertThat(evalRequestCaptor.getValue().level()).isEqualTo("Middle");
             assertThat(evalRequestCaptor.getValue().answer()).isEqualTo("JVM - виртуальная машина");
 
             verify(interviewWriter).saveFeedback(questionId, evaluation);

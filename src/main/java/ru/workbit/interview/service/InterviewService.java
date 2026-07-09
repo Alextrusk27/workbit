@@ -297,7 +297,7 @@ public class InterviewService {
             VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
             return new SessionContext(vacancy.name(), experienceLabel(vacancy.experience()));
         }
-        return new SessionContext(session.getProfession().name(), session.getLevel().name());
+        return new SessionContext(session.getProfession().getName(), session.getLevel().getName());
     }
 
     private static String experienceLabel(String experience) {

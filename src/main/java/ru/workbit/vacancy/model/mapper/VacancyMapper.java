@@ -5,6 +5,7 @@ import org.mapstruct.Mapping;
 import ru.workbit.vacancy.dto.HhVacancyResponse;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancyPreviewResponse;
+import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.model.VacancySnapshot;
 
 import java.util.Locale;
@@ -25,6 +26,8 @@ public interface VacancyMapper {
     @Mapping(target = "employer", source = "response.employer.name")
     @Mapping(target = "experience", source = "response.experience.name")
     VacancyPreviewResponse toPreview(HhVacancyResponse response, String url);
+
+    VacancySnapshotView toSnapshotView(VacancySnapshot snapshot);
 
     default String toSkillName(HhVacancyResponse.KeySkill keySkill) {
         return keySkill.name();

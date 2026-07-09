@@ -62,6 +62,26 @@ public class InterviewController {
                 .body(session);
     }
 
+    @PostMapping("/sessions/by-vacancy")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Создать сессию по вакансии", description = "Создаёт сессию с вопросами, сгенерированными LLM по вакансии hh.ru (vacancyUrl) либо по вставленному тексту вакансии (vacancyText). В запросе указывается ровно одно из двух полей.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Сессия создана"),
+            @ApiResponse(responseCode = "400", description = "Ссылка не является вакансией hh.ru, текст вакансии или количество вопросов вне допустимых значений, либо не заполнено ровно одно из полей vacancyUrl/vacancyText", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Вакансия не найдена или в архиве", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "hh.ru или AI-сервис недоступны", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull SessionResponse> createSessionByVacancy(
+            @RequestBody @Valid CreateSessionByVacancyRequest request,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        var session = interviewService.createSessionByVacancy(request, userDetails.getId());
+        return ResponseEntity
+                .created(URI.create("/sessions/" + session.id()))
+                .body(session);
+    }
+
     @GetMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
     @Operation(summary = "Список сессий пользователя", description = "Возвращает все сессии собеседований текущего пользователя.")

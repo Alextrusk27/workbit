@@ -7,6 +7,7 @@ import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.SessionReport;
 import ru.workbit.interview.dto.SessionResponse;
 import ru.workbit.interview.model.InterviewSession;
+import ru.workbit.vacancy.dto.VacancySnapshotView;
 
 @Mapper(componentModel = "spring")
 public interface SessionMapper {
@@ -23,7 +24,9 @@ public interface SessionMapper {
     InterviewSession toEntity(CreateSessionRequest request);
 
     @Mapping(target = "answeredCount", source = "answeredCount")
-    SessionResponse toResponse(InterviewSession session, int answeredCount);
+    @Mapping(target = "source", source = "session.source")
+    @Mapping(target = "vacancy", source = "vacancy")
+    SessionResponse toResponse(InterviewSession session, int answeredCount, VacancySnapshotView vacancy);
 
     @Mappings({
             @Mapping(target = "reportId", source = "session.interviewReport.id"),

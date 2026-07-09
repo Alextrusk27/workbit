@@ -14,7 +14,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.VacancyFetchException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.interview.dto.*;
 import ru.workbit.interview.model.*;
@@ -73,6 +75,20 @@ class InterviewControllerTest {
     private SessionResponse aSessionResponse() {
         return new SessionResponse(
                 SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                SessionSource.CATALOG, null,
+                SessionStatus.CREATED, 10, 0,
+                Instant.parse("2026-01-01T00:00:00Z"), null);
+    }
+
+    private CreateSessionByVacancyRequest aCreateSessionByVacancyRequest() {
+        return new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", null, 10);
+    }
+
+    private SessionResponse aVacancySessionResponse() {
+        return new SessionResponse(
+                SESSION_ID, null, null, null,
+                SessionSource.VACANCY,
+                new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123456"),
                 SessionStatus.CREATED, 10, 0,
                 Instant.parse("2026-01-01T00:00:00Z"), null);
     }
@@ -257,6 +273,199 @@ class InterviewControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions/by-vacancy
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("CreateSessionByVacancy")
+    class CreateSessionByVacancy {
+
+        @Test
+        @DisplayName("Возвращает 201, Location и данные вакансии при успешном создании")
+        void returns201WithLocationAndVacancyInfo() throws Exception {
+            // given
+            var request = aCreateSessionByVacancyRequest();
+            when(interviewService.createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID)))
+                    .thenReturn(aVacancySessionResponse());
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string(HttpHeaders.LOCATION, "/sessions/" + SESSION_ID))
+                    .andExpect(jsonPath("$.id").value(SESSION_ID.toString()))
+                    .andExpect(jsonPath("$.source").value("VACANCY"))
+                    .andExpect(jsonPath("$.vacancy.name").value("Java-разработчик"));
+
+            verify(interviewService).createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда заданы оба поля vacancyUrl и vacancyText")
+        void returns400WhenBothFieldsSet() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest(
+                    "https://hh.ru/vacancy/123456", "x".repeat(50), 10);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда не задано ни одного поля")
+        void returns400WhenNeitherFieldSet() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest(null, null, 10);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда vacancyText короче 50 символов")
+        void returns400WhenVacancyTextTooShort() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest(null, "слишком короткий текст", 10);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда totalQuestions отсутствует")
+        void returns400WhenTotalQuestionsMissing() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", null, null);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда totalQuestions меньше минимума")
+        void returns400WhenTotalQuestionsBelowMin() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest(
+                    "https://hh.ru/vacancy/123456", null, CreateSessionRequest.MIN_QUESTIONS - 1);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда totalQuestions больше максимума")
+        void returns400WhenTotalQuestionsAboveMax() throws Exception {
+            // given
+            var request = new CreateSessionByVacancyRequest(
+                    "https://hh.ru/vacancy/123456", null, CreateSessionRequest.MAX_QUESTIONS + 1);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда вакансия не найдена")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var request = aCreateSessionByVacancyRequest();
+            when(interviewService.createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID)))
+                    .thenThrow(new NotFoundException("Vacancy not found"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 503, когда hh.ru недоступен")
+        void returns503WhenVacancyFetchFails() throws Exception {
+            // given
+            var request = aCreateSessionByVacancyRequest();
+            when(interviewService.createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID)))
+                    .thenThrow(new VacancyFetchException("hh.ru unavailable", new RuntimeException("timeout")));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isServiceUnavailable());
+        }
+
+        @Test
+        @DisplayName("Возвращает 503, когда AI-сервис недоступен")
+        void returns503WhenLlmFails() throws Exception {
+            // given
+            var request = aCreateSessionByVacancyRequest();
+            when(interviewService.createSessionByVacancy(any(CreateSessionByVacancyRequest.class), eq(USER_ID)))
+                    .thenThrow(new LlmException("LLM unavailable"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isServiceUnavailable());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var request = aCreateSessionByVacancyRequest();
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions/by-vacancy")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(interviewService);
         }

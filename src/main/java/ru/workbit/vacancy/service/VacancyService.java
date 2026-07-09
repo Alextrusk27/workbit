@@ -8,12 +8,17 @@ import ru.workbit.vacancy.client.HhClient;
 import ru.workbit.vacancy.dto.HhVacancyResponse;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancyPreviewResponse;
+import ru.workbit.vacancy.dto.VacancySnapshotView;
+import ru.workbit.vacancy.model.VacancySnapshot;
 import ru.workbit.vacancy.model.mapper.VacancyMapper;
 import ru.workbit.vacancy.repository.VacancySnapshotRepository;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +48,17 @@ public class VacancyService {
 
     public UUID saveSnapshot(VacancyData data, String name) {
         return vacancySnapshotRepository.save(vacancyMapper.toSnapshot(data, name)).getId();
+    }
+
+    public VacancySnapshotView getSnapshotView(UUID id) {
+        return vacancySnapshotRepository.findById(id)
+                .map(vacancyMapper::toSnapshotView)
+                .orElseThrow(() -> new NotFoundException("Vacancy snapshot %s not found".formatted(id)));
+    }
+
+    public Map<UUID, VacancySnapshotView> getSnapshotViews(Collection<UUID> ids) {
+        return vacancySnapshotRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(VacancySnapshot::getId, vacancyMapper::toSnapshotView));
     }
 
     private HhVacancyResponse getActiveVacancy(String vacancyId) {

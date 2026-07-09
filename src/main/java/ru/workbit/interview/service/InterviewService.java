@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
+import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
 import ru.workbit.interview.model.*;
@@ -19,6 +20,9 @@ import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
 import ru.workbit.llm.dto.*;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.vacancy.dto.VacancyData;
+import ru.workbit.vacancy.dto.VacancySnapshotView;
+import ru.workbit.vacancy.service.VacancyService;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +39,8 @@ import java.util.stream.IntStream;
 public class InterviewService {
     private final QuestionBank questionBank;
     private final LlmService llmService;
+    private final VacancyService vacancyService;
+    private final VacancySessionCreator vacancySessionCreator;
 
     private final SessionMapper sessionMapper;
     private final QuestionMapper questionMapper;
@@ -61,7 +67,68 @@ public class InterviewService {
         session.setQuestions(createQuestions(request, session));
         sessionRepository.save(session);
 
-        return sessionMapper.toResponse(session, 0);
+        return sessionMapper.toResponse(session, 0, null);
+    }
+
+    public SessionResponse createSessionByVacancy(CreateSessionByVacancyRequest request, UUID userId) {
+        VacancyData data = resolveVacancyData(request);
+
+        LlmGeneratedQuestions generated = llmService.generateVacancyQuestions(
+                toGenerationRequest(data, request.totalQuestions()));
+
+        List<String> questions = trimQuestions(generated.questions(), request.totalQuestions());
+        if (questions.isEmpty()) {
+            log.error("Question generator returned no questions for a vacancy session of user {}", userId);
+            throw new LlmException("Question generator returned no questions");
+        }
+
+        String name = resolveName(data, generated);
+        InterviewSession session = vacancySessionCreator.persist(data, name, questions, userId);
+
+        return sessionMapper.toResponse(session, 0,
+                new VacancySnapshotView(name, data.employer(), data.url(), data.experience()));
+    }
+
+    private VacancyData resolveVacancyData(CreateSessionByVacancyRequest request) {
+        if (request.vacancyUrl() != null && !request.vacancyUrl().isBlank()) {
+            return vacancyService.fetch(request.vacancyUrl());
+        }
+        return vacancyService.fromText(request.vacancyText());
+    }
+
+    private LlmQuestionGenerationRequest toGenerationRequest(VacancyData data, int questionCount) {
+        return new LlmQuestionGenerationRequest(
+                nvl(data.name()),
+                nvl(data.employer()),
+                nvl(data.experience()),
+                data.keySkills() == null ? "" : String.join(", ", data.keySkills()),
+                data.description(),
+                questionCount);
+    }
+
+    private List<String> trimQuestions(List<String> questions, int requested) {
+        if (questions == null || questions.isEmpty()) {
+            return List.of();
+        }
+        if (questions.size() > requested) {
+            return List.copyOf(questions.subList(0, requested));
+        }
+        if (questions.size() < requested) {
+            log.warn("LLM generated {} questions, {} requested; using what was generated",
+                    questions.size(), requested);
+        }
+        return questions;
+    }
+
+    private String resolveName(VacancyData data, LlmGeneratedQuestions generated) {
+        if (data.name() != null && !data.name().isBlank()) {
+            return data.name();
+        }
+        return generated.title() != null && !generated.title().isBlank() ? generated.title() : "Вакансия";
+    }
+
+    private static String nvl(String value) {
+        return value == null ? "" : value;
     }
 
     public List<SessionResponse> getAllSessions(UUID userId) {
@@ -74,17 +141,36 @@ public class InterviewService {
                         QuestionRepository.AnsweredCount::getSessionId,
                         QuestionRepository.AnsweredCount::getCount));
 
+        Map<UUID, VacancySnapshotView> vacancies = vacancyService.getSnapshotViews(
+                sessions.stream()
+                        .map(InterviewSession::getVacancySnapshotId)
+                        .filter(Objects::nonNull)
+                        .toList());
+
         return sessions.stream()
                 .map(session -> sessionMapper.toResponse(
-                        session, answered.getOrDefault(session.getId(), 0L).intValue()))
+                        session,
+                        answered.getOrDefault(session.getId(), 0L).intValue(),
+                        session.getVacancySnapshotId() == null
+                                ? null
+                                : vacancies.get(session.getVacancySnapshotId())))
                 .toList();
     }
 
     public SessionResponse getSession(UUID sessionId, UUID userId) {
         return sessionRepository.findByIdAndUserId(sessionId, userId)
                 .map(session -> sessionMapper.toResponse(
-                        session, (int) questionRepository.countBySessionIdAndAnsweredTrue(sessionId)))
+                        session,
+                        (int) questionRepository.countBySessionIdAndAnsweredTrue(sessionId),
+                        vacancyView(session)))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
+    }
+
+    private VacancySnapshotView vacancyView(InterviewSession session) {
+        if (session.getSource() != SessionSource.VACANCY || session.getVacancySnapshotId() == null) {
+            return null;
+        }
+        return vacancyService.getSnapshotView(session.getVacancySnapshotId());
     }
 
     public QuestionResponse continueSession(UUID sessionId, UUID userId) {
@@ -217,11 +303,12 @@ public class InterviewService {
     }
 
     private void saveEvaluation(InterviewQuestion question, String answerText) {
+        SessionContext context = resolveContext(question.getSession());
         LlmAnswerEvaluation evaluation = llmService.evaluateAnswer(
                 new LlmAnswerEvaluationRequest(
-                        question.getSession().getProfession().name(),
+                        context.profession(),
                         question.getQuestionText(),
-                        question.getSession().getLevel().name(),
+                        context.level(),
                         answerText));
 
         AnswerFeedback feedback = feedbackRepository.save(
@@ -254,10 +341,11 @@ public class InterviewService {
     }
 
     public LlmReport createLlmReport(InterviewSession session) {
+        SessionContext context = resolveContext(session);
         return llmService.createReport(
                 new LlmReportRequest(
-                        session.getProfession().name(),
-                        session.getLevel().name(),
+                        context.profession(),
+                        context.level(),
                         session.getQuestions().stream()
                                 .map(q -> new LlmAnswer(
                                                 q.getId(),
@@ -296,5 +384,20 @@ public class InterviewService {
                 .mapToInt(Integer::intValue)
                 .average()
                 .orElse(0.0);
+    }
+
+    private SessionContext resolveContext(InterviewSession session) {
+        if (session.getSource() == SessionSource.VACANCY) {
+            VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
+            return new SessionContext(vacancy.name(), experienceLabel(vacancy.experience()));
+        }
+        return new SessionContext(session.getProfession().name(), session.getLevel().name());
+    }
+
+    private static String experienceLabel(String experience) {
+        return experience != null && !experience.isBlank() ? experience : "не указан";
+    }
+
+    private record SessionContext(String profession, String level) {
     }
 }

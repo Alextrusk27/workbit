@@ -1,4 +1,4 @@
-package ru.workbit.interview;
+package ru.workbit.interview.service;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -11,7 +11,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
+import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.interview.dto.CreateSessionByVacancyRequest;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.QuestionRequest;
 import ru.workbit.interview.dto.QuestionResponse;
@@ -26,6 +28,7 @@ import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.OfferProbability;
 import ru.workbit.interview.model.Profession;
+import ru.workbit.interview.model.SessionSource;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.mapper.QuestionMapper;
 import ru.workbit.interview.model.mapper.SessionMapper;
@@ -34,15 +37,20 @@ import ru.workbit.interview.question.QuestionBank;
 import ru.workbit.interview.repository.FeedbackRepository;
 import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
-import ru.workbit.interview.service.InterviewService;
 import ru.workbit.llm.dto.LlmAnswerEvaluation;
 import ru.workbit.llm.dto.LlmAnswerEvaluationRequest;
 import ru.workbit.llm.dto.LlmAnswerReview;
+import ru.workbit.llm.dto.LlmGeneratedQuestions;
+import ru.workbit.llm.dto.LlmQuestionGenerationRequest;
 import ru.workbit.llm.dto.LlmReport;
 import ru.workbit.llm.dto.LlmReportRequest;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.vacancy.dto.VacancyData;
+import ru.workbit.vacancy.dto.VacancySnapshotView;
+import ru.workbit.vacancy.service.VacancyService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -63,6 +71,10 @@ class InterviewServiceTest {
     QuestionBank questionBank;
     @Mock
     LlmService llmService;
+    @Mock
+    VacancyService vacancyService;
+    @Mock
+    VacancySessionCreator vacancySessionCreator;
     @Mock
     SessionMapper sessionMapper;
     @Mock
@@ -142,8 +154,9 @@ class InterviewServiceTest {
 
             SessionResponse expectedResponse = new SessionResponse(
                     null, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    SessionSource.CATALOG, null,
                     SessionStatus.CREATED, 2, 0, null, null);
-            when(sessionMapper.toResponse(session, 0)).thenReturn(expectedResponse);
+            when(sessionMapper.toResponse(session, 0, null)).thenReturn(expectedResponse);
 
             // when
             var result = interviewService.createSession(request, USER_ID);
@@ -176,6 +189,279 @@ class InterviewServiceTest {
     }
 
     // -------------------------------------------------------------------------
+    // createSessionByVacancy
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("CreateSessionByVacancy")
+    class CreateSessionByVacancy {
+
+        private VacancyData aVacancyData() {
+            return new VacancyData(123L, "https://hh.ru/vacancy/123", "Java-разработчик",
+                    "ООО Ромашка", "От 3 до 6 лет", List.of("Java", "Spring", "SQL"), "Описание вакансии");
+        }
+
+        private InterviewSession aPersistedSession(UUID vacancySnapshotId, int totalQuestions) {
+            return InterviewSession.builder()
+                    .id(SESSION_ID)
+                    .userId(USER_ID)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .status(SessionStatus.CREATED)
+                    .totalQuestions(totalQuestions)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Получает данные вакансии по URL, генерирует вопросы через LLM и сохраняет сессию")
+        void fetchesByUrlPersistsAndMapsResponse() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            when(vacancyService.fetch("https://hh.ru/vacancy/123")).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Сгенерированный заголовок",
+                    List.of("Q1", "Q2", "Q3"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession persistedSession = aPersistedSession(vacancySnapshotId, 3);
+            when(vacancySessionCreator.persist(data, "Java-разработчик", List.of("Q1", "Q2", "Q3"), USER_ID))
+                    .thenReturn(persistedSession);
+
+            SessionResponse expectedResponse = new SessionResponse(
+                    SESSION_ID, null, null, null,
+                    SessionSource.VACANCY,
+                    new SessionResponse.VacancyInfo("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123"),
+                    SessionStatus.CREATED, 3, 0, null, null);
+            when(sessionMapper.toResponse(persistedSession, 0,
+                    new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет")))
+                    .thenReturn(expectedResponse);
+
+            // when
+            var result = interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(vacancyService).fetch("https://hh.ru/vacancy/123");
+            verify(vacancyService, never()).fromText(any());
+        }
+
+        @Test
+        @DisplayName("Получает данные вакансии из текста, когда URL не задан")
+        void fromTextWhenUrlBlank() {
+            // given
+            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
+            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 2);
+            when(vacancyService.fromText("Текст вакансии, достаточно длинный")).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок из LLM", List.of("Q1", "Q2"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession persistedSession = aPersistedSession(vacancySnapshotId, 2);
+            when(vacancySessionCreator.persist(data, "Заголовок из LLM", List.of("Q1", "Q2"), USER_ID))
+                    .thenReturn(persistedSession);
+
+            SessionResponse expectedResponse = new SessionResponse(
+                    SESSION_ID, null, null, null,
+                    SessionSource.VACANCY,
+                    new SessionResponse.VacancyInfo("Заголовок из LLM", null, null),
+                    SessionStatus.CREATED, 2, 0, null, null);
+            when(sessionMapper.toResponse(persistedSession, 0,
+                    new VacancySnapshotView("Заголовок из LLM", null, null, null)))
+                    .thenReturn(expectedResponse);
+
+            // when
+            var result = interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(vacancyService).fromText("Текст вакансии, достаточно длинный");
+            verify(vacancyService, never()).fetch(any());
+        }
+
+        @Test
+        @DisplayName("Прокидывает поля вакансии в запрос к LLM и склеивает keySkills через ', '")
+        void passesVacancyFieldsToLlmRequest() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            when(vacancyService.fetch(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2", "Q3"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 3));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(LlmQuestionGenerationRequest.class);
+            verify(llmService).generateVacancyQuestions(captor.capture());
+            assertThat(captor.getValue().vacancyName()).isEqualTo("Java-разработчик");
+            assertThat(captor.getValue().employer()).isEqualTo("ООО Ромашка");
+            assertThat(captor.getValue().experience()).isEqualTo("От 3 до 6 лет");
+            assertThat(captor.getValue().keySkills()).isEqualTo("Java, Spring, SQL");
+            assertThat(captor.getValue().description()).isEqualTo("Описание вакансии");
+            assertThat(captor.getValue().questionCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("Заменяет null-поля вакансии на пустые строки, а null keySkills на пустую строку")
+        void nullVacancyFieldsBecomeEmptyStringsInLlmRequest() {
+            // given
+            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
+            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 2);
+            when(vacancyService.fromText(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 2));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(LlmQuestionGenerationRequest.class);
+            verify(llmService).generateVacancyQuestions(captor.capture());
+            assertThat(captor.getValue().vacancyName()).isEmpty();
+            assertThat(captor.getValue().employer()).isEmpty();
+            assertThat(captor.getValue().experience()).isEmpty();
+            assertThat(captor.getValue().keySkills()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Обрезает вопросы до totalQuestions, когда LLM сгенерировала больше")
+        void trimsQuestionsWhenLlmReturnsMoreThanRequested() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 2);
+            when(vacancyService.fetch(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок",
+                    List.of("Q1", "Q2", "Q3", "Q4"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 2));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(List.class);
+            verify(vacancySessionCreator).persist(eq(data), eq("Java-разработчик"), captor.capture(), eq(USER_ID));
+            assertThat(captor.getValue()).containsExactly("Q1", "Q2");
+        }
+
+        @Test
+        @DisplayName("Использует все вопросы, когда LLM сгенерировала меньше, чем запрошено")
+        void keepsAllQuestionsWhenLlmReturnsFewerThanRequested() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 5);
+            when(vacancyService.fetch(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 2));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(List.class);
+            verify(vacancySessionCreator).persist(eq(data), eq("Java-разработчик"), captor.capture(), eq(USER_ID));
+            assertThat(captor.getValue()).containsExactly("Q1", "Q2");
+        }
+
+        @Test
+        @DisplayName("Бросает LlmException и не сохраняет сессию, когда LLM вернула пустой список вопросов")
+        void throwsLlmExceptionWhenGeneratedQuestionsEmpty() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            when(vacancyService.fetch(any())).thenReturn(data);
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
+                    .thenReturn(new LlmGeneratedQuestions("Заголовок", List.of()));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSessionByVacancy(request, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Question generator returned no questions");
+
+            verifyNoInteractions(vacancySessionCreator, sessionMapper);
+        }
+
+        @Test
+        @DisplayName("Бросает LlmException и не сохраняет сессию, когда LLM вернула null вместо списка вопросов")
+        void throwsLlmExceptionWhenGeneratedQuestionsNull() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            when(vacancyService.fetch(any())).thenReturn(data);
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
+                    .thenReturn(new LlmGeneratedQuestions("Заголовок", null));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSessionByVacancy(request, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Question generator returned no questions");
+
+            verifyNoInteractions(vacancySessionCreator, sessionMapper);
+        }
+
+        @Test
+        @DisplayName("Берёт имя из заголовка LLM, когда имя вакансии не задано")
+        void resolvesNameFromGeneratedTitleWhenVacancyNameBlank() {
+            // given
+            VacancyData data = new VacancyData(null, null, "  ", null, null, null, "Текст вакансии, достаточно длинный");
+            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
+            when(vacancyService.fromText(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок из LLM", List.of("Q1"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 1));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            verify(vacancySessionCreator).persist(eq(data), eq("Заголовок из LLM"), any(), eq(USER_ID));
+        }
+
+        @Test
+        @DisplayName("Использует фолбэк 'Вакансия', когда ни имя вакансии, ни заголовок LLM не заданы")
+        void resolvesNameFallbackWhenBothBlank() {
+            // given
+            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
+            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
+            when(vacancyService.fromText(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions(null, List.of("Q1"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 1));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            verify(vacancySessionCreator).persist(eq(data), eq("Вакансия"), any(), eq(USER_ID));
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // getAllSessions
     // -------------------------------------------------------------------------
 
@@ -199,20 +485,58 @@ class InterviewServiceTest {
             when(questionRepository.countAnsweredBySessionIds(List.of(session1Id, session2Id)))
                     .thenReturn(List.of(answeredCount1));
 
+            when(vacancyService.getSnapshotViews(any())).thenReturn(Map.of());
+
             SessionResponse response1 = new SessionResponse(
                     session1Id, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    SessionSource.CATALOG, null,
                     SessionStatus.CREATED, 10, 3, null, null);
             SessionResponse response2 = new SessionResponse(
                     session2Id, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    SessionSource.CATALOG, null,
                     SessionStatus.CREATED, 10, 0, null, null);
-            when(sessionMapper.toResponse(session1, 3)).thenReturn(response1);
-            when(sessionMapper.toResponse(session2, 0)).thenReturn(response2);
+            when(sessionMapper.toResponse(session1, 3, null)).thenReturn(response1);
+            when(sessionMapper.toResponse(session2, 0, null)).thenReturn(response2);
 
             // when
             var result = interviewService.getAllSessions(USER_ID);
 
             // then
             assertThat(result).containsExactly(response1, response2);
+        }
+
+        @Test
+        @DisplayName("Подставляет данные вакансии для VACANCY-сессий из карты снапшотов")
+        void resolvesVacancyInfoForVacancySessions() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession catalogSession = aSessionBuilder().id(SESSION_ID).build();
+            InterviewSession vacancySession = aSessionBuilder()
+                    .id(UUID.randomUUID())
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .build();
+            when(sessionRepository.findAllByUserId(USER_ID)).thenReturn(List.of(catalogSession, vacancySession));
+            when(questionRepository.countAnsweredBySessionIds(
+                    List.of(catalogSession.getId(), vacancySession.getId())))
+                    .thenReturn(List.of());
+
+            VacancySnapshotView vacancyView = new VacancySnapshotView(
+                    "Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет");
+            when(vacancyService.getSnapshotViews(List.of(vacancySnapshotId)))
+                    .thenReturn(Map.of(vacancySnapshotId, vacancyView));
+
+            SessionResponse catalogResponse = mock(SessionResponse.class);
+            SessionResponse vacancyResponse = mock(SessionResponse.class);
+            when(sessionMapper.toResponse(catalogSession, 0, null)).thenReturn(catalogResponse);
+            when(sessionMapper.toResponse(vacancySession, 0, vacancyView)).thenReturn(vacancyResponse);
+
+            // when
+            var result = interviewService.getAllSessions(USER_ID);
+
+            // then
+            assertThat(result).containsExactly(catalogResponse, vacancyResponse);
         }
     }
 
@@ -234,8 +558,37 @@ class InterviewServiceTest {
 
             SessionResponse expectedResponse = new SessionResponse(
                     SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    SessionSource.CATALOG, null,
                     SessionStatus.CREATED, 10, 3, null, null);
-            when(sessionMapper.toResponse(session, 3)).thenReturn(expectedResponse);
+            when(sessionMapper.toResponse(session, 3, null)).thenReturn(expectedResponse);
+
+            // when
+            var result = interviewService.getSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verifyNoInteractions(vacancyService);
+        }
+
+        @Test
+        @DisplayName("Подставляет данные вакансии из снапшота для VACANCY-сессии")
+        void resolvesVacancyInfoForVacancySession() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession session = aSessionBuilder()
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .build();
+            when(sessionRepository.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Optional.of(session));
+            when(questionRepository.countBySessionIdAndAnsweredTrue(SESSION_ID)).thenReturn(0L);
+
+            VacancySnapshotView vacancyView = new VacancySnapshotView(
+                    "Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancyView);
+
+            SessionResponse expectedResponse = mock(SessionResponse.class);
+            when(sessionMapper.toResponse(session, 0, vacancyView)).thenReturn(expectedResponse);
 
             // when
             var result = interviewService.getSession(SESSION_ID, USER_ID);
@@ -527,6 +880,76 @@ class InterviewServiceTest {
 
             verifyNoInteractions(llmService, feedbackRepository, questionMapper);
         }
+
+        @Test
+        @DisplayName("Берёт профессию и опыт из снапшота вакансии для VACANCY-сессии")
+        void usesVacancySnapshotContextForVacancySession() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession session = aSessionBuilder()
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .build();
+            InterviewQuestion question = aQuestion(session);
+            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            when(vacancyService.getSnapshotView(vacancySnapshotId))
+                    .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет"));
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
+                    .thenReturn(new LlmAnswerEvaluation(7, "Неплохо"));
+            when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            QuestionResponse expectedResponse = new QuestionResponse(
+                    questionId, 1, "Что такое JVM?", "ответ", 7, "Неплохо");
+            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
+
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+
+            // when
+            var result = interviewService.submitAnswer(request);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            var captor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
+            verify(llmService).evaluateAnswer(captor.capture());
+            assertThat(captor.getValue().profession()).isEqualTo("Java-разработчик");
+            assertThat(captor.getValue().level()).isEqualTo("От 3 до 6 лет");
+        }
+
+        @Test
+        @DisplayName("Подставляет 'не указан', когда опыт в снапшоте вакансии не задан")
+        void usesNotSpecifiedLabelWhenSnapshotExperienceBlank() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession session = aSessionBuilder()
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .build();
+            InterviewQuestion question = aQuestion(session);
+            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            when(vacancyService.getSnapshotView(vacancySnapshotId))
+                    .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", null));
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
+                    .thenReturn(new LlmAnswerEvaluation(7, "Неплохо"));
+            when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            QuestionResponse expectedResponse = new QuestionResponse(
+                    questionId, 1, "Что такое JVM?", "ответ", 7, "Неплохо");
+            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
+
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
+
+            // when
+            interviewService.submitAnswer(request);
+
+            // then
+            var captor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
+            verify(llmService).evaluateAnswer(captor.capture());
+            assertThat(captor.getValue().level()).isEqualTo("не указан");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -745,6 +1168,84 @@ class InterviewServiceTest {
 
             verifyNoInteractions(llmService, feedbackRepository);
             verify(sessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Берёт контекст отчёта из снапшота вакансии для VACANCY-сессии")
+        void usesVacancySnapshotContextForVacancySession() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession session = aSessionBuilder()
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .status(SessionStatus.IN_PROGRESS)
+                    .build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+            when(vacancyService.getSnapshotView(vacancySnapshotId))
+                    .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет"));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)), "Отчёт", "HIGH");
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    null, SESSION_ID, null, null, null, 10, 8.0, "Отчёт", OfferProbability.HIGH, null);
+            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+
+            // when
+            var result = interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedReport);
+            var captor = ArgumentCaptor.forClass(LlmReportRequest.class);
+            verify(llmService).createReport(captor.capture());
+            assertThat(captor.getValue().profession()).isEqualTo("Java-разработчик");
+            assertThat(captor.getValue().level()).isEqualTo("От 3 до 6 лет");
+        }
+
+        @Test
+        @DisplayName("Подставляет 'не указан' в отчёт, когда опыт в снапшоте вакансии не задан")
+        void usesNotSpecifiedLabelWhenSnapshotExperienceBlank() {
+            // given
+            UUID vacancySnapshotId = UUID.randomUUID();
+            InterviewSession session = aSessionBuilder()
+                    .profession(null).level(null)
+                    .source(SessionSource.VACANCY)
+                    .vacancySnapshotId(vacancySnapshotId)
+                    .status(SessionStatus.IN_PROGRESS)
+                    .build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+            when(vacancyService.getSnapshotView(vacancySnapshotId))
+                    .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", ""));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)), "Отчёт", "HIGH");
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    null, SESSION_ID, null, null, null, 10, 8.0, "Отчёт", OfferProbability.HIGH, null);
+            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+
+            // when
+            interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(LlmReportRequest.class);
+            verify(llmService).createReport(captor.capture());
+            assertThat(captor.getValue().level()).isEqualTo("не указан");
         }
     }
 

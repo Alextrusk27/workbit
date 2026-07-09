@@ -53,6 +53,7 @@ class InterviewWriter {
 
         checkQuestionOwnership(question, request.userId());
         checkQuestionSession(question, request.sessionId());
+        checkSessionNotCompleted(question.getSession());
         checkQuestionNotAnswered(question);
 
         question.setAnswerText(request.answerText());
@@ -176,6 +177,13 @@ class InterviewWriter {
             log.warn("Question {} belongs to session {}, but request came with session {}",
                     question.getId(), question.getSession().getId(), sessionId);
             throw new ConflictException("Invalid session");
+        }
+    }
+
+    private void checkSessionNotCompleted(InterviewSession session) {
+        if (session.getStatus() == SessionStatus.COMPLETED) {
+            log.warn("Cannot submit answer to session {}, because it is already completed", session.getId());
+            throw new ConflictException("Session already finished");
         }
     }
 

@@ -171,6 +171,28 @@ class InterviewWriterTest {
         }
 
         @Test
+        @DisplayName("Бросает ConflictException и не сохраняет ответ, когда сессия уже завершена")
+        void throwsWhenSessionAlreadyCompleted() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.COMPLETED).build();
+            InterviewQuestion question = aQuestion(session);
+            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "answer");
+
+            // when / then
+            assertThatThrownBy(() -> interviewWriter.saveAnswer(request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+
+            assertThat(question.isAnswered()).isFalse();
+            assertThat(question.getAnswerText()).isNull();
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+
+            verifyNoInteractions(questionMapper, feedbackRepository);
+        }
+
+        @Test
         @DisplayName("Бросает ConflictException, когда вопрос уже отвечен")
         void throwsWhenQuestionAlreadyAnswered() {
             // given

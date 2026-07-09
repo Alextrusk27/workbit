@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import {
   interviewApi,
+  type CreateSessionByVacancyRequest,
   type CreateSessionRequest,
   type QuestionResponse,
   type SubmitAnswerVars,
@@ -78,6 +79,15 @@ export function useCreateSession() {
   return useMutation({
     mutationFn: (data: CreateSessionRequest) =>
       interviewApi.createSession(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
+  })
+}
+
+export function useCreateSessionByVacancy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateSessionByVacancyRequest) =>
+      interviewApi.createSessionByVacancy(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
   })
 }

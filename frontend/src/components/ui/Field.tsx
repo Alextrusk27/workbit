@@ -9,13 +9,24 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 /** Поле формы с подписью в стиле дизайн-системы. */
-export function Field({ label, hint, className, id, type, ...props }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  className,
+  id,
+  type,
+  ...props
+}: FieldProps) {
   const autoId = useId()
   const inputId = id ?? autoId
   const hintId = hint ? `${inputId}-hint` : undefined
   const emailProps =
     type === 'email'
-      ? { spellCheck: false, autoCapitalize: 'none' as const, autoCorrect: 'off' }
+      ? {
+          spellCheck: false,
+          autoCapitalize: 'none' as const,
+          autoCorrect: 'off',
+        }
       : {}
   return (
     <div className={className}>

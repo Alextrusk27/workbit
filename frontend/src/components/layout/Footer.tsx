@@ -20,7 +20,7 @@ const columns = [
 export function Footer() {
   return (
     <footer className="border-rule mt-24 border-t">
-      <Container className="py-12">
+      <Container className="py-11">
         <div className="grid gap-10 sm:grid-cols-[1.5fr_1fr_1fr]">
           <div className="max-w-xs">
             <Logo />
@@ -51,7 +51,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="border-rule text-muted mt-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-6 font-mono text-xs">
+        <div className="border-rule text-muted mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-5 font-mono text-xs">
           <span>© {new Date().getFullYear()} workbit. Все права защищены.</span>
           <Link
             to="/privacy"

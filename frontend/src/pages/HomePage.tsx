@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
@@ -7,6 +7,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { plans } from '@/content/plans'
 import { faqPreview } from '@/content/faq'
+import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function Eyebrow({ children }: { children: ReactNode }) {
@@ -20,8 +21,8 @@ function Eyebrow({ children }: { children: ReactNode }) {
 const steps = [
   {
     n: '01',
-    title: 'Выберите роль',
-    body: 'Профессия, уровень, тип компании и число вопросов. Сессия подстраивается под то, к чему вы готовитесь.',
+    title: 'Выберите роль или вакансию',
+    body: 'Профессия, уровень и тип компании — или вставьте ссылку на вакансию с hh.ru. Вопросы подстраиваются под то, к чему вы готовитесь.',
   },
   {
     n: '02',
@@ -31,9 +32,95 @@ const steps = [
   {
     n: '03',
     title: 'Получайте разбор',
-    body: 'Оценка каждого ответа от 0 до 10, пометки рецензента на полях, итоговый фидбэк и вероятность оффера.',
+    body: 'Оценка каждого ответа звёздами от 1 до 5, пометки рецензента на полях, итоговый фидбэк и вероятность оффера.',
   },
 ]
+
+interface Example {
+  meta: string
+  question: string
+  answer: string
+  score: number
+  note: string
+}
+
+const examples: Example[] = [
+  {
+    meta: 'Вопрос 3 / 10 · Java-разработчик · Middle',
+    question: 'Чем отличается HashMap от ConcurrentHashMap?',
+    answer:
+      'HashMap не потокобезопасен, а ConcurrentHashMap разрешает конкурентный доступ и блокирует не всю таблицу, а сегменты, чтобы чтение и запись шли параллельно.',
+    score: 4,
+    note: 'Верно про сегменты. Уточните, что в Java 8+ это не сегменты, а блокировка на уровне бакета.',
+  },
+  {
+    meta: 'Вопрос 5 / 12 · Инженер по тестированию · Сбер',
+    question: 'Чем smoke-тестирование отличается от регрессионного?',
+    answer:
+      'Smoke — быстрый прогон ключевых функций после сборки: работает ли вообще. Регрессионное шире: проверяем, что новые изменения не сломали то, что уже работало.',
+    score: 5,
+    note: 'Суть верна. Добавьте, что smoke гоняют перед допуском к глубоким тестам, а регрессию — по расширенному набору кейсов.',
+  },
+]
+
+/** Пример вопроса с разбором: примеры сменяются сами раз в 6 с и по клику на точки. */
+function ExampleCarousel() {
+  const [active, setActive] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(
+      () => setActive((v) => (v + 1) % examples.length),
+      6000,
+    )
+    return () => clearInterval(id)
+  }, [])
+
+  const ex = examples[active]
+
+  return (
+    <figure
+      className="border-rule bg-paper-2/50 animate-rise rounded-lg border p-6 sm:p-8"
+      style={{ animationDelay: '320ms' }}
+    >
+      <figcaption className="text-muted mb-4 font-mono text-xs tracking-wide">
+        {ex.meta}
+      </figcaption>
+      <p className="text-ink font-display text-lg leading-snug">
+        {ex.question}
+      </p>
+      <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
+        <blockquote className="border-rule text-ink/90 text-body-sm border-l-2 pl-4 leading-relaxed">
+          {ex.answer}
+        </blockquote>
+        <MarginNote score={ex.score} className="sm:max-w-[15rem]">
+          {ex.note}
+        </MarginNote>
+      </div>
+      <div
+        className="mt-6 flex gap-2"
+        role="tablist"
+        aria-label="Примеры вопросов"
+      >
+        {examples.map((item, idx) => (
+          <button
+            key={item.meta}
+            type="button"
+            role="tab"
+            aria-selected={idx === active}
+            aria-label={`Пример ${idx + 1}`}
+            onClick={() => setActive(idx)}
+            className={cn(
+              'h-1.5 rounded-full transition-all',
+              idx === active
+                ? 'bg-accent w-6'
+                : 'bg-rule hover:bg-ink/30 w-1.5',
+            )}
+          />
+        ))}
+      </div>
+    </figure>
+  )
+}
 
 export function HomePage() {
   usePageTitle()
@@ -80,28 +167,7 @@ export function HomePage() {
           </div>
 
           {/* Артефакт-сигнатура: лист с ответом и пометкой на полях. */}
-          <figure
-            className="border-rule bg-paper-2/50 animate-rise rounded-lg border p-6 sm:p-8"
-            style={{ animationDelay: '320ms' }}
-          >
-            <figcaption className="text-muted mb-4 font-mono text-xs tracking-wide">
-              Вопрос 3 / 10 · Java-разработчик · Middle
-            </figcaption>
-            <p className="text-ink font-display text-lg leading-snug">
-              Чем отличается HashMap от ConcurrentHashMap?
-            </p>
-            <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
-              <blockquote className="border-rule text-ink/90 text-body-sm border-l-2 pl-4 leading-relaxed">
-                HashMap не потокобезопасен, а ConcurrentHashMap разрешает
-                конкурентный доступ и блокирует не всю таблицу, а сегменты,
-                чтобы чтение и запись шли параллельно.
-              </blockquote>
-              <MarginNote score={8} className="sm:max-w-[15rem]">
-                Верно про сегменты. Уточните, что в Java 8+ это не сегменты, а
-                блокировка на уровне бакета.
-              </MarginNote>
-            </div>
-          </figure>
+          <ExampleCarousel />
         </Container>
       </section>
 

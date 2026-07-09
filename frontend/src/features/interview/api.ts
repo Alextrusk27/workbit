@@ -6,6 +6,8 @@ export type CompanyType = string
 
 export type SessionStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED'
 
+export type SessionSource = 'CATALOG' | 'VACANCY'
+
 export interface InterviewOptions {
   professions: Profession[]
   levels: Level[]
@@ -21,11 +23,27 @@ export interface CreateSessionRequest {
   totalQuestions: number
 }
 
+export interface CreateSessionByVacancyRequest {
+  vacancyUrl?: string
+  vacancyText?: string
+  totalQuestions: number
+}
+
+/** Блок вакансии в SessionResponse. Для каталожных сессий — null. */
+export interface VacancyInfo {
+  name: string
+  employer: string | null
+  url: string | null
+  experience: string | null
+}
+
 export interface SessionResponse {
   id: string
-  profession: Profession
-  companyType: CompanyType
-  level: Level
+  profession: Profession | null
+  companyType: CompanyType | null
+  level: Level | null
+  source: SessionSource
+  vacancy: VacancyInfo | null
   status: SessionStatus
   totalQuestions: number
   answeredCount: number
@@ -45,9 +63,9 @@ export interface QuestionResponse {
 export interface SessionReport {
   reportId: string
   sessionId: string
-  profession: Profession
-  companyType: CompanyType
-  level: Level
+  profession: Profession | null
+  companyType: CompanyType | null
+  level: Level | null
   totalQuestions: number
   avgScore: number
   overallFeedback: string
@@ -67,6 +85,12 @@ export const interviewApi = {
 
   createSession: (data: CreateSessionRequest) =>
     apiFetch<SessionResponse>('/interview/sessions', {
+      method: 'POST',
+      body: data,
+    }),
+
+  createSessionByVacancy: (data: CreateSessionByVacancyRequest) =>
+    apiFetch<SessionResponse>('/interview/sessions/by-vacancy', {
       method: 'POST',
       body: data,
     }),

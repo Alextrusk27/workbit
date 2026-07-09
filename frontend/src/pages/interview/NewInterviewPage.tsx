@@ -1,16 +1,28 @@
 import type { FormEvent, KeyboardEvent } from 'react'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useId, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
+import { Field } from '@/components/ui/Field'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Textarea } from '@/components/ui/Textarea'
+import type { InterviewOptions } from '@/features/interview/api'
 import {
   useCreateSession,
+  useCreateSessionByVacancy,
   useInterviewOptions,
 } from '@/features/interview/useInterview'
+import {
+  isHhVacancyUrl,
+  useVacancyPreview,
+} from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
+
+const VACANCY_TEXT_MIN = 50
+const VACANCY_TEXT_MAX = 20000
 
 function ChipGroup({
   label,
@@ -54,7 +66,7 @@ function ChipGroup({
               onClick={() => onChange(opt)}
               onKeyDown={(e) => onKeyDown(e, i)}
               className={cn(
-                'rounded-md border px-4 py-2 text-sm transition-colors touch-manipulation',
+                'touch-manipulation rounded-md border px-4 py-2 text-sm transition-colors',
                 'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
                 selected
                   ? 'border-accent bg-accent text-paper'
@@ -70,38 +82,273 @@ function ChipGroup({
   )
 }
 
-export function NewInterviewPage() {
-  usePageTitle('Новое интервью')
-  const navigate = useNavigate()
-  const { data: options, isLoading, isError } = useInterviewOptions()
-  const create = useCreateSession()
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+}) {
+  return (
+    <div
+      role="tablist"
+      className="border-rule inline-flex rounded-lg border p-1"
+    >
+      {options.map((opt) => {
+        const selected = opt.value === value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'touch-manipulation rounded-md px-4 py-2 text-sm transition-colors',
+              'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+              selected ? 'bg-accent text-paper' : 'text-muted hover:text-ink',
+            )}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
+function QuestionCountSlider({
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  min: number
+  max: number
+  value: number
+  onChange: (v: number) => void
+}) {
+  const id = useId()
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="text-ink flex items-baseline justify-between text-sm font-medium"
+      >
+        <span>Количество вопросов</span>
+        <span className="text-accent font-mono text-base">{value}</span>
+      </label>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="accent-accent mt-3 w-full"
+      />
+      <div className="text-muted mt-1 flex justify-between text-xs">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  )
+}
+
+function CatalogForm({
+  options,
+  onCreated,
+}: {
+  options: InterviewOptions
+  onCreated: (sessionId: string) => void
+}) {
+  const create = useCreateSession()
   const [profession, setProfession] = useState<string | null>(null)
   const [level, setLevel] = useState<string | null>(null)
   const [companyType, setCompanyType] = useState<string | null>(null)
-  const [total, setTotal] = useState<number | null>(null)
+  const [total, setTotal] = useState(options.minQuestions)
 
-  useEffect(() => {
-    if (options && total === null) setTotal(options.minQuestions)
-  }, [options, total])
-
-  const ready =
-    profession !== null &&
-    level !== null &&
-    companyType !== null &&
-    total !== null
+  const ready = profession !== null && level !== null && companyType !== null
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!ready) return
     create.mutate(
       { profession, level, companyType, totalQuestions: total },
-      {
-        onSuccess: (session) =>
-          navigate(`/app/interview/${session.id}`, { replace: true }),
-      },
+      { onSuccess: (session) => onCreated(session.id) },
     )
   }
+
+  return (
+    <form onSubmit={onSubmit} className="mt-8 space-y-8">
+      {create.isError && <Alert>{getErrorMessage(create.error)}</Alert>}
+
+      <ChipGroup
+        label="Профессия"
+        options={options.professions}
+        value={profession}
+        onChange={setProfession}
+      />
+      <ChipGroup
+        label="Уровень"
+        options={options.levels}
+        value={level}
+        onChange={setLevel}
+      />
+      <ChipGroup
+        label="Тип компании"
+        options={options.companyTypes}
+        value={companyType}
+        onChange={setCompanyType}
+      />
+      <QuestionCountSlider
+        min={options.minQuestions}
+        max={options.maxQuestions}
+        value={total}
+        onChange={setTotal}
+      />
+
+      <Button type="submit" size="lg" disabled={!ready || create.isPending}>
+        {create.isPending ? 'Создаём…' : 'Начать интервью'}
+      </Button>
+    </form>
+  )
+}
+
+function VacancyPreviewCard({ url }: { url: string }) {
+  const { data, isFetching, isError, error } = useVacancyPreview(url)
+
+  if (isFetching) {
+    return (
+      <div role="status" className="border-rule rounded-lg border p-4">
+        <span className="sr-only">Загрузка вакансии…</span>
+        <Skeleton className="h-5 w-52" />
+        <Skeleton className="mt-2 h-4 w-36" />
+        <Skeleton className="mt-3 h-4 w-44" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return <Alert>{getErrorMessage(error)}</Alert>
+  }
+
+  if (!data) return null
+
+  return (
+    <div className="border-rule bg-paper-2/60 rounded-lg border p-4">
+      <p className="text-ink font-display text-lg leading-snug">{data.name}</p>
+      <p className="text-muted mt-1 text-sm">{data.employer}</p>
+      <div className="text-muted mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {data.salary && <span>{data.salary}</span>}
+        {data.experience && <span>Опыт: {data.experience}</span>}
+      </div>
+    </div>
+  )
+}
+
+function VacancyForm({
+  options,
+  onCreated,
+}: {
+  options: InterviewOptions
+  onCreated: (sessionId: string) => void
+}) {
+  const create = useCreateSessionByVacancy()
+  const [inputMode, setInputMode] = useState<'url' | 'text'>('url')
+  const [url, setUrl] = useState('')
+  const [text, setText] = useState('')
+  const [total, setTotal] = useState(options.minQuestions)
+
+  const urlValid = isHhVacancyUrl(url)
+  const trimmedLen = text.trim().length
+  const textValid =
+    trimmedLen >= VACANCY_TEXT_MIN && trimmedLen <= VACANCY_TEXT_MAX
+  const ready = inputMode === 'url' ? urlValid : textValid
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!ready) return
+    const body =
+      inputMode === 'url'
+        ? { vacancyUrl: url.trim(), totalQuestions: total }
+        : { vacancyText: text.trim(), totalQuestions: total }
+    create.mutate(body, { onSuccess: (session) => onCreated(session.id) })
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="mt-8 space-y-6">
+      {create.isError && <Alert>{getErrorMessage(create.error)}</Alert>}
+
+      <Segmented
+        options={[
+          { value: 'url', label: 'Ссылка hh.ru' },
+          { value: 'text', label: 'Текст вакансии' },
+        ]}
+        value={inputMode}
+        onChange={setInputMode}
+      />
+
+      {inputMode === 'url' ? (
+        <div className="space-y-4">
+          <Field
+            label="Ссылка на вакансию hh.ru"
+            type="url"
+            inputMode="url"
+            placeholder="https://hh.ru/vacancy/123456"
+            hint={
+              url && !urlValid
+                ? 'Ссылка должна вести на вакансию hh.ru (https://hh.ru/vacancy/…)'
+                : 'Подтянем название, работодателя и требуемый опыт'
+            }
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          {urlValid && <VacancyPreviewCard url={url} />}
+        </div>
+      ) : (
+        <Textarea
+          label="Текст вакансии"
+          rows={10}
+          placeholder="Вставьте описание вакансии: обязанности, требования, стек…"
+          hint={`${trimmedLen} / ${VACANCY_TEXT_MAX} символов, минимум ${VACANCY_TEXT_MIN}`}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+      )}
+
+      <QuestionCountSlider
+        min={options.minQuestions}
+        max={options.maxQuestions}
+        value={total}
+        onChange={setTotal}
+      />
+
+      <Button type="submit" size="lg" disabled={!ready || create.isPending}>
+        {create.isPending ? 'Собираем вопросы…' : 'Начать интервью'}
+      </Button>
+      {create.isPending && (
+        <p className="text-muted text-xs">
+          Готовим вопросы под вакансию — это может занять несколько секунд.
+        </p>
+      )}
+    </form>
+  )
+}
+
+export function NewInterviewPage() {
+  usePageTitle('Новое интервью')
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { data: options, isLoading, isError } = useInterviewOptions()
+  const [mode, setMode] = useState<'catalog' | 'vacancy'>(
+    searchParams.get('mode') === 'vacancy' ? 'vacancy' : 'catalog',
+  )
+
+  const onCreated = (sessionId: string) =>
+    navigate(`/app/interview/${sessionId}`, { replace: true })
 
   if (isLoading) {
     return (
@@ -123,66 +370,39 @@ export function NewInterviewPage() {
 
   return (
     <Container className="py-12 sm:py-16">
-      <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
+      <Link
+        to="/app"
+        className="text-accent hover:text-accent-hover text-sm transition-colors"
+      >
+        ← Мои интервью
+      </Link>
+      <p className="text-muted mt-8 font-mono text-xs tracking-[0.2em] uppercase">
         Новое интервью
       </p>
       <h1 className="text-ink mt-4 text-3xl sm:text-4xl">
-        Соберём тренировку под вас
+        Соберём интервью под вас
       </h1>
       <p className="text-muted mt-4 max-w-xl">
-        Выберите профессию, уровень и тип компании — подберём вопросы под этот
-        контекст.
+        Тренировка — вопросы под профессию, уровень и тип компании. По вакансии
+        — вопросы под конкретную вакансию hh.ru или вставленный текст.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-10 max-w-2xl space-y-8">
-        {create.isError && <Alert>{getErrorMessage(create.error)}</Alert>}
-
-        <ChipGroup
-          label="Профессия"
-          options={options.professions}
-          value={profession}
-          onChange={setProfession}
-        />
-        <ChipGroup
-          label="Уровень"
-          options={options.levels}
-          value={level}
-          onChange={setLevel}
-        />
-        <ChipGroup
-          label="Тип компании"
-          options={options.companyTypes}
-          value={companyType}
-          onChange={setCompanyType}
+      <div className="mt-10 max-w-2xl">
+        <Segmented
+          options={[
+            { value: 'catalog', label: 'Тренировка' },
+            { value: 'vacancy', label: 'По вакансии' },
+          ]}
+          value={mode}
+          onChange={setMode}
         />
 
-        <div>
-          <label
-            htmlFor="total"
-            className="text-ink flex items-baseline justify-between text-sm font-medium"
-          >
-            <span>Количество вопросов</span>
-            <span className="text-accent font-mono text-base">{total}</span>
-          </label>
-          <input
-            id="total"
-            type="range"
-            min={options.minQuestions}
-            max={options.maxQuestions}
-            value={total ?? options.minQuestions}
-            onChange={(e) => setTotal(Number(e.target.value))}
-            className="accent-accent mt-3 w-full"
-          />
-          <div className="text-muted mt-1 flex justify-between text-xs">
-            <span>{options.minQuestions}</span>
-            <span>{options.maxQuestions}</span>
-          </div>
-        </div>
-
-        <Button type="submit" size="lg" disabled={!ready || create.isPending}>
-          {create.isPending ? 'Создаём…' : 'Начать интервью'}
-        </Button>
-      </form>
+        {mode === 'catalog' ? (
+          <CatalogForm options={options} onCreated={onCreated} />
+        ) : (
+          <VacancyForm options={options} onCreated={onCreated} />
+        )}
+      </div>
     </Container>
   )
 }

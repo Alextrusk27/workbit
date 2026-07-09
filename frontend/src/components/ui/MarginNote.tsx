@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
+import { Stars } from '@/components/ui/Stars'
 import { cn } from '@/lib/cn'
 
 interface MarginNoteProps {
   children: ReactNode
-  /** Балл 0–10, если пометка несёт оценку. */
+  /** Балл 1–5, если пометка несёт оценку. */
   score?: number
   className?: string
 }
@@ -19,8 +20,8 @@ export function MarginNote({ children, score, className }: MarginNoteProps) {
       )}
     >
       {score !== undefined && (
-        <span className="mb-1 block font-mono text-xs font-medium tracking-wide not-italic">
-          {score}/10
+        <span className="mb-1 block text-sm not-italic">
+          <Stars value={score} />
         </span>
       )}
       {children}

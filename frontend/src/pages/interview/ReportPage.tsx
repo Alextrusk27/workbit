@@ -3,8 +3,14 @@ import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import { useReport, useTranscript } from '@/features/interview/useInterview'
+import { sessionHeadline, sessionSubtitle } from '@/features/interview/labels'
+import {
+  useReport,
+  useSession,
+  useTranscript,
+} from '@/features/interview/useInterview'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -12,6 +18,7 @@ export function ReportPage() {
   usePageTitle('Отчёт по интервью')
   const { sessionId = '' } = useParams()
   const { data: report, isLoading, isError, error } = useReport(sessionId)
+  const { data: session } = useSession(sessionId)
   const transcript = useTranscript(sessionId, report?.totalQuestions ?? 0)
 
   if (isLoading) {
@@ -40,26 +47,35 @@ export function ReportPage() {
     )
   }
 
+  const subtitle = (
+    session
+      ? [sessionSubtitle(session), `${report.totalQuestions} вопросов`]
+      : [report.level, report.companyType, `${report.totalQuestions} вопросов`]
+  )
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <Container className="py-12 sm:py-16">
       <div className="mx-auto max-w-2xl">
         <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
           Разбор интервью
         </p>
-        <h1 className="text-ink mt-4 text-3xl sm:text-4xl">
-          {report.profession}
+        <h1 className="text-ink mt-4 text-3xl break-words sm:text-4xl">
+          {session
+            ? sessionHeadline(session)
+            : (report.profession ?? 'Интервью')}
         </h1>
-        <p className="text-muted mt-2 text-sm">
-          {report.level} · {report.companyType} · {report.totalQuestions}
-          {' '}вопросов
-        </p>
+        <p className="text-muted mt-2 text-sm">{subtitle}</p>
 
         <div className="mt-8 grid grid-cols-2 gap-4">
           <div className="border-rule bg-paper-2/60 rounded-lg border p-5">
-            <p className="text-muted text-xs">Средний балл</p>
-            <p className="text-ink mt-1 font-mono text-3xl">
-              {report.avgScore.toFixed(1)}
-              <span className="text-muted text-lg">/10</span>
+            <p className="text-muted text-xs">Средняя оценка</p>
+            <div className="text-accent mt-2 text-2xl">
+              <Stars value={Math.round(report.avgScore * 2) / 2} />
+            </div>
+            <p className="text-muted mt-1.5 font-mono text-sm">
+              {report.avgScore.toFixed(1).replace('.', ',')} из 5
             </p>
           </div>
           <div className="border-rule bg-paper-2/60 rounded-lg border p-5">

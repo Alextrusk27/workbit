@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
@@ -7,6 +7,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Textarea } from '@/components/ui/Textarea'
 import type { SessionResponse } from '@/features/interview/api'
+import { sessionHeadline } from '@/features/interview/labels'
 import {
   useFinishSession,
   useQuestion,
@@ -85,9 +86,15 @@ function SessionRunner({ session }: { session: SessionResponse }) {
   return (
     <Container className="py-10 sm:py-14">
       <div className="mx-auto max-w-2xl">
+        <Link
+          to="/app"
+          className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
+        >
+          ← Мои интервью
+        </Link>
         <div className="flex items-center justify-between">
           <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-            {session.profession} · {session.level}
+            {sessionHeadline(session)}
           </p>
           <p aria-live="polite" className="text-muted font-mono text-xs">
             {Math.min(index, total)} / {total}
@@ -96,7 +103,9 @@ function SessionRunner({ session }: { session: SessionResponse }) {
         <div className="bg-rule mt-3 h-1 w-full overflow-hidden rounded-full">
           <div
             className="bg-accent h-full origin-left transition-transform duration-500"
-            style={{ transform: `scaleX(${Math.min(index - 1, total) / total})` }}
+            style={{
+              transform: `scaleX(${Math.min(index - 1, total) / total})`,
+            }}
           />
         </div>
 

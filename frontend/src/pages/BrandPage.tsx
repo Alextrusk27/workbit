@@ -136,7 +136,7 @@ export function BrandPage() {
             <p className="text-muted font-mono text-xs tracking-widest uppercase">
               Mono — JetBrains Mono · данные, лейблы, метрики
             </p>
-            <p className="text-ink mt-3 font-mono text-2xl">8.4 / 10</p>
+            <p className="text-ink mt-3 font-mono text-2xl">4.2 / 5</p>
             <p className="text-muted mt-2 font-mono text-xs tracking-[0.2em] uppercase">
               Java-разработчик · Middle
             </p>
@@ -181,7 +181,7 @@ export function BrandPage() {
             HashMap не потокобезопасен, а ConcurrentHashMap разрешает
             конкурентный доступ.
           </p>
-          <MarginNote score={8} className="mt-4">
+          <MarginNote score={4} className="mt-4">
             Верно про сегменты. Уточните, что в Java 8+ это блокировка на уровне
             бакета.
           </MarginNote>

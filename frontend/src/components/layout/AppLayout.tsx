@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { Footer } from '@/components/layout/Footer'
 import { useAuth, useLogout } from '@/features/auth/useAuth'
 
 export function AppLayout() {
@@ -18,13 +19,13 @@ export function AppLayout() {
     <div className="flex min-h-screen flex-col">
       <a
         href="#main"
-        className="focus:bg-paper focus:text-ink sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:not-sr-only focus:rounded-md focus:px-4 focus:py-2 focus:shadow-lg"
+        className="focus:bg-paper focus:text-ink sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:shadow-lg"
       >
         Перейти к содержимому
       </a>
       <header className="border-rule bg-paper/85 sticky top-0 z-40 border-b backdrop-blur">
         <Container>
-          <div className="flex h-16 items-center justify-between gap-4">
+          <div className="flex h-16 items-center justify-between gap-6">
             <Link
               to="/"
               className="rounded-sm"
@@ -32,6 +33,29 @@ export function AppLayout() {
             >
               <Logo />
             </Link>
+            <nav
+              aria-label="Основная навигация"
+              className="hidden items-center gap-8 md:flex"
+            >
+              <Link
+                to="/#how"
+                className="text-ink/75 hover:text-ink text-sm transition-colors"
+              >
+                AI-интервью
+              </Link>
+              <Link
+                to="/faq"
+                className="text-ink/75 hover:text-ink text-sm transition-colors"
+              >
+                FAQ
+              </Link>
+              <Link
+                to="/pricing"
+                className="text-ink/75 hover:text-ink text-sm transition-colors"
+              >
+                Тарифы
+              </Link>
+            </nav>
             {user && (
               <UserMenu
                 email={user.email}
@@ -45,6 +69,7 @@ export function AppLayout() {
       <main id="main" tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
+      <Footer />
     </div>
   )
 }

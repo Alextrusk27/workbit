@@ -41,7 +41,11 @@ management:
       exposure:
         include: "*"
 
+llm:
+  yandex-ai:
+    log-level: debug
+
 logging:
   level:
     root: INFO
-    com.zaxxer.hikari: INFO
+    ru.workbit.llm: DEBUG

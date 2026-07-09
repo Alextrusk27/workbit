@@ -56,6 +56,7 @@ llm:
   yandex-ai:
     folder: ${YANDEX_FOLDER_ID}
     api-key: ${YANDEX_API_KEY}
+    log-level: ${LLM_LOG_LEVEL:info}
     agents:
       answer-evaluator: ${ANSWER_EVALUATOR}
       interview-reviewer: ${INTERVIEW_REVIEWER}

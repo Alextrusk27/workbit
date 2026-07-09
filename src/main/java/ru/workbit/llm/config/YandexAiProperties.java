@@ -1,5 +1,6 @@
 package ru.workbit.llm.config;
 
+import com.openai.core.LogLevel;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.Map;
@@ -8,6 +9,7 @@ import java.util.Map;
 public record YandexAiProperties(
         String folder,
         String apiKey,
-        Map<String, String> agents
+        Map<String, String> agents,
+        LogLevel logLevel
 ) {
 }

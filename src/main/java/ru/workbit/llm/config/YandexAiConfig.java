@@ -16,6 +16,7 @@ public class YandexAiConfig {
                 .apiKey(props.apiKey())
                 .baseUrl("https://ai.api.cloud.yandex.net/v1")
                 .organization(props.folder())
+                .logLevel(props.logLevel())
                 .build();
     }
 }

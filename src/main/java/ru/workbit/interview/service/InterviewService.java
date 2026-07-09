@@ -229,8 +229,9 @@ public class InterviewService {
 
         LlmReport llmReport = createLlmReport(session);
 
-        Map<UUID, LlmAnswerReview> answersMap = llmReport.answers().stream()
-                .collect(Collectors.toMap(LlmAnswerReview::id, Function.identity()));
+        List<LlmAnswerReview> reviews = llmReport.answers() != null ? llmReport.answers() : List.of();
+        Map<UUID, LlmAnswerReview> answersMap = reviews.stream()
+                .collect(Collectors.toMap(LlmAnswerReview::id, Function.identity(), (a, b) -> a));
 
         OptionalDouble avgScore = calculateAvgScore(answersMap);
         if (avgScore.isEmpty()) {

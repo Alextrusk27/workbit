@@ -1538,6 +1538,79 @@ class InterviewServiceTest {
 
             verify(sessionRepository).save(session);
         }
+
+        @Test
+        @DisplayName("Бросает LlmException и не падает с NPE, когда LLM вернула null вместо списка отзывов")
+        void throwsWhenLlmReturnsNullAnswersList() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(null, "Отчёт", "LOW");
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview report has no usable scores");
+
+            assertThat(session.getInterviewReport()).isNull();
+            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(feedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Не падает с дублирующимися id вопросов от LLM и дедуплицирует отзывы")
+        void deduplicatesReviewsWithDuplicateQuestionIds() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(
+                            new LlmAnswerReview(q1Id, "Первый", 4),
+                            new LlmAnswerReview(q1Id, "Второй", 2)
+                    ),
+                    "Отчёт",
+                    "LOW"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    10, 4.0, "Отчёт", OfferProbability.LOW, null);
+            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+
+            // when
+            var result = interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedReport);
+
+            assertThat(q1.getFeedback()).isNotNull();
+            // при дубликате id merge-функция оставляет первый отзыв
+            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
+            assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Первый");
+
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+            verify(sessionRepository).save(session);
+        }
     }
 
     // -------------------------------------------------------------------------

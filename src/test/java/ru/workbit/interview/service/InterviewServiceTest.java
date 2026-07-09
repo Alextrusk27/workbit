@@ -1316,6 +1316,76 @@ class InterviewServiceTest {
             verify(sessionRepository, never()).save(any());
             verifyNoInteractions(feedbackRepository);
         }
+
+        @Test
+        @DisplayName("Бросает LlmException, когда offerProbability от LLM не распознан")
+        void throwsWhenOfferProbabilityUnrecognized() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)),
+                    "Отчёт",
+                    "unknown"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview report has an invalid offer probability");
+
+            assertThat(session.getInterviewReport()).isNull();
+            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(feedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Распознаёт русский лейбл offerProbability от LLM и завершает сессию")
+        void resolvesOfferProbabilityFromRussianLabel() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+
+            session.setQuestions(List.of(q1));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)),
+                    "Отчёт",
+                    "Средняя"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    10, 8.0, "Отчёт", OfferProbability.MEDIUM, null);
+            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+
+            // when
+            interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(session.getInterviewReport()).isNotNull();
+            assertThat(session.getInterviewReport().getOfferProbability()).isEqualTo(OfferProbability.MEDIUM);
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository).save(session);
+        }
     }
 
     // -------------------------------------------------------------------------

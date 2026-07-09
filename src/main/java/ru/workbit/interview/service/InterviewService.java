@@ -270,9 +270,17 @@ public class InterviewService {
         session.setInterviewReport(InterviewReport.builder()
                 .session(session)
                 .avgScore(Math.round(avgScore * 10) / 10.0)
-                .offerProbability(OfferProbability.valueOf(llmReport.offerProbability()))
+                .offerProbability(resolveOfferProbability(llmReport.offerProbability()))
                 .overallFeedback(llmReport.overallFeedback())
                 .build());
+    }
+
+    private OfferProbability resolveOfferProbability(String raw) {
+        return OfferProbability.fromString(raw)
+                .orElseThrow(() -> {
+                    log.error("LLM returned unrecognized offerProbability '{}'", raw);
+                    return new LlmException("Interview report has an invalid offer probability");
+                });
     }
 
     private void markCompleted(InterviewSession session) {

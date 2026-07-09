@@ -100,7 +100,7 @@ class InterviewControllerTest {
     private SessionReport aSessionReport() {
         return new SessionReport(
                 UUID.randomUUID(), SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                10, 7.5, "Хороший результат", OfferProbability.MEDIUM,
+                10, 4.2, "Хороший результат", OfferProbability.MEDIUM,
                 Instant.parse("2026-01-02T00:00:00Z"));
     }
 

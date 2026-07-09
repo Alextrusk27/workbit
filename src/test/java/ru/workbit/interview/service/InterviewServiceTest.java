@@ -756,11 +756,11 @@ class InterviewServiceTest {
             when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
 
             when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(8, "Хороший ответ"));
+                    .thenReturn(new LlmAnswerEvaluation(4, "Хороший ответ"));
             when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
 
             QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", 8, "Хороший ответ");
+                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", 4, "Хороший ответ");
             when(questionMapper.toDto(question)).thenReturn(expectedResponse);
 
             var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
@@ -774,7 +774,7 @@ class InterviewServiceTest {
             assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
             assertThat(question.getAnsweredAt()).isNotNull();
             assertThat(question.getFeedback()).isNotNull();
-            assertThat(question.getFeedback().getScore()).isEqualTo(8);
+            assertThat(question.getFeedback().getScore()).isEqualTo(4);
             assertThat(question.getFeedback().getFeedbackText()).isEqualTo("Хороший ответ");
             assertThat(session.getStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
 
@@ -897,11 +897,11 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId))
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет"));
             when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(7, "Неплохо"));
+                    .thenReturn(new LlmAnswerEvaluation(4, "Неплохо"));
             when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
 
             QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "ответ", 7, "Неплохо");
+                    questionId, 1, "Что такое JVM?", "ответ", 4, "Неплохо");
             when(questionMapper.toDto(question)).thenReturn(expectedResponse);
 
             var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
@@ -933,11 +933,11 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId))
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", null));
             when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
-                    .thenReturn(new LlmAnswerEvaluation(7, "Неплохо"));
+                    .thenReturn(new LlmAnswerEvaluation(4, "Неплохо"));
             when(feedbackRepository.save(any(AnswerFeedback.class))).thenAnswer(inv -> inv.getArgument(0));
 
             QuestionResponse expectedResponse = new QuestionResponse(
-                    questionId, 1, "Что такое JVM?", "ответ", 7, "Неплохо");
+                    questionId, 1, "Что такое JVM?", "ответ", 4, "Неплохо");
             when(questionMapper.toDto(question)).thenReturn(expectedResponse);
 
             var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "ответ");
@@ -949,6 +949,63 @@ class InterviewServiceTest {
             var captor = ArgumentCaptor.forClass(LlmAnswerEvaluationRequest.class);
             verify(llmService).evaluateAnswer(captor.capture());
             assertThat(captor.getValue().level()).isEqualTo("не указан");
+        }
+
+        @Test
+        @DisplayName("Не создаёт фидбэк, но сохраняет ответ, когда LLM вернула оценку вне диапазона 1..5")
+        void skipsFeedbackWhenLlmReturnsOutOfRangeScore() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
+            InterviewQuestion question = aQuestion(session);
+            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
+                    .thenReturn(new LlmAnswerEvaluation(6, "Отлично"));
+
+            QuestionResponse expectedResponse = new QuestionResponse(
+                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", null, null);
+            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
+
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
+
+            // when
+            var result = interviewService.submitAnswer(request);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(question.isAnswered()).isTrue();
+            assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
+            assertThat(question.getAnsweredAt()).isNotNull();
+            assertThat(question.getFeedback()).isNull();
+            verify(feedbackRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Не создаёт фидбэк, но сохраняет ответ, когда LLM вернула валидную оценку без текста фидбэка")
+        void skipsFeedbackWhenLlmReturnsBlankFeedbackText() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.CREATED).build();
+            InterviewQuestion question = aQuestion(session);
+            when(questionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            when(llmService.evaluateAnswer(any(LlmAnswerEvaluationRequest.class)))
+                    .thenReturn(new LlmAnswerEvaluation(4, "  "));
+
+            QuestionResponse expectedResponse = new QuestionResponse(
+                    questionId, 1, "Что такое JVM?", "JVM - виртуальная машина", null, null);
+            when(questionMapper.toDto(question)).thenReturn(expectedResponse);
+
+            var request = new SubmitAnswerRequest(USER_ID, SESSION_ID, questionId, true, "JVM - виртуальная машина");
+
+            // when
+            var result = interviewService.submitAnswer(request);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(question.isAnswered()).isTrue();
+            assertThat(question.getAnswerText()).isEqualTo("JVM - виртуальная машина");
+            assertThat(question.getFeedback()).isNull();
+            verify(feedbackRepository, never()).save(any());
         }
     }
 
@@ -989,9 +1046,9 @@ class InterviewServiceTest {
 
             LlmReport llmReport = new LlmReport(
                     List.of(
-                            new LlmAnswerReview(q1Id, "Хорошо", 7),
-                            new LlmAnswerReview(q2Id, "Хорошо", 7),
-                            new LlmAnswerReview(q3Id, "Отлично", 9),
+                            new LlmAnswerReview(q1Id, "Хорошо", 4),
+                            new LlmAnswerReview(q2Id, "Хорошо", 4),
+                            new LlmAnswerReview(q3Id, "Отлично", 5),
                             new LlmAnswerReview(q4Id, "Уже оценено ранее", null)
                     ),
                     "В целом уверенное собеседование.",
@@ -1001,7 +1058,7 @@ class InterviewServiceTest {
 
             SessionReport expectedReport = new SessionReport(
                     null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 7.7, "В целом уверенное собеседование.", OfferProbability.MEDIUM, null);
+                    10, 4.3, "В целом уверенное собеседование.", OfferProbability.MEDIUM, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when
@@ -1010,17 +1067,17 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedReport);
 
-            assertThat(q1.getFeedback().getScore()).isEqualTo(7);
+            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
             assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Хорошо");
-            assertThat(q2.getFeedback().getScore()).isEqualTo(7);
-            assertThat(q3.getFeedback().getScore()).isEqualTo(9);
+            assertThat(q2.getFeedback().getScore()).isEqualTo(4);
+            assertThat(q3.getFeedback().getScore()).isEqualTo(5);
             assertThat(q3.getFeedback().getFeedbackText()).isEqualTo("Отлично");
             // фидбэк уже отвеченного вопроса не перезаписывается
             assertThat(q4.getFeedback()).isSameAs(existingFeedback);
 
             assertThat(session.getInterviewReport()).isNotNull();
-            // (7 + 7 + 9) / 3 = 7.666..., округление до 0.1 -> 7.7; null-скор q4 отфильтрован
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(7.7);
+            // (4 + 4 + 5) / 3 = 4.333..., округление до 0.1 -> 4.3; null-скор q4 отфильтрован
+            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.3);
             assertThat(session.getInterviewReport().getOfferProbability()).isEqualTo(OfferProbability.MEDIUM);
             assertThat(session.getInterviewReport().getOverallFeedback())
                     .isEqualTo("В целом уверенное собеседование.");
@@ -1052,7 +1109,7 @@ class InterviewServiceTest {
 
             LlmReport llmReport = new LlmReport(
                     List.of(
-                            new LlmAnswerReview(q1Id, "Хорошо", 8),
+                            new LlmAnswerReview(q1Id, "Хорошо", 4),
                             new LlmAnswerReview(q2Id, "Не удалось оценить", null)
                     ),
                     "Собеседование пройдено.",
@@ -1062,7 +1119,7 @@ class InterviewServiceTest {
 
             SessionReport expectedReport = new SessionReport(
                     null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 8.0, "Собеседование пройдено.", OfferProbability.LOW, null);
+                    10, 4.0, "Собеседование пройдено.", OfferProbability.LOW, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when
@@ -1072,13 +1129,13 @@ class InterviewServiceTest {
             assertThat(result).isEqualTo(expectedReport);
 
             assertThat(q1.getFeedback()).isNotNull();
-            assertThat(q1.getFeedback().getScore()).isEqualTo(8);
+            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
             // вопрос с null score от LLM не получает фидбэк, а не падает с NPE
             assertThat(q2.getFeedback()).isNull();
 
             assertThat(session.getInterviewReport()).isNotNull();
             // null-скор q2 отфильтрован, средний балл считается только по q1
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(8.0);
+            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
 
             assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
             assertThat(session.getCompletedAt()).isNotNull();
@@ -1107,7 +1164,7 @@ class InterviewServiceTest {
 
             // LLM вернула отзыв только на q1, про q2 в ответе нет записи вовсе
             LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)),
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
                     "Собеседование пройдено.",
                     "LOW"
             );
@@ -1115,7 +1172,7 @@ class InterviewServiceTest {
 
             SessionReport expectedReport = new SessionReport(
                     null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 8.0, "Собеседование пройдено.", OfferProbability.LOW, null);
+                    10, 4.0, "Собеседование пройдено.", OfferProbability.LOW, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when
@@ -1125,12 +1182,12 @@ class InterviewServiceTest {
             assertThat(result).isEqualTo(expectedReport);
 
             assertThat(q1.getFeedback()).isNotNull();
-            assertThat(q1.getFeedback().getScore()).isEqualTo(8);
+            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
             // на вопрос без отзыва от LLM (нет записи в answersMap) фидбэк не создаётся
             assertThat(q2.getFeedback()).isNull();
 
             assertThat(session.getInterviewReport()).isNotNull();
-            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(8.0);
+            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
 
             assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
             assertThat(session.getCompletedAt()).isNotNull();
@@ -1192,11 +1249,11 @@ class InterviewServiceTest {
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", "От 3 до 6 лет"));
 
             LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)), "Отчёт", "HIGH");
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)), "Отчёт", "HIGH");
             when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
 
             SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, null, null, null, 10, 8.0, "Отчёт", OfferProbability.HIGH, null);
+                    null, SESSION_ID, null, null, null, 10, 4.0, "Отчёт", OfferProbability.HIGH, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when
@@ -1232,11 +1289,11 @@ class InterviewServiceTest {
                     .thenReturn(new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url", ""));
 
             LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)), "Отчёт", "HIGH");
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)), "Отчёт", "HIGH");
             when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
 
             SessionReport expectedReport = new SessionReport(
-                    null, SESSION_ID, null, null, null, 10, 8.0, "Отчёт", OfferProbability.HIGH, null);
+                    null, SESSION_ID, null, null, null, 10, 4.0, "Отчёт", OfferProbability.HIGH, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when
@@ -1289,6 +1346,101 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("Пропускает фидбэк вопроса с оценкой вне диапазона 1..5, а средний балл считает только по валидным")
+        void skipsFeedbackForOutOfRangeScoreAndAveragesOnlyValidOnes() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            UUID q2Id = UUID.randomUUID();
+
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            InterviewQuestion q2 = InterviewQuestion.builder()
+                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
+
+            session.setQuestions(List.of(q1, q2));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(
+                            new LlmAnswerReview(q1Id, "Хорошо", 4),
+                            new LlmAnswerReview(q2Id, "Отлично", 6)
+                    ),
+                    "Отчёт",
+                    "LOW"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            SessionReport expectedReport = new SessionReport(
+                    null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
+                    10, 4.0, "Отчёт", OfferProbability.LOW, null);
+            when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
+
+            // when
+            var result = interviewService.finishSession(SESSION_ID, USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(expectedReport);
+
+            assertThat(q1.getFeedback()).isNotNull();
+            assertThat(q1.getFeedback().getScore()).isEqualTo(4);
+            // оценка вне диапазона 1..5 не сохраняется в фидбэк
+            assertThat(q2.getFeedback()).isNull();
+
+            assertThat(session.getInterviewReport()).isNotNull();
+            // средний балл считается только по валидным оценкам (q2 со score=6 отфильтрован)
+            assertThat(session.getInterviewReport().getAvgScore()).isEqualTo(4.0);
+
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+            verify(sessionRepository).save(session);
+            verifyNoInteractions(feedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Бросает LlmException, когда все отзывы LLM вне диапазона 1..5")
+        void throwsWhenAllReviewsHaveOutOfRangeScore() {
+            // given
+            InterviewSession session = aSessionBuilder().status(SessionStatus.IN_PROGRESS).build();
+
+            UUID q1Id = UUID.randomUUID();
+            UUID q2Id = UUID.randomUUID();
+
+            InterviewQuestion q1 = InterviewQuestion.builder()
+                    .id(q1Id).session(session).questionText("Q1").answerText("A1").build();
+            InterviewQuestion q2 = InterviewQuestion.builder()
+                    .id(q2Id).session(session).questionText("Q2").answerText("A2").build();
+
+            session.setQuestions(List.of(q1, q2));
+
+            when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
+
+            LlmReport llmReport = new LlmReport(
+                    List.of(
+                            new LlmAnswerReview(q1Id, "Отлично", 6),
+                            new LlmAnswerReview(q2Id, "Плохо", 0)
+                    ),
+                    "Отчёт",
+                    "LOW"
+            );
+            when(llmService.createReport(any(LlmReportRequest.class))).thenReturn(llmReport);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.finishSession(SESSION_ID, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview report has no usable scores");
+
+            assertThat(q1.getFeedback()).isNull();
+            assertThat(q2.getFeedback()).isNull();
+            assertThat(session.getInterviewReport()).isNull();
+            assertThat(session.getStatus()).isNotEqualTo(SessionStatus.COMPLETED);
+
+            verify(sessionRepository, never()).save(any());
+            verifyNoInteractions(feedbackRepository);
+        }
+
+        @Test
         @DisplayName("Бросает LlmException, когда LLM вернула пустой список отзывов")
         void throwsWhenLlmReturnsEmptyAnswersList() {
             // given
@@ -1332,7 +1484,7 @@ class InterviewServiceTest {
             when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
 
             LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)),
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
                     "Отчёт",
                     "unknown"
             );
@@ -1365,7 +1517,7 @@ class InterviewServiceTest {
             when(sessionRepository.findWithQuestionsById(SESSION_ID)).thenReturn(Optional.of(session));
 
             LlmReport llmReport = new LlmReport(
-                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 8)),
+                    List.of(new LlmAnswerReview(q1Id, "Хорошо", 4)),
                     "Отчёт",
                     "Средняя"
             );
@@ -1373,7 +1525,7 @@ class InterviewServiceTest {
 
             SessionReport expectedReport = new SessionReport(
                     null, SESSION_ID, Profession.JAVA_DEV, CompanyType.PRODUCT, Level.MIDDLE,
-                    10, 8.0, "Отчёт", OfferProbability.MEDIUM, null);
+                    10, 4.0, "Отчёт", OfferProbability.MEDIUM, null);
             when(sessionMapper.toSessionReport(session)).thenReturn(expectedReport);
 
             // when

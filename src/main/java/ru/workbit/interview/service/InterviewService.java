@@ -326,6 +326,12 @@ public class InterviewService {
                         context.level(),
                         answerText));
 
+        if (!isPersistableFeedback(evaluation.score(), evaluation.feedback())) {
+            log.warn("LLM returned invalid evaluation for question {} (score={}), skipping feedback",
+                    question.getId(), evaluation.score());
+            return;
+        }
+
         AnswerFeedback feedback = feedbackRepository.save(
                 AnswerFeedback.builder()
                         .question(question)
@@ -380,8 +386,8 @@ public class InterviewService {
                 .filter(q -> q.getFeedback() == null)
                 .forEach(q -> {
                     LlmAnswerReview review = answersMap.get(q.getId());
-                    if (review == null || review.score() == null) {
-                        log.warn("LLM returned no score for question {}, skipping feedback", q.getId());
+                    if (review == null || !isPersistableFeedback(review.score(), review.evaluation())) {
+                        log.warn("LLM returned no valid feedback for question {}, skipping feedback", q.getId());
                         return;
                     }
                     q.setFeedback(AnswerFeedback.builder()
@@ -395,9 +401,17 @@ public class InterviewService {
     private OptionalDouble calculateAvgScore(Map<UUID, LlmAnswerReview> answersMap) {
         return answersMap.values().stream()
                 .map(LlmAnswerReview::score)
-                .filter(Objects::nonNull)
+                .filter(InterviewService::isValidScore)
                 .mapToInt(Integer::intValue)
                 .average();
+    }
+
+    private static boolean isPersistableFeedback(Integer score, String feedbackText) {
+        return isValidScore(score) && feedbackText != null && !feedbackText.isBlank();
+    }
+
+    private static boolean isValidScore(Integer score) {
+        return score != null && score >= 1 && score <= 5;
     }
 
     private SessionContext resolveContext(InterviewSession session) {

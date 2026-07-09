@@ -47,6 +47,7 @@ import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -456,6 +457,71 @@ class InterviewServiceTest {
 
             // then
             verify(vacancySessionCreator).persist(eq(data), eq("Вакансия"), any(), eq(USER_ID));
+        }
+
+        @Test
+        @DisplayName("Отфильтровывает null и пустые вопросы от LLM перед сохранением")
+        void filtersOutNullAndBlankQuestionsBeforePersisting() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 5);
+            when(vacancyService.fetch(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок",
+                    Arrays.asList("Q1", null, "   ", "Q2"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 2));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(List.class);
+            verify(vacancySessionCreator).persist(eq(data), any(), captor.capture(), eq(USER_ID));
+            assertThat(captor.getValue()).containsExactly("Q1", "Q2");
+        }
+
+        @Test
+        @DisplayName("Бросает LlmException, когда все сгенерированные вопросы пустые/null")
+        void throwsLlmExceptionWhenAllGeneratedQuestionsBlank() {
+            // given
+            VacancyData data = aVacancyData();
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            when(vacancyService.fetch(any())).thenReturn(data);
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
+                    .thenReturn(new LlmGeneratedQuestions("Заголовок", Arrays.asList(null, "  ", "")));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSessionByVacancy(request, USER_ID))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Question generator returned no questions");
+
+            verifyNoInteractions(vacancySessionCreator, sessionMapper);
+        }
+
+        @Test
+        @DisplayName("Обрезает слишком длинное имя вакансии до 255 символов")
+        void clampsTooLongVacancyNameTo255Characters() {
+            // given
+            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
+            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
+            when(vacancyService.fromText(any())).thenReturn(data);
+
+            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("a".repeat(300), List.of("Q1"));
+            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
+            when(vacancySessionCreator.persist(any(), any(), any(), any()))
+                    .thenReturn(aPersistedSession(UUID.randomUUID(), 1));
+            when(sessionMapper.toResponse(any(), eq(0), any())).thenReturn(mock(SessionResponse.class));
+
+            // when
+            interviewService.createSessionByVacancy(request, USER_ID);
+
+            // then
+            var captor = ArgumentCaptor.forClass(String.class);
+            verify(vacancySessionCreator).persist(eq(data), captor.capture(), any(), eq(USER_ID));
+            assertThat(captor.getValue()).hasSize(255);
         }
     }
 

@@ -34,6 +34,8 @@ import java.util.stream.IntStream;
 @Slf4j
 @RequiredArgsConstructor
 public class InterviewService {
+    private static final int MAX_VACANCY_NAME_LENGTH = 255;
+
     private final QuestionBank questionBank;
     private final LlmService llmService;
     private final VacancyService vacancyService;
@@ -80,7 +82,7 @@ public class InterviewService {
             throw new LlmException("Question generator returned no questions");
         }
 
-        String name = resolveName(data, generated);
+        String name = clampName(resolveName(data, generated));
         InterviewSession session = vacancySessionCreator.persist(data, name, questions, userId);
 
         return sessionMapper.toResponse(session, 0,
@@ -108,14 +110,17 @@ public class InterviewService {
         if (questions == null || questions.isEmpty()) {
             return List.of();
         }
-        if (questions.size() > requested) {
-            return List.copyOf(questions.subList(0, requested));
+        List<String> valid = questions.stream()
+                .filter(q -> q != null && !q.isBlank())
+                .toList();
+        if (valid.size() > requested) {
+            return List.copyOf(valid.subList(0, requested));
         }
-        if (questions.size() < requested) {
-            log.warn("LLM generated {} questions, {} requested; using what was generated",
-                    questions.size(), requested);
+        if (valid.size() < requested) {
+            log.warn("LLM generated {} usable questions, {} requested; using what was generated",
+                    valid.size(), requested);
         }
-        return questions;
+        return valid;
     }
 
     private String resolveName(VacancyData data, LlmGeneratedQuestions generated) {
@@ -123,6 +128,10 @@ public class InterviewService {
             return data.name();
         }
         return generated.title() != null && !generated.title().isBlank() ? generated.title() : "Вакансия";
+    }
+
+    private static String clampName(String name) {
+        return name.length() > MAX_VACANCY_NAME_LENGTH ? name.substring(0, MAX_VACANCY_NAME_LENGTH) : name;
     }
 
     private static String nvl(String value) {

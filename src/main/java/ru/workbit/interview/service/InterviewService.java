@@ -13,8 +13,7 @@ import ru.workbit.interview.dto.*;
 import ru.workbit.interview.model.*;
 import ru.workbit.interview.model.mapper.QuestionMapper;
 import ru.workbit.interview.model.mapper.SessionMapper;
-import ru.workbit.interview.question.BankQuestion;
-import ru.workbit.interview.question.QuestionBank;
+import ru.workbit.interview.repository.QuestionBankRepository;
 import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
 import ru.workbit.llm.dto.*;
@@ -36,7 +35,7 @@ import java.util.stream.IntStream;
 public class InterviewService {
     private static final int MAX_VACANCY_NAME_LENGTH = 255;
 
-    private final QuestionBank questionBank;
+    private final QuestionBankRepository questionBankRepository;
     private final LlmService llmService;
     private final VacancyService vacancyService;
     private final VacancySessionCreator vacancySessionCreator;
@@ -261,7 +260,9 @@ public class InterviewService {
     }
 
     private List<InterviewQuestion> createQuestions(CreateSessionRequest request, InterviewSession session) {
-        List<BankQuestion> questions = questionBank.forLevel(request.level(), request.totalQuestions());
+        List<BankQuestion> questions = questionBankRepository.pickRandomByLevel(
+                request.level(), request.totalQuestions()
+        );
 
         if (questions.isEmpty()) {
             log.error("Question storage did not return any questions. {}", request);

@@ -20,6 +20,7 @@ import ru.workbit.interview.dto.QuestionResponse;
 import ru.workbit.interview.dto.SessionReport;
 import ru.workbit.interview.dto.SessionResponse;
 import ru.workbit.interview.dto.SubmitAnswerRequest;
+import ru.workbit.interview.model.BankQuestion;
 import ru.workbit.interview.model.Category;
 import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.InterviewQuestion;
@@ -31,8 +32,7 @@ import ru.workbit.interview.model.SessionSource;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.mapper.QuestionMapper;
 import ru.workbit.interview.model.mapper.SessionMapper;
-import ru.workbit.interview.question.BankQuestion;
-import ru.workbit.interview.question.QuestionBank;
+import ru.workbit.interview.repository.QuestionBankRepository;
 import ru.workbit.interview.repository.QuestionRepository;
 import ru.workbit.interview.repository.SessionRepository;
 import ru.workbit.llm.dto.LlmAnswerEvaluation;
@@ -67,7 +67,7 @@ class InterviewServiceTest {
     private static final UUID SESSION_ID = UUID.randomUUID();
 
     @Mock
-    QuestionBank questionBank;
+    QuestionBankRepository questionBankRepository;
     @Mock
     LlmService llmService;
     @Mock
@@ -141,13 +141,15 @@ class InterviewServiceTest {
             when(sessionMapper.toEntity(request)).thenReturn(session);
 
             List<BankQuestion> bankQuestions = List.of(
-                    new BankQuestion(Category.JAVA_CORE, Level.MIDDLE, "Что такое JVM?"),
-                    new BankQuestion(Category.SPRING, Level.MIDDLE, "Что такое Spring контекст?")
+                    BankQuestion.builder()
+                            .category(Category.JAVA_CORE).level(Level.MIDDLE).text("Что такое JVM?").build(),
+                    BankQuestion.builder()
+                            .category(Category.SPRING).level(Level.MIDDLE).text("Что такое Spring контекст?").build()
             );
-            when(questionBank.forLevel(Level.MIDDLE, 2)).thenReturn(bankQuestions);
+            when(questionBankRepository.pickRandomByLevel(Level.MIDDLE, 2)).thenReturn(bankQuestions);
             when(questionMapper.toEntity(any(BankQuestion.class), eq(session)))
                     .thenAnswer(inv -> InterviewQuestion.builder()
-                            .questionText(((BankQuestion) inv.getArgument(0)).text())
+                            .questionText(((BankQuestion) inv.getArgument(0)).getText())
                             .session(inv.getArgument(1))
                             .build());
 
@@ -175,7 +177,7 @@ class InterviewServiceTest {
             // given
             InterviewSession session = aSessionBuilder().id(null).build();
             when(sessionMapper.toEntity(request)).thenReturn(session);
-            when(questionBank.forLevel(Level.MIDDLE, 2)).thenReturn(List.of());
+            when(questionBankRepository.pickRandomByLevel(Level.MIDDLE, 2)).thenReturn(List.of());
 
             // when / then
             assertThatThrownBy(() -> interviewService.createSession(request, USER_ID))

@@ -127,6 +127,25 @@ CREATE TABLE IF NOT EXISTS interview.answer_feedback (
         CHECK (score BETWEEN 1 AND 5)
 );
 
+CREATE TABLE IF NOT EXISTS interview.question_bank (
+    id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category VARCHAR(32) NOT NULL,
+    level    VARCHAR(32) NOT NULL,
+    text     TEXT NOT NULL,
+
+    CONSTRAINT chk_bank_category
+        CHECK (category IN (
+            'JAVA_CORE', 'CONCURRENCY', 'SPRING', 'SPRING_BOOT', 'SQL_JPA',
+            'TRANSACTIONS', 'XML_SOAP', 'LEGACY_INTEGRATION',
+            'PYTHON_CORE', 'ASYNCIO', 'DJANGO', 'FASTAPI', 'ORM_SQL', 'DATA_PROCESSING',
+            'TEST_DESIGN', 'TEST_AUTOMATION', 'MANUAL_TESTING', 'API_TESTING', 'PERFORMANCE_TESTING',
+            'REST_API', 'MICROSERVICES', 'DISTRIBUTED_SYSTEMS', 'CACHING', 'OBSERVABILITY',
+            'NOSQL', 'SECURITY', 'CI_CD', 'COMPLIANCE', 'SOFT_SKILLS'
+        )),
+    CONSTRAINT chk_bank_level
+        CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR', 'LEAD'))
+);
+
 CREATE TABLE IF NOT EXISTS interview.report (
     id                UUID PRIMARY KEY,
     session_id        UUID NOT NULL UNIQUE REFERENCES interview.session(id) ON DELETE CASCADE,

@@ -3,9 +3,9 @@ package ru.workbit.interview.model.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import ru.workbit.interview.dto.QuestionResponse;
+import ru.workbit.interview.model.BankQuestion;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewSession;
-import ru.workbit.interview.question.BankQuestion;
 
 @Mapper(componentModel = "spring")
 public interface QuestionMapper {

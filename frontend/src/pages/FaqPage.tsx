@@ -9,11 +9,9 @@ export function FaqPage() {
       <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
         FAQ
       </p>
-      <h1 className="text-ink mt-4 max-w-2xl text-4xl sm:text-5xl">
-        Частые вопросы
-      </h1>
+      <h1 className="text-ink mt-4 text-4xl sm:text-5xl">Частые вопросы</h1>
 
-      <div className="divide-rule border-rule mt-12 max-w-2xl divide-y border-t border-b">
+      <div className="divide-rule border-rule mt-12 divide-y border-t border-b">
         {faq.map((item) => (
           <details key={item.q} className="group py-5">
             <summary className="text-ink font-display flex cursor-pointer list-none items-center justify-between gap-4 text-lg [&::-webkit-details-marker]:hidden">

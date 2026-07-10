@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
 
@@ -67,44 +68,46 @@ export function Header() {
             )}
           </nav>
 
-          <div className="hidden md:block">
-            <Link
-              to={account.to}
-              className={buttonClasses({ variant: 'secondary' })}
+          <div className="-mr-2 flex items-center gap-1 md:mr-0 md:gap-3">
+            <ThemeToggle />
+            <div className="hidden md:block">
+              <Link
+                to={account.to}
+                className={buttonClasses({ variant: 'secondary' })}
+              >
+                {account.label}
+              </Link>
+            </div>
+            <button
+              type="button"
+              className="text-ink inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-md md:hidden"
+              aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
+              aria-expanded={open}
+              aria-controls="mobile-nav"
+              onClick={() => setOpen((v) => !v)}
             >
-              {account.label}
-            </Link>
+              <span aria-hidden className="relative block h-4 w-5">
+                <span
+                  className={cn(
+                    'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
+                    open ? 'top-1.5 rotate-45' : 'top-0',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'bg-ink absolute top-1.5 left-0 block h-0.5 w-5 transition-opacity duration-200',
+                    open && 'opacity-0',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
+                    open ? 'top-1.5 -rotate-45' : 'top-3',
+                  )}
+                />
+              </span>
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="text-ink -mr-2 inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-md md:hidden"
-            aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            onClick={() => setOpen((v) => !v)}
-          >
-            <span aria-hidden className="relative block h-4 w-5">
-              <span
-                className={cn(
-                  'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
-                  open ? 'top-1.5 rotate-45' : 'top-0',
-                )}
-              />
-              <span
-                className={cn(
-                  'bg-ink absolute top-1.5 left-0 block h-0.5 w-5 transition-opacity duration-200',
-                  open && 'opacity-0',
-                )}
-              />
-              <span
-                className={cn(
-                  'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
-                  open ? 'top-1.5 -rotate-45' : 'top-3',
-                )}
-              />
-            </span>
-          </button>
         </div>
       </Container>
 

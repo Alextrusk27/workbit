@@ -199,7 +199,7 @@ function ExampleCarousel() {
           transform: 'rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))',
         }}
       >
-        <figure className="border-rule bg-paper-2/50 relative flex flex-col rounded-lg border p-6 shadow-[0_18px_45px_-28px_rgba(26,26,26,0.4)] sm:p-8">
+        <figure className="border-rule bg-paper-2/50 relative flex flex-col rounded-lg border p-6 shadow-(--shadow-lift) sm:p-8">
           <div className="grid">
             {examples.map((ex, idx) => (
               <div

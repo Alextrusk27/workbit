@@ -8,6 +8,16 @@
       content="Тренажёр собеседований с AI: реалистичные вопросы под профессию и уровень, разбор каждого ответа и честная оценка — как на настоящем интервью."
     />
     <title>workbit — AI-интервью</title>
+    <script>
+      const stored = localStorage.getItem('theme')
+      if (
+        stored === 'dark' ||
+        (stored !== 'light' &&
+          matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

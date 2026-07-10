@@ -28,6 +28,9 @@
   --radius-md: 4px;
   --radius-lg: 8px;
 
+  /* Тень «приподнятой» карточки (hero-карусель) */
+  --shadow-lift: 0 18px 45px -28px rgba(26, 26, 26, 0.4);
+
   /* Базовая анимация входа контента — на загрузке и по скроллу (useReveal).
      Точечные «живые» штрихи (перо MarginNote, заполнение Stars) — на transition.
      Всё гасится reduced-motion глобальным правилом ниже. */
@@ -49,6 +52,24 @@
     color-scheme: light;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+  }
+
+  /* Тёмная тема — «кабинет при лампе»: тёплая тёмная бумага, те же чернильные
+     принципы, акценты осветлены до контраста на тёмном. Класс dark на <html>
+     ставят инлайн-скрипт в index.html (до первой отрисовки) и ThemeToggle;
+     выбор — в localStorage 'theme', без него — prefers-color-scheme. */
+  .dark {
+    color-scheme: dark;
+    --color-paper: #1c1a17;
+    --color-paper-2: #262320;
+    --color-ink: #eae6dc;
+    --color-muted: #a39c8d;
+    --color-rule: #3b362e;
+    --color-accent: #7fb0c4;
+    --color-accent-hover: #93c0d2;
+    --color-pine: #8fb8a8;
+    --color-edit: #82aed2;
+    --shadow-lift: 0 18px 45px -28px rgba(0, 0, 0, 0.7);
   }
 
   body {
@@ -73,6 +94,11 @@
     pointer-events: none;
     opacity: 0.05;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* На тёмном зерно светлит фон — чуть приглушаем. */
+  .dark body::before {
+    opacity: 0.04;
   }
 
   h1,

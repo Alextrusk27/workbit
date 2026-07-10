@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Footer } from '@/components/layout/Footer'
 import { useAuth, useLogout } from '@/features/auth/useAuth'
 
@@ -56,13 +57,16 @@ export function AppLayout() {
                 Тарифы
               </Link>
             </nav>
-            {user && (
-              <UserMenu
-                email={user.email}
-                onLogout={onLogout}
-                loggingOut={logout.isPending}
-              />
-            )}
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
+              {user && (
+                <UserMenu
+                  email={user.email}
+                  onLogout={onLogout}
+                  loggingOut={logout.isPending}
+                />
+              )}
+            </div>
           </div>
         </Container>
       </header>
@@ -109,7 +113,7 @@ function UserMenu({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="text-ink/75 hover:text-ink flex max-w-[60vw] touch-manipulation items-center gap-1.5 text-sm transition-colors sm:max-w-none"
+        className="text-ink/75 hover:text-ink flex max-w-[50vw] touch-manipulation items-center gap-1.5 text-sm transition-colors sm:max-w-none"
       >
         <span className="min-w-0 truncate">{email}</span>
         <svg

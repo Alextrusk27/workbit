@@ -218,7 +218,7 @@ class InterviewServiceTest {
         void fetchesByUrlPersistsAndMapsResponse() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 3);
             when(vacancyService.fetch("https://hh.ru/vacancy/123")).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Сгенерированный заголовок",
@@ -245,41 +245,6 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             verify(vacancyService).fetch("https://hh.ru/vacancy/123");
-            verify(vacancyService, never()).fromText(any());
-        }
-
-        @Test
-        @DisplayName("Получает данные вакансии из текста, когда URL не задан")
-        void fromTextWhenUrlBlank() {
-            // given
-            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
-            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 2);
-            when(vacancyService.fromText("Текст вакансии, достаточно длинный")).thenReturn(data);
-
-            LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок из LLM", List.of("Q1", "Q2"));
-            when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
-
-            UUID vacancySnapshotId = UUID.randomUUID();
-            InterviewSession persistedSession = aPersistedSession(vacancySnapshotId, 2);
-            when(vacancySessionCreator.persist(data, "Заголовок из LLM", List.of("Q1", "Q2"), USER_ID))
-                    .thenReturn(persistedSession);
-
-            SessionResponse expectedResponse = new SessionResponse(
-                    SESSION_ID, null, null, null,
-                    SessionSource.VACANCY,
-                    new SessionResponse.VacancyInfo("Заголовок из LLM", null, null, null),
-                    SessionStatus.CREATED, 2, 0, null, null);
-            when(sessionMapper.toResponse(persistedSession, 0,
-                    new VacancySnapshotView("Заголовок из LLM", null, null, null)))
-                    .thenReturn(expectedResponse);
-
-            // when
-            var result = interviewService.createSessionByVacancy(request, USER_ID);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(vacancyService).fromText("Текст вакансии, достаточно длинный");
-            verify(vacancyService, never()).fetch(any());
         }
 
         @Test
@@ -287,7 +252,7 @@ class InterviewServiceTest {
         void passesVacancyFieldsToLlmRequest() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 3);
             when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2", "Q3"));
@@ -314,9 +279,9 @@ class InterviewServiceTest {
         @DisplayName("Заменяет null-поля вакансии на пустые строки, а null keySkills на пустую строку")
         void nullVacancyFieldsBecomeEmptyStringsInLlmRequest() {
             // given
-            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
-            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 2);
-            when(vacancyService.fromText(any())).thenReturn(data);
+            VacancyData data = new VacancyData(123L, "https://hh.ru/vacancy/123", null, null, null, null, "Описание вакансии");
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 2);
+            when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2"));
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
@@ -341,7 +306,7 @@ class InterviewServiceTest {
         void trimsQuestionsWhenLlmReturnsMoreThanRequested() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 2);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 2);
             when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок",
@@ -365,7 +330,7 @@ class InterviewServiceTest {
         void keepsAllQuestionsWhenLlmReturnsFewerThanRequested() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 5);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 5);
             when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок", List.of("Q1", "Q2"));
@@ -388,7 +353,7 @@ class InterviewServiceTest {
         void throwsLlmExceptionWhenGeneratedQuestionsEmpty() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 3);
             when(vacancyService.fetch(any())).thenReturn(data);
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
                     .thenReturn(new LlmGeneratedQuestions("Заголовок", List.of()));
@@ -406,7 +371,7 @@ class InterviewServiceTest {
         void throwsLlmExceptionWhenGeneratedQuestionsNull() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 3);
             when(vacancyService.fetch(any())).thenReturn(data);
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
                     .thenReturn(new LlmGeneratedQuestions("Заголовок", null));
@@ -423,9 +388,9 @@ class InterviewServiceTest {
         @DisplayName("Берёт имя из заголовка LLM, когда имя вакансии не задано")
         void resolvesNameFromGeneratedTitleWhenVacancyNameBlank() {
             // given
-            VacancyData data = new VacancyData(null, null, "  ", null, null, null, "Текст вакансии, достаточно длинный");
-            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
-            when(vacancyService.fromText(any())).thenReturn(data);
+            VacancyData data = new VacancyData(123L, "https://hh.ru/vacancy/123", "  ", null, null, null, "Описание вакансии");
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 1);
+            when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок из LLM", List.of("Q1"));
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
@@ -444,9 +409,9 @@ class InterviewServiceTest {
         @DisplayName("Использует фолбэк 'Вакансия', когда ни имя вакансии, ни заголовок LLM не заданы")
         void resolvesNameFallbackWhenBothBlank() {
             // given
-            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
-            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
-            when(vacancyService.fromText(any())).thenReturn(data);
+            VacancyData data = new VacancyData(123L, "https://hh.ru/vacancy/123", null, null, null, null, "Описание вакансии");
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 1);
+            when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions(null, List.of("Q1"));
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);
@@ -466,7 +431,7 @@ class InterviewServiceTest {
         void filtersOutNullAndBlankQuestionsBeforePersisting() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 5);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 5);
             when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("Заголовок",
@@ -490,7 +455,7 @@ class InterviewServiceTest {
         void throwsLlmExceptionWhenAllGeneratedQuestionsBlank() {
             // given
             VacancyData data = aVacancyData();
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", null, 3);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 3);
             when(vacancyService.fetch(any())).thenReturn(data);
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class)))
                     .thenReturn(new LlmGeneratedQuestions("Заголовок", Arrays.asList(null, "  ", "")));
@@ -507,9 +472,9 @@ class InterviewServiceTest {
         @DisplayName("Обрезает слишком длинное имя вакансии до 255 символов")
         void clampsTooLongVacancyNameTo255Characters() {
             // given
-            VacancyData data = new VacancyData(null, null, null, null, null, null, "Текст вакансии, достаточно длинный");
-            var request = new CreateSessionByVacancyRequest(null, "Текст вакансии, достаточно длинный", 1);
-            when(vacancyService.fromText(any())).thenReturn(data);
+            VacancyData data = new VacancyData(123L, "https://hh.ru/vacancy/123", null, null, null, null, "Описание вакансии");
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123", 1);
+            when(vacancyService.fetch(any())).thenReturn(data);
 
             LlmGeneratedQuestions generated = new LlmGeneratedQuestions("a".repeat(300), List.of("Q1"));
             when(llmService.generateVacancyQuestions(any(LlmQuestionGenerationRequest.class))).thenReturn(generated);

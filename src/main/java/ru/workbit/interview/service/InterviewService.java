@@ -70,7 +70,7 @@ public class InterviewService {
     }
 
     public SessionResponse createSessionByVacancy(CreateSessionByVacancyRequest request, UUID userId) {
-        VacancyData data = resolveVacancyData(request);
+        VacancyData data = vacancyService.fetch(request.vacancyUrl());
 
         LlmGeneratedQuestions generated = llmService.generateVacancyQuestions(
                 toGenerationRequest(data, request.totalQuestions()));
@@ -86,13 +86,6 @@ public class InterviewService {
 
         return sessionMapper.toResponse(session, 0,
                 new VacancySnapshotView(name, data.employer(), data.url(), data.experience()));
-    }
-
-    private VacancyData resolveVacancyData(CreateSessionByVacancyRequest request) {
-        if (request.vacancyUrl() != null && !request.vacancyUrl().isBlank()) {
-            return vacancyService.fetch(request.vacancyUrl());
-        }
-        return vacancyService.fromText(request.vacancyText());
     }
 
     private LlmQuestionGenerationRequest toGenerationRequest(VacancyData data, int questionCount) {

@@ -42,10 +42,6 @@ public class VacancyService {
         return vacancyMapper.toPreview(getActiveVacancy(vacancyId), canonicalUrl(vacancyId));
     }
 
-    public VacancyData fromText(String text) {
-        return new VacancyData(null, null, null, null, null, null, sanitize(text));
-    }
-
     public UUID saveSnapshot(VacancyData data, String name) {
         return vacancySnapshotRepository.save(vacancyMapper.toSnapshot(data, name)).getId();
     }

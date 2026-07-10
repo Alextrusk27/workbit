@@ -217,28 +217,6 @@ class VacancyServiceTest {
     }
 
     @Nested
-    @DisplayName("FromText")
-    class FromText {
-
-        @Test
-        @DisplayName("Возвращает VacancyData с очищенным от HTML текстом и пустыми остальными полями")
-        void returnsVacancyDataWithSanitizedDescriptionOnly() {
-            // when
-            var result = vacancyService.fromText("<p>Текст <b>вакансии</b></p>");
-
-            // then
-            assertThat(result.hhVacancyId()).isNull();
-            assertThat(result.url()).isNull();
-            assertThat(result.name()).isNull();
-            assertThat(result.employer()).isNull();
-            assertThat(result.experience()).isNull();
-            assertThat(result.keySkills()).isNull();
-            assertThat(result.description()).isEqualTo("Текст вакансии");
-            verifyNoInteractions(hhClient, vacancyMapper);
-        }
-    }
-
-    @Nested
     @DisplayName("SaveSnapshot")
     class SaveSnapshot {
 

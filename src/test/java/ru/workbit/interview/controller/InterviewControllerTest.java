@@ -81,7 +81,7 @@ class InterviewControllerTest {
     }
 
     private CreateSessionByVacancyRequest aCreateSessionByVacancyRequest() {
-        return new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", null, 10);
+        return new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", 10);
     }
 
     private SessionResponse aVacancySessionResponse() {
@@ -310,43 +310,10 @@ class InterviewControllerTest {
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда заданы оба поля vacancyUrl и vacancyText")
-        void returns400WhenBothFieldsSet() throws Exception {
+        @DisplayName("Возвращает 400, когда vacancyUrl не задан")
+        void returns400WhenVacancyUrlMissing() throws Exception {
             // given
-            var request = new CreateSessionByVacancyRequest(
-                    "https://hh.ru/vacancy/123456", "x".repeat(50), 10);
-
-            // when / then
-            mvc.perform(post(BASE + "/sessions/by-vacancy")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(interviewService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда не задано ни одного поля")
-        void returns400WhenNeitherFieldSet() throws Exception {
-            // given
-            var request = new CreateSessionByVacancyRequest(null, null, 10);
-
-            // when / then
-            mvc.perform(post(BASE + "/sessions/by-vacancy")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(interviewService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда vacancyText короче 50 символов")
-        void returns400WhenVacancyTextTooShort() throws Exception {
-            // given
-            var request = new CreateSessionByVacancyRequest(null, "слишком короткий текст", 10);
+            var request = new CreateSessionByVacancyRequest(null, 10);
 
             // when / then
             mvc.perform(post(BASE + "/sessions/by-vacancy")
@@ -362,7 +329,7 @@ class InterviewControllerTest {
         @DisplayName("Возвращает 400, когда totalQuestions отсутствует")
         void returns400WhenTotalQuestionsMissing() throws Exception {
             // given
-            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", null, null);
+            var request = new CreateSessionByVacancyRequest("https://hh.ru/vacancy/123456", null);
 
             // when / then
             mvc.perform(post(BASE + "/sessions/by-vacancy")
@@ -379,7 +346,7 @@ class InterviewControllerTest {
         void returns400WhenTotalQuestionsBelowMin() throws Exception {
             // given
             var request = new CreateSessionByVacancyRequest(
-                    "https://hh.ru/vacancy/123456", null, CreateSessionRequest.MIN_QUESTIONS - 1);
+                    "https://hh.ru/vacancy/123456", CreateSessionRequest.MIN_QUESTIONS - 1);
 
             // when / then
             mvc.perform(post(BASE + "/sessions/by-vacancy")
@@ -396,7 +363,7 @@ class InterviewControllerTest {
         void returns400WhenTotalQuestionsAboveMax() throws Exception {
             // given
             var request = new CreateSessionByVacancyRequest(
-                    "https://hh.ru/vacancy/123456", null, CreateSessionRequest.MAX_QUESTIONS + 1);
+                    "https://hh.ru/vacancy/123456", CreateSessionRequest.MAX_QUESTIONS + 1);
 
             // when / then
             mvc.perform(post(BASE + "/sessions/by-vacancy")

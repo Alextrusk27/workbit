@@ -150,6 +150,9 @@ public class AuthService {
 
     private User reactivate(User user, String rawPassword) {
         if (user.isActive()) {
+            if (!user.isEmailVerified()) {
+                throw new BadCredentialsException("Email registered but not verified");
+            }
             throw new BadCredentialsException("Email already in use");
         }
         user.setPassword(passwordEncoder.encode(rawPassword));

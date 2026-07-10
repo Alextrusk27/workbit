@@ -301,6 +301,20 @@ class AuthServiceTest {
 
             verifyNoInteractions(verificationTokenService, eventPublisher);
         }
+
+        @Test
+        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с активным, но не подтверждённым email")
+        void throwsWhenActiveEmailRegisteredButNotVerified() {
+            // given
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeUnverifiedUser()));
+
+            // when / then
+            assertThatThrownBy(() -> authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD)))
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("Email registered but not verified");
+
+            verifyNoInteractions(verificationTokenService, eventPublisher);
+        }
     }
 
     // -------------------------------------------------------------------------

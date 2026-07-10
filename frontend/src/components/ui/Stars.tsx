@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/cn'
 
 const STAR =
@@ -22,18 +23,33 @@ function Row({ count }: { count: number }) {
 }
 
 /** Оценка звёздами с дробным заполнением (шаг 0.5 и любой процент). Цвет
- *  заполненных звёзд — currentColor (наследуется от контекста), пустых — rule. */
+ *  заполненных звёзд — currentColor (наследуется от контекста), пустых — rule.
+ *  `animate` — заполнить от 0 до значения при монтировании (сигнатурный штрих;
+ *  по умолчанию выключено, чтобы списки оценок оставались спокойными). */
 export function Stars({
   value,
   max = 5,
   className,
+  animate = false,
 }: {
   value: number
   max?: number
   className?: string
+  animate?: boolean
 }) {
   const pct = Math.max(0, Math.min(1, value / max)) * 100
   const rounded = Math.round(value * 2) / 2
+  const [width, setWidth] = useState(animate ? 0 : pct)
+
+  useEffect(() => {
+    if (!animate) {
+      setWidth(pct)
+      return
+    }
+    const id = requestAnimationFrame(() => setWidth(pct))
+    return () => cancelAnimationFrame(id)
+  }, [animate, pct])
+
   return (
     <span
       role="img"
@@ -48,7 +64,12 @@ export function Stars({
       </span>
       <span
         className="absolute inset-0 flex overflow-hidden"
-        style={{ width: `${pct}%` }}
+        style={{
+          width: `${width}%`,
+          transition: animate
+            ? 'width 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
+            : undefined,
+        }}
       >
         <Row count={max} />
       </span>

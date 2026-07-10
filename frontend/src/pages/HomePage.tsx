@@ -5,10 +5,13 @@ import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
+import { Stars } from '@/components/ui/Stars'
 import { plans } from '@/content/plans'
 import { faqPreview } from '@/content/faq'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useReveal } from '@/lib/useReveal'
+import { useTilt } from '@/lib/useTilt'
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return (
@@ -36,7 +39,8 @@ const steps = [
   },
 ]
 
-interface Example {
+type QaExample = {
+  kind: 'qa'
   meta: string
   question: string
   answer: string
@@ -44,8 +48,19 @@ interface Example {
   note: string
 }
 
+type SummaryExample = {
+  kind: 'summary'
+  meta: string
+  avgScore: number
+  offerProbability: string
+  feedback: string
+}
+
+type Example = QaExample | SummaryExample
+
 const examples: Example[] = [
   {
+    kind: 'qa',
     meta: 'Вопрос 3 / 10 · Java-разработчик · Middle',
     question: 'Чем отличается HashMap от ConcurrentHashMap?',
     answer:
@@ -54,6 +69,7 @@ const examples: Example[] = [
     note: 'Верно про сегменты. Уточните, что в Java 8+ это не сегменты, а блокировка на уровне бакета.',
   },
   {
+    kind: 'qa',
     meta: 'Вопрос 5 / 12 · Инженер по тестированию · Сбер',
     question: 'Чем smoke-тестирование отличается от регрессионного?',
     answer:
@@ -61,30 +77,41 @@ const examples: Example[] = [
     score: 5,
     note: 'Суть верна. Добавьте, что smoke гоняют перед допуском к глубоким тестам, а регрессию — по расширенному набору кейсов.',
   },
+  {
+    kind: 'summary',
+    meta: 'Итог интервью · Java-разработчик · Middle',
+    avgScore: 4.2,
+    offerProbability: 'Высокая',
+    feedback:
+      'Сильные ответы по коллекциям и многопоточности, рассуждения структурные. Проседает работа с транзакциями — повторите уровни изоляции и оптимистичные блокировки. В целом вы готовы к собеседованию на Middle.',
+  },
 ]
 
-/** Пример вопроса с разбором: примеры сменяются сами раз в 6 с и по клику на точки. */
-function ExampleCarousel() {
-  const [active, setActive] = useState(0)
-
-  useEffect(() => {
-    const id = setInterval(
-      () => setActive((v) => (v + 1) % examples.length),
-      6000,
-    )
-    return () => clearInterval(id)
-  }, [])
-
-  const ex = examples[active]
-
+function CarouselArrow({ dir }: { dir: 'left' | 'right' }) {
   return (
-    <figure
-      className="border-rule bg-paper-2/50 animate-rise rounded-lg border p-6 sm:p-8"
-      style={{ animationDelay: '320ms' }}
+    <svg
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
     >
-      <figcaption className="text-muted mb-4 font-mono text-xs tracking-wide">
+      <path
+        d={dir === 'left' ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function QuestionExample({ ex }: { ex: QaExample }) {
+  return (
+    <>
+      <p className="text-muted mb-4 font-mono text-xs tracking-wide">
         {ex.meta}
-      </figcaption>
+      </p>
       <p className="text-ink font-display text-lg leading-snug">
         {ex.question}
       </p>
@@ -92,33 +119,143 @@ function ExampleCarousel() {
         <blockquote className="border-rule text-ink/90 text-body-sm border-l-2 pl-4 leading-relaxed">
           {ex.answer}
         </blockquote>
-        <MarginNote score={ex.score} className="sm:max-w-[15rem]">
-          {ex.note}
-        </MarginNote>
+        <div
+          className="sm:max-w-[15rem]"
+          style={{
+            transform:
+              'translate3d(calc(var(--px, 0) * 10px), calc(var(--py, 0) * 10px), 0)',
+            transition: 'transform 0.3s ease-out',
+          }}
+        >
+          <MarginNote score={ex.score}>{ex.note}</MarginNote>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SummaryExampleCard({ ex }: { ex: SummaryExample }) {
+  return (
+    <>
+      <p className="text-muted mb-4 font-mono text-xs tracking-wide">
+        {ex.meta}
+      </p>
+      <p className="text-ink font-display text-lg leading-snug">
+        Итоговый разбор
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <span className="flex items-center gap-2">
+          <span className="text-accent text-xl">
+            <Stars value={ex.avgScore} />
+          </span>
+          <span className="text-muted font-mono text-sm tabular-nums">
+            {ex.avgScore.toFixed(1).replace('.', ',')} из 5
+          </span>
+        </span>
+        <span className="text-muted text-sm">
+          Вероятность оффера:{' '}
+          <span className="text-ink font-medium">{ex.offerProbability}</span>
+        </span>
       </div>
       <div
-        className="mt-6 flex gap-2"
-        role="tablist"
-        aria-label="Примеры вопросов"
+        className="mt-5"
+        style={{
+          transform:
+            'translate3d(calc(var(--px, 0) * 8px), calc(var(--py, 0) * 8px), 0)',
+          transition: 'transform 0.3s ease-out',
+        }}
       >
-        {examples.map((item, idx) => (
-          <button
-            key={item.meta}
-            type="button"
-            role="tab"
-            aria-selected={idx === active}
-            aria-label={`Пример ${idx + 1}`}
-            onClick={() => setActive(idx)}
-            className={cn(
-              'h-1.5 rounded-full transition-all',
-              idx === active
-                ? 'bg-accent w-6'
-                : 'bg-rule hover:bg-ink/30 w-1.5',
-            )}
-          />
-        ))}
+        <MarginNote>{ex.feedback}</MarginNote>
       </div>
-    </figure>
+    </>
+  )
+}
+
+/** Примеры разбора: вопросы и итог собеседования. Сменяются плавным кроссфейдом
+ *  сами раз в 6 с и стрелками в нижних углах (ручное переключение сбрасывает
+ *  таймер — таймаут пересоздаётся при каждой смене активного слайда). Слайды
+ *  наложены в одну grid-ячейку — высота карточки не прыгает при переключении. */
+function ExampleCarousel() {
+  const [active, setActive] = useState(0)
+  const count = examples.length
+
+  useEffect(() => {
+    const id = setTimeout(() => setActive((v) => (v + 1) % count), 6000)
+    return () => clearTimeout(id)
+  }, [active, count])
+
+  const go = (dir: 1 | -1) => setActive((v) => (v + dir + count) % count)
+  const tiltRef = useTilt<HTMLDivElement>()
+
+  return (
+    <div
+      className="animate-rise [perspective:1200px]"
+      style={{ animationDelay: '320ms' }}
+    >
+      <div
+        ref={tiltRef}
+        className="transition-transform duration-300 ease-out will-change-transform"
+        style={{
+          transform: 'rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))',
+        }}
+      >
+        <figure className="border-rule bg-paper-2/50 relative flex flex-col rounded-lg border p-6 shadow-[0_18px_45px_-28px_rgba(26,26,26,0.4)] sm:p-8">
+          <div className="grid">
+            {examples.map((ex, idx) => (
+              <div
+                key={ex.meta}
+                aria-hidden={idx !== active}
+                className={cn(
+                  'col-start-1 row-start-1 transition-opacity duration-500 ease-out',
+                  idx === active
+                    ? 'opacity-100'
+                    : 'pointer-events-none opacity-0',
+                )}
+              >
+                {ex.kind === 'qa' ? (
+                  <QuestionExample ex={ex} />
+                ) : (
+                  <SummaryExampleCard ex={ex} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              aria-label="Предыдущий пример"
+              className="border-rule text-muted hover:border-ink/30 hover:text-ink focus-visible:outline-accent flex size-9 items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <CarouselArrow dir="left" />
+            </button>
+            <span className="text-muted font-mono text-xs tabular-nums">
+              {active + 1} / {count}
+            </span>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              aria-label="Следующий пример"
+              className="border-rule text-muted hover:border-ink/30 hover:text-ink focus-visible:outline-accent flex size-9 items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <CarouselArrow dir="right" />
+            </button>
+          </div>
+
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-lg transition-opacity duration-300"
+            style={{
+              opacity: 'var(--active, 0)',
+              mixBlendMode: 'soft-light',
+              background:
+                'radial-gradient(28rem 28rem at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, #fff 45%, transparent), transparent 60%)',
+            }}
+          />
+        </figure>
+      </div>
+    </div>
   )
 }
 
@@ -127,6 +264,10 @@ export function HomePage() {
   const [selectedPlan, setSelectedPlan] = useState(
     () => (plans.find((p) => p.featured) ?? plans[0]).name,
   )
+  const how = useReveal<HTMLElement>()
+  const pricing = useReveal<HTMLElement>()
+  const faq = useReveal<HTMLElement>()
+  const cta = useReveal<HTMLElement>()
   return (
     <>
       {/* Hero: продукт показан сразу — ответ соискателя с правкой рецензента. */}
@@ -148,7 +289,7 @@ export function HomePage() {
             >
               Тренируйтесь на реалистичных вопросах под вашу профессию и
               уровень. После каждого ответа — разбор рецензента и честная
-              оценка, будто это уже настоящее интервью.
+              оценка, как в настоящем интервью.
             </p>
             <div
               className="animate-rise mt-8 flex flex-wrap items-center gap-3"
@@ -172,7 +313,11 @@ export function HomePage() {
       </section>
 
       {/* Как проходит интервью — реальная последовательность, отсюда нумерация. */}
-      <section id="how" className="scroll-mt-20">
+      <section
+        id="how"
+        ref={how.ref}
+        className={cn('scroll-mt-20', how.shown ? 'animate-rise' : 'opacity-0')}
+      >
         <Container className="py-16 sm:py-24">
           <Eyebrow>Как проходит интервью</Eyebrow>
           <h2 className="text-ink mt-4 max-w-2xl text-3xl sm:text-4xl">
@@ -196,7 +341,13 @@ export function HomePage() {
       </section>
 
       {/* Превью тарифов */}
-      <section className="border-rule border-t">
+      <section
+        ref={pricing.ref}
+        className={cn(
+          'border-rule border-t',
+          pricing.shown ? 'animate-rise' : 'opacity-0',
+        )}
+      >
         <Container className="py-16 sm:py-24">
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -279,7 +430,14 @@ export function HomePage() {
       </section>
 
       {/* Превью FAQ */}
-      <section id="faq" className="border-rule scroll-mt-20 border-t">
+      <section
+        id="faq"
+        ref={faq.ref}
+        className={cn(
+          'border-rule scroll-mt-20 border-t',
+          faq.shown ? 'animate-rise' : 'opacity-0',
+        )}
+      >
         <Container className="grid gap-10 py-16 sm:py-24 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <Eyebrow>Вопросы</Eyebrow>
@@ -310,7 +468,13 @@ export function HomePage() {
       </section>
 
       {/* Финальный CTA */}
-      <section className="border-rule border-t">
+      <section
+        ref={cta.ref}
+        className={cn(
+          'border-rule border-t',
+          cta.shown ? 'animate-rise' : 'opacity-0',
+        )}
+      >
         <Container className="py-16 text-center sm:py-24">
           <h2 className="text-ink mx-auto max-w-2xl text-3xl sm:text-4xl">
             Следующее собеседование — уже не первое

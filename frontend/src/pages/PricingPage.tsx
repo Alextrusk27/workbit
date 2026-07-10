@@ -21,13 +21,19 @@ export function PricingPage() {
   )
   return (
     <Container className="py-16 sm:py-24">
-      <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
+      <p className="text-muted animate-rise font-mono text-xs tracking-[0.2em] uppercase">
         Тарифы
       </p>
-      <h1 className="text-ink mt-4 max-w-2xl text-4xl sm:text-5xl">
+      <h1
+        className="text-ink animate-rise mt-4 max-w-2xl text-4xl sm:text-5xl"
+        style={{ animationDelay: '80ms' }}
+      >
         Один тренажёр, два режима
       </h1>
-      <p className="text-muted mt-5 max-w-xl text-lg">
+      <p
+        className="text-muted animate-rise mt-5 max-w-xl text-lg"
+        style={{ animationDelay: '160ms' }}
+      >
         Начните бесплатно, чтобы понять формат. Переходите на Про, когда
         готовитесь всерьёз и нужен глубокий разбор.
       </p>
@@ -35,7 +41,8 @@ export function PricingPage() {
       <div
         role="radiogroup"
         aria-label="Выбор тарифа"
-        className="mt-12 grid items-stretch gap-5 sm:grid-cols-2"
+        className="animate-rise mt-12 grid items-stretch gap-5 sm:grid-cols-2"
+        style={{ animationDelay: '240ms' }}
       >
         {plans.map((p) => {
           const isSelected = selected === p.name
@@ -84,7 +91,10 @@ export function PricingPage() {
         })}
       </div>
 
-      <p className="text-muted mt-8 text-sm">
+      <p
+        className="text-muted animate-rise mt-8 text-sm"
+        style={{ animationDelay: '320ms' }}
+      >
         Цены указаны для примера и могут измениться до запуска.
       </p>
     </Container>

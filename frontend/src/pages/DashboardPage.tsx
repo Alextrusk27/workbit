@@ -45,13 +45,19 @@ function formatDate(iso: string): string {
 export function DashboardPage() {
   usePageTitle('Личный кабинет')
   const { data: sessions, isLoading, isError, error } = useSessions()
-  const [tab, setTab] = useState<SessionSource>('CATALOG')
+  const [tab, setTab] = useState<SessionSource>('VACANCY')
   const [status, setStatus] = useState<StatusFilter>('ALL')
 
   const newHref = `/app/interview/new?mode=${tab === 'VACANCY' ? 'vacancy' : 'catalog'}`
 
   return (
     <Container className="py-12 sm:py-16">
+      <Link
+        to="/"
+        className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
+      >
+        ← На главную
+      </Link>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
@@ -113,7 +119,7 @@ function SessionBrowser({
         className="border-rule flex gap-1 border-b"
         aria-label="Разделы интервью"
       >
-        {(['CATALOG', 'VACANCY'] as const).map((source) => {
+        {(['VACANCY', 'CATALOG'] as const).map((source) => {
           const selected = source === tab
           return (
             <button
@@ -179,7 +185,7 @@ function SessionBrowser({
             Нет интервью с этим статусом.
           </p>
         ) : (
-          <ul className="space-y-4">
+          <ul key={`${tab}-${status}`} className="space-y-4">
             {shown.map((s, i) => (
               <SessionCard key={s.id} session={s} index={i} />
             ))}
@@ -248,6 +254,10 @@ function SessionCard({
 }) {
   const del = useDeleteSession()
   const completed = session.status === 'COMPLETED'
+  const openHref = completed
+    ? `/app/interview/${session.id}/report`
+    : `/app/interview/${session.id}`
+  const newHref = `/app/interview/new?mode=${session.source === 'VACANCY' ? 'vacancy' : 'catalog'}`
 
   const onDelete = () => {
     if (!window.confirm('Удалить это интервью? Действие необратимо.')) return
@@ -262,7 +272,12 @@ function SessionCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-ink font-display text-lg break-words">
-            {sessionHeadline(session)}
+            <Link
+              to={openHref}
+              className="hover:text-accent focus-visible:outline-accent rounded-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              {sessionHeadline(session)}
+            </Link>
           </h2>
           <p className="text-muted mt-1 text-sm break-words">
             {sessionSubtitle(session)}
@@ -290,27 +305,36 @@ function SessionCard({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          {completed ? (
-            <Link
-              to={`/app/interview/${session.id}/report`}
-              className={buttonClasses({ variant: 'secondary' })}
+        <div className="flex flex-col gap-2">
+          <Link
+            to={openHref}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            {completed ? 'Результаты' : 'Продолжить'}
+          </Link>
+          <span title="Скоро — можно будет начать это же интервью сначала">
+            <button
+              type="button"
+              disabled
+              className={buttonClasses({
+                variant: 'secondary',
+                className: 'w-full',
+              })}
             >
-              Отчёт
-            </Link>
-          ) : (
-            <Link
-              to={`/app/interview/${session.id}`}
-              className={buttonClasses()}
-            >
-              Продолжить
-            </Link>
-          )}
+              Начать сначала
+            </button>
+          </span>
+          <Link
+            to={newHref}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            Новое интервью
+          </Link>
           <button
             type="button"
             onClick={onDelete}
             disabled={del.isPending}
-            className="text-muted hover:text-ink text-sm transition-colors disabled:opacity-50"
+            className="text-muted hover:text-ink self-center text-sm transition-colors disabled:opacity-50"
           >
             Удалить
           </button>

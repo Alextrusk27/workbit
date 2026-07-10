@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { Field } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Textarea } from '@/components/ui/Textarea'
 import type { InterviewOptions } from '@/features/interview/api'
 import {
   useCreateSession,
@@ -20,9 +19,6 @@ import {
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
-
-const VACANCY_TEXT_MIN = 50
-const VACANCY_TEXT_MAX = 20000
 
 function ChipGroup({
   label,
@@ -257,67 +253,40 @@ function VacancyForm({
   onCreated: (sessionId: string) => void
 }) {
   const create = useCreateSessionByVacancy()
-  const [inputMode, setInputMode] = useState<'url' | 'text'>('url')
   const [url, setUrl] = useState('')
-  const [text, setText] = useState('')
   const [total, setTotal] = useState(options.minQuestions)
 
   const urlValid = isHhVacancyUrl(url)
-  const trimmedLen = text.trim().length
-  const textValid =
-    trimmedLen >= VACANCY_TEXT_MIN && trimmedLen <= VACANCY_TEXT_MAX
-  const ready = inputMode === 'url' ? urlValid : textValid
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!ready) return
-    const body =
-      inputMode === 'url'
-        ? { vacancyUrl: url.trim(), totalQuestions: total }
-        : { vacancyText: text.trim(), totalQuestions: total }
-    create.mutate(body, { onSuccess: (session) => onCreated(session.id) })
+    if (!urlValid) return
+    create.mutate(
+      { vacancyUrl: url.trim(), totalQuestions: total },
+      { onSuccess: (session) => onCreated(session.id) },
+    )
   }
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-6">
       {create.isError && <Alert>{getErrorMessage(create.error)}</Alert>}
 
-      <Segmented
-        options={[
-          { value: 'url', label: 'Ссылка hh.ru' },
-          { value: 'text', label: 'Текст вакансии' },
-        ]}
-        value={inputMode}
-        onChange={setInputMode}
-      />
-
-      {inputMode === 'url' ? (
-        <div className="space-y-4">
-          <Field
-            label="Ссылка на вакансию hh.ru"
-            type="url"
-            inputMode="url"
-            placeholder="https://hh.ru/vacancy/123456"
-            hint={
-              url && !urlValid
-                ? 'Ссылка должна вести на вакансию hh.ru (https://hh.ru/vacancy/…)'
-                : 'Подтянем название, работодателя и требуемый опыт'
-            }
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          {urlValid && <VacancyPreviewCard url={url} />}
-        </div>
-      ) : (
-        <Textarea
-          label="Текст вакансии"
-          rows={10}
-          placeholder="Вставьте описание вакансии: обязанности, требования, стек…"
-          hint={`${trimmedLen} / ${VACANCY_TEXT_MAX} символов, минимум ${VACANCY_TEXT_MIN}`}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+      <div className="space-y-4">
+        <Field
+          label="Ссылка на вакансию hh.ru"
+          type="url"
+          inputMode="url"
+          placeholder="https://hh.ru/vacancy/123456"
+          hint={
+            url && !urlValid
+              ? 'Ссылка должна вести на вакансию hh.ru (https://hh.ru/vacancy/…)'
+              : 'Подтянем название, работодателя и требуемый опыт'
+          }
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
         />
-      )}
+        {urlValid && <VacancyPreviewCard url={url} />}
+      </div>
 
       <QuestionCountSlider
         min={options.minQuestions}
@@ -326,7 +295,7 @@ function VacancyForm({
         onChange={setTotal}
       />
 
-      <Button type="submit" size="lg" disabled={!ready || create.isPending}>
+      <Button type="submit" size="lg" disabled={!urlValid || create.isPending}>
         {create.isPending ? 'Собираем вопросы…' : 'Начать интервью'}
       </Button>
       {create.isPending && (
@@ -383,15 +352,15 @@ export function NewInterviewPage() {
         Соберём интервью под вас
       </h1>
       <p className="text-muted mt-4 max-w-xl">
-        Тренировка — вопросы под профессию, уровень и тип компании. По вакансии
-        — вопросы под конкретную вакансию hh.ru или вставленный текст.
+        Тренировка — вопросы под профессию, уровень и тип компании. Под вакансию
+        — вопросы под конкретную вакансию с hh.ru.
       </p>
 
       <div className="mt-10 max-w-2xl">
         <Segmented
           options={[
             { value: 'catalog', label: 'Тренировка' },
-            { value: 'vacancy', label: 'По вакансии' },
+            { value: 'vacancy', label: 'Под вакансию' },
           ]}
           value={mode}
           onChange={setMode}

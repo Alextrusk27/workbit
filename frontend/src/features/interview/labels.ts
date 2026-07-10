@@ -7,8 +7,8 @@ export const STATUS_LABELS: Record<SessionStatus, string> = {
 }
 
 export const SOURCE_LABELS: Record<SessionSource, string> = {
-  CATALOG: 'Тренировки',
-  VACANCY: 'По вакансии',
+  CATALOG: 'Тренировка',
+  VACANCY: 'Под вакансию',
 }
 
 /** Заголовок сессии: профессия для каталога, название вакансии — для вакансии. */

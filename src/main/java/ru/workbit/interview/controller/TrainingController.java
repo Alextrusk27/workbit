@@ -71,7 +71,7 @@ public class TrainingController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Страница сессий")
     })
-    public ResponseEntity<@NotNull PagedModel<TrainingSessionResponse>> getAllSessions(
+    public ResponseEntity<@NotNull PagedModel<@NotNull TrainingSessionResponse>> getAllSessions(
             @PageableDefault(sort = "created", direction = Sort.Direction.DESC) Pageable pageable,
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {

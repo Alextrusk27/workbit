@@ -2,6 +2,8 @@ app:
   security:
     cors:
       allowed-origins: http://localhost:5173
+  mail:
+    base-url: http://localhost:5173
 
 spring:
   sql:
@@ -39,7 +41,11 @@ management:
       exposure:
         include: "*"
 
+llm:
+  yandex-ai:
+    log-level: debug
+
 logging:
   level:
     root: INFO
-    com.zaxxer.hikari: INFO
+    ru.workbit.llm: DEBUG

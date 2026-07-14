@@ -49,6 +49,12 @@ export function useRegister() {
   })
 }
 
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: (email: string) => authApi.resendVerification(email),
+  })
+}
+
 export function useVerifyEmail() {
   const qc = useQueryClient()
   return useMutation({

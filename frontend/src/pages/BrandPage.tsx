@@ -7,7 +7,9 @@ import { Container } from '@/components/ui/Container'
 import { Field } from '@/components/ui/Field'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useTheme, type Theme } from '@/lib/useTheme'
 
 interface Token {
   name: string
@@ -30,8 +32,9 @@ const PALETTE: Token[] = [
 
 const TOKEN_NAMES = PALETTE.map((t) => t.name)
 
-/** Читает вычисленные значения CSS-переменных — токены остаются источником истины. */
-function useTokenHex(names: string[]): Record<string, string> {
+/** Читает вычисленные значения CSS-переменных — токены остаются источником
+ *  истины; перечитывает при смене темы. */
+function useTokenHex(names: string[], theme: Theme): Record<string, string> {
   const [hex, setHex] = useState<Record<string, string>>({})
   useEffect(() => {
     const styles = getComputedStyle(document.documentElement)
@@ -40,7 +43,7 @@ function useTokenHex(names: string[]): Record<string, string> {
       next[n] = styles.getPropertyValue(`--color-${n}`).trim().toUpperCase()
     }
     setHex(next)
-  }, [names])
+  }, [names, theme])
   return hex
 }
 
@@ -55,16 +58,20 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export function BrandPage() {
   usePageTitle('Брендбук')
-  const hex = useTokenHex(TOKEN_NAMES)
+  const { theme } = useTheme()
+  const hex = useTokenHex(TOKEN_NAMES, theme)
 
   return (
     <Container className="py-12 sm:py-16">
-      <Link
-        to="/"
-        className="text-accent hover:text-accent-hover text-sm transition-colors"
-      >
-        ← На главную
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          to="/"
+          className="text-accent hover:text-accent-hover text-sm transition-colors"
+        >
+          ← На главную
+        </Link>
+        <ThemeToggle />
+      </div>
 
       <header className="mt-8">
         <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
@@ -136,7 +143,7 @@ export function BrandPage() {
             <p className="text-muted font-mono text-xs tracking-widest uppercase">
               Mono — JetBrains Mono · данные, лейблы, метрики
             </p>
-            <p className="text-ink mt-3 font-mono text-2xl">8.4 / 10</p>
+            <p className="text-ink mt-3 font-mono text-2xl">4.2 / 5</p>
             <p className="text-muted mt-2 font-mono text-xs tracking-[0.2em] uppercase">
               Java-разработчик · Middle
             </p>
@@ -181,7 +188,7 @@ export function BrandPage() {
             HashMap не потокобезопасен, а ConcurrentHashMap разрешает
             конкурентный доступ.
           </p>
-          <MarginNote score={8} className="mt-4">
+          <MarginNote score={4} className="mt-4">
             Верно про сегменты. Уточните, что в Java 8+ это блокировка на уровне
             бакета.
           </MarginNote>

@@ -4,8 +4,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Field } from '@/components/ui/Field'
+import { ResendVerification } from '@/components/auth/ResendVerification'
+import { authErrorMessage, isEmailNotVerified } from '@/features/auth/errors'
 import { useLogin } from '@/features/auth/useAuth'
-import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function LoginPage() {
@@ -41,7 +42,15 @@ export function LoginPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
-        {login.isError && <Alert>{getErrorMessage(login.error)}</Alert>}
+        {login.isError &&
+          (isEmailNotVerified(login.error) ? (
+            <div>
+              <Alert>{authErrorMessage(login.error)}</Alert>
+              <ResendVerification email={email} />
+            </div>
+          ) : (
+            <Alert>{authErrorMessage(login.error)}</Alert>
+          ))}
         <Field
           label="Email"
           type="email"

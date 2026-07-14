@@ -6,14 +6,20 @@ export function FaqPage() {
   usePageTitle('Частые вопросы')
   return (
     <Container className="py-16 sm:py-24">
-      <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
+      <p className="text-muted animate-rise font-mono text-xs tracking-[0.2em] uppercase">
         FAQ
       </p>
-      <h1 className="text-ink mt-4 max-w-2xl text-4xl sm:text-5xl">
+      <h1
+        className="text-ink animate-rise mt-4 text-4xl sm:text-5xl"
+        style={{ animationDelay: '80ms' }}
+      >
         Частые вопросы
       </h1>
 
-      <div className="divide-rule border-rule mt-12 max-w-2xl divide-y border-t border-b">
+      <div
+        className="divide-rule border-rule animate-rise mt-12 divide-y border-t border-b"
+        style={{ animationDelay: '160ms' }}
+      >
         {faq.map((item) => (
           <details key={item.q} className="group py-5">
             <summary className="text-ink font-display flex cursor-pointer list-none items-center justify-between gap-4 text-lg [&::-webkit-details-marker]:hidden">

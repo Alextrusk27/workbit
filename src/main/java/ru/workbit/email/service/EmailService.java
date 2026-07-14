@@ -87,10 +87,10 @@ public class EmailService {
     }
 
     private String createVerificationLink(String token) {
-        return mailProperties.baseUrl() + "/api/v1/auth/verify-email?token=" + token;
+        return mailProperties.baseUrl() + "/verify-email?token=" + token;
     }
 
     private String createResetPasswordLink(String token) {
-        return mailProperties.baseUrl() + "/api/v1/auth/reset-password?token=" + token;
+        return mailProperties.baseUrl() + "/reset-password?token=" + token;
     }
 }

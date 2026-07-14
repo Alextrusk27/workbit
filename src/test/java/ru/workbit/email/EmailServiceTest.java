@@ -89,7 +89,7 @@ class EmailServiceTest {
 
             // then
             var capturedContext = contextCaptor.getValue();
-            var expectedUrl = BASE_URL + "/api/v1/auth/verify-email?token=" + TOKEN;
+            var expectedUrl = BASE_URL + "/verify-email?token=" + TOKEN;
             assertThat(capturedContext.getVariable("verificationUrl")).isEqualTo(expectedUrl);
         }
 
@@ -155,7 +155,7 @@ class EmailServiceTest {
 
             // then
             var capturedContext = contextCaptor.getValue();
-            var expectedUrl = BASE_URL + "/api/v1/auth/reset-password?token=" + TOKEN;
+            var expectedUrl = BASE_URL + "/reset-password?token=" + TOKEN;
             assertThat(capturedContext.getVariable("resetUrl")).isEqualTo(expectedUrl);
         }
 

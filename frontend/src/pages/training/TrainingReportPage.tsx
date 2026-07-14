@@ -7,7 +7,8 @@ import { sessionSubtitle } from '@/features/training/labels'
 import { useReport } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { QuestionEntry, ReportSummary } from './reportParts'
+import { groupReportCases } from './reportCases'
+import { CaseEntry, ReportSummary } from './reportParts'
 
 export function TrainingReportPage() {
   usePageTitle('Разбор тренировки')
@@ -70,16 +71,9 @@ export function TrainingReportPage() {
       <div className="mt-12">
         <h2 className="text-ink font-display text-xl">Ответы с пометками</h2>
         <ol className="mt-6 space-y-8">
-          {report.questions.map((q) => (
-            <li key={q.questionId}>
-              <QuestionEntry
-                orderIndex={q.orderIndex}
-                followUp={q.followUp}
-                questionText={q.questionText}
-                answerText={q.answerText}
-                score={q.score}
-                feedback={q.feedback}
-              />
+          {groupReportCases(report.questions).map((c) => (
+            <li key={c.main.questionId}>
+              <CaseEntry main={c.main} followUps={c.followUps} />
             </li>
           ))}
         </ol>

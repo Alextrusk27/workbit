@@ -1,22 +1,18 @@
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Stars } from '@/components/ui/Stars'
+import type { ReportCase } from './reportCases'
 
-/** Отвеченный вопрос в режиме чтения: текст вопроса, ответ пользователя и —
- *  если разбор уже сформирован — пометка рецензента с оценкой. */
+/** Отвеченный вопрос в режиме чтения: текст вопроса и ответ пользователя. */
 export function QuestionEntry({
   orderIndex,
   followUp,
   questionText,
   answerText,
-  score,
-  feedback,
 }: {
   orderIndex: number
   followUp: boolean
   questionText: string
   answerText: string | null
-  score?: number | null
-  feedback?: string | null
 }) {
   return (
     <div>
@@ -36,9 +32,34 @@ export function QuestionEntry({
           {answerText || <span className="text-muted italic">Без ответа</span>}
         </p>
       </div>
-      {feedback && (
-        <MarginNote score={score ?? undefined} className="mt-4">
-          {feedback}
+    </div>
+  )
+}
+
+/** Кейс в отчёте: основной вопрос, его уточнения и — если разбор уже
+ *  сформирован — общая пометка рецензента с оценкой за весь кейс. */
+export function CaseEntry({ main, followUps }: ReportCase) {
+  return (
+    <div>
+      <QuestionEntry
+        orderIndex={main.orderIndex}
+        followUp={main.followUp}
+        questionText={main.questionText}
+        answerText={main.answerText}
+      />
+      {followUps.map((q) => (
+        <div key={q.questionId} className="mt-6">
+          <QuestionEntry
+            orderIndex={q.orderIndex}
+            followUp={q.followUp}
+            questionText={q.questionText}
+            answerText={q.answerText}
+          />
+        </div>
+      ))}
+      {main.feedback && (
+        <MarginNote score={main.score ?? undefined} className="mt-4">
+          {main.feedback}
         </MarginNote>
       )}
     </div>

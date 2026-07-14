@@ -21,7 +21,8 @@ import {
 } from '@/features/training/useTraining'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { QuestionEntry, ReportSummary } from './reportParts'
+import { groupReportCases } from './reportCases'
+import { CaseEntry, QuestionEntry, ReportSummary } from './reportParts'
 
 export function TrainingSessionPage() {
   usePageTitle('Тренировка')
@@ -375,16 +376,9 @@ function FinishedView({ report }: { report: TrainingReport }) {
   return (
     <div className="mt-8">
       <ol className="space-y-10">
-        {report.questions.map((q) => (
-          <li key={q.questionId}>
-            <QuestionEntry
-              orderIndex={q.orderIndex}
-              followUp={q.followUp}
-              questionText={q.questionText}
-              answerText={q.answerText}
-              score={q.score}
-              feedback={q.feedback}
-            />
+        {groupReportCases(report.questions).map((c) => (
+          <li key={c.main.questionId}>
+            <CaseEntry main={c.main} followUps={c.followUps} />
           </li>
         ))}
       </ol>

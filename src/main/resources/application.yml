@@ -61,6 +61,8 @@ llm:
       answer-evaluator: ${ANSWER_EVALUATOR}
       interview-reviewer: ${INTERVIEW_REVIEWER}
       vacancy-questions-generator: ${VACANCY_QUESTIONS_GENERATOR}
+      training-question-generator: ${TRAINING_QUESTION_GENERATOR}
+      training-reviewer: ${TRAINING_REVIEWER}
 
 hh:
   api:

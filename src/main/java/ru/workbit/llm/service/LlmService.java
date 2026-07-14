@@ -27,4 +27,14 @@ public class LlmService {
     public LlmGeneratedQuestions generateVacancyQuestions(LlmQuestionGenerationRequest request) {
         return llm.call("vacancy-questions-generator", request, LlmGeneratedQuestions.class);
     }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmTrainingQuestion generateTrainingQuestion(LlmTrainingQuestionRequest request) {
+        return llm.call("training-question-generator", request, LlmTrainingQuestion.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
+        return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
+    }
 }

@@ -5,6 +5,6 @@ import java.util.List;
 public record LlmTrainingReportRequest(
         String profession,
         String level,
-        List<LlmTrainingAnswer> answers
+        List<LlmTrainingCase> cases
 ) {
 }

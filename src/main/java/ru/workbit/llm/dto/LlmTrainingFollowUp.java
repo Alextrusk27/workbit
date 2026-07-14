@@ -1,7 +1,6 @@
 package ru.workbit.llm.dto;
 
-public record LlmTrainingAnswer(
-        int index,
+public record LlmTrainingFollowUp(
         String question,
         String answer
 ) {

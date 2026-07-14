@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS interview.training_question (
     answered_at   TIMESTAMPTZ,
 
     CONSTRAINT chk_training_question_order_index
-        CHECK (order_index BETWEEN 1 AND 20),
+        CHECK (order_index BETWEEN 1 AND 50),
     CONSTRAINT chk_training_answer_has_text_and_timestamp
         CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL)),
     CONSTRAINT uq_training_question_order

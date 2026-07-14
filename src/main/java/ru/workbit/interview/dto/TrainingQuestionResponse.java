@@ -20,10 +20,12 @@ public record TrainingQuestionResponse(
         @Schema(description = "Текст ответа пользователя, null пока не отвечен")
         String answerText,
 
-        @Schema(description = "Оценка ответа от LLM (1-5), null пока не выставлена", example = "4")
+        @Schema(description = "Оценка кейса от LLM (1-5): основной вопрос вместе с его уточнениями; "
+                + "у уточняющих вопросов всегда null, до формирования отчёта null", example = "4")
         Integer score,
 
-        @Schema(description = "Текстовый фидбэк по ответу от LLM, null пока не выставлен")
+        @Schema(description = "Текстовый фидбэк по кейсу от LLM; у уточняющих вопросов всегда null, "
+                + "до формирования отчёта null")
         String feedback
 
 ) implements QuestionResponse {

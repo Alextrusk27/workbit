@@ -24,7 +24,8 @@ import ru.workbit.interview.model.mapper.TrainingReportMapper;
 import ru.workbit.interview.model.mapper.TrainingSessionMapper;
 import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
-import ru.workbit.llm.dto.LlmTrainingAnswer;
+import ru.workbit.llm.dto.LlmTrainingCase;
+import ru.workbit.llm.dto.LlmTrainingFollowUp;
 import ru.workbit.llm.dto.LlmTrainingHistoryItem;
 import ru.workbit.llm.dto.LlmTrainingQuestion;
 import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
@@ -49,6 +50,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     public static final int MAIN_QUESTION_CAP = 10;
     public static final int MIN_ANSWERED_TO_FINISH = 3;
+    public static final int MAX_FOLLOW_UPS_PER_QUESTION = 4;
 
     private static final String FOLLOW_UP_TYPE = "FOLLOW_UP";
 
@@ -112,14 +114,15 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
         List<TrainingQuestion> history = trainingQuestionRepository
                 .findAllByTrainingSessionIdOrderByOrderIndex(sessionId);
-        boolean allowFollowUp = !history.isEmpty() && !history.getLast().isFollowUp();
+        boolean allowFollowUp = !history.isEmpty()
+                && trailingFollowUps(history) < MAX_FOLLOW_UPS_PER_QUESTION;
 
         LlmTrainingQuestion generated = llmService.generateTrainingQuestion(new LlmTrainingQuestionRequest(
                 session.getProfession().getName(),
                 session.getLevel().getName(),
                 session.getCompanyType().getName(),
                 history.stream()
-                        .map(q -> new LlmTrainingHistoryItem(q.getQuestionText(), q.getAnswerText()))
+                        .map(q -> new LlmTrainingHistoryItem(q.getQuestionText(), q.getAnswerText(), q.isFollowUp()))
                         .toList(),
                 (int) answeredMain + 1,
                 allowFollowUp));
@@ -164,14 +167,12 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 .toList();
         checkEnoughAnsweredToFinish(sessionId, answered);
 
+        List<List<TrainingQuestion>> cases = TrainingWriter.groupCases(answered);
         LlmTrainingReport llmReport = llmService.createTrainingReport(new LlmTrainingReportRequest(
                 session.getProfession().getName(),
                 session.getLevel().getName(),
-                IntStream.range(0, answered.size())
-                        .mapToObj(i -> new LlmTrainingAnswer(
-                                i + 1,
-                                answered.get(i).getQuestionText(),
-                                answered.get(i).getAnswerText()))
+                IntStream.range(0, cases.size())
+                        .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
                         .toList()));
 
         return trainingWriter.completeReport(sessionId, llmReport);
@@ -210,6 +211,25 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 List.of(CompanyType.values()),
                 MAIN_QUESTION_CAP,
                 MIN_ANSWERED_TO_FINISH);
+    }
+
+    private static int trailingFollowUps(List<TrainingQuestion> history) {
+        int count = 0;
+        for (int i = history.size() - 1; i >= 0 && history.get(i).isFollowUp(); i--) {
+            count++;
+        }
+        return count;
+    }
+
+    private static LlmTrainingCase toLlmCase(int index, List<TrainingQuestion> trainingCase) {
+        return new LlmTrainingCase(
+                index,
+                trainingCase.getFirst().getQuestionText(),
+                trainingCase.getFirst().getAnswerText(),
+                trainingCase.stream()
+                        .skip(1)
+                        .map(q -> new LlmTrainingFollowUp(q.getQuestionText(), q.getAnswerText()))
+                        .toList());
     }
 
     private void checkCapNotReached(UUID sessionId, long answeredMain) {

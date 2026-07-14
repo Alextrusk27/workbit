@@ -18,10 +18,11 @@ import ru.workbit.interview.model.mapper.TrainingQuestionMapper;
 import ru.workbit.interview.model.mapper.TrainingReportMapper;
 import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
-import ru.workbit.llm.dto.LlmTrainingAnswerReview;
+import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReport;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -76,7 +77,7 @@ class TrainingWriter {
                 .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
                 .toList();
 
-        saveFeedbacks(answered, llmReport.answers() != null ? llmReport.answers() : List.of());
+        saveFeedbacks(groupCases(answered), llmReport.cases() != null ? llmReport.cases() : List.of());
 
         double avgScore = calculateAvgScore(sessionId, answered);
 
@@ -94,19 +95,30 @@ class TrainingWriter {
         return trainingReportMapper.toResponse(session.getReport(), session, answered);
     }
 
-    private void saveFeedbacks(List<TrainingQuestion> answered, List<LlmTrainingAnswerReview> reviews) {
-        for (LlmTrainingAnswerReview review : reviews) {
-            if (review.index() < 1 || review.index() > answered.size()) {
+    static List<List<TrainingQuestion>> groupCases(List<TrainingQuestion> answered) {
+        List<List<TrainingQuestion>> cases = new ArrayList<>();
+        for (TrainingQuestion question : answered) {
+            if (!question.isFollowUp() || cases.isEmpty()) {
+                cases.add(new ArrayList<>());
+            }
+            cases.getLast().add(question);
+        }
+        return cases;
+    }
+
+    private void saveFeedbacks(List<List<TrainingQuestion>> cases, List<LlmTrainingCaseReview> reviews) {
+        for (LlmTrainingCaseReview review : reviews) {
+            if (review.index() < 1 || review.index() > cases.size()) {
                 log.warn("LLM returned review with invalid index {}, skipping feedback", review.index());
                 continue;
             }
             if (!isPersistableFeedback(review.score(), review.evaluation())) {
-                log.warn("LLM returned invalid review for answer {} (score={}), skipping feedback",
+                log.warn("LLM returned invalid review for case {} (score={}), skipping feedback",
                         review.index(), review.score());
                 continue;
             }
 
-            TrainingQuestion question = answered.get(review.index() - 1);
+            TrainingQuestion question = cases.get(review.index() - 1).getFirst();
             if (question.getFeedback() != null) {
                 continue;
             }

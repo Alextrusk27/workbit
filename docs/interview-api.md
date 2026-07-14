@@ -1,45 +1,52 @@
-# Interview API — `/api/v1/interview`
+# Interview Training API — `/api/v1/interview/training`
 
-Тренировочное собеседование: пользователь создаёт сессию, получает набор вопросов,
-отвечает на них и в конце получает итоговый отчёт с оценкой и вероятностью оффера.
-Оценку ответов и финальный отчёт формирует LLM. Есть два источника вопросов: каталог
-(вопросы подобраны заранее под профессию/уровень/тип компании) и вакансия (вопросы
-генерирует LLM под конкретную вакансию hh.ru по ссылке на неё). Все тела запросов
-и ответов — JSON.
+Тренажёр AI-собеседования: пользователь выбирает профессию, уровень и тип компании,
+проходит серию вопросов и в конце получает отчёт с поразборным фидбэком и средним баллом.
+Банка готовых вопросов больше нет — каждый вопрос генерирует LLM по одному, с учётом
+параметров сессии и всей предыдущей истории «вопрос-ответ». Все тела запросов и ответов —
+JSON.
+
+> **Интервью по вакансии временно недоступно.** Раньше в этом домене был второй режим —
+> сессия по конкретной вакансии hh.ru или вставленному тексту (`POST /sessions/by-vacancy`
+> и связанные с ним поля/эндпоинты). На время переработки он выведен из API целиком:
+> в контроллере остался только тренажёр, описанный в этом документе. Режим вернётся
+> отдельным контрактом — не полагайтесь на старые описания `by-vacancy`, `vacancyUrl`,
+> `SessionSource` и т.п., они больше не актуальны.
 
 ## Доступ
 
-Весь домен закрыт: `SecurityConfig` требует аутентификации на любой путь, не входящий
-в `/api/v1/auth/**` и Swagger. Значит, ко всем ручкам `/api/v1/interview/**` нужен
-валидный access-токен — cookie `access_token` (для Swagger в dev поддержан fallback
+Домен закрыт целиком: `SecurityConfig` требует аутентификации на любой путь, не входящий
+в `/api/v1/auth/**` и Swagger. Ко всем ручкам `/api/v1/interview/training/**` нужен валидный
+access-токен — cookie `access_token` (для Swagger в dev поддержан fallback
 `Authorization: Bearer <accessToken>`). Без него — `401` с пустым телом (это делает
 Security-фильтр, а не контроллер, поэтому тело `ApiError` не приходит).
 
-Все сессии и вопросы привязаны к пользователю из токена: чужие ресурсы либо не находятся
-(`404`), либо явно отклоняются (`403`). Пользователь не может ни увидеть, ни изменить
-сессию другого пользователя.
+Сессии и вопросы привязаны к пользователю из токена. Большинство ручек (получение
+сессии, список, следующий вопрос, завершение, отчёт, удаление) сами ищут ресурс с учётом
+`userId`, поэтому чужой ресурс для них просто «не существует» — ответ `404`. Исключение —
+отправка ответа (`POST .../questions/{questionId}`): там вопрос сначала ищется по
+`questionId` без учёта владельца, и если он оказывается чужим, это разбирается явно —
+ответ `403`.
 
 ## Эндпоинты
 
 | Метод | Путь | Назначение | Авторизация |
 |---|---|---|---|
-| GET | `/options` | справочник допустимых профессий/уровней/типов компании и границ числа вопросов | cookie `access_token` |
-| POST | `/sessions` | создать каталожную сессию с набором вопросов | cookie `access_token` |
-| POST | `/sessions/by-vacancy` | создать сессию с вопросами, сгенерированными LLM под вакансию | cookie `access_token` |
-| GET | `/sessions` | список всех сессий пользователя | cookie `access_token` |
+| GET | `/options` | справочник допустимых профессий/уровней/типов компании и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
+| POST | `/sessions` | создать тренировочную сессию (без вопросов) | cookie `access_token` |
+| GET | `/sessions` | страница сессий текущего пользователя | cookie `access_token` |
 | GET | `/sessions/{sessionId}` | получить сессию по id | cookie `access_token` |
-| GET | `/sessions/{sessionId}/continue` | следующий неотвеченный вопрос | cookie `access_token` |
-| GET | `/sessions/{sessionId}/questions/{index}` | вопрос по порядковому индексу (1-based) | cookie `access_token` |
-| POST | `/sessions/{sessionId}/questions/{questionId}` | отправить ответ на вопрос (опц. LLM-оценка) | cookie `access_token` |
+| POST | `/sessions/{sessionId}/questions/next` | получить текущий неотвеченный вопрос либо сгенерировать следующий | cookie `access_token` |
+| POST | `/sessions/{sessionId}/questions/{questionId}` | отправить ответ на вопрос | cookie `access_token` |
 | POST | `/sessions/{sessionId}/finish` | завершить сессию и сформировать отчёт | cookie `access_token` |
 | GET | `/sessions/{sessionId}/report` | получить ранее сформированный отчёт | cookie `access_token` |
-| DELETE | `/sessions/{sessionId}` | удалить сессию вместе с вопросами | cookie `access_token` |
+| DELETE | `/sessions/{sessionId}` | удалить сессию вместе с вопросами и отчётом | cookie `access_token` |
 
 ## Справочные значения (enum'ы)
 
-Enum'ы сериализуются не по имени константы, а по русскому лейблу (`@JsonValue`). В теле
-запроса и ответа фигурирует именно лейбл. Чтобы не хардкодить их на фронте, есть
-`GET /options`.
+`Profession` и `CompanyType` сериализуются не по имени константы, а по русскому лейблу
+(`@JsonValue`); `Level` — по лейблу, совпадающему с именем на английском. В запросах и
+ответах фигурирует именно лейбл. Чтобы не хардкодить их на фронте, есть `GET /options`.
 
 - **Profession** — `Java-разработчик`, `Python-разработчик`, `Инженер по тестированию`.
 - **Level** — `Junior`, `Middle`, `Senior`, `Lead`.
@@ -47,11 +54,6 @@ Enum'ы сериализуются не по имени константы, а �
   `Государственная компания`.
 - **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED` (без кастомного лейбла,
   сериализуется по имени константы).
-- **SessionSource** — `CATALOG`, `VACANCY` (без кастомного лейбла, сериализуется по
-  имени константы). Показывает, откуда взяты вопросы сессии — из каталога или
-  сгенерированы под вакансию.
-- **OfferProbability** — лейблы `Низкая`/`Средняя`/`Высокая` (поле `offerProbability`
-  в отчёте).
 
 ## Запросы (DTO)
 
@@ -59,130 +61,154 @@ Enum'ы сериализуются не по имени константы, а �
 record CreateSessionRequest(
     @NotNull Profession profession,
     @NotNull Level level,
-    @NotNull CompanyType companyType,
-    @NotNull @Min(10) @Max(20) Integer totalQuestions)
-
-record CreateSessionByVacancyRequest(
-    @NotBlank String vacancyUrl,
-    @NotNull @Min(10) @Max(20) Integer totalQuestions)
+    @NotNull CompanyType companyType)
 
 record SubmitAnswerBody(@NotBlank String answerText)
 ```
 
-- `CreateSessionRequest` — все поля обязательны. `totalQuestions` — от 10 до 20
-  включительно. Значения enum'ов передаются лейблами (например `"profession": "Java-разработчик"`).
-- `CreateSessionByVacancyRequest` — оба поля обязательны. `totalQuestions` — диапазон тот
-  же (10..20). `vacancyUrl` — непустая (не пробельная) строка, которая должна вести на
-  конкретную вакансию hh.ru (`https://hh.ru/vacancy/<id>`); отсутствующее поле или ссылка
-  не на hh.ru — `400`.
-- `SubmitAnswerBody` — единственное поле `answerText`, непустое.
+Все поля обязательны. `GET /options`, `POST .../questions/next`, `POST .../finish`,
+`GET .../report` и `DELETE` тела не принимают.
 
-`GET /options`, `finish` и `delete` тела не принимают.
+Пример `CreateSessionRequest`:
 
-### Query-параметры
-
-- `POST /sessions/{sessionId}/questions/{questionId}` принимает `?evaluate=<bool>`
-  (по умолчанию `false`). При `evaluate=true` ответ синхронно отправляется в LLM и
-  сразу получает оценку и фидбэк; при `false` ответ просто сохраняется, а оценка
-  выставится позже, при завершении сессии.
+```json
+{
+  "profession": "Java-разработчик",
+  "level": "Middle",
+  "companyType": "Продуктовая компания"
+}
+```
 
 ## Ответы
 
 ```java
-record InterviewOptionsResponse(
+record TrainingOptionsResponse(
     List<Profession> professions, List<Level> levels, List<CompanyType> companyTypes,
-    int minQuestions, int maxQuestions)
+    int questionCap, int minAnswersToFinish)
 
-record SessionResponse(
+record TrainingSessionResponse(
     UUID id, Profession profession, CompanyType companyType, Level level,
-    SessionSource source, VacancyInfo vacancy,
-    SessionStatus status, int totalQuestions, int answeredCount,
-    Instant created, Instant completedAt)
+    SessionStatus status, int answeredCount, Instant created, Instant completedAt)
 
-record VacancyInfo(String name, String employer, String url, String experience) // вложен в SessionResponse
-
-record QuestionResponse(
-    UUID questionId, int orderIndex, String questionText,
+record TrainingQuestionResponse(
+    UUID questionId, int orderIndex, String questionText, boolean followUp,
     String answerText, Integer score, String feedback)
 
-record SessionReport(
+record TrainingReportResponse(
     UUID reportId, UUID sessionId, Profession profession, CompanyType companyType,
-    Level level, Integer totalQuestions, Double avgScore, String overallFeedback,
-    OfferProbability offerProbability, Instant generatedAt)
+    Level level, Double avgScore, String overallFeedback, Instant generatedAt,
+    List<TrainingQuestionResponse> questions)
 ```
 
-`SessionResponse` возвращают все ручки, отдающие сессию (`POST /sessions`,
-`POST /sessions/by-vacancy`, `GET /sessions`, `GET /sessions/{sessionId}`).
-Поля `profession`, `companyType` и `level` заполнены только у каталожных сессий
-(`source = CATALOG`), для сессий по вакансии (`source = VACANCY`) они `null`. И наоборот:
-`vacancy` заполнен только у сессий по вакансии, для каталожных — `null`. Поля `VacancyInfo`
-заполняются данными, полученными с hh.ru. `experience` — требуемый опыт работы в
-формулировке hh.ru (например `"От 1 года до 3 лет"`); может быть `null`, если для
-конкретной вакансии опыт на hh.ru не указан. По той же причине `profession`, `companyType`
-и `level` в `SessionReport` (`finish`, `.../report`) для сессий по вакансии тоже `null` —
-отчёт строится без каталожной связки.
-
-- **`GET /options`** — `200`, `InterviewOptionsResponse`.
-- **`POST /sessions`** — `201` с `SessionResponse` и заголовком `Location`
-  (`/sessions/{id}`). Только что созданная сессия имеет статус `CREATED` и `answeredCount = 0`,
-  `source = CATALOG`, `vacancy = null`.
-- **`POST /sessions/by-vacancy`** — `201` с `SessionResponse` и заголовком `Location`
-  (`/sessions/{id}`), как и у каталожной сессии. `source = VACANCY`, `profession`,
-  `companyType` и `level` равны `null` (у вакансии нет каталожной связки), а `vacancy`
-  заполнен данными вакансии.
-- **`GET /sessions`** — `200`, массив `SessionResponse` (может быть пустым; в нём
-  вперемешку каталожные сессии и сессии по вакансии, различить их можно по `source`).
-- **`GET /sessions/{sessionId}`** — `200`, `SessionResponse` с актуальным `answeredCount`.
-- **`GET .../continue`** и **`GET .../questions/{index}`** — `200`, `QuestionResponse`.
-  Поля `answerText`, `score`, `feedback` равны `null`, пока по вопросу нет ответа/оценки.
-- **`POST .../questions/{questionId}`** — `200`, `QuestionResponse` с сохранённым ответом
-  (и оценкой/фидбэком, если `evaluate=true`).
-- **`POST .../finish`** — `201` с `SessionReport` и заголовком `Location`
+- **`GET /options`** — `200`, `TrainingOptionsResponse`. `questionCap` = 10 (максимум
+  основных вопросов за тренировку), `minAnswersToFinish` = 3 (минимум отвеченных основных
+  вопросов, чтобы завершение стало доступно).
+- **`POST /sessions`** — `201` с `TrainingSessionResponse` и заголовком `Location`
+  (`/sessions/{id}`). Свежесозданная сессия: `status = CREATED`, `answeredCount = 0`,
+  вопросов ещё нет — они появляются только через `.../questions/next`.
+- **`GET /sessions`** — `200`, `PagedModel<TrainingSessionResponse>` (страница Spring
+  Data: поле `content` с массивом сессий плюс метаданные страницы). Поддерживаются
+  стандартные query-параметры Spring Pageable — `page`, `size`, `sort`; по умолчанию
+  сортировка `created,desc` (новые сессии первыми).
+- **`GET /sessions/{sessionId}`** — `200`, `TrainingSessionResponse` с актуальным
+  `answeredCount`.
+- **`POST .../questions/next`** — `200`, `TrainingQuestionResponse`. Если у сессии уже
+  есть неотвеченный вопрос — вернётся именно он (без обращения к LLM); иначе будет
+  сгенерирован и сохранён новый. `answerText`, `score`, `feedback` для только что
+  полученного вопроса всегда `null` — по ходу тренировки оценок нет.
+- **`POST .../questions/{questionId}`** — `204`, пустое тело. Фидбэка в ответе нет —
+  оценка появится только в отчёте после `finish`.
+- **`POST .../finish`** — `201` с `TrainingReportResponse` и заголовком `Location`
   (`/sessions/{id}/report`).
-- **`GET .../report`** — `200`, `SessionReport`.
+- **`GET .../report`** — `200`, `TrainingReportResponse`.
 - **`DELETE /sessions/{sessionId}`** — `204`, пустое тело.
+
+Пример `TrainingQuestionResponse` (уточняющий вопрос к предыдущему ответу):
+
+```json
+{
+  "questionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "orderIndex": 4,
+  "questionText": "Вы упомянули пул соединений — а как вы выбирали его размер?",
+  "followUp": true,
+  "answerText": null,
+  "score": null,
+  "feedback": null
+}
+```
+
+Пример `TrainingReportResponse`:
+
+```json
+{
+  "reportId": "b6b6c1c2-1111-4a3a-9a3a-000000000001",
+  "sessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "profession": "Java-разработчик",
+  "companyType": "Продуктовая компания",
+  "level": "Middle",
+  "avgScore": 3.8,
+  "overallFeedback": "Кандидат уверенно ориентируется в основах, но...",
+  "generatedAt": "2026-07-14T12:00:00Z",
+  "questions": [
+    {
+      "questionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "orderIndex": 1,
+      "questionText": "Расскажите про индексы в PostgreSQL",
+      "followUp": false,
+      "answerText": "Использую индексы и explain analyze...",
+      "score": 4,
+      "feedback": "Ответ по существу, но не хватило деталей про..."
+    }
+  ]
+}
+```
 
 ## Поведение
 
-- **Создание каталожной сессии.** Вопросы берутся из внутреннего банка вопросов под
-  выбранный уровень в количестве `totalQuestions`, нумеруются `orderIndex` от 1. Если банк
-  не вернул ни одного вопроса — `500` (сессия не создаётся).
-- **Создание сессии по вакансии.** `POST /sessions/by-vacancy` подтягивает данные вакансии
-  с hh.ru по `vacancyUrl` (вакансия должна существовать и не быть в архиве). Дальше
-  название, работодатель, требуемый опыт, ключевые навыки и описание уходят в LLM,
-  которая генерирует вопросы. Если LLM вернула вопросов больше, чем запрошено в
-  `totalQuestions`, — лишние отбрасываются; если
-  меньше — сессия создаётся с тем количеством, что фактически сгенерировано (в лог пишется
-  предупреждение), поэтому `totalQuestions` в ответе не всегда точно совпадает с
-  запрошенным значением. Если LLM не вернула ни одного вопроса — `503`, сессия не создаётся.
-- **Снимок вакансии.** Данные вакансии на момент создания сессии сохраняются отдельным
-  неизменяемым снимком; блок `vacancy` в `SessionResponse` строится по этому снимку, а не
-  живым запросом к hh.ru. Если вакансия на hh.ru впоследствии изменится или уйдёт в
-  архив — уже созданная сессия и её данные не меняются.
-- **Контекст оценки и отчёта для сессий по вакансии.** LLM-оценка ответа (`evaluate=true`)
-  и итоговый отчёт (`finish`) для таких сессий используют вместо профессии и уровня
-  название вакансии и требуемый опыт из снимка; если опыт в вакансии не указан, в LLM
-  передаётся значение «не указан».
-- **Прогресс сессии.** Статус меняется автоматически: `CREATED` → `IN_PROGRESS` при
-  первом сохранённом ответе, `COMPLETED` — при `finish`. `answeredCount` в
-  `SessionResponse` считается по числу отвеченных вопросов.
-- **`continue`** возвращает первый неотвеченный вопрос по порядку. Когда неотвеченных
-  не осталось — `404` («This session finished»); это штатный сигнал «сессия пройдена»,
-  а не ошибка данных.
-- **Индекс вопроса** в `.../questions/{index}` — порядковый номер (1-based), а не UUID.
-  Отсутствующий индекс — `404`.
-- **Отправка ответа.** Вопрос ищется по `questionId`; проверяются владелец (иначе `403`),
-  принадлежность указанной в пути сессии (иначе `409`) и то, что вопрос ещё не отвечен
-  (иначе `409`). Повторно ответить на вопрос нельзя. При `evaluate=true` идёт синхронный
-  вызов LLM — ручка отвечает медленнее.
-- **Завершение сессии.** `finish` собирает все вопросы с ответами, запрашивает у LLM
-  итоговый отчёт: для ответов без индивидуальной оценки (тех, что сохраняли с
-  `evaluate=false`) выставляются оценки из отчёта, считается средний балл (округляется
-  до одного знака), фиксируются общий фидбэк и вероятность оффера. Статус переходит в
-  `COMPLETED`, проставляется `completedAt`. Отчёт после этого доступен через
-  `GET .../report`. Повторный `finish` пересоберёт отчёт заново.
-- **Удаление** — физическое: сессия удаляется вместе с вопросами (не soft delete,
-  в отличие от домена пользователей).
+- **Создание сессии ничего не генерирует.** `POST /sessions` только фиксирует профессию,
+  уровень и тип компании. Вопросов в момент создания нет — первый и все следующие
+  запрашиваются отдельно через `.../questions/next`.
+- **`.../questions/next` идемпотентен.** Если в сессии уже есть неотвеченный вопрос —
+  ручка вернёт его же, не обращаясь к LLM. Это одновременно и точка возврата: если
+  пользователь прервал тренировку и вернулся позже, повторный вызов даст тот же вопрос,
+  на который он ещё не ответил.
+- **Уточняющие вопросы.** Отвечая на очередной основной вопрос, LLM может решить задать
+  уточняющий вопрос по только что данному ответу — в ответе он помечен `followUp: true`.
+  Уточняющие вопросы не входят ни в лимит основных вопросов (10), ни в порог, необходимый
+  для завершения (3) — считается только `answeredCount`, а он растёт лишь на основных
+  вопросах. Два уточняющих вопроса подряд невозможны: LLM может предложить уточнение
+  только сразу после основного вопроса, а не после другого уточняющего.
+- **Лимит вопросов исчерпывающий.** Как только число отвеченных основных вопросов
+  достигает 10 (`questionCap`), `.../questions/next` перестаёт генерировать что-либо
+  вообще (в том числе уточняющие) и отвечает `409`. После этого из действий с сессией
+  остаётся только `finish`.
+- **Оценок по ходу тренировки нет.** `POST .../questions/{questionId}` только сохраняет
+  текст ответа и отвечает `204` без каких-либо `score`/`feedback`. Весь фидбэк
+  формируется одним пакетом при завершении. Повторно ответить на уже отвеченный вопрос
+  нельзя — `409`. Как только сохранён первый ответ, статус сессии переходит из `CREATED`
+  в `IN_PROGRESS`.
+- **Проверка принадлежности вопроса.** Помимо владельца, у отправки ответа проверяется,
+  что `questionId` действительно относится к сессии, указанной в пути `sessionId` — если
+  нет, это `409` (а не `404`/`403`), потому что сам вопрос существует и доступен, просто
+  запрос обратился не к той сессии.
+- **Завершение (`finish`) требует минимум 3 отвеченных основных вопроса.** Если отвечено
+  меньше — `409`. Уточняющие вопросы в этот порог не засчитываются, но если на них уже
+  дан ответ, они всё равно попадают в отчёт наравне с основными: LLM формирует
+  индивидуальную оценку (1-5) и текстовый фидбэк по каждому отвеченному вопросу сессии,
+  включая отвеченные уточняющие.
+- **Средний балл считается на бэке**, а не берётся из LLM целиком: это среднее по
+  индивидуальным оценкам, округлённое до одного знака после запятой (диапазон 1.0-5.0).
+  Вероятности оффера в отчёте тренажёра нет — этого поля в контракте не предусмотрено.
+- **Незавершённый сгенерированный вопрос при завершении удаляется.** Если на момент
+  `finish` в сессии есть вопрос, который был сгенерирован, но так и не получил ответ, он
+  просто выбрасывается и в отчёт не попадает.
+- **Сессия завершается один раз.** После `finish` статус — `COMPLETED`, проставляется
+  `completedAt`. Повторный `finish` на уже завершённой сессии — `409`, отчёт не
+  пересобирается; посмотреть его повторно можно только через `GET .../report`.
+- **`answeredCount`** в `TrainingSessionResponse` считает только отвеченные основные
+  вопросы (уточняющие не входят), даже если по факту в сессии есть отвеченные уточнения.
+- **Удаление** — физическое: сессия удаляется вместе со всеми вопросами и отчётом (не
+  soft delete, в отличие от домена пользователей).
 
 ## Ошибки
 
@@ -190,25 +216,21 @@ record SessionReport(
 
 ```json
 {
-  "timestamp": "2026-07-02T12:00:00",
-  "status": "NOT_FOUND",
-  "message": "The required object was not found.",
-  "errors": ["Session not found"]
+  "timestamp": "2026-07-14T12:00:00",
+  "status": "CONFLICT",
+  "message": "Conflict.",
+  "errors": ["Question already answered"]
 }
 ```
 
 | Код | Когда |
 |---|---|
-| `400` | невалидное тело запроса: нарушены ограничения полей (`totalQuestions` вне 10..20, пустой `answerText`, отсутствующий enum, пустой `vacancyUrl`), `vacancyUrl` не является ссылкой на вакансию hh.ru, битый JSON, неверный тип path/query-параметра |
+| `400` | невалидное тело запроса: отсутствующий/невалидный enum в `CreateSessionRequest`, пустой `answerText`, битый JSON, неверный тип path-параметра (например, `sessionId`/`questionId` не UUID) |
 | `401` | нет валидного access-токена (ставит Security-фильтр, тело пустое) |
-| `403` | вопрос или сессия принадлежат другому пользователю |
-| `404` | сессия или вопрос не найдены (в т.ч. чужие); `continue` при отсутствии неотвеченных вопросов; вакансия по `vacancyUrl` не найдена на hh.ru или архивирована |
-| `409` | вопрос уже отвечен либо не принадлежит указанной в пути сессии |
-| `500` | банк вопросов не вернул вопросов при создании каталожной сессии |
-| `503` | недоступен LLM-сервис (при оценке ответа с `evaluate=true`, формировании отчёта в `finish`, генерации вопросов в `by-vacancy` или если LLM вернула пустой список вопросов); недоступен hh.ru при получении вакансии по `vacancyUrl` |
+| `403` | вопрос, на который отправляется ответ, принадлежит другому пользователю |
+| `404` | сессия или вопрос не найдены (в т.ч. чужие — они ищутся сразу с учётом пользователя); отчёт ещё не сформирован |
+| `409` | сессия уже завершена; достигнут лимит основных вопросов (10); вопрос уже отвечен; вопрос не принадлежит указанной в пути сессии; отвечено меньше 3 основных вопросов при попытке завершить |
+| `503` | AI-сервис недоступен или вернул непригодный ответ — при генерации вопроса (пустой текст вопроса) и при завершении сессии (пустой/слишком короткий итоговый фидбэк, либо ни один ответ не получил пригодной оценки) |
 
-`503` отдаётся глобальным обработчиком одного из двух исключений: `LlmException`
-(`AI service unavailable.`) — на ручках, дергающих LLM (`POST .../questions/{questionId}?evaluate=true`,
-`POST .../finish`, `POST /sessions/by-vacancy`), и `VacancyFetchException`
-(`Vacancy service unavailable.`) — когда hh.ru недоступен по сети при получении вакансии
-по ссылке.
+`503` отдаётся глобальным обработчиком `LlmException` (`AI service unavailable.`) — на
+ручках, дёргающих LLM: `POST .../questions/next` и `POST .../finish`.

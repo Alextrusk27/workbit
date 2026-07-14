@@ -18,4 +18,6 @@ public interface QuestionBankRepository extends JpaRepository<@NotNull BankQuest
             LIMIT :quantity
             """)
     List<BankQuestion> pickRandomByLevel(Level level, int quantity);
+
+
 }

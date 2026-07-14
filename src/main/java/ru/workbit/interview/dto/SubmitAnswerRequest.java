@@ -6,7 +6,6 @@ public record SubmitAnswerRequest(
         UUID userId,
         UUID sessionId,
         UUID questionId,
-        boolean evaluate,
         String answerText
 ) {
 }

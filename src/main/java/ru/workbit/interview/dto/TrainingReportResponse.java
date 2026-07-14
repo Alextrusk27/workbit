@@ -3,13 +3,13 @@ package ru.workbit.interview.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.Level;
-import ru.workbit.interview.model.OfferProbability;
 import ru.workbit.interview.model.Profession;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
-public record SessionReport(
+public record TrainingReportResponse(
         @Schema(description = "Идентификатор отчёта")
         UUID reportId,
 
@@ -25,19 +25,17 @@ public record SessionReport(
         @Schema(description = "Целевой уровень кандидата", example = "Middle")
         Level level,
 
-        @Schema(description = "Общее количество вопросов в сессии", example = "10")
-        Integer totalQuestions,
-
-        @Schema(description = "Средний балл по всем оценённым ответам", example = "7.5")
+        @Schema(description = "Средний балл по всем оценённым ответам (1.0-5.0)", example = "3.8")
         Double avgScore,
 
-        @Schema(description = "Итоговый текстовый фидбэк по собеседованию от LLM")
+        @Schema(description = "Итоговый текстовый фидбэк по тренировке от LLM")
         String overallFeedback,
 
-        @Schema(description = "Оценка вероятности получения оффера", example = "Средняя")
-        OfferProbability offerProbability,
-
         @Schema(description = "Момент формирования отчёта")
-        Instant generatedAt
-) {
+        Instant generatedAt,
+
+        @Schema(description = "Отвеченные вопросы сессии с поразборным фидбэком")
+        List<TrainingQuestionResponse> questions
+
+) implements ReportResponse {
 }

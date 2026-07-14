@@ -9,13 +9,13 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "session", schema = "interview")
+@Table(name = "training_session", schema = "interview")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InterviewSession {
+public class TrainingSession {
     @Id
     @UuidGenerator
     private UUID id;
@@ -24,32 +24,21 @@ public class InterviewSession {
     private UUID userId;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private Profession profession;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "company_type")
+    @Column(name = "company_type", nullable = false)
     private CompanyType companyType;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private Level level;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private SessionSource source = SessionSource.CATALOG;
-
-    @Column(name = "vacancy_snapshot_id")
-    private UUID vacancySnapshotId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
     private SessionStatus status = SessionStatus.CREATED;
-
-    @Column(name = "total_questions", nullable = false)
-    private int totalQuestions;
 
     @Builder.Default
     @Column(nullable = false, updatable = false)
@@ -58,9 +47,9 @@ public class InterviewSession {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    @OneToMany(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<InterviewQuestion> questions;
+    @OneToMany(mappedBy = "trainingSession", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TrainingQuestion> questions;
 
-    @OneToOne(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL)
-    private InterviewReport interviewReport;
+    @OneToOne(mappedBy = "trainingSession", orphanRemoval = true, cascade = CascadeType.ALL)
+    private TrainingReport report;
 }

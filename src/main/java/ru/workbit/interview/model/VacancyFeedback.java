@@ -8,20 +8,20 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "answer_feedback", schema = "interview")
+@Table(name = "vacancy_feedback", schema = "interview")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AnswerFeedback {
+public class VacancyFeedback {
     @Id
     @UuidGenerator
     private UUID id;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "question_id", nullable = false, updatable = false)
-    private InterviewQuestion question;
+    private VacancyQuestion question;
 
     @Column(nullable = false)
     private int score;

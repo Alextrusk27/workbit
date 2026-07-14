@@ -18,11 +18,13 @@ import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
-import { DashboardPage } from '@/pages/DashboardPage'
+import { HubPage } from '@/pages/HubPage'
 import { SettingsPage } from '@/pages/SettingsPage'
-import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
-import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
-import { ReportPage } from '@/pages/interview/ReportPage'
+import { TrainingListPage } from '@/pages/training/TrainingListPage'
+import { NewTrainingPage } from '@/pages/training/NewTrainingPage'
+import { TrainingSessionPage } from '@/pages/training/TrainingSessionPage'
+import { TrainingReportPage } from '@/pages/training/TrainingReportPage'
+import { InterviewStubPage } from '@/pages/interview/InterviewStubPage'
 
 export const router = createBrowserRouter([
   {
@@ -66,17 +68,19 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <DashboardPage /> },
+              { index: true, element: <HubPage /> },
               { path: 'settings', element: <SettingsPage /> },
-              { path: 'interview/new', element: <NewInterviewPage /> },
+              { path: 'training', element: <TrainingListPage /> },
+              { path: 'training/new', element: <NewTrainingPage /> },
               {
-                path: 'interview/:sessionId',
-                element: <InterviewSessionPage />,
+                path: 'training/:sessionId',
+                element: <TrainingSessionPage />,
               },
               {
-                path: 'interview/:sessionId/report',
-                element: <ReportPage />,
+                path: 'training/:sessionId/report',
+                element: <TrainingReportPage />,
               },
+              { path: 'interview', element: <InterviewStubPage /> },
             ],
           },
         ],

@@ -5,24 +5,19 @@ import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import { cn } from '@/lib/cn'
-import type {
-  SessionResponse,
-  SessionSource,
-  SessionStatus,
-} from '@/features/interview/api'
+import type { SessionStatus, TrainingSession } from '@/features/training/api'
 import {
   sessionHeadline,
   sessionSubtitle,
-  SOURCE_LABELS,
   STATUS_LABELS,
-} from '@/features/interview/labels'
+} from '@/features/training/labels'
 import {
   useDeleteSession,
   useReport,
   useSessions,
-} from '@/features/interview/useInterview'
+} from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 type StatusFilter = 'ALL' | SessionStatus
@@ -42,31 +37,27 @@ function formatDate(iso: string): string {
   })
 }
 
-export function DashboardPage() {
-  usePageTitle('Личный кабинет')
+export function TrainingListPage() {
+  usePageTitle('Тренажёр')
   const { data: sessions, isLoading, isError, error } = useSessions()
-  const [tab, setTab] = useState<SessionSource>('VACANCY')
-  const [status, setStatus] = useState<StatusFilter>('ALL')
-
-  const newHref = `/app/interview/new?mode=${tab === 'VACANCY' ? 'vacancy' : 'catalog'}`
 
   return (
     <Container className="py-12 sm:py-16">
       <Link
-        to="/"
+        to="/app"
         className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
       >
-        ← На главную
+        ← Личный кабинет
       </Link>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-            Личный кабинет
+            Тренажёр
           </p>
-          <h1 className="text-ink mt-4 text-3xl sm:text-4xl">Мои интервью</h1>
+          <h1 className="text-ink mt-4 text-3xl sm:text-4xl">Мои тренировки</h1>
         </div>
-        <Link to={newHref} className={buttonClasses()}>
-          Новое интервью
+        <Link to="/app/training/new" className={buttonClasses()}>
+          Новая тренировка
         </Link>
       </div>
 
@@ -78,86 +69,33 @@ export function DashboardPage() {
         {sessions && sessions.length === 0 && <EmptyState />}
 
         {sessions && sessions.length > 0 && (
-          <SessionBrowser
-            sessions={sessions}
-            tab={tab}
-            onTab={setTab}
-            status={status}
-            onStatus={setStatus}
-          />
+          <SessionBrowser sessions={sessions} />
         )}
       </div>
     </Container>
   )
 }
 
-function SessionBrowser({
-  sessions,
-  tab,
-  onTab,
-  status,
-  onStatus,
-}: {
-  sessions: SessionResponse[]
-  tab: SessionSource
-  onTab: (t: SessionSource) => void
-  status: StatusFilter
-  onStatus: (s: StatusFilter) => void
-}) {
-  const bySource: Record<SessionSource, SessionResponse[]> = {
-    CATALOG: sessions.filter((s) => s.source === 'CATALOG'),
-    VACANCY: sessions.filter((s) => s.source === 'VACANCY'),
-  }
-  const inTab = bySource[tab]
+function SessionBrowser({ sessions }: { sessions: TrainingSession[] }) {
+  const [status, setStatus] = useState<StatusFilter>('ALL')
   const shown =
-    status === 'ALL' ? inTab : inTab.filter((s) => s.status === status)
+    status === 'ALL' ? sessions : sessions.filter((s) => s.status === status)
 
   return (
     <div>
-      <div
-        role="tablist"
-        className="border-rule flex gap-1 border-b"
-        aria-label="Разделы интервью"
-      >
-        {(['VACANCY', 'CATALOG'] as const).map((source) => {
-          const selected = source === tab
-          return (
-            <button
-              key={source}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => onTab(source)}
-              className={cn(
-                '-mb-px border-b-2 px-4 py-2.5 text-sm transition-colors',
-                'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-                selected
-                  ? 'border-accent text-ink'
-                  : 'text-muted hover:text-ink border-transparent',
-              )}
-            >
-              {SOURCE_LABELS[source]}
-              <span className="text-muted ml-1.5 tabular-nums">
-                {bySource[source].length}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {STATUS_FILTERS.map((f) => {
           const count =
             f.key === 'ALL'
-              ? inTab.length
-              : inTab.filter((s) => s.status === f.key).length
+              ? sessions.length
+              : sessions.filter((s) => s.status === f.key).length
           const selected = f.key === status
           return (
             <button
               key={f.key}
               type="button"
               aria-pressed={selected}
-              onClick={() => onStatus(f.key)}
+              onClick={() => setStatus(f.key)}
               className={cn(
                 'rounded-full border px-3 py-1 text-xs transition-colors',
                 'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
@@ -174,18 +112,12 @@ function SessionBrowser({
       </div>
 
       <div className="mt-6">
-        {inTab.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="text-muted py-8 text-center text-sm">
-            {tab === 'CATALOG'
-              ? 'Пока нет тренировок по каталогу.'
-              : 'Пока нет интервью по вакансиям.'}
-          </p>
-        ) : shown.length === 0 ? (
-          <p className="text-muted py-8 text-center text-sm">
-            Нет интервью с этим статусом.
+            Нет тренировок с этим статусом.
           </p>
         ) : (
-          <ul key={`${tab}-${status}`} className="space-y-4">
+          <ul key={status} className="space-y-4">
             {shown.map((s, i) => (
               <SessionCard key={s.id} session={s} index={i} />
             ))}
@@ -199,7 +131,7 @@ function SessionBrowser({
 function SessionListSkeleton() {
   return (
     <div role="status" className="space-y-4">
-      <span className="sr-only">Загрузка списка интервью…</span>
+      <span className="sr-only">Загрузка списка тренировок…</span>
       {[0, 1, 2].map((i) => (
         <div key={i} className="border-rule rounded-lg border p-5">
           <Skeleton className="h-5 w-40" />
@@ -214,16 +146,16 @@ function SessionListSkeleton() {
 function EmptyState() {
   return (
     <div className="border-rule rounded-lg border border-dashed p-10 text-center">
-      <h2 className="text-ink font-display text-xl">Пока нет интервью</h2>
+      <h2 className="text-ink font-display text-xl">Пока нет тренировок</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Запустите первую тренировку или интервью по вакансии — подберём вопросы,
-        а рецензент разберёт ваши ответы.
+        Запустите первую тренировку — рецензент подберёт вопросы под профессию и
+        уровень, а в конце разберёт ваши ответы.
       </p>
       <Link
-        to="/app/interview/new"
+        to="/app/training/new"
         className={cn('mt-6', buttonClasses({ size: 'lg' }))}
       >
-        Начать первое интервью
+        Начать первую тренировку
       </Link>
     </div>
   )
@@ -232,7 +164,7 @@ function EmptyState() {
 function CardScore({ sessionId }: { sessionId: string }) {
   const { data, isLoading } = useReport(sessionId)
   if (isLoading) return <Skeleton className="mt-2 h-4 w-28" />
-  if (!data) return null
+  if (!data || data.avgScore == null) return null
   return (
     <div className="mt-2 flex items-center gap-2">
       <span className="text-accent text-base">
@@ -249,18 +181,17 @@ function SessionCard({
   session,
   index,
 }: {
-  session: SessionResponse
+  session: TrainingSession
   index: number
 }) {
   const del = useDeleteSession()
   const completed = session.status === 'COMPLETED'
   const openHref = completed
-    ? `/app/interview/${session.id}/report`
-    : `/app/interview/${session.id}`
-  const newHref = `/app/interview/new?mode=${session.source === 'VACANCY' ? 'vacancy' : 'catalog'}`
+    ? `/app/training/${session.id}/report`
+    : `/app/training/${session.id}`
 
   const onDelete = () => {
-    if (!window.confirm('Удалить это интервью? Действие необратимо.')) return
+    if (!window.confirm('Удалить эту тренировку? Действие необратимо.')) return
     del.mutate(session.id)
   }
 
@@ -292,7 +223,7 @@ function SessionCard({
               {STATUS_LABELS[session.status]}
             </span>
             <span className="tabular-nums">
-              {session.answeredCount} / {session.totalQuestions} вопросов
+              {session.answeredCount} вопросов отвечено
             </span>
             <span>{formatDate(session.created)}</span>
           </div>
@@ -300,7 +231,7 @@ function SessionCard({
             <CardScore sessionId={session.id} />
           ) : (
             <p className="text-muted mt-2 text-xs italic">
-              Завершите интервью и узнайте оценку
+              Завершите тренировку и узнайте оценку
             </p>
           )}
         </div>
@@ -310,25 +241,7 @@ function SessionCard({
             to={openHref}
             className={buttonClasses({ variant: 'secondary' })}
           >
-            {completed ? 'Результаты' : 'Продолжить'}
-          </Link>
-          <span title="Скоро — можно будет начать это же интервью сначала">
-            <button
-              type="button"
-              disabled
-              className={buttonClasses({
-                variant: 'secondary',
-                className: 'w-full',
-              })}
-            >
-              Начать сначала
-            </button>
-          </span>
-          <Link
-            to={newHref}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            Новое интервью
+            {completed ? 'Разбор' : 'Продолжить'}
           </Link>
           <button
             type="button"

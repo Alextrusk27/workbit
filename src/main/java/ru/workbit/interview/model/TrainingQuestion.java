@@ -23,6 +23,13 @@ public class TrainingQuestion {
     @JoinColumn(name = "training_session_id", nullable = false, updatable = false)
     private TrainingSession trainingSession;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_question_id", updatable = false)
+    private TrainingQuestion parentQuestion;
+
+    @Column(name = "bank_question_id", updatable = false)
+    private UUID bankQuestionId;
+
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
     private TrainingFeedback feedback;
 

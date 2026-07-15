@@ -27,6 +27,9 @@ public class TrainingSession {
     @Column(nullable = false)
     private Profession profession;
 
+    @Column(length = 100)
+    private String topic;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Level level;

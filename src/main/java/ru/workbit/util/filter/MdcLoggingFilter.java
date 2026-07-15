@@ -11,6 +11,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import ru.workbit.util.ClientIp;
 
 import java.io.IOException;
 
@@ -24,15 +25,10 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
                                     @NotNull FilterChain chain) throws ServletException, IOException {
         try {
             MDC.put("requestId", UlidCreator.getUlid().toString());
-            MDC.put("ip", getClientIp(request));
+            MDC.put("ip", ClientIp.from(request));
             chain.doFilter(request, response);
         } finally {
             MDC.clear();
         }
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        return forwarded != null ? forwarded.split(",")[0].trim() : request.getRemoteAddr();
     }
 }

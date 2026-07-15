@@ -6,6 +6,7 @@ const AUTH_DETAIL = {
   EMAIL_NOT_VERIFIED: 'Email not verified',
   EMAIL_REGISTERED_UNVERIFIED: 'Email registered but not verified',
   EMAIL_IN_USE: 'Email already in use',
+  TOO_MANY_REQUESTS: 'Too many requests',
 } as const
 
 function authDetail(error: unknown): string | null {
@@ -35,6 +36,8 @@ const RU_MESSAGE: Record<string, string> = {
     'Этот email уже зарегистрирован, но не подтверждён. Проверьте почту или отправьте письмо заново.',
   [AUTH_DETAIL.EMAIL_IN_USE]:
     'Этот email уже зарегистрирован. Войдите или восстановите пароль.',
+  [AUTH_DETAIL.TOO_MANY_REQUESTS]:
+    'Слишком много запросов. Подождите немного и попробуйте снова.',
 }
 
 /** Русское сообщение auth-ошибки: известные случаи маппим, иначе — общий текст. */

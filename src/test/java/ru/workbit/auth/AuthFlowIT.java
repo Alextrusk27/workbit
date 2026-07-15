@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "jwt.secret=test-secret-key-that-is-at-least-32-bytes-long-enough-for-hmac",
         "jwt.expiration=3600000",
+        "app.security.rate-limit.limit=1000",
         "app.mail.from-name=Workbit",
         "app.mail.from-mail=noreply@workbit.ru",
         "app.mail.base-url=https://workbit.ru",

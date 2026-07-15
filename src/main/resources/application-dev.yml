@@ -1,5 +1,7 @@
 app:
   security:
+    rate-limit:
+      limit: 100
     cors:
       allowed-origins: http://localhost:5173
   mail:

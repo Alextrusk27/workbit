@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert } from '@/components/ui/Alert'
+import { authErrorMessage } from '@/features/auth/errors'
 import { useResendVerification } from '@/features/auth/useAuth'
-import { getErrorMessage } from '@/lib/api'
 
 const COOLDOWN_SECONDS = 60
 
@@ -50,7 +50,7 @@ export function ResendVerification({
       )}
       {resend.isError && (
         <div className="mt-2">
-          <Alert>{getErrorMessage(resend.error)}</Alert>
+          <Alert>{authErrorMessage(resend.error)}</Alert>
         </div>
       )}
     </div>

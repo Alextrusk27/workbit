@@ -115,6 +115,14 @@ public class ExceptionController {
                         Collections.singletonList(e.getMessage())));
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<@NotNull ApiError> handleTooManyRequests(final TooManyRequestsException e) {
+        log.warn("Too many requests exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS, "Too many requests.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
     @ExceptionHandler(VacancyFetchException.class)
     public ResponseEntity<@NotNull ApiError> handleVacancyFetch(final VacancyFetchException e) {
         log.warn("Vacancy fetch exception: {}", e.getMessage());

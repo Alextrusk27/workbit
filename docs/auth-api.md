@@ -83,6 +83,9 @@ record UserResponse(String email, Instant created)
 - **`/delete`** — soft delete: `active=false` + фиксация времени деактивации + отзыв всех
   refresh-токенов пользователя. Физически запись из БД не удаляется. Зарегистрироваться
   заново с тем же email после деактивации возможно.
+- **Лимит частоты**: `/register`, `/forgot-password` и `/resend-verification` ограничены
+  по IP — не более 5 запросов за 15 минут на эндпоинт (настраивается через
+  `RATE_LIMIT_LIMIT` / `RATE_LIMIT_WINDOW`). При превышении — `429`.
 
 ## Ошибки
 
@@ -102,3 +105,4 @@ record UserResponse(String email, Instant created)
 | `400` | невалидное тело запроса (нарушение ограничений полей, битый JSON) |
 | `401` | неверные учётные данные; email не подтверждён; email уже используется; refresh/verify/reset-токен недействителен, истёк или уже использован |
 | `404` | запрашиваемый объект не найден |
+| `429` | превышен лимит частоты запросов с одного IP (`/register`, `/forgot-password`, `/resend-verification`) |

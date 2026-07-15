@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Field } from '@/components/ui/Field'
+import { authErrorMessage } from '@/features/auth/errors'
 import { useForgotPassword } from '@/features/auth/useAuth'
-import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function ForgotPasswordPage() {
@@ -43,7 +43,7 @@ export function ForgotPasswordPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
-        {forgot.isError && <Alert>{getErrorMessage(forgot.error)}</Alert>}
+        {forgot.isError && <Alert>{authErrorMessage(forgot.error)}</Alert>}
         <Field
           label="Email"
           type="email"

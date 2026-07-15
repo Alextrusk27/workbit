@@ -17,10 +17,12 @@ import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.BadCredentialsException;
+import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
+import ru.workbit.security.service.RateLimiterService;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -57,6 +60,9 @@ class AuthControllerTest {
 
     @MockitoBean
     AuthService authService;
+
+    @MockitoBean
+    RateLimiterService rateLimiterService;
 
     // JWTAuthFilter-зависимости: нужны, чтобы SecurityConfig мог создать фильтр
     @MockitoBean
@@ -149,6 +155,25 @@ class AuthControllerTest {
             mvc.perform(post(BASE + "/register")
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("Возвращает 429, когда превышен лимит запросов")
+        void returns429WhenRateLimitExceeded() throws Exception {
+            // given
+            var request = new RegistrationRequest(EMAIL, PASSWORD);
+            doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
+
+            // when / then
+            mvc.perform(post(BASE + "/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
+                    .andExpect(jsonPath("$.message").value("Too many requests."))
+                    .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
+
+            verifyNoInteractions(authService);
         }
     }
 
@@ -253,6 +278,25 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 429, когда превышен лимит запросов")
+        void returns429WhenRateLimitExceeded() throws Exception {
+            // given
+            var request = new ResendVerificationRequest(EMAIL);
+            doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
+
+            // when / then
+            mvc.perform(post(BASE + "/resend-verification")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
+                    .andExpect(jsonPath("$.message").value("Too many requests."))
+                    .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
 
             verifyNoInteractions(authService);
         }
@@ -528,6 +572,25 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 429, когда превышен лимит запросов")
+        void returns429WhenRateLimitExceeded() throws Exception {
+            // given
+            var request = new ForgotPasswordRequest(EMAIL);
+            doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
+
+            // when / then
+            mvc.perform(post(BASE + "/forgot-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
+                    .andExpect(jsonPath("$.message").value("Too many requests."))
+                    .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
 
             verifyNoInteractions(authService);
         }

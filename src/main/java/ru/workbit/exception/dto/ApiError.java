@@ -7,7 +7,7 @@ import java.util.List;
 
 public record ApiError(
         String timestamp,
-        HttpStatus status,
+        String status,
         String message,
         List<String> errors
 ) {
@@ -15,7 +15,7 @@ public record ApiError(
     public static ApiError of(HttpStatus status, String message, List<String> errors) {
         return new ApiError(
                 LocalDateTime.now().toString(),
-                status,
+                status.name(),
                 message,
                 errors
         );

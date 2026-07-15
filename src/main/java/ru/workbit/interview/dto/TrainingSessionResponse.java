@@ -11,7 +11,10 @@ public record TrainingSessionResponse(
         UUID id,
 
         @Schema(description = "Профессия, по которой проводится собеседование", example = "Java-разработчик")
-        Profession profession,
+        String profession,
+
+        @Schema(description = "Тема тренировки, null если не задана", example = "Spring Boot")
+        String topic,
 
         @Schema(description = "Целевой уровень кандидата", example = "Middle")
         Level level,

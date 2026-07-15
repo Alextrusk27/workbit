@@ -2,13 +2,12 @@ package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import ru.workbit.interview.model.Level;
-import ru.workbit.interview.model.Profession;
 
 import java.util.List;
 
 public record TrainingOptionsResponse(
-        @Schema(description = "Доступные профессии")
-        List<Profession> professions,
+        @Schema(description = "Популярные профессии из словаря для быстрого выбора; свободный ввод тоже допустим")
+        List<String> professions,
 
         @Schema(description = "Доступные уровни кандидата")
         List<Level> levels,

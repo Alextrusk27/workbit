@@ -37,7 +37,7 @@ public class TrainingController {
 
     @GetMapping("/options")
     @Loggable(logResult = true)
-    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает допустимые профессии, уровни и типы компании, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
+    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает популярные профессии из словаря (подсказки для быстрого выбора, свободный ввод тоже допустим), допустимые уровни, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Справочник значений")
@@ -48,7 +48,7 @@ public class TrainingController {
 
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по выбранной профессии, уровню и типу компании. Вопросы заранее не генерируются: первый вопрос запрашивается отдельным вызовом.")
+    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по указанной профессии (свободный ввод), необязательной теме и уровню. Вопросы заранее не генерируются: первый вопрос запрашивается отдельным вызовом.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),

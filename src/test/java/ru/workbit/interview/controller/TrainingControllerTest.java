@@ -1,0 +1,257 @@
+package ru.workbit.interview.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import ru.workbit.exception.controller.ExceptionController;
+import ru.workbit.interview.dto.CreateSessionRequest;
+import ru.workbit.interview.dto.TrainingOptionsResponse;
+import ru.workbit.interview.dto.TrainingSessionResponse;
+import ru.workbit.interview.model.Level;
+import ru.workbit.interview.model.SessionStatus;
+import ru.workbit.interview.service.TrainingService;
+import ru.workbit.security.config.SecurityConfig;
+import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.JWTService;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(TrainingController.class)
+@Import({SecurityConfig.class, ExceptionController.class})
+@DisplayName("TrainingControllerTest")
+class TrainingControllerTest {
+
+    private static final String BASE = "/api/v1/interview/training";
+    private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+    @Autowired
+    MockMvc mvc;
+
+    // ObjectMapper создаём напрямую: в SB4 @WebMvcTest не включает JacksonAutoConfiguration автоматически
+    private final ObjectMapper om = new ObjectMapper();
+
+    @MockitoBean
+    TrainingService trainingService;
+
+    // JWTAuthFilter-зависимости: нужны, чтобы SecurityConfig мог создать фильтр
+    @MockitoBean
+    JWTService jwtService;
+
+    @MockitoBean
+    UserDetailsService userDetailsService;
+
+    private CustomUserDetails principal() {
+        return new CustomUserDetails(USER_ID, "user@example.com", "hash", true, List.of());
+    }
+
+    private TrainingSessionResponse sessionResponse(String profession, String topic) {
+        return new TrainingSessionResponse(
+                UUID.randomUUID(), profession, topic, Level.MIDDLE, SessionStatus.IN_PROGRESS,
+                0, Instant.now(), null);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("CreateSession")
+    class CreateSession {
+
+        @Test
+        @DisplayName("Возвращает 201, Location и тело с profession/topic при валидном запросе")
+        void returns201OnHappyPath() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Java-разработчик", "Spring Boot", Level.MIDDLE);
+            var response = sessionResponse("Java-разработчик", "Spring Boot");
+            when(trainingService.create(any(), any())).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().exists("Location"))
+                    .andExpect(jsonPath("$.profession").value("Java-разработчик"))
+                    .andExpect(jsonPath("$.topic").value("Spring Boot"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 201, когда профессия — произвольная строка не из справочника")
+        void returns201WhenProfessionIsFreeformNotInDictionary() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Астролог", null, Level.JUNIOR);
+            var response = sessionResponse("Астролог", null);
+            when(trainingService.create(any(), any())).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.profession").value("Астролог"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 201, когда topic отсутствует")
+        void returns201WhenTopicMissing() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Java-разработчик", null, Level.SENIOR);
+            var response = sessionResponse("Java-разработчик", null);
+            when(trainingService.create(any(), any())).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.topic").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда profession пустая строка")
+        void returns400WhenProfessionBlank() throws Exception {
+            // given
+            var request = new CreateSessionRequest("", "Spring Boot", Level.MIDDLE);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда profession длиннее 100 символов")
+        void returns400WhenProfessionTooLong() throws Exception {
+            // given
+            var request = new CreateSessionRequest("a".repeat(101), "Spring Boot", Level.MIDDLE);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда topic длиннее 100 символов")
+        void returns400WhenTopicTooLong() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Java-разработчик", "b".repeat(101), Level.MIDDLE);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда level невалиден")
+        void returns400WhenLevelInvalid() throws Exception {
+            // given — level со значением, отсутствующим в enum Level
+            var body = """
+                    {"profession":"Java-разработчик","topic":"Spring Boot","level":"NotALevel"}
+                    """;
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Java-разработчик", "Spring Boot", Level.MIDDLE);
+
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(BASE + "/sessions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /options
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetOptions")
+    class GetOptions {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком профессий-строк, уровнями и капами")
+        void returns200WithOptions() throws Exception {
+            // given
+            var response = new TrainingOptionsResponse(
+                    List.of("Java-разработчик", "Frontend-разработчик"),
+                    List.of(Level.JUNIOR, Level.MIDDLE, Level.SENIOR, Level.LEAD),
+                    10, 3);
+            when(trainingService.getOptions()).thenReturn(response);
+
+            // when / then
+            mvc.perform(get(BASE + "/options")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.professions").isArray())
+                    .andExpect(jsonPath("$.professions[0]").value("Java-разработчик"))
+                    .andExpect(jsonPath("$.professions[1]").value("Frontend-разработчик"))
+                    .andExpect(jsonPath("$.levels").isArray())
+                    .andExpect(jsonPath("$.levels[0]").value("Junior"))
+                    .andExpect(jsonPath("$.questionCap").value(10))
+                    .andExpect(jsonPath("$.minAnswersToFinish").value(3));
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(get(BASE + "/options"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+}

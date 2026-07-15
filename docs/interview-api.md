@@ -1,7 +1,8 @@
 # Interview Training API — `/api/v1/interview/training`
 
-Тренажёр AI-собеседования: пользователь выбирает профессию и уровень,
-проходит серию вопросов и в конце получает отчёт с поразборным фидбэком и средним баллом.
+Тренажёр AI-собеседования: пользователь указывает профессию, уровень и опционально тему
+тренировки, проходит серию вопросов и в конце получает отчёт с поразборным фидбэком и
+средним баллом.
 Банка готовых вопросов больше нет — каждый вопрос генерирует LLM по одному, с учётом
 параметров сессии и всей предыдущей истории «вопрос-ответ». Все тела запросов и ответов —
 JSON.
@@ -32,7 +33,7 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 
 | Метод | Путь | Назначение | Авторизация |
 |---|---|---|---|
-| GET | `/options` | справочник допустимых профессий/уровней и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
+| GET | `/options` | справочник популярных профессий (подсказки для UI), уровней и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
 | POST | `/sessions` | создать тренировочную сессию (без вопросов) | cookie `access_token` |
 | GET | `/sessions` | страница сессий текущего пользователя | cookie `access_token` |
 | GET | `/sessions/{sessionId}` | получить сессию по id | cookie `access_token` |
@@ -42,28 +43,47 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 | GET | `/sessions/{sessionId}/report` | получить ранее сформированный отчёт | cookie `access_token` |
 | DELETE | `/sessions/{sessionId}` | удалить сессию вместе с вопросами и отчётом | cookie `access_token` |
 
-## Справочные значения (enum'ы)
+## Справочные значения
 
-`Profession` сериализуется не по имени константы, а по русскому лейблу
-(`@JsonValue`); `Level` — по лейблу, совпадающему с именем на английском. В запросах и
-ответах фигурирует именно лейбл. Чтобы не хардкодить их на фронте, есть `GET /options`.
+`Level` сериализуется не по имени константы, а по лейблу, совпадающему с именем на
+английском. `SessionStatus` кастомного лейбла не имеет, сериализуется по имени
+константы.
 
-- **Profession** — `Java-разработчик`, `Python-разработчик`, `Инженер по тестированию`.
 - **Level** — `Junior`, `Middle`, `Senior`, `Lead`.
-- **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED` (без кастомного лейбла,
-  сериализуется по имени константы).
+- **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED`.
+
+### Профессия и тема
+
+`profession` и `topic` — свободный текст, а не enum. Раньше профессия была закрытым
+перечнем из трёх значений (`Profession`, сериализовался лейблом через `@JsonValue`);
+теперь это просто строка, и в `CreateSessionRequest` принимается любая непустая
+профессия до 100 символов — «неизвестной профессии» больше не существует как ошибки.
+
+`GET /options` по-прежнему отдаёт список профессий в поле `professions`, но его смысл
+изменился: это не перечень допустимых значений, а топ-20 самых используемых профессий
+словаря (по убыванию счётчика использования) — подсказки для быстрого выбора в UI.
+Ввод любой другой профессии, которой нет в этом списке, так же валиден.
+
+`topic` (до 100 символов) — необязательная тема тренировки: технология или область
+знаний внутри профессии (например, `Spring Boot` для `Java-разработчик`). `null` (поле
+можно не передавать), если тема не важна — тогда вопросы задаются по профессии в целом.
+Тема сохраняется в сессии и возвращается в ответах, но на сам процесс генерации вопросов
+пока не влияет — LLM её пока не получает, это зарезервировано под один из следующих
+этапов.
 
 ## Запросы (DTO)
 
 ```java
 record CreateSessionRequest(
-    @NotNull Profession profession,
+    @NotBlank @Size(max = 100) String profession,
+    @Size(max = 100) String topic,
     @NotNull Level level)
 
 record SubmitAnswerBody(@NotBlank String answerText)
 ```
 
-Все поля обязательны. `GET /options`, `POST .../questions/next`, `POST .../finish`,
+`profession` и `level` обязательны; `topic` необязателен (можно не передавать или
+передать `null`; пустая/пробельная строка нормализуется в `null` на бэке). `GET /options`, `POST .../questions/next`, `POST .../finish`,
 `GET .../report` и `DELETE` тела не принимают.
 
 Пример `CreateSessionRequest`:
@@ -71,6 +91,7 @@ record SubmitAnswerBody(@NotBlank String answerText)
 ```json
 {
   "profession": "Java-разработчик",
+  "topic": "Spring Boot",
   "level": "Middle"
 }
 ```
@@ -79,11 +100,11 @@ record SubmitAnswerBody(@NotBlank String answerText)
 
 ```java
 record TrainingOptionsResponse(
-    List<Profession> professions, List<Level> levels,
+    List<String> professions, List<Level> levels,
     int questionCap, int minAnswersToFinish)
 
 record TrainingSessionResponse(
-    UUID id, Profession profession, Level level,
+    UUID id, String profession, String topic, Level level,
     SessionStatus status, int answeredCount, Instant created, Instant completedAt)
 
 record TrainingQuestionResponse(
@@ -91,14 +112,16 @@ record TrainingQuestionResponse(
     String answerText, Integer score, String feedback)
 
 record TrainingReportResponse(
-    UUID reportId, UUID sessionId, Profession profession,
+    UUID reportId, UUID sessionId, String profession, String topic,
     Level level, Double avgScore, String overallFeedback, Instant generatedAt,
     List<TrainingQuestionResponse> questions)
 ```
 
-- **`GET /options`** — `200`, `TrainingOptionsResponse`. `questionCap` = 10 (максимум
-  основных вопросов за тренировку), `minAnswersToFinish` = 3 (минимум отвеченных основных
-  вопросов, чтобы завершение стало доступно).
+- **`GET /options`** — `200`, `TrainingOptionsResponse`. `professions` — топ-20
+  профессий словаря по убыванию частоты использования, только подсказки для UI (см.
+  «Профессия и тема» выше). `questionCap` = 10 (максимум основных вопросов за
+  тренировку), `minAnswersToFinish` = 3 (минимум отвеченных основных вопросов, чтобы
+  завершение стало доступно).
 - **`POST /sessions`** — `201` с `TrainingSessionResponse` и заголовком `Location`
   (`/sessions/{id}`). Свежесозданная сессия: `status = CREATED`, `answeredCount = 0`,
   вопросов ещё нет — они появляются только через `.../questions/next`.
@@ -146,6 +169,7 @@ record TrainingReportResponse(
   "reportId": "b6b6c1c2-1111-4a3a-9a3a-000000000001",
   "sessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "profession": "Java-разработчик",
+  "topic": "PostgreSQL",
   "level": "Middle",
   "avgScore": 3.8,
   "overallFeedback": "Кандидат уверенно ориентируется в основах, но...",
@@ -179,8 +203,8 @@ record TrainingReportResponse(
 
 ## Поведение
 
-- **Создание сессии ничего не генерирует.** `POST /sessions` только фиксирует профессию
-  и уровень. Вопросов в момент создания нет — первый и все следующие
+- **Создание сессии ничего не генерирует.** `POST /sessions` только фиксирует профессию,
+  тему и уровень. Вопросов в момент создания нет — первый и все следующие
   запрашиваются отдельно через `.../questions/next`.
 - **`.../questions/next` идемпотентен.** Если в сессии уже есть неотвеченный вопрос —
   ручка вернёт его же, не обращаясь к LLM. Это одновременно и точка возврата: если
@@ -250,7 +274,7 @@ record TrainingReportResponse(
 
 | Код | Когда |
 |---|---|
-| `400` | невалидное тело запроса: отсутствующий/невалидный enum в `CreateSessionRequest`, пустой `answerText`, битый JSON, неверный тип path-параметра (например, `sessionId`/`questionId` не UUID) |
+| `400` | невалидное тело запроса: пустая или длиннее 100 символов `profession`, `topic` длиннее 100 символов, отсутствующий/невалидный `level`, пустой `answerText`, битый JSON, неверный тип path-параметра (например, `sessionId`/`questionId` не UUID) |
 | `401` | нет валидного access-токена (ставит Security-фильтр, тело пустое) |
 | `403` | вопрос, на который отправляется ответ, принадлежит другому пользователю |
 | `404` | сессия или вопрос не найдены (в т.ч. чужие — они ищутся сразу с учётом пользователя); отчёт ещё не сформирован |

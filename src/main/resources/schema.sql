@@ -247,3 +247,9 @@ CREATE INDEX IF NOT EXISTS idx_vacancy_question_session_id
 
 CREATE INDEX IF NOT EXISTS idx_vacancy_snapshot_hh_id
     ON vacancy.snapshot(hh_vacancy_id);
+
+INSERT INTO content.profession_dict (name, status) VALUES
+    ('Java-разработчик', 'APPROVED'),
+    ('Python-разработчик', 'APPROVED'),
+    ('Инженер по тестированию', 'APPROVED')
+ON CONFLICT DO NOTHING;

@@ -12,8 +12,9 @@ import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
+import ru.workbit.content.model.ProfessionDict;
+import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.interview.model.Level;
-import ru.workbit.interview.model.Profession;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.TrainingQuestion;
 import ru.workbit.interview.model.TrainingReport;
@@ -55,6 +56,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
+    private final ProfessionDictRepository professionDictRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
 
@@ -67,6 +69,9 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
+        if (session.getTopic() != null && session.getTopic().isBlank()) {
+            session.setTopic(null);
+        }
         trainingSessionRepository.save(session);
 
         return trainingSessionMapper.toResponse(session, 0);
@@ -117,7 +122,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 && trailingFollowUps(history) < MAX_FOLLOW_UPS_PER_QUESTION;
 
         LlmTrainingQuestion generated = llmService.generateTrainingQuestion(new LlmTrainingQuestionRequest(
-                session.getProfession().getName(),
+                session.getProfession(),
                 session.getLevel().getName(),
                 history.stream()
                         .map(q -> new LlmTrainingHistoryItem(q.getQuestionText(), q.getAnswerText(), q.isFollowUp()))
@@ -167,7 +172,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
         List<List<TrainingQuestion>> cases = TrainingWriter.groupCases(answered);
         LlmTrainingReport llmReport = llmService.createTrainingReport(new LlmTrainingReportRequest(
-                session.getProfession().getName(),
+                session.getProfession(),
                 session.getLevel().getName(),
                 IntStream.range(0, cases.size())
                         .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
@@ -204,7 +209,9 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     public TrainingOptionsResponse getOptions() {
         return new TrainingOptionsResponse(
-                List.of(Profession.values()),
+                professionDictRepository.findTop20ByOrderByUsageCountDesc().stream()
+                        .map(ProfessionDict::getName)
+                        .toList(),
                 List.of(Level.values()),
                 MAIN_QUESTION_CAP,
                 MIN_ANSWERED_TO_FINISH);

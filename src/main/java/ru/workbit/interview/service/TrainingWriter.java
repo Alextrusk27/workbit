@@ -4,11 +4,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.content.model.BankQuestion;
+import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.TopicDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.TrainingQuestionResponse;
 import ru.workbit.interview.dto.TrainingReportResponse;
+import ru.workbit.interview.dto.TrainingSessionResponse;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.TrainingFeedback;
 import ru.workbit.interview.model.TrainingQuestion;
@@ -16,6 +20,7 @@ import ru.workbit.interview.model.TrainingReport;
 import ru.workbit.interview.model.TrainingSession;
 import ru.workbit.interview.model.mapper.TrainingQuestionMapper;
 import ru.workbit.interview.model.mapper.TrainingReportMapper;
+import ru.workbit.interview.model.mapper.TrainingSessionMapper;
 import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
@@ -27,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalDouble;
 import java.util.UUID;
 
 @Component
@@ -36,12 +40,53 @@ import java.util.UUID;
 class TrainingWriter {
 
     private static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    private static final double MIN_REVIEWED_CASES_RATIO = 0.5;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
+    private final ProfessionDictRepository professionDictRepository;
+    private final TopicDictRepository topicDictRepository;
 
+    private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingQuestionMapper trainingQuestionMapper;
     private final TrainingReportMapper trainingReportMapper;
+
+    record DictionaryRefs(UUID professionId, UUID topicId) {
+    }
+
+    @Transactional
+    public DictionaryRefs upsertDictionaries(String profession, String topic) {
+        UUID professionId = professionDictRepository.upsertAndIncrementUsage(profession);
+        UUID topicId = topic != null ? topicDictRepository.upsertAndIncrementUsage(professionId, topic) : null;
+        return new DictionaryRefs(professionId, topicId);
+    }
+
+    @Transactional
+    public TrainingSessionResponse createSession(TrainingSession session, List<BankQuestion> bankQuestions,
+                                                 List<String> generatedQuestions) {
+        List<TrainingQuestion> questions = new ArrayList<>();
+        for (BankQuestion bankQuestion : bankQuestions) {
+            questions.add(mainQuestion(session, bankQuestion.getText(), bankQuestion.getId(), questions.size() + 1));
+        }
+        for (String questionText : generatedQuestions) {
+            questions.add(mainQuestion(session, questionText, null, questions.size() + 1));
+        }
+
+        session.setQuestions(questions);
+        trainingSessionRepository.save(session);
+
+        return trainingSessionMapper.toResponse(session, 0);
+    }
+
+    private static TrainingQuestion mainQuestion(TrainingSession session, String questionText, UUID bankQuestionId,
+                                                 int orderIndex) {
+        return TrainingQuestion.builder()
+                .trainingSession(session)
+                .bankQuestionId(bankQuestionId)
+                .questionText(questionText)
+                .orderIndex(orderIndex)
+                .build();
+    }
 
     @Transactional
     public TrainingQuestionResponse saveQuestion(UUID sessionId, String questionText, boolean followUp) {
@@ -77,9 +122,11 @@ class TrainingWriter {
                 .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
                 .toList();
 
-        saveFeedbacks(groupCases(answered), llmReport.cases() != null ? llmReport.cases() : List.of());
+        List<List<TrainingQuestion>> cases = groupCases(answered);
+        saveFeedbacks(cases, llmReport.cases() != null ? llmReport.cases() : List.of());
+        checkEnoughReviewedCases(sessionId, cases);
 
-        double avgScore = calculateAvgScore(sessionId, answered);
+        double avgScore = calculateAvgScore(answered);
 
         session.getQuestions().removeIf(q -> !q.isAnswered());
         session.setReport(TrainingReport.builder()
@@ -120,6 +167,7 @@ class TrainingWriter {
 
             TrainingQuestion question = cases.get(review.index() - 1).getFirst();
             if (question.getFeedback() != null) {
+                log.warn("LLM returned duplicate review for case {}, skipping feedback", review.index());
                 continue;
             }
             question.setFeedback(TrainingFeedback.builder()
@@ -130,19 +178,22 @@ class TrainingWriter {
         }
     }
 
-    private double calculateAvgScore(UUID sessionId, List<TrainingQuestion> answered) {
-        OptionalDouble avg = answered.stream()
+    private double calculateAvgScore(List<TrainingQuestion> answered) {
+        double avg = answered.stream()
                 .map(TrainingQuestion::getFeedback)
                 .filter(Objects::nonNull)
                 .mapToInt(TrainingFeedback::getScore)
-                .average();
+                .average()
+                .orElseThrow(() -> new LlmException("Training report has no usable scores"));
+        return Math.round(avg * 10) / 10.0;
+    }
 
-        if (avg.isEmpty()) {
-            log.error("Cannot finish session {}: LLM report contains no usable scores", sessionId);
-            throw new LlmException("Training report has no usable scores");
+    private void checkEnoughReviewedCases(UUID sessionId, List<List<TrainingQuestion>> cases) {
+        long reviewed = cases.stream().filter(c -> c.getFirst().getFeedback() != null).count();
+        if (reviewed < cases.size() * MIN_REVIEWED_CASES_RATIO) {
+            log.error("Cannot finish session {}: LLM reviewed only {} of {} cases", sessionId, reviewed, cases.size());
+            throw new LlmException("Training report has too few reviewed cases");
         }
-
-        return Math.round(avg.getAsDouble() * 10) / 10.0;
     }
 
     private void checkOverallFeedback(UUID sessionId, String overallFeedback) {

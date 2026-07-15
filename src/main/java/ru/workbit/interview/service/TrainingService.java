@@ -3,6 +3,7 @@ package ru.workbit.interview.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -12,9 +13,11 @@ import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
+import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.QuestionBankRepository;
 import ru.workbit.content.repository.TopicDictRepository;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.SessionStatus;
@@ -33,6 +36,8 @@ import ru.workbit.llm.dto.LlmTrainingFollowUp;
 import ru.workbit.llm.dto.LlmTrainingHistoryItem;
 import ru.workbit.llm.dto.LlmTrainingQuestion;
 import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
@@ -64,6 +69,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
     private final TopicDictRepository topicDictRepository;
+    private final QuestionBankRepository questionBankRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
 
@@ -72,16 +78,24 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     private final TrainingReportMapper trainingReportMapper;
 
     @Override
-    @Transactional
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
         if (session.getTopic() != null && session.getTopic().isBlank()) {
             session.setTopic(null);
         }
-        trainingSessionRepository.save(session);
 
-        return trainingSessionMapper.toResponse(session, 0);
+        TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
+                session.getProfession(), session.getTopic());
+        List<BankQuestion> bankQuestions = questionBankRepository.sampleUnseen(
+                refs.professionId(), refs.topicId(), session.getLevel().name(), userId, MAIN_QUESTION_CAP);
+
+        List<String> generatedQuestions = bankQuestions.size() < MAIN_QUESTION_CAP
+                ? generateMissingQuestions(session, bankQuestions)
+                : List.of();
+        checkHasMainQuestions(session, bankQuestions, generatedQuestions);
+
+        return trainingWriter.createSession(session, bankQuestions, generatedQuestions);
     }
 
     @Override
@@ -140,7 +154,14 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         checkGeneratedQuestion(sessionId, generated);
         boolean followUp = allowFollowUp && FOLLOW_UP_TYPE.equals(generated.type());
 
-        return trainingWriter.saveQuestion(sessionId, generated.question(), followUp);
+        try {
+            return trainingWriter.saveQuestion(sessionId, generated.question(), followUp);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent request already created a question for session {}", sessionId);
+            return trainingQuestionRepository.findNextUnanswered(sessionId)
+                    .map(trainingQuestionMapper::toDto)
+                    .orElseThrow(() -> new ConflictException("Concurrent session update"));
+        }
     }
 
     @Override
@@ -185,7 +206,12 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                         .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
                         .toList()));
 
-        return trainingWriter.completeReport(sessionId, llmReport);
+        try {
+            return trainingWriter.completeReport(sessionId, llmReport);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent request already completed session {}", sessionId);
+            throw new ConflictException("Session already finished");
+        }
     }
 
     @Override
@@ -262,6 +288,35 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     private static String escapeLike(String query) {
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {
+        int missing = MAIN_QUESTION_CAP - bankQuestions.size();
+        LlmTrainingQuestions generated = llmService.generateTrainingQuestions(new LlmTrainingQuestionsRequest(
+                session.getProfession(),
+                session.getTopic() != null ? session.getTopic() : "",
+                session.getLevel().getName(),
+                missing,
+                bankQuestions.stream().map(BankQuestion::getText).toList()));
+
+        List<String> questions = generated.questions() == null ? List.of() : generated.questions().stream()
+                .filter(q -> q != null && !q.isBlank())
+                .limit(missing)
+                .toList();
+        if (questions.size() < missing) {
+            log.warn("LLM returned {} usable questions of {} requested [profession={}, topic={}, level={}]",
+                    questions.size(), missing, session.getProfession(), session.getTopic(), session.getLevel());
+        }
+        return questions;
+    }
+
+    private void checkHasMainQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
+                                       List<String> generatedQuestions) {
+        if (bankQuestions.isEmpty() && generatedQuestions.isEmpty()) {
+            log.error("No main questions for new training session [profession={}, topic={}, level={}]",
+                    session.getProfession(), session.getTopic(), session.getLevel());
+            throw new LlmException("Generated questions are empty");
+        }
     }
 
     private static int trailingFollowUps(List<TrainingQuestion> history) {

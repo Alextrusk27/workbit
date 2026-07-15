@@ -11,13 +11,24 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.QuestionBankRepository;
 import ru.workbit.content.repository.TopicDictRepository;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.NormalizeInputRequest;
 import ru.workbit.interview.dto.NormalizeInputResponse;
+import ru.workbit.interview.dto.SubmitAnswerRequest;
 import ru.workbit.interview.dto.TrainingOptionsResponse;
 import ru.workbit.interview.dto.TrainingQuestionResponse;
 import ru.workbit.interview.dto.TrainingReportResponse;
@@ -25,6 +36,7 @@ import ru.workbit.interview.dto.TrainingSessionResponse;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.TrainingQuestion;
+import ru.workbit.interview.model.TrainingReport;
 import ru.workbit.interview.model.TrainingSession;
 import ru.workbit.interview.model.mapper.TrainingQuestionMapper;
 import ru.workbit.interview.model.mapper.TrainingReportMapper;
@@ -35,19 +47,26 @@ import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestion;
 import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -67,6 +86,8 @@ class TrainingServiceTest {
     ProfessionDictRepository professionDictRepository;
     @Mock
     TopicDictRepository topicDictRepository;
+    @Mock
+    QuestionBankRepository questionBankRepository;
     @Mock
     TrainingWriter trainingWriter;
     @Mock
@@ -102,57 +123,79 @@ class TrainingServiceTest {
                 .build();
     }
 
+    private static List<BankQuestion> bankQuestions(int count) {
+        return IntStream.rangeClosed(1, count)
+                .mapToObj(i -> BankQuestion.builder().id(UUID.randomUUID()).text("Банковский вопрос " + i).build())
+                .toList();
+    }
+
     @Nested
     @DisplayName("Create")
     class Create {
 
-        @Test
-        @DisplayName("Сохраняет сессию с профессией и темой из запроса, возвращает answeredCount=0")
-        void savesSessionWithProfessionAndTopicFromRequest() {
-            // given
-            UUID userId = UUID.randomUUID();
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
-            TrainingSession mappedEntity = TrainingSession.builder()
+        private final UUID userId = UUID.randomUUID();
+        private final UUID professionId = UUID.randomUUID();
+        private final UUID topicId = UUID.randomUUID();
+
+        private TrainingSession mappedEntity(String topic) {
+            return TrainingSession.builder()
                     .profession(PROFESSION)
-                    .topic(TOPIC)
+                    .topic(topic)
                     .level(Level.MIDDLE)
                     .build();
+        }
+
+        @Test
+        @DisplayName("Банк выдал полные 10 вопросов - LLM не вызывается, в writer уходят 10 банковских и пустой список сгенерированных")
+        void fullBankSkipsLlmGeneration() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
-            when(trainingSessionMapper.toResponse(mappedEntity, 0)).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getUserId()).isEqualTo(userId);
 
-            ArgumentCaptor<TrainingSession> captor = ArgumentCaptor.forClass(TrainingSession.class);
-            verify(trainingSessionRepository).save(captor.capture());
-            TrainingSession saved = captor.getValue();
-            assertThat(saved.getUserId()).isEqualTo(userId);
-            assertThat(saved.getProfession()).isEqualTo(PROFESSION);
-            assertThat(saved.getTopic()).isEqualTo(TOPIC);
+            verifyNoInteractions(llmService);
+            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
         }
 
         @Test
-        @DisplayName("Создаёт сессию без темы - topic сохраняется как null")
-        void createsSessionWithNullTopic() {
+        @DisplayName("Банк выдал часть вопросов (7 из 10) - LLM вызывается с count=3 и текстами банковских вопросов")
+        void partialBankRequestsMissingFromLlm() {
             // given
-            UUID userId = UUID.randomUUID();
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
-            TrainingSession mappedEntity = TrainingSession.builder()
-                    .profession(PROFESSION)
-                    .topic(null)
-                    .level(Level.MIDDLE)
-                    .build();
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(7);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            List<String> generated = List.of("Сгенерированный 1", "Сгенерированный 2", "Сгенерированный 3");
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
-            when(trainingSessionMapper.toResponse(mappedEntity, 0)).thenReturn(expectedResponse);
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -160,27 +203,45 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
 
-            ArgumentCaptor<TrainingSession> captor = ArgumentCaptor.forClass(TrainingSession.class);
-            verify(trainingSessionRepository).save(captor.capture());
-            assertThat(captor.getValue().getTopic()).isNull();
+            verify(questionBankRepository).sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP);
+
+            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
+            verify(llmService).generateTrainingQuestions(captor.capture());
+            LlmTrainingQuestionsRequest llmRequest = captor.getValue();
+            assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
+            assertThat(llmRequest.topic()).isEqualTo(TOPIC);
+            assertThat(llmRequest.level()).isEqualTo("Middle");
+            assertThat(llmRequest.count()).isEqualTo(3);
+            assertThat(llmRequest.existingQuestions())
+                    .containsExactlyElementsOf(bank.stream().map(BankQuestion::getText).toList());
+
+            verify(trainingWriter).createSession(mappedEntity, bank, generated);
         }
 
         @Test
-        @DisplayName("Пробельная тема в запросе - topic нормализуется в null перед сохранением")
-        void normalizesBlankTopicToNull() {
+        @DisplayName("Банк пуст - LLM запрашивается на полный батч из 10 вопросов")
+        void emptyBankRequestsFullBatch() {
             // given
-            UUID userId = UUID.randomUUID();
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, "   ", Level.MIDDLE);
-            TrainingSession mappedEntity = TrainingSession.builder()
-                    .profession(PROFESSION)
-                    .topic("   ")
-                    .level(Level.MIDDLE)
-                    .build();
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(List.of());
+
+            List<String> generated = IntStream.rangeClosed(1, TrainingService.MAIN_QUESTION_CAP)
+                    .mapToObj(i -> "Сгенерированный " + i)
+                    .toList();
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
-            when(trainingSessionMapper.toResponse(mappedEntity, 0)).thenReturn(expectedResponse);
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, List.of(), generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -188,9 +249,236 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
 
-            ArgumentCaptor<TrainingSession> captor = ArgumentCaptor.forClass(TrainingSession.class);
-            verify(trainingSessionRepository).save(captor.capture());
-            assertThat(captor.getValue().getTopic()).isNull();
+            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
+            verify(llmService).generateTrainingQuestions(captor.capture());
+            assertThat(captor.getValue().count()).isEqualTo(TrainingService.MAIN_QUESTION_CAP);
+            assertThat(captor.getValue().existingQuestions()).isEmpty();
+
+            verify(trainingWriter).createSession(mappedEntity, List.of(), generated);
+        }
+
+        @Test
+        @DisplayName("Ответ LLM с null/blank и лишними строками - фильтруется и обрезается до missing")
+        void filtersAndTrimsLlmResponse() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(8);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(
+                    Arrays.asList(null, "   ", "Годный вопрос 1", "Годный вопрос 2", "Лишний вопрос 3")));
+
+            List<String> expectedGenerated = List.of("Годный вопрос 1", "Годный вопрос 2");
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, expectedGenerated)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).createSession(mappedEntity, bank, expectedGenerated);
+        }
+
+        @Test
+        @DisplayName("LLM вернул меньше вопросов, чем запрошено - сессия создаётся с тем, что есть, без исключения")
+        void createsSessionWithFewerThanRequestedFromLlm() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(8);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            List<String> generated = List.of("Единственный сгенерированный");
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).createSession(mappedEntity, bank, generated);
+        }
+
+        @Test
+        @DisplayName("Банк пуст и LLM вернул null-список - LlmException, сессия не создаётся")
+        void throwsWhenBankEmptyAndLlmReturnsNullList() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(List.of());
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(null));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Generated questions are empty");
+            verify(trainingWriter, never()).createSession(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Банк пуст и LLM вернул только blank-строки - LlmException, сессия не создаётся")
+        void throwsWhenBankEmptyAndLlmReturnsOnlyBlankStrings() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(List.of());
+            when(llmService.generateTrainingQuestions(any()))
+                    .thenReturn(new LlmTrainingQuestions(Arrays.asList("", "   ", null)));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Generated questions are empty");
+            verify(trainingWriter, never()).createSession(any(), any(), any());
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"   "})
+        @DisplayName("Тема null или из пробелов - в upsertDictionaries уходит null, в LLM-запрос (при генерации) - пустая строка")
+        void nullOrBlankTopicNormalizesForDictionariesAndLlm(String rawTopic) {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, rawTopic, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(rawTopic);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+
+            List<BankQuestion> bank = bankQuestions(9);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            List<String> generated = List.of("Доп. вопрос");
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
+
+            // when
+            trainingService.create(request, userId);
+
+            // then
+            assertThat(mappedEntity.getTopic()).isNull();
+            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
+
+            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
+            verify(llmService).generateTrainingQuestions(captor.capture());
+            assertThat(captor.getValue().topic()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("Get")
+    class Get {
+
+        @Test
+        @DisplayName("Сессия найдена - возвращает ответ с числом отвеченных основных вопросов")
+        void returnsResponseWithAnsweredMainCount() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn(3L);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    sessionId, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 3, null, null);
+            when(trainingSessionMapper.toResponse(session, 3)).thenReturn(expectedResponse);
+
+            // when
+            TrainingSessionResponse result = trainingService.get(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена у пользователя - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.get(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(trainingQuestionRepository, trainingSessionMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("GetAll")
+    class GetAll {
+
+        @Test
+        @DisplayName("Мапит счётчик отвеченных вопросов по каждой сессии, для сессий без записи в счётчике - 0")
+        void mapsAnsweredCountsPerSessionDefaultingToZero() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionWithAnswers = UUID.randomUUID();
+            UUID sessionWithoutAnswers = UUID.randomUUID();
+            TrainingSession first = aSession(sessionWithAnswers, userId, PROFESSION);
+            TrainingSession second = aSession(sessionWithoutAnswers, userId, PROFESSION);
+            Pageable pageable = Pageable.ofSize(10);
+            Page<TrainingSession> page = new PageImpl<>(List.of(first, second));
+            when(trainingSessionRepository.findAllByUserId(userId, pageable)).thenReturn(page);
+
+            TrainingQuestionRepository.AnsweredCount answeredCount = mock(TrainingQuestionRepository.AnsweredCount.class);
+            when(answeredCount.getSessionId()).thenReturn(sessionWithAnswers);
+            when(answeredCount.getCount()).thenReturn(5L);
+            when(trainingQuestionRepository.countAnsweredBySessionIds(List.of(sessionWithAnswers, sessionWithoutAnswers)))
+                    .thenReturn(List.of(answeredCount));
+
+            TrainingSessionResponse firstResponse = new TrainingSessionResponse(
+                    sessionWithAnswers, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 5, null, null);
+            TrainingSessionResponse secondResponse = new TrainingSessionResponse(
+                    sessionWithoutAnswers, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingSessionMapper.toResponse(first, 5)).thenReturn(firstResponse);
+            when(trainingSessionMapper.toResponse(second, 0)).thenReturn(secondResponse);
+
+            // when
+            Page<TrainingSessionResponse> result = trainingService.getAll(userId, pageable);
+
+            // then
+            assertThat(result.getContent()).containsExactly(firstResponse, secondResponse);
         }
     }
 
@@ -265,6 +553,317 @@ class TrainingServiceTest {
             verify(llmService).generateTrainingQuestion(captor.capture());
             assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
         }
+
+        @Test
+        @DisplayName("Есть неотвеченный вопрос - возвращает его напрямую без обращения к LLM")
+        void returnsExistingUnansweredQuestionWithoutCallingLlm() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            TrainingQuestion unanswered = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).questionText("Вопрос").orderIndex(1).build();
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(unanswered));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    unanswered.getId(), 1, "Вопрос", false, null, null, null);
+            when(trainingQuestionMapper.toDto(unanswered)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verifyNoInteractions(llmService);
+        }
+
+        @Test
+        @DisplayName("Сессия уже завершена - ConflictException")
+        void throwsWhenSessionCompleted() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setStatus(SessionStatus.COMPLETED);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+            verifyNoInteractions(trainingQuestionRepository, llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Кап основных вопросов уже достигнут - ConflictException")
+        void throwsWhenCapReached() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn((long) TrainingService.MAIN_QUESTION_CAP);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Question cap reached");
+            verifyNoInteractions(llmService);
+        }
+
+        @Test
+        @DisplayName("LLM вернул пустой текст вопроса - LlmException")
+        void throwsWhenLlmReturnsBlankQuestion() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn(0L);
+            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
+                    .thenReturn(List.of());
+            when(llmService.generateTrainingQuestion(any())).thenReturn(new LlmTrainingQuestion("   ", "MAIN"));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Generated question is empty");
+            verifyNoInteractions(trainingWriter);
+        }
+
+        @Test
+        @DisplayName("История не пуста и лимит уточнений не достигнут, LLM вернул FOLLOW_UP - followUp=true уходит в writer")
+        void marksFollowUpWhenAllowedAndLlmReturnsFollowUpType() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn(1L);
+            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
+                    .thenReturn(List.of(aQuestion(1)));
+
+            LlmTrainingQuestion generated = new LlmTrainingQuestion("Уточнение", "FOLLOW_UP");
+            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    UUID.randomUUID(), 2, generated.question(), true, null, null, null);
+            when(trainingWriter.saveQuestion(sessionId, generated.question(), true)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).saveQuestion(sessionId, generated.question(), true);
+        }
+
+        @Test
+        @DisplayName("saveQuestion бросает DataIntegrityViolationException, findNextUnanswered находит вопрос - возвращает его")
+        void returnsFoundQuestionWhenSaveQuestionHitsConcurrentConflict() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            TrainingQuestion concurrentQuestion = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).questionText("Вопрос").orderIndex(1).build();
+            when(trainingQuestionRepository.findNextUnanswered(sessionId))
+                    .thenReturn(Optional.empty(), Optional.of(concurrentQuestion));
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn(0L);
+            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
+                    .thenReturn(List.of());
+
+            LlmTrainingQuestion generated = new LlmTrainingQuestion("Расскажите про Spring Boot", "MAIN");
+            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
+            when(trainingWriter.saveQuestion(sessionId, generated.question(), false))
+                    .thenThrow(new DataIntegrityViolationException("duplicate question"));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    concurrentQuestion.getId(), 1, "Вопрос", false, null, null, null);
+            when(trainingQuestionMapper.toDto(concurrentQuestion)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+        }
+
+        @Test
+        @DisplayName("saveQuestion бросает DataIntegrityViolationException, findNextUnanswered тоже пуст - ConflictException")
+        void throwsConflictWhenSaveQuestionFailsAndNoQuestionFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
+                    .thenReturn(0L);
+            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
+                    .thenReturn(List.of());
+
+            LlmTrainingQuestion generated = new LlmTrainingQuestion("Расскажите про Spring Boot", "MAIN");
+            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
+            when(trainingWriter.saveQuestion(sessionId, generated.question(), false))
+                    .thenThrow(new DataIntegrityViolationException("duplicate question"));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Concurrent session update");
+        }
+    }
+
+    @Nested
+    @DisplayName("SubmitAnswer")
+    class SubmitAnswer {
+
+        private TrainingQuestion aSubmittableQuestion(TrainingSession session) {
+            return TrainingQuestion.builder()
+                    .id(UUID.randomUUID())
+                    .trainingSession(session)
+                    .questionText("Вопрос")
+                    .orderIndex(1)
+                    .answered(false)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Валидный ответ на CREATED-сессию - сохраняет ответ, переводит сессию в IN_PROGRESS")
+        void savesAnswerAndMovesSessionToInProgress() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(userId, sessionId, question.getId(), "Мой ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when
+            trainingService.submitAnswer(request);
+
+            // then
+            assertThat(question.getAnswerText()).isEqualTo("Мой ответ");
+            assertThat(question.isAnswered()).isTrue();
+            assertThat(question.getAnsweredAt()).isNotNull();
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("Ответ на вопрос IN_PROGRESS-сессии - статус сессии не меняется")
+        void keepsSessionStatusWhenAlreadyInProgress() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setStatus(SessionStatus.IN_PROGRESS);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(userId, sessionId, question.getId(), "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when
+            trainingService.submitAnswer(request);
+
+            // then
+            assertThat(session.getStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
+        }
+
+        @Test
+        @DisplayName("Вопрос не найден - NotFoundException")
+        void throwsWhenQuestionNotFound() {
+            // given
+            UUID questionId = UUID.randomUUID();
+            SubmitAnswerRequest request = new SubmitAnswerRequest(
+                    UUID.randomUUID(), UUID.randomUUID(), questionId, "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitAnswer(request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другому пользователю - ForbiddenException")
+        void throwsWhenQuestionOwnedByAnotherUser() {
+            // given
+            UUID ownerId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, ownerId, PROFESSION);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(
+                    UUID.randomUUID(), sessionId, question.getId(), "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitAnswer(request))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Access denied");
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другой сессии, чем в запросе - ConflictException")
+        void throwsWhenQuestionBelongsToAnotherSession() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(
+                    userId, UUID.randomUUID(), question.getId(), "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitAnswer(request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Invalid session");
+        }
+
+        @Test
+        @DisplayName("Сессия уже завершена - ConflictException")
+        void throwsWhenSessionAlreadyCompleted() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setStatus(SessionStatus.COMPLETED);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(userId, sessionId, question.getId(), "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitAnswer(request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+        }
+
+        @Test
+        @DisplayName("Вопрос уже отвечен - ConflictException")
+        void throwsWhenQuestionAlreadyAnswered() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aSubmittableQuestion(session);
+            question.setAnswered(true);
+            SubmitAnswerRequest request = new SubmitAnswerRequest(userId, sessionId, question.getId(), "Ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitAnswer(request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Question already answered");
+        }
     }
 
     @Nested
@@ -298,6 +897,189 @@ class TrainingServiceTest {
             ArgumentCaptor<LlmTrainingReportRequest> captor = ArgumentCaptor.forClass(LlmTrainingReportRequest.class);
             verify(llmService).createTrainingReport(captor.capture());
             assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Сессия уже завершена - ConflictException")
+        void throwsWhenSessionCompleted() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setStatus(SessionStatus.COMPLETED);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Отвечено меньше минимума основных вопросов - ConflictException")
+        void throwsWhenNotEnoughAnsweredQuestions() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Not enough answered questions to finish");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("completeReport бросает DataIntegrityViolationException - ConflictException")
+        void throwsConflictWhenCompleteReportHitsConcurrentConflict() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport llmReport = new LlmTrainingReport(List.of(), "Общий фидбэк по тренировке");
+            when(llmService.createTrainingReport(any())).thenReturn(llmReport);
+            when(trainingWriter.completeReport(sessionId, llmReport))
+                    .thenThrow(new DataIntegrityViolationException("session already completed concurrently"));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+        }
+    }
+
+    @Nested
+    @DisplayName("GetReport")
+    class GetReport {
+
+        @Test
+        @DisplayName("Отчёт есть - маппит через trainingReportMapper с отсортированными отвеченными вопросами")
+        void returnsMappedReport() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingReport report = TrainingReport.builder()
+                    .id(UUID.randomUUID()).trainingSession(session).avgScore(4.0).overallFeedback("Фидбэк").build();
+            session.setReport(report);
+            session.setQuestions(List.of(aQuestion(2), aQuestion(1)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            TrainingReportResponse expectedResponse = new TrainingReportResponse(
+                    report.getId(), sessionId, PROFESSION, TOPIC, Level.MIDDLE, 4.0, "Фидбэк", null, List.of());
+            when(trainingReportMapper.toResponse(eq(report), eq(session), any())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.getReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<TrainingQuestion>> captor = ArgumentCaptor.forClass(List.class);
+            verify(trainingReportMapper).toResponse(eq(report), eq(session), captor.capture());
+            assertThat(captor.getValue()).extracting(TrainingQuestion::getOrderIndex).containsExactly(1, 2);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReport(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+        }
+
+        @Test
+        @DisplayName("Сессия принадлежит другому пользователю - NotFoundException")
+        void throwsWhenSessionOwnedByAnotherUser() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, UUID.randomUUID(), PROFESSION);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReport(sessionId, UUID.randomUUID()))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+        }
+
+        @Test
+        @DisplayName("Отчёт ещё не сформирован - NotFoundException")
+        void throwsWhenReportNotYetGenerated() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReport(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Report not found");
+            verifyNoInteractions(trainingReportMapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("Delete")
+    class Delete {
+
+        @Test
+        @DisplayName("Сессия принадлежит пользователю - удаляет её")
+        void deletesOwnedSession() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.existsByIdAndUserId(sessionId, userId)).thenReturn(true);
+
+            // when
+            trainingService.delete(sessionId, userId);
+
+            // then
+            verify(trainingSessionRepository).deleteById(sessionId);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена у пользователя - NotFoundException, удаление не происходит")
+        void throwsWhenSessionNotOwned() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.existsByIdAndUserId(sessionId, userId)).thenReturn(false);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.delete(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verify(trainingSessionRepository, never()).deleteById(any());
         }
     }
 

@@ -264,6 +264,8 @@ class AuthServiceTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
             assertThat(eventCaptor.getValue().token()).isEqualTo(VERIFY_TOKEN);
+
+            verify(eventPublisher, never()).publishEvent(any(UserReactivatedEvent.class));
         }
 
         @Test
@@ -286,6 +288,10 @@ class AuthServiceTest {
 
             verify(refreshTokenService).revokeAll(existingUser);
             verify(eventPublisher).publishEvent(any(VerificationEmailEvent.class));
+
+            var reactivatedEventCaptor = ArgumentCaptor.forClass(UserReactivatedEvent.class);
+            verify(eventPublisher).publishEvent(reactivatedEventCaptor.capture());
+            assertThat(reactivatedEventCaptor.getValue().userId()).isEqualTo(existingUser.getId());
         }
 
         @Test

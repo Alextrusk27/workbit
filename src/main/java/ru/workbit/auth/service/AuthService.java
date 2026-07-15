@@ -6,6 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.auth.UserReactivatedEvent;
 import ru.workbit.auth.dto.*;
 import ru.workbit.auth.model.VerificationToken;
 import ru.workbit.email.ResetPasswordEmailEvent;
@@ -160,6 +161,7 @@ public class AuthService {
         user.setActive(true);
         user.setDeactivated(null);
         refreshTokenService.revokeAll(user);
+        eventPublisher.publishEvent(new UserReactivatedEvent(user.getId()));
         return user;
     }
 

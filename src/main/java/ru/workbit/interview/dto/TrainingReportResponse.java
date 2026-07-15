@@ -1,7 +1,6 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.Profession;
 
@@ -18,9 +17,6 @@ public record TrainingReportResponse(
 
         @Schema(description = "Профессия, по которой проводилось собеседование", example = "Java-разработчик")
         Profession profession,
-
-        @Schema(description = "Тип компании, под который стилизовались вопросы", example = "Продуктовая компания")
-        CompanyType companyType,
 
         @Schema(description = "Целевой уровень кандидата", example = "Middle")
         Level level,

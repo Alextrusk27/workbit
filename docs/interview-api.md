@@ -1,6 +1,6 @@
 # Interview Training API — `/api/v1/interview/training`
 
-Тренажёр AI-собеседования: пользователь выбирает профессию, уровень и тип компании,
+Тренажёр AI-собеседования: пользователь выбирает профессию и уровень,
 проходит серию вопросов и в конце получает отчёт с поразборным фидбэком и средним баллом.
 Банка готовых вопросов больше нет — каждый вопрос генерирует LLM по одному, с учётом
 параметров сессии и всей предыдущей истории «вопрос-ответ». Все тела запросов и ответов —
@@ -32,7 +32,7 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 
 | Метод | Путь | Назначение | Авторизация |
 |---|---|---|---|
-| GET | `/options` | справочник допустимых профессий/уровней/типов компании и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
+| GET | `/options` | справочник допустимых профессий/уровней и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
 | POST | `/sessions` | создать тренировочную сессию (без вопросов) | cookie `access_token` |
 | GET | `/sessions` | страница сессий текущего пользователя | cookie `access_token` |
 | GET | `/sessions/{sessionId}` | получить сессию по id | cookie `access_token` |
@@ -44,14 +44,12 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 
 ## Справочные значения (enum'ы)
 
-`Profession` и `CompanyType` сериализуются не по имени константы, а по русскому лейблу
+`Profession` сериализуется не по имени константы, а по русскому лейблу
 (`@JsonValue`); `Level` — по лейблу, совпадающему с именем на английском. В запросах и
 ответах фигурирует именно лейбл. Чтобы не хардкодить их на фронте, есть `GET /options`.
 
 - **Profession** — `Java-разработчик`, `Python-разработчик`, `Инженер по тестированию`.
 - **Level** — `Junior`, `Middle`, `Senior`, `Lead`.
-- **CompanyType** — `Банк`, `Финтех`, `Стартап`, `Продуктовая компания`, `Аутсорс`,
-  `Государственная компания`.
 - **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED` (без кастомного лейбла,
   сериализуется по имени константы).
 
@@ -60,8 +58,7 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 ```java
 record CreateSessionRequest(
     @NotNull Profession profession,
-    @NotNull Level level,
-    @NotNull CompanyType companyType)
+    @NotNull Level level)
 
 record SubmitAnswerBody(@NotBlank String answerText)
 ```
@@ -74,8 +71,7 @@ record SubmitAnswerBody(@NotBlank String answerText)
 ```json
 {
   "profession": "Java-разработчик",
-  "level": "Middle",
-  "companyType": "Продуктовая компания"
+  "level": "Middle"
 }
 ```
 
@@ -83,11 +79,11 @@ record SubmitAnswerBody(@NotBlank String answerText)
 
 ```java
 record TrainingOptionsResponse(
-    List<Profession> professions, List<Level> levels, List<CompanyType> companyTypes,
+    List<Profession> professions, List<Level> levels,
     int questionCap, int minAnswersToFinish)
 
 record TrainingSessionResponse(
-    UUID id, Profession profession, CompanyType companyType, Level level,
+    UUID id, Profession profession, Level level,
     SessionStatus status, int answeredCount, Instant created, Instant completedAt)
 
 record TrainingQuestionResponse(
@@ -95,7 +91,7 @@ record TrainingQuestionResponse(
     String answerText, Integer score, String feedback)
 
 record TrainingReportResponse(
-    UUID reportId, UUID sessionId, Profession profession, CompanyType companyType,
+    UUID reportId, UUID sessionId, Profession profession,
     Level level, Double avgScore, String overallFeedback, Instant generatedAt,
     List<TrainingQuestionResponse> questions)
 ```
@@ -150,7 +146,6 @@ record TrainingReportResponse(
   "reportId": "b6b6c1c2-1111-4a3a-9a3a-000000000001",
   "sessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "profession": "Java-разработчик",
-  "companyType": "Продуктовая компания",
   "level": "Middle",
   "avgScore": 3.8,
   "overallFeedback": "Кандидат уверенно ориентируется в основах, но...",
@@ -184,8 +179,8 @@ record TrainingReportResponse(
 
 ## Поведение
 
-- **Создание сессии ничего не генерирует.** `POST /sessions` только фиксирует профессию,
-  уровень и тип компании. Вопросов в момент создания нет — первый и все следующие
+- **Создание сессии ничего не генерирует.** `POST /sessions` только фиксирует профессию
+  и уровень. Вопросов в момент создания нет — первый и все следующие
   запрашиваются отдельно через `.../questions/next`.
 - **`.../questions/next` идемпотентен.** Если в сессии уже есть неотвеченный вопрос —
   ручка вернёт его же, не обращаясь к LLM. Это одновременно и точка возврата: если

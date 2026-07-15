@@ -59,7 +59,6 @@ CREATE TABLE IF NOT EXISTS interview.training_session (
     id              UUID PRIMARY KEY,
     user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     profession      VARCHAR(32) NOT NULL,
-    company_type    VARCHAR(32) NOT NULL,
     level           VARCHAR(32) NOT NULL,
     status          VARCHAR(32) NOT NULL,
     created         TIMESTAMPTZ NOT NULL,
@@ -67,8 +66,6 @@ CREATE TABLE IF NOT EXISTS interview.training_session (
 
     CONSTRAINT chk_training_profession
         CHECK (profession IN ('JAVA_DEV', 'PYTHON_DEV', 'QA')),
-    CONSTRAINT chk_training_company_type
-        CHECK (company_type IN ('BANK', 'FINTECH', 'STARTUP', 'PRODUCT', 'OUTSOURCE', 'GOV')),
     CONSTRAINT chk_training_level
         CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR', 'LEAD')),
     CONSTRAINT chk_training_status

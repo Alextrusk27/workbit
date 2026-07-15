@@ -76,15 +76,14 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
   const create = useCreateSession()
   const [profession, setProfession] = useState<string | null>(null)
   const [level, setLevel] = useState<string | null>(null)
-  const [companyType, setCompanyType] = useState<string | null>(null)
 
-  const ready = profession !== null && level !== null && companyType !== null
+  const ready = profession !== null && level !== null
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!ready) return
     create.mutate(
-      { profession, level, companyType },
+      { profession, level },
       {
         onSuccess: (session) =>
           navigate(`/app/training/${session.id}`, { replace: true }),
@@ -107,12 +106,6 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
         options={options.levels}
         value={level}
         onChange={setLevel}
-      />
-      <ChipGroup
-        label="Тип компании"
-        options={options.companyTypes}
-        value={companyType}
-        onChange={setCompanyType}
       />
 
       <Button type="submit" size="lg" disabled={!ready || create.isPending}>
@@ -141,8 +134,8 @@ export function NewTrainingPage() {
         Соберём тренировку под вас
       </h1>
       <p className="text-muted mt-4 max-w-xl">
-        Выберите профессию, уровень и тип компании — вопросы соберёт рецензент
-        по ходу тренировки, а разбор придёт в конце.
+        Выберите профессию и уровень — вопросы соберёт рецензент по ходу
+        тренировки, а разбор придёт в конце.
       </p>
 
       <div className="mt-10 max-w-2xl">

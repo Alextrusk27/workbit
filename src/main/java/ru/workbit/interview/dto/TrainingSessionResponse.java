@@ -13,9 +13,6 @@ public record TrainingSessionResponse(
         @Schema(description = "Профессия, по которой проводится собеседование", example = "Java-разработчик")
         Profession profession,
 
-        @Schema(description = "Тип компании, под который стилизуются вопросы", example = "Продуктовая компания")
-        CompanyType companyType,
-
         @Schema(description = "Целевой уровень кандидата", example = "Middle")
         Level level,
 

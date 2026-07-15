@@ -2,14 +2,12 @@ import { apiFetch } from '@/lib/api'
 
 export type Profession = string
 export type Level = string
-export type CompanyType = string
 
 export type SessionStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED'
 
 export interface TrainingOptions {
   professions: Profession[]
   levels: Level[]
-  companyTypes: CompanyType[]
   questionCap: number
   minAnswersToFinish: number
 }
@@ -17,13 +15,11 @@ export interface TrainingOptions {
 export interface CreateTrainingRequest {
   profession: Profession
   level: Level
-  companyType: CompanyType
 }
 
 export interface TrainingSession {
   id: string
   profession: Profession
-  companyType: CompanyType
   level: Level
   status: SessionStatus
   answeredCount: number
@@ -45,7 +41,6 @@ export interface TrainingReport {
   reportId: string
   sessionId: string
   profession: Profession
-  companyType: CompanyType
   level: Level
   avgScore: number | null
   overallFeedback: string

@@ -13,10 +13,9 @@ export function sessionHeadline(session: {
   return session.profession
 }
 
-/** Подпись под заголовком — уровень · тип компании. */
+/** Подпись под заголовком — уровень. */
 export function sessionSubtitle(session: {
   level: TrainingSession['level']
-  companyType: TrainingSession['companyType']
 }): string {
-  return [session.level, session.companyType].filter(Boolean).join(' · ')
+  return session.level
 }

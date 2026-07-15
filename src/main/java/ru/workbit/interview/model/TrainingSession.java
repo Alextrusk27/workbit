@@ -28,10 +28,6 @@ public class TrainingSession {
     private Profession profession;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "company_type", nullable = false)
-    private CompanyType companyType;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Level level;
 

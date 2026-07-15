@@ -12,7 +12,6 @@ import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
-import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.Profession;
 import ru.workbit.interview.model.SessionStatus;
@@ -120,7 +119,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         LlmTrainingQuestion generated = llmService.generateTrainingQuestion(new LlmTrainingQuestionRequest(
                 session.getProfession().getName(),
                 session.getLevel().getName(),
-                session.getCompanyType().getName(),
                 history.stream()
                         .map(q -> new LlmTrainingHistoryItem(q.getQuestionText(), q.getAnswerText(), q.isFollowUp()))
                         .toList(),
@@ -208,7 +206,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         return new TrainingOptionsResponse(
                 List.of(Profession.values()),
                 List.of(Level.values()),
-                List.of(CompanyType.values()),
                 MAIN_QUESTION_CAP,
                 MIN_ANSWERED_TO_FINISH);
     }

@@ -13,9 +13,10 @@ export function sessionHeadline(session: {
   return session.profession
 }
 
-/** Подпись под заголовком — уровень. */
+/** Подпись под заголовком — уровень и тема, если она задана. */
 export function sessionSubtitle(session: {
   level: TrainingSession['level']
+  topic: TrainingSession['topic']
 }): string {
-  return session.level
+  return session.topic ? `${session.level} · ${session.topic}` : session.level
 }

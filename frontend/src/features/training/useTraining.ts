@@ -2,14 +2,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   trainingApi,
   type CreateTrainingRequest,
+  type NormalizeInputRequest,
   type SubmitAnswerVars,
 } from './api'
+
+const MIN_SUGGEST_QUERY = 2
 
 const keys = {
   options: ['training', 'options'] as const,
   sessions: ['training', 'sessions'] as const,
   session: (id: string) => ['training', 'session', id] as const,
   report: (id: string) => ['training', 'report', id] as const,
+  professionSuggest: (query: string) =>
+    ['training', 'suggest', 'professions', query] as const,
+  topicSuggest: (profession: string, query: string) =>
+    ['training', 'suggest', 'topics', profession, query] as const,
 }
 
 export function useTrainingOptions() {
@@ -39,6 +46,32 @@ export function useReport(sessionId: string, enabled = true) {
     queryKey: keys.report(sessionId),
     queryFn: () => trainingApi.getReport(sessionId),
     enabled,
+  })
+}
+
+export function useProfessionSuggest(query: string) {
+  return useQuery({
+    queryKey: keys.professionSuggest(query),
+    queryFn: () => trainingApi.suggestProfessions(query),
+    enabled: query.trim().length >= MIN_SUGGEST_QUERY,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useTopicSuggest(profession: string, query: string) {
+  return useQuery({
+    queryKey: keys.topicSuggest(profession, query),
+    queryFn: () => trainingApi.suggestTopics(profession, query),
+    enabled:
+      profession.trim().length > 0 && query.trim().length >= MIN_SUGGEST_QUERY,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useNormalizeInput() {
+  return useMutation({
+    mutationFn: (data: NormalizeInputRequest) =>
+      trainingApi.normalizeInput(data),
   })
 }
 

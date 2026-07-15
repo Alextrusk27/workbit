@@ -143,17 +143,20 @@ CREATE TABLE IF NOT EXISTS interview.training_question (
     training_session_id UUID NOT NULL REFERENCES interview.training_session(id) ON DELETE CASCADE,
     parent_question_id  UUID REFERENCES interview.training_question(id) ON DELETE CASCADE,
     bank_question_id    UUID REFERENCES content.question_bank(id) ON DELETE SET NULL,
-    question_text TEXT NOT NULL,
-    order_index   INT NOT NULL,
-    follow_up     BOOLEAN NOT NULL DEFAULT FALSE,
-    answered      BOOL DEFAULT FALSE,
-    answer_text   TEXT,
-    answered_at   TIMESTAMPTZ,
+    question_text     TEXT NOT NULL,
+    order_index       INT NOT NULL,
+    follow_up         BOOLEAN NOT NULL DEFAULT FALSE,
+    follow_up_checked BOOLEAN NOT NULL DEFAULT FALSE,
+    answered          BOOL DEFAULT FALSE,
+    answer_text       TEXT,
+    answered_at       TIMESTAMPTZ,
 
     CONSTRAINT chk_training_question_order_index
         CHECK (order_index BETWEEN 1 AND 50),
     CONSTRAINT chk_training_answer_has_text_and_timestamp
         CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL)),
+    CONSTRAINT chk_training_question_follow_up_parent
+        CHECK (follow_up = (parent_question_id IS NOT NULL)),
     CONSTRAINT uq_training_question_order
         UNIQUE NULLS NOT DISTINCT (training_session_id, parent_question_id, order_index)
 );

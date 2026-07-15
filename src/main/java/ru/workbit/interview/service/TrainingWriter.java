@@ -30,9 +30,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -89,25 +91,35 @@ class TrainingWriter {
     }
 
     @Transactional
-    public TrainingQuestionResponse saveQuestion(UUID sessionId, String questionText, boolean followUp) {
-        TrainingSession session = trainingSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new NotFoundException("Session not found"));
-        checkSessionNotCompleted(session);
+    public void markFollowUpChecked(UUID questionId) {
+        trainingQuestionRepository.findById(questionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"))
+                .setFollowUpChecked(true);
+    }
 
-        Optional<TrainingQuestion> unanswered = trainingQuestionRepository.findNextUnanswered(sessionId);
-        if (unanswered.isPresent()) {
-            log.warn("Session {} already has an unanswered question, discarding the generated one", sessionId);
-            return trainingQuestionMapper.toDto(unanswered.get());
+    @Transactional
+    public TrainingQuestionResponse saveFollowUp(UUID answeredQuestionId, UUID caseMainId, String questionText) {
+        TrainingQuestion answered = trainingQuestionRepository.findWithSessionById(answeredQuestionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+        TrainingSession session = answered.getTrainingSession();
+        checkSessionNotCompleted(session);
+        answered.setFollowUpChecked(true);
+
+        Optional<TrainingQuestion> pending = trainingQuestionRepository.findNextUnansweredFollowUp(session.getId());
+        if (pending.isPresent()) {
+            log.warn("Session {} already has an unanswered follow-up, discarding the generated one", session.getId());
+            return trainingQuestionMapper.toDto(pending.get());
         }
 
-        TrainingQuestion question = trainingQuestionRepository.save(TrainingQuestion.builder()
+        TrainingQuestion followUp = trainingQuestionRepository.save(TrainingQuestion.builder()
                 .trainingSession(session)
+                .parentQuestionId(caseMainId)
                 .questionText(questionText)
-                .orderIndex((int) trainingQuestionRepository.countByTrainingSessionId(sessionId) + 1)
-                .followUp(followUp)
+                .orderIndex((int) trainingQuestionRepository.countByParentQuestionId(caseMainId) + 1)
+                .followUp(true)
                 .build());
 
-        return trainingQuestionMapper.toDto(question);
+        return trainingQuestionMapper.toDto(followUp);
     }
 
     @Transactional
@@ -126,9 +138,10 @@ class TrainingWriter {
         saveFeedbacks(cases, llmReport.cases() != null ? llmReport.cases() : List.of());
         checkEnoughReviewedCases(sessionId, cases);
 
-        double avgScore = calculateAvgScore(answered);
+        List<TrainingQuestion> mains = cases.stream().map(List::getFirst).toList();
+        double avgScore = calculateAvgScore(mains);
 
-        session.getQuestions().removeIf(q -> !q.isAnswered());
+        session.getQuestions().removeIf(q -> !q.isAnswered() || q.isFollowUp());
         session.setReport(TrainingReport.builder()
                 .trainingSession(session)
                 .avgScore(avgScore)
@@ -139,18 +152,26 @@ class TrainingWriter {
 
         trainingSessionRepository.save(session);
 
-        return trainingReportMapper.toResponse(session.getReport(), session, answered);
+        return trainingReportMapper.toResponse(session.getReport(), session, mains);
     }
 
     static List<List<TrainingQuestion>> groupCases(List<TrainingQuestion> answered) {
-        List<List<TrainingQuestion>> cases = new ArrayList<>();
-        for (TrainingQuestion question : answered) {
-            if (!question.isFollowUp() || cases.isEmpty()) {
-                cases.add(new ArrayList<>());
-            }
-            cases.getLast().add(question);
-        }
-        return cases;
+        Map<UUID, List<TrainingQuestion>> followUpsByParent = answered.stream()
+                .filter(TrainingQuestion::isFollowUp)
+                .collect(Collectors.groupingBy(TrainingQuestion::getParentQuestionId));
+
+        return answered.stream()
+                .filter(q -> !q.isFollowUp())
+                .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
+                .map(main -> {
+                    List<TrainingQuestion> trainingCase = new ArrayList<>();
+                    trainingCase.add(main);
+                    followUpsByParent.getOrDefault(main.getId(), List.of()).stream()
+                            .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
+                            .forEach(trainingCase::add);
+                    return trainingCase;
+                })
+                .toList();
     }
 
     private void saveFeedbacks(List<List<TrainingQuestion>> cases, List<LlmTrainingCaseReview> reviews) {
@@ -178,8 +199,8 @@ class TrainingWriter {
         }
     }
 
-    private double calculateAvgScore(List<TrainingQuestion> answered) {
-        double avg = answered.stream()
+    private double calculateAvgScore(List<TrainingQuestion> mains) {
+        double avg = mains.stream()
                 .map(TrainingQuestion::getFeedback)
                 .filter(Objects::nonNull)
                 .mapToInt(TrainingFeedback::getScore)

@@ -14,13 +14,13 @@ public class LlmService {
     private final LlmClient llm;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestion generateTrainingQuestion(LlmTrainingQuestionRequest request) {
-        return llm.call("training-question-generator", request, LlmTrainingQuestion.class);
+    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
+        return llm.call("training-question-generator", request, LlmTrainingQuestions.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
-        return llm.call("training-question-generator", request, LlmTrainingQuestions.class);
+    public LlmTrainingFollowUpDecision decideTrainingFollowUp(LlmTrainingFollowUpRequest request) {
+        return llm.call("training-follow-up", request, LlmTrainingFollowUpDecision.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

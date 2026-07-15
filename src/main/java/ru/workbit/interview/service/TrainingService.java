@@ -33,9 +33,8 @@ import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCase;
 import ru.workbit.llm.dto.LlmTrainingFollowUp;
-import ru.workbit.llm.dto.LlmTrainingHistoryItem;
-import ru.workbit.llm.dto.LlmTrainingQuestion;
-import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
+import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
+import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestions;
 import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
@@ -62,8 +61,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     public static final int MAX_FOLLOW_UPS_PER_QUESTION = 4;
     public static final int SUGGEST_LIMIT = 7;
     public static final int MIN_SUGGEST_QUERY_LENGTH = 2;
-
-    private static final String FOLLOW_UP_TYPE = "FOLLOW_UP";
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
@@ -128,39 +125,63 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
 
-        Optional<TrainingQuestion> unanswered = trainingQuestionRepository.findNextUnanswered(sessionId);
-        if (unanswered.isPresent()) {
-            return trainingQuestionMapper.toDto(unanswered.get());
+        Optional<TrainingQuestion> pendingFollowUp = trainingQuestionRepository
+                .findNextUnansweredFollowUp(sessionId);
+        if (pendingFollowUp.isPresent()) {
+            return trainingQuestionMapper.toDto(pendingFollowUp.get());
         }
 
-        long answeredMain = trainingQuestionRepository
-                .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId);
-        checkCapNotReached(sessionId, answeredMain);
+        return askFollowUp(session)
+                .or(() -> trainingQuestionRepository.findNextUnansweredMain(sessionId)
+                        .map(trainingQuestionMapper::toDto))
+                .orElseThrow(() -> {
+                    log.warn("Session {} has no questions left to ask", sessionId);
+                    return new ConflictException("Question cap reached");
+                });
+    }
 
-        List<TrainingQuestion> history = trainingQuestionRepository
-                .findAllByTrainingSessionIdOrderByOrderIndex(sessionId);
-        boolean allowFollowUp = !history.isEmpty()
-                && trailingFollowUps(history) < MAX_FOLLOW_UPS_PER_QUESTION;
+    private Optional<TrainingQuestionResponse> askFollowUp(TrainingSession session) {
+        Optional<TrainingQuestion> lastAnswered = trainingQuestionRepository
+                .findLastAnsweredUnchecked(session.getId());
+        if (lastAnswered.isEmpty()) {
+            return Optional.empty();
+        }
 
-        LlmTrainingQuestion generated = llmService.generateTrainingQuestion(new LlmTrainingQuestionRequest(
+        TrainingQuestion answered = lastAnswered.get();
+        UUID caseMainId = answered.isFollowUp() ? answered.getParentQuestionId() : answered.getId();
+        List<TrainingQuestion> caseFollowUps = trainingQuestionRepository
+                .findAllByParentQuestionIdOrderByOrderIndex(caseMainId);
+
+        if (caseFollowUps.size() >= MAX_FOLLOW_UPS_PER_QUESTION) {
+            trainingWriter.markFollowUpChecked(answered.getId());
+            return Optional.empty();
+        }
+
+        TrainingQuestion caseMain = answered.isFollowUp()
+                ? trainingQuestionRepository.findById(caseMainId)
+                        .orElseThrow(() -> new NotFoundException("Question not found"))
+                : answered;
+
+        LlmTrainingFollowUpDecision decision = llmService.decideTrainingFollowUp(new LlmTrainingFollowUpRequest(
                 session.getProfession(),
                 session.getLevel().getName(),
-                history.stream()
-                        .map(q -> new LlmTrainingHistoryItem(q.getQuestionText(), q.getAnswerText(), q.isFollowUp()))
-                        .toList(),
-                (int) answeredMain + 1,
-                allowFollowUp));
+                caseMain.getQuestionText(),
+                caseMain.getAnswerText(),
+                caseFollowUps.stream()
+                        .map(q -> new LlmTrainingFollowUp(q.getQuestionText(), q.getAnswerText()))
+                        .toList()));
 
-        checkGeneratedQuestion(sessionId, generated);
-        boolean followUp = allowFollowUp && FOLLOW_UP_TYPE.equals(generated.type());
+        if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
+            trainingWriter.markFollowUpChecked(answered.getId());
+            return Optional.empty();
+        }
 
         try {
-            return trainingWriter.saveQuestion(sessionId, generated.question(), followUp);
+            return Optional.of(trainingWriter.saveFollowUp(answered.getId(), caseMainId, decision.question()));
         } catch (DataIntegrityViolationException e) {
-            log.warn("Concurrent request already created a question for session {}", sessionId);
-            return trainingQuestionRepository.findNextUnanswered(sessionId)
-                    .map(trainingQuestionMapper::toDto)
-                    .orElseThrow(() -> new ConflictException("Concurrent session update"));
+            log.warn("Concurrent request already created a follow-up for session {}", session.getId());
+            return trainingQuestionRepository.findNextUnansweredFollowUp(session.getId())
+                    .map(trainingQuestionMapper::toDto);
         }
     }
 
@@ -319,14 +340,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         }
     }
 
-    private static int trailingFollowUps(List<TrainingQuestion> history) {
-        int count = 0;
-        for (int i = history.size() - 1; i >= 0 && history.get(i).isFollowUp(); i--) {
-            count++;
-        }
-        return count;
-    }
-
     private static LlmTrainingCase toLlmCase(int index, List<TrainingQuestion> trainingCase) {
         return new LlmTrainingCase(
                 index,
@@ -336,20 +349,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                         .skip(1)
                         .map(q -> new LlmTrainingFollowUp(q.getQuestionText(), q.getAnswerText()))
                         .toList());
-    }
-
-    private void checkCapNotReached(UUID sessionId, long answeredMain) {
-        if (answeredMain >= MAIN_QUESTION_CAP) {
-            log.warn("Session {} reached the main question cap of {}", sessionId, MAIN_QUESTION_CAP);
-            throw new ConflictException("Question cap reached");
-        }
-    }
-
-    private void checkGeneratedQuestion(UUID sessionId, LlmTrainingQuestion generated) {
-        if (generated.question() == null || generated.question().isBlank()) {
-            log.error("LLM returned a blank training question for session {}", sessionId);
-            throw new LlmException("Generated question is empty");
-        }
     }
 
     private void checkEnoughAnsweredToFinish(UUID sessionId, List<TrainingQuestion> answered) {

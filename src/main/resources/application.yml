@@ -68,6 +68,7 @@ llm:
     log-level: ${LLM_LOG_LEVEL:info}
     agents:
       training-question-generator: ${TRAINING_QUESTION_GENERATOR}
+      training-follow-up: ${TRAINING_FOLLOW_UP}
       training-reviewer: ${TRAINING_REVIEWER}
       input-normalizer: ${INPUT_NORMALIZER}
 

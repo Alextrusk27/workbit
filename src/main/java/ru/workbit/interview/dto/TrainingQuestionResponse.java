@@ -8,7 +8,8 @@ public record TrainingQuestionResponse(
         @Schema(description = "Идентификатор вопроса")
         UUID questionId,
 
-        @Schema(description = "Порядковый индекс вопроса в сессии (1-based)", example = "1")
+        @Schema(description = "Порядковый номер (1-based): у основного вопроса — в сессии, "
+                + "у уточняющего — внутри своего кейса", example = "1")
         int orderIndex,
 
         @Schema(description = "Текст вопроса")

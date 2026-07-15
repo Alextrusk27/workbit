@@ -19,7 +19,7 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
 
     long countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(UUID trainingSessionId);
 
-    long countByTrainingSessionId(UUID trainingSessionId);
+    long countByParentQuestionId(UUID parentQuestionId);
 
     @Query("""
             SELECT q.trainingSession.id AS sessionId, COUNT(q) AS count
@@ -38,11 +38,27 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
 
     @Query("""
             SELECT q FROM TrainingQuestion q
-            WHERE q.trainingSession.id = :sessionId AND q.answered = false
+            WHERE q.trainingSession.id = :sessionId AND q.answered = false AND q.followUp = true
             ORDER BY q.orderIndex
             LIMIT 1
             """)
-    Optional<TrainingQuestion> findNextUnanswered(UUID sessionId);
+    Optional<TrainingQuestion> findNextUnansweredFollowUp(UUID sessionId);
 
-    List<TrainingQuestion> findAllByTrainingSessionIdOrderByOrderIndex(UUID trainingSessionId);
+    @Query("""
+            SELECT q FROM TrainingQuestion q
+            WHERE q.trainingSession.id = :sessionId AND q.answered = false AND q.followUp = false
+            ORDER BY q.orderIndex
+            LIMIT 1
+            """)
+    Optional<TrainingQuestion> findNextUnansweredMain(UUID sessionId);
+
+    @Query("""
+            SELECT q FROM TrainingQuestion q
+            WHERE q.trainingSession.id = :sessionId AND q.answered = true AND q.followUpChecked = false
+            ORDER BY q.answeredAt DESC
+            LIMIT 1
+            """)
+    Optional<TrainingQuestion> findLastAnsweredUnchecked(UUID sessionId);
+
+    List<TrainingQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
 }

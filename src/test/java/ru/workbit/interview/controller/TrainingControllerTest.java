@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.ArgumentCaptor;
+import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.TrainingOptionsResponse;
@@ -21,12 +23,19 @@ import ru.workbit.interview.service.TrainingService;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
+import ru.workbit.security.service.RateLimiterService;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -59,6 +68,9 @@ class TrainingControllerTest {
 
     @MockitoBean
     UserDetailsService userDetailsService;
+
+    @MockitoBean
+    RateLimiterService rateLimiter;
 
     private CustomUserDetails principal() {
         return new CustomUserDetails(USER_ID, "user@example.com", "hash", true, List.of());
@@ -249,6 +261,150 @@ class TrainingControllerTest {
         void returns401WithoutAuthentication() throws Exception {
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(get(BASE + "/options"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /suggest/professions
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("SuggestProfessions")
+    class SuggestProfessions {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком подсказок из сервиса")
+        void returns200WithSuggestions() throws Exception {
+            // given
+            when(trainingService.suggestProfessions("ja")).thenReturn(List.of("Java-разработчик"));
+
+            // when / then
+            mvc.perform(get(BASE + "/suggest/professions")
+                            .with(user(principal()))
+                            .param("query", "ja"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0]").value("Java-разработчик"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда query отсутствует")
+        void returns400WhenQueryMissing() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/suggest/professions")
+                            .with(user(principal())))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 429, когда rate limiter отклоняет запрос")
+        void returns429WhenRateLimited() throws Exception {
+            // given
+            doThrow(new TooManyRequestsException("Too many requests"))
+                    .when(rateLimiter).check(anyString(), anyInt(), any());
+
+            // when / then
+            mvc.perform(get(BASE + "/suggest/professions")
+                            .with(user(principal()))
+                            .param("query", "ja"))
+                    .andExpect(status().isTooManyRequests());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(get(BASE + "/suggest/professions")
+                            .param("query", "ja"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Передаёт в rate limiter ключ с префиксом \"suggest:\"")
+        void passesKeyWithSuggestPrefixToRateLimiter() throws Exception {
+            // given
+            when(trainingService.suggestProfessions("ja")).thenReturn(List.of("Java-разработчик"));
+            var keyCaptor = ArgumentCaptor.forClass(String.class);
+
+            // when
+            mvc.perform(get(BASE + "/suggest/professions")
+                            .with(user(principal()))
+                            .param("query", "ja"))
+                    .andExpect(status().isOk());
+
+            // then
+            verify(rateLimiter).check(keyCaptor.capture(), anyInt(), any(Duration.class));
+            assertThat(keyCaptor.getValue()).startsWith("suggest:");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /suggest/topics
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("SuggestTopics")
+    class SuggestTopics {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком подсказок из сервиса")
+        void returns200WithSuggestions() throws Exception {
+            // given
+            when(trainingService.suggestTopics("Java-разработчик", "spr")).thenReturn(List.of("Spring Boot"));
+
+            // when / then
+            mvc.perform(get(BASE + "/suggest/topics")
+                            .with(user(principal()))
+                            .param("profession", "Java-разработчик")
+                            .param("query", "spr"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0]").value("Spring Boot"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда profession отсутствует")
+        void returns400WhenProfessionMissing() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/suggest/topics")
+                            .with(user(principal()))
+                            .param("query", "spr"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 429, когда rate limiter отклоняет запрос")
+        void returns429WhenRateLimited() throws Exception {
+            // given
+            doThrow(new TooManyRequestsException("Too many requests"))
+                    .when(rateLimiter).check(anyString(), anyInt(), any());
+
+            // when / then
+            mvc.perform(get(BASE + "/suggest/topics")
+                            .with(user(principal()))
+                            .param("profession", "Java-разработчик")
+                            .param("query", "spr"))
+                    .andExpect(status().isTooManyRequests());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(get(BASE + "/suggest/topics")
+                            .param("profession", "Java-разработчик")
+                            .param("query", "spr"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

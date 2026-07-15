@@ -8,9 +8,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -22,10 +24,14 @@ import ru.workbit.exception.dto.ApiError;
 import ru.workbit.interview.dto.*;
 import ru.workbit.interview.service.TrainingService;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.RateLimiterService;
+import ru.workbit.util.ClientIp;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
 
 import java.net.URI;
+import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,6 +40,13 @@ import java.util.UUID;
 @Tag(name = "Training", description = "Тренировочное AI-собеседование: сессии, генерация вопросов, ответы, отчёт")
 public class TrainingController {
     private final TrainingService trainingService;
+    private final RateLimiterService rateLimiter;
+
+    @Value("${app.security.rate-limit.suggest.limit}")
+    private int suggestRateLimit;
+
+    @Value("${app.security.rate-limit.suggest.window}")
+    private Duration suggestRateWindow;
 
     @GetMapping("/options")
     @Loggable(logResult = true)
@@ -44,6 +57,39 @@ public class TrainingController {
     })
     public ResponseEntity<@NotNull TrainingOptionsResponse> getOptions() {
         return ResponseEntity.ok(trainingService.getOptions());
+    }
+
+    @GetMapping("/suggest/professions")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Подсказки профессий", description = "Возвращает до 7 профессий из словаря по подстроке: сначала совпадения по началу названия, затем по популярности. Запрос короче 2 символов даёт пустой список.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Список подсказок, возможно пустой"),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<String>> suggestProfessions(
+            @RequestParam String query,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), suggestRateLimit, suggestRateWindow);
+        return ResponseEntity.ok(trainingService.suggestProfessions(query));
+    }
+
+    @GetMapping("/suggest/topics")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Подсказки тем", description = "Возвращает до 7 тем словаря для указанной профессии по подстроке: сначала совпадения по началу названия, затем по популярности. Неизвестная профессия или запрос короче 2 символов дают пустой список.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Список подсказок, возможно пустой"),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<String>> suggestTopics(
+            @RequestParam String profession,
+            @RequestParam String query,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), suggestRateLimit, suggestRateWindow);
+        return ResponseEntity.ok(trainingService.suggestTopics(profession, query));
     }
 
     @PostMapping("/sessions")

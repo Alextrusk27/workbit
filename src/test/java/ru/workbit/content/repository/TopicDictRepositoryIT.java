@@ -43,6 +43,14 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
                 .build(); // status=AUTO, usageCount=0 — @Builder.Default
     }
 
+    private TopicDict aTopic(UUID professionId, String name, int usageCount) {
+        return TopicDict.builder()
+                .professionId(professionId)
+                .name(name)
+                .usageCount(usageCount)
+                .build();
+    }
+
     // =========================================================================
 
     @Nested
@@ -136,6 +144,85 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getStatus()).isEqualTo(DictStatus.AUTO);
             assertThat(saved.getUsageCount()).isZero();
             assertThat(saved.getCreated()).isNotNull();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Suggest")
+    class Suggest {
+
+        @Test
+        @DisplayName("Возвращаются только темы указанной профессии")
+        void returnsOnlyTopicsOfGivenProfession() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Backend Developer"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Frontend Developer"));
+            var topicA = em.persistAndFlush(aTopic(professionA.getId(), "Databases Basics"));
+            em.persistAndFlush(aTopic(professionB.getId(), "Databases Basics"));
+
+            // when
+            var result = repository.suggest(professionA.getName(), "databases", 10);
+
+            // then
+            assertThat(result).extracting(TopicDict::getId).containsExactly(topicA.getId());
+        }
+
+        @Test
+        @DisplayName("Профессия резолвится регистронезависимо")
+        void resolvesProfessionCaseInsensitively() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Backend Developer"));
+            var topic = em.persistAndFlush(aTopic(profession.getId(), "Rest Api Basics"));
+
+            // when
+            var result = repository.suggest("zzz BACKEND developer", "rest", 10);
+
+            // then
+            assertThat(result).extracting(TopicDict::getId).containsExactly(topic.getId());
+        }
+
+        @Test
+        @DisplayName("Неизвестная профессия — пустой список")
+        void unknownProfessionReturnsEmptyList() {
+            // when
+            var result = repository.suggest("Zzz Nonexistent Profession", "any", 10);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Prefix-совпадения идут раньше substring-совпадений независимо от usage_count")
+        void prefixMatchesRankBeforeSubstringMatches() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Ranking Profession"));
+            em.persistAndFlush(aTopic(profession.getId(), "Backend Dev Guru", 100));
+            em.persistAndFlush(aTopic(profession.getId(), "Dev Ninja", 1));
+
+            // when
+            var result = repository.suggest(profession.getName(), "dev", 10);
+
+            // then
+            assertThat(result).extracting(TopicDict::getName)
+                    .containsExactly("Dev Ninja", "Backend Dev Guru");
+        }
+
+        @Test
+        @DisplayName("При равном типе совпадения — порядок по usage_count DESC")
+        void sameMatchTypeOrderedByUsageCountDesc() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Usage Profession"));
+            em.persistAndFlush(aTopic(profession.getId(), "Qwe One", 1));
+            em.persistAndFlush(aTopic(profession.getId(), "Qwe Two", 5));
+
+            // when
+            var result = repository.suggest(profession.getName(), "qwe", 10);
+
+            // then
+            assertThat(result).extracting(TopicDict::getName)
+                    .containsExactly("Qwe Two", "Qwe One");
         }
     }
 }

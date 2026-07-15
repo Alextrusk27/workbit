@@ -38,6 +38,13 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
                 .build(); // status=AUTO, usageCount=0 — @Builder.Default
     }
 
+    private ProfessionDict aProfession(String name, int usageCount) {
+        return ProfessionDict.builder()
+                .name(name)
+                .usageCount(usageCount)
+                .build();
+    }
+
     private TopicDict aTopic(UUID professionId, String name) {
         return TopicDict.builder()
                 .professionId(professionId)
@@ -164,6 +171,101 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
             assertThat(em.find(TopicDict.class, topic.getId())).isNull();
             assertThat(em.find(BankQuestion.class, topicalQuestion.getId())).isNull();
             assertThat(em.find(BankQuestion.class, generalQuestion.getId())).isNull();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Suggest")
+    class Suggest {
+
+        @Test
+        @DisplayName("Регистронезависимый поиск по подстроке")
+        void findsBySubstringCaseInsensitive() {
+            // given
+            em.persistAndFlush(aProfession("Zzz Backend Engineer", 0));
+
+            // when
+            var result = repository.suggest("BACKEND", 10);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName).contains("Zzz Backend Engineer");
+        }
+
+        @Test
+        @DisplayName("Prefix-совпадения идут раньше substring-совпадений независимо от usage_count")
+        void prefixMatchesRankBeforeSubstringMatches() {
+            // given
+            em.persistAndFlush(aProfession("Backend Dev Guru", 100));
+            em.persistAndFlush(aProfession("Dev Ninja", 1));
+
+            // when
+            var result = repository.suggest("dev", 10);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .containsExactly("Dev Ninja", "Backend Dev Guru");
+        }
+
+        @Test
+        @DisplayName("При равном типе совпадения — порядок по usage_count DESC")
+        void sameMatchTypeOrderedByUsageCountDesc() {
+            // given
+            em.persistAndFlush(aProfession("Qwe One", 1));
+            em.persistAndFlush(aProfession("Qwe Two", 5));
+
+            // when
+            var result = repository.suggest("qwe", 10);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .containsExactly("Qwe Two", "Qwe One");
+        }
+
+        @Test
+        @DisplayName("Limit обрезает количество результатов")
+        void limitCutsResults() {
+            // given
+            em.persistAndFlush(aProfession("Lim One", 1));
+            em.persistAndFlush(aProfession("Lim Two", 2));
+            em.persistAndFlush(aProfession("Lim Three", 3));
+
+            // when
+            var result = repository.suggest("lim", 2);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .containsExactly("Lim Three", "Lim Two");
+        }
+
+        @Test
+        @DisplayName("Экранированный литерал \\% матчит буквальный процент, а не как wildcard")
+        void escapedPercentMatchesLiteral() {
+            // given
+            em.persistAndFlush(aProfession("100% Off Sale", 0));
+            em.persistAndFlush(aProfession("100 Percent Off", 0));
+
+            // when — репозиторий ждёт уже экранированный ввод (экранирование делает сервис)
+            var result = repository.suggest("100\\%", 10);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName).containsExactly("100% Off Sale");
+        }
+
+        @Test
+        @DisplayName("Неэкранированный % работает как wildcard и матчит всё")
+        void unescapedPercentMatchesEverything() {
+            // given
+            em.persistAndFlush(aProfession("Wild One", 0));
+            em.persistAndFlush(aProfession("Wild Two", 0));
+
+            // when
+            var result = repository.suggest("%", 50);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .contains("Wild One", "Wild Two");
         }
     }
 }

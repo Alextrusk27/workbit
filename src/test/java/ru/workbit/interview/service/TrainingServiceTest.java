@@ -4,12 +4,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.content.model.ProfessionDict;
+import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.TopicDictRepository;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.TrainingOptionsResponse;
 import ru.workbit.interview.dto.TrainingQuestionResponse;
@@ -36,7 +41,11 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +61,8 @@ class TrainingServiceTest {
     TrainingQuestionRepository trainingQuestionRepository;
     @Mock
     ProfessionDictRepository professionDictRepository;
+    @Mock
+    TopicDictRepository topicDictRepository;
     @Mock
     TrainingWriter trainingWriter;
     @Mock
@@ -283,6 +294,103 @@ class TrainingServiceTest {
             ArgumentCaptor<LlmTrainingReportRequest> captor = ArgumentCaptor.forClass(LlmTrainingReportRequest.class);
             verify(llmService).createTrainingReport(captor.capture());
             assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+        }
+    }
+
+    @Nested
+    @DisplayName("SuggestProfessions")
+    class SuggestProfessions {
+
+        @Test
+        @DisplayName("Маппит найденные профессии словаря в имена с сохранением порядка")
+        void mapsSuggestedProfessionsToNamesPreservingOrder() {
+            // given
+            ProfessionDict first = ProfessionDict.builder().id(UUID.randomUUID()).name("Java-разработчик").build();
+            ProfessionDict second = ProfessionDict.builder().id(UUID.randomUUID()).name("JavaScript-разработчик").build();
+            when(professionDictRepository.suggest("ja", TrainingService.SUGGEST_LIMIT)).thenReturn(List.of(first, second));
+
+            // when
+            List<String> result = trainingService.suggestProfessions("ja");
+
+            // then
+            assertThat(result).containsExactly("Java-разработчик", "JavaScript-разработчик");
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"j", " j "})
+        @DisplayName("Запрос короче 2 символов (null, 1 символ, 1 символ после strip) - пустой список без обращения к репозиторию")
+        void returnsEmptyListForTooShortQuery(String query) {
+            // when
+            List<String> result = trainingService.suggestProfessions(query);
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(professionDictRepository);
+        }
+
+        @Test
+        @DisplayName("Экранирует спецсимволы LIKE перед обращением к репозиторию")
+        void escapesLikeSpecialCharsBeforeQuerying() {
+            // given
+            when(professionDictRepository.suggest(anyString(), anyInt())).thenReturn(List.of());
+
+            // when
+            trainingService.suggestProfessions("100%_x\\");
+
+            // then
+            ArgumentCaptor<String> queryCaptor = ArgumentCaptor.forClass(String.class);
+            verify(professionDictRepository).suggest(queryCaptor.capture(), eq(TrainingService.SUGGEST_LIMIT));
+            assertThat(queryCaptor.getValue()).isEqualTo("100\\%\\_x\\\\");
+        }
+
+        @Test
+        @DisplayName("Обрезает пробелы по краям запроса перед обращением к репозиторию")
+        void stripsQueryBeforeQuerying() {
+            // given
+            when(professionDictRepository.suggest("java", TrainingService.SUGGEST_LIMIT)).thenReturn(List.of());
+
+            // when
+            trainingService.suggestProfessions("  java  ");
+
+            // then
+            verify(professionDictRepository).suggest("java", TrainingService.SUGGEST_LIMIT);
+        }
+    }
+
+    @Nested
+    @DisplayName("SuggestTopics")
+    class SuggestTopics {
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"  "})
+        @DisplayName("Профессия null или пробельная - пустой список без обращения к репозиторию")
+        void returnsEmptyListWhenProfessionBlank(String profession) {
+            // when
+            List<String> result = trainingService.suggestTopics(profession, "java");
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(topicDictRepository);
+        }
+
+        @Test
+        @DisplayName("Маппит найденные темы словаря в имена с сохранением порядка")
+        void mapsSuggestedTopicsToNamesPreservingOrder() {
+            // given
+            TopicDict first = TopicDict.builder().id(UUID.randomUUID()).professionId(UUID.randomUUID())
+                    .name("Spring Boot").build();
+            TopicDict second = TopicDict.builder().id(UUID.randomUUID()).professionId(UUID.randomUUID())
+                    .name("Spring Security").build();
+            when(topicDictRepository.suggest(PROFESSION, "sp", TrainingService.SUGGEST_LIMIT))
+                    .thenReturn(List.of(first, second));
+
+            // when
+            List<String> result = trainingService.suggestTopics(PROFESSION, "sp");
+
+            // then
+            assertThat(result).containsExactly("Spring Boot", "Spring Security");
         }
     }
 }

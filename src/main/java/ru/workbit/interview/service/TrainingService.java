@@ -13,7 +13,9 @@ import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
 import ru.workbit.content.model.ProfessionDict;
+import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.TopicDictRepository;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.model.TrainingQuestion;
@@ -51,12 +53,15 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     public static final int MAIN_QUESTION_CAP = 10;
     public static final int MIN_ANSWERED_TO_FINISH = 3;
     public static final int MAX_FOLLOW_UPS_PER_QUESTION = 4;
+    public static final int SUGGEST_LIMIT = 7;
+    public static final int MIN_SUGGEST_QUERY_LENGTH = 2;
 
     private static final String FOLLOW_UP_TYPE = "FOLLOW_UP";
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
+    private final TopicDictRepository topicDictRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
 
@@ -215,6 +220,32 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 List.of(Level.values()),
                 MAIN_QUESTION_CAP,
                 MIN_ANSWERED_TO_FINISH);
+    }
+
+    public List<String> suggestProfessions(String query) {
+        if (isTooShortQuery(query)) {
+            return List.of();
+        }
+        return professionDictRepository.suggest(escapeLike(query.strip()), SUGGEST_LIMIT).stream()
+                .map(ProfessionDict::getName)
+                .toList();
+    }
+
+    public List<String> suggestTopics(String profession, String query) {
+        if (profession == null || profession.isBlank() || isTooShortQuery(query)) {
+            return List.of();
+        }
+        return topicDictRepository.suggest(profession.strip(), escapeLike(query.strip()), SUGGEST_LIMIT).stream()
+                .map(TopicDict::getName)
+                .toList();
+    }
+
+    private static boolean isTooShortQuery(String query) {
+        return query == null || query.strip().length() < MIN_SUGGEST_QUERY_LENGTH;
+    }
+
+    private static String escapeLike(String query) {
+        return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static int trailingFollowUps(List<TrainingQuestion> history) {

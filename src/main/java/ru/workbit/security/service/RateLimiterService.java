@@ -20,20 +20,24 @@ public class RateLimiterService {
 
     private final ConcurrentHashMap<String, Window> buckets = new ConcurrentHashMap<>();
 
-    private record Window(long startedAt, AtomicInteger count) {
+    private record Window(long startedAt, long windowMillis, AtomicInteger count) {
     }
 
     public void check(String key) {
+        check(key, limit, window);
+    }
+
+    public void check(String key, int limit, Duration window) {
         long now = System.currentTimeMillis();
         long windowMillis = window.toMillis();
 
         if (buckets.size() > CLEANUP_THRESHOLD) {
-            buckets.values().removeIf(w -> now - w.startedAt() >= windowMillis);
+            buckets.values().removeIf(w -> now - w.startedAt() >= w.windowMillis());
         }
 
         Window current = buckets.compute(key, (k, w) ->
-                w == null || now - w.startedAt() >= windowMillis
-                        ? new Window(now, new AtomicInteger())
+                w == null || now - w.startedAt() >= w.windowMillis()
+                        ? new Window(now, windowMillis, new AtomicInteger())
                         : w);
 
         if (current.count().incrementAndGet() > limit) {

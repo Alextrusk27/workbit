@@ -45,8 +45,9 @@ import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
-import ru.workbit.llm.dto.LlmTrainingQuestion;
-import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
+import ru.workbit.llm.dto.LlmTrainingFollowUp;
+import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
+import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestions;
 import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
@@ -522,60 +523,63 @@ class TrainingServiceTest {
     @DisplayName("NextQuestion")
     class NextQuestion {
 
-        @Test
-        @DisplayName("Передаёт profession сессии как есть в LlmTrainingQuestionRequest")
-        void passesSessionProfessionAsIsToLlmRequest() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(0L);
-            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
-                    .thenReturn(List.of());
+        private TrainingQuestion answeredMain(UUID id, int orderIndex) {
+            return TrainingQuestion.builder()
+                    .id(id)
+                    .questionText("Вопрос " + orderIndex)
+                    .answerText("Ответ " + orderIndex)
+                    .orderIndex(orderIndex)
+                    .followUp(false)
+                    .answered(true)
+                    .build();
+        }
 
-            LlmTrainingQuestion generated = new LlmTrainingQuestion("Расскажите про Spring Boot", "MAIN");
-            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
+        private TrainingQuestion unansweredMain(UUID id, int orderIndex) {
+            return TrainingQuestion.builder()
+                    .id(id)
+                    .questionText("Вопрос " + orderIndex)
+                    .orderIndex(orderIndex)
+                    .followUp(false)
+                    .answered(false)
+                    .build();
+        }
 
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    UUID.randomUUID(), 1, generated.question(), false, null, null, null);
-            when(trainingWriter.saveQuestion(sessionId, generated.question(), false)).thenReturn(expectedResponse);
+        private TrainingQuestion answeredFollowUp(UUID id, UUID parentQuestionId, int orderIndex) {
+            return TrainingQuestion.builder()
+                    .id(id)
+                    .parentQuestionId(parentQuestionId)
+                    .questionText("Уточнение " + orderIndex)
+                    .answerText("Ответ на уточнение " + orderIndex)
+                    .orderIndex(orderIndex)
+                    .followUp(true)
+                    .answered(true)
+                    .build();
+        }
 
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-
-            ArgumentCaptor<LlmTrainingQuestionRequest> captor = ArgumentCaptor.forClass(LlmTrainingQuestionRequest.class);
-            verify(llmService).generateTrainingQuestion(captor.capture());
-            assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+        private TrainingQuestion unansweredFollowUp(UUID id, UUID parentQuestionId, int orderIndex) {
+            return TrainingQuestion.builder()
+                    .id(id)
+                    .parentQuestionId(parentQuestionId)
+                    .questionText("Уточнение " + orderIndex)
+                    .orderIndex(orderIndex)
+                    .followUp(true)
+                    .answered(false)
+                    .build();
         }
 
         @Test
-        @DisplayName("Есть неотвеченный вопрос - возвращает его напрямую без обращения к LLM")
-        void returnsExistingUnansweredQuestionWithoutCallingLlm() {
+        @DisplayName("Сессия не найдена у пользователя - NotFoundException")
+        void throwsWhenSessionNotFound() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            TrainingQuestion unanswered = TrainingQuestion.builder()
-                    .id(UUID.randomUUID()).questionText("Вопрос").orderIndex(1).build();
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(unanswered));
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
 
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    unanswered.getId(), 1, "Вопрос", false, null, null, null);
-            when(trainingQuestionMapper.toDto(unanswered)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verifyNoInteractions(llmService);
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(trainingQuestionRepository, llmService, trainingWriter);
         }
 
         @Test
@@ -596,131 +600,350 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Кап основных вопросов уже достигнут - ConflictException")
-        void throwsWhenCapReached() {
+        @DisplayName("Есть неотвеченный follow-up - возвращает его напрямую, LLM не вызывается")
+        void returnsPendingFollowUpWithoutCallingLlm() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn((long) TrainingService.MAIN_QUESTION_CAP);
+
+            TrainingQuestion pendingFollowUp = unansweredFollowUp(UUID.randomUUID(), UUID.randomUUID(), 2);
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
+                    .thenReturn(Optional.of(pendingFollowUp));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    pendingFollowUp.getId(), 2, pendingFollowUp.getQuestionText(), true, null, null, null);
+            when(trainingQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verifyNoInteractions(llmService, trainingWriter);
+            verify(trainingQuestionRepository, never()).findLastAnsweredUnchecked(any());
+        }
+
+        @Test
+        @DisplayName("Нет неотвеченного follow-up и нет отвеченного-непроверенного вопроса - возвращает следующий основной, LLM не вызывается")
+        void returnsNextMainWhenNoLastAnsweredUnchecked() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 3);
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    nextMain.getId(), 3, nextMain.getQuestionText(), false, null, null, null);
+            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("В кейсе уже максимум уточнений - markFollowUpChecked, LLM не вызывается, возвращается следующий основной")
+        void marksFollowUpCheckedAndReturnsNextMainWhenLimitReached() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+
+            List<TrainingQuestion> maxFollowUps = IntStream.rangeClosed(1, TrainingService.MAX_FOLLOW_UPS_PER_QUESTION)
+                    .mapToObj(i -> answeredFollowUp(UUID.randomUUID(), answered.getId(), i + 1))
+                    .toList();
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(maxFollowUps);
+
+            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).markFollowUpChecked(answered.getId());
+            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
+            verifyNoInteractions(llmService);
+        }
+
+        @Test
+        @DisplayName("LLM решил не уточнять (askFollowUp=false) - markFollowUpChecked, возвращается следующий основной")
+        void marksFollowUpCheckedWhenLlmDecidesNotToAsk() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(List.of());
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(false, null));
+
+            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).markFollowUpChecked(answered.getId());
+            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"   "})
+        @DisplayName("LLM решил уточнить, но текст вопроса null/пустой - трактуется как отказ: markFollowUpChecked, возвращается следующий основной")
+        void treatsBlankOrNullQuestionAsRefusal(String question) {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(List.of());
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(true, question));
+
+            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).markFollowUpChecked(answered.getId());
+            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("LLM решил уточнить - сохраняет follow-up через trainingWriter, в запросе - профессия/уровень сессии, текст/ответ основного вопроса и история уточнений")
+        void savesFollowUpWhenLlmDecidesToAskFollowUp() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+
+            TrainingQuestion previousFollowUp = answeredFollowUp(UUID.randomUUID(), answered.getId(), 2);
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(List.of(previousFollowUp));
+
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Новое уточнение"));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    UUID.randomUUID(), 3, "Новое уточнение", true, null, null, null);
+            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Новое уточнение"))
+                    .thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            ArgumentCaptor<LlmTrainingFollowUpRequest> captor = ArgumentCaptor.forClass(LlmTrainingFollowUpRequest.class);
+            verify(llmService).decideTrainingFollowUp(captor.capture());
+            LlmTrainingFollowUpRequest llmRequest = captor.getValue();
+            assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
+            assertThat(llmRequest.level()).isEqualTo("Middle");
+            assertThat(llmRequest.question()).isEqualTo(answered.getQuestionText());
+            assertThat(llmRequest.answer()).isEqualTo(answered.getAnswerText());
+            assertThat(llmRequest.previousFollowUps()).containsExactly(
+                    new LlmTrainingFollowUp(previousFollowUp.getQuestionText(), previousFollowUp.getAnswerText()));
+
+            verify(trainingWriter, never()).markFollowUpChecked(any());
+        }
+
+        @Test
+        @DisplayName("Последний отвеченный вопрос сам - уточнение: caseMainId берётся из parentQuestionId, в промпт уходит текст/ответ основного вопроса")
+        void usesParentMainWhenLastAnsweredIsFollowUp() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            TrainingQuestion caseMain = answeredMain(UUID.randomUUID(), 1);
+            TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), caseMain.getId(), 2);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId))
+                    .thenReturn(Optional.of(lastAnsweredFollowUp));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(caseMain.getId()))
+                    .thenReturn(List.of(lastAnsweredFollowUp));
+            when(trainingQuestionRepository.findById(caseMain.getId())).thenReturn(Optional.of(caseMain));
+
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Ещё уточнение"));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    UUID.randomUUID(), 3, "Ещё уточнение", true, null, null, null);
+            when(trainingWriter.saveFollowUp(lastAnsweredFollowUp.getId(), caseMain.getId(), "Ещё уточнение"))
+                    .thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            ArgumentCaptor<LlmTrainingFollowUpRequest> captor = ArgumentCaptor.forClass(LlmTrainingFollowUpRequest.class);
+            verify(llmService).decideTrainingFollowUp(captor.capture());
+            assertThat(captor.getValue().question()).isEqualTo(caseMain.getQuestionText());
+            assertThat(captor.getValue().answer()).isEqualTo(caseMain.getAnswerText());
+
+            verify(trainingWriter).saveFollowUp(lastAnsweredFollowUp.getId(), caseMain.getId(), "Ещё уточнение");
+        }
+
+        @Test
+        @DisplayName("Основной вопрос кейса не найден по parentQuestionId - NotFoundException")
+        void throwsNotFoundWhenCaseMainMissing() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            UUID missingMainId = UUID.randomUUID();
+            TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), missingMainId, 2);
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId))
+                    .thenReturn(Optional.of(lastAnsweredFollowUp));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(missingMainId))
+                    .thenReturn(List.of(lastAnsweredFollowUp));
+            when(trainingQuestionRepository.findById(missingMainId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("saveFollowUp бросает DataIntegrityViolationException, конкурентный follow-up уже создан - возвращает его")
+        void returnsConcurrentFollowUpWhenSaveFollowUpConflicts() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            TrainingQuestion concurrentFollowUp = unansweredFollowUp(UUID.randomUUID(), answered.getId(), 2);
+
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
+                    .thenReturn(Optional.empty(), Optional.of(concurrentFollowUp));
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(List.of());
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Уточнение"));
+            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Уточнение"))
+                    .thenThrow(new DataIntegrityViolationException("concurrent follow-up"));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    concurrentFollowUp.getId(), 2, concurrentFollowUp.getQuestionText(), true, null, null, null);
+            when(trainingQuestionMapper.toDto(concurrentFollowUp)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+        }
+
+        @Test
+        @DisplayName("saveFollowUp бросает DataIntegrityViolationException, конкурентного follow-up нет - падает дальше к следующему основному")
+        void fallsBackToNextMainWhenSaveFollowUpConflictsWithoutConcurrentFollowUp() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+
+            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
+                    .thenReturn(Optional.empty(), Optional.empty());
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
+                    .thenReturn(List.of());
+            when(llmService.decideTrainingFollowUp(any()))
+                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Уточнение"));
+            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Уточнение"))
+                    .thenThrow(new DataIntegrityViolationException("concurrent follow-up"));
+
+            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+        }
+
+        @Test
+        @DisplayName("Нет ни неотвеченного follow-up, ни основного вопроса - ConflictException")
+        void throwsConflictWhenNoFollowUpAndNoMainLeft() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.empty());
 
             // when / then
             assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Question cap reached");
-            verifyNoInteractions(llmService);
-        }
-
-        @Test
-        @DisplayName("LLM вернул пустой текст вопроса - LlmException")
-        void throwsWhenLlmReturnsBlankQuestion() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(0L);
-            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
-                    .thenReturn(List.of());
-            when(llmService.generateTrainingQuestion(any())).thenReturn(new LlmTrainingQuestion("   ", "MAIN"));
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Generated question is empty");
-            verifyNoInteractions(trainingWriter);
-        }
-
-        @Test
-        @DisplayName("История не пуста и лимит уточнений не достигнут, LLM вернул FOLLOW_UP - followUp=true уходит в writer")
-        void marksFollowUpWhenAllowedAndLlmReturnsFollowUpType() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(1L);
-            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
-                    .thenReturn(List.of(aQuestion(1)));
-
-            LlmTrainingQuestion generated = new LlmTrainingQuestion("Уточнение", "FOLLOW_UP");
-            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    UUID.randomUUID(), 2, generated.question(), true, null, null, null);
-            when(trainingWriter.saveQuestion(sessionId, generated.question(), true)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).saveQuestion(sessionId, generated.question(), true);
-        }
-
-        @Test
-        @DisplayName("saveQuestion бросает DataIntegrityViolationException, findNextUnanswered находит вопрос - возвращает его")
-        void returnsFoundQuestionWhenSaveQuestionHitsConcurrentConflict() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            TrainingQuestion concurrentQuestion = TrainingQuestion.builder()
-                    .id(UUID.randomUUID()).questionText("Вопрос").orderIndex(1).build();
-            when(trainingQuestionRepository.findNextUnanswered(sessionId))
-                    .thenReturn(Optional.empty(), Optional.of(concurrentQuestion));
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(0L);
-            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
-                    .thenReturn(List.of());
-
-            LlmTrainingQuestion generated = new LlmTrainingQuestion("Расскажите про Spring Boot", "MAIN");
-            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
-            when(trainingWriter.saveQuestion(sessionId, generated.question(), false))
-                    .thenThrow(new DataIntegrityViolationException("duplicate question"));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    concurrentQuestion.getId(), 1, "Вопрос", false, null, null, null);
-            when(trainingQuestionMapper.toDto(concurrentQuestion)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-        }
-
-        @Test
-        @DisplayName("saveQuestion бросает DataIntegrityViolationException, findNextUnanswered тоже пуст - ConflictException")
-        void throwsConflictWhenSaveQuestionFailsAndNoQuestionFound() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(0L);
-            when(trainingQuestionRepository.findAllByTrainingSessionIdOrderByOrderIndex(sessionId))
-                    .thenReturn(List.of());
-
-            LlmTrainingQuestion generated = new LlmTrainingQuestion("Расскажите про Spring Boot", "MAIN");
-            when(llmService.generateTrainingQuestion(any())).thenReturn(generated);
-            when(trainingWriter.saveQuestion(sessionId, generated.question(), false))
-                    .thenThrow(new DataIntegrityViolationException("duplicate question"));
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Concurrent session update");
+            verifyNoInteractions(llmService, trainingWriter);
         }
     }
 

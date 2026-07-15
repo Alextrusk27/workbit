@@ -179,91 +179,140 @@ class TrainingWriterTest {
     }
 
     @Nested
-    @DisplayName("SaveQuestion")
-    class SaveQuestion {
+    @DisplayName("MarkFollowUpChecked")
+    class MarkFollowUpChecked {
 
         @Test
-        @DisplayName("Есть неотвеченный вопрос - возвращает его, новый вопрос не сохраняется")
-        void returnsExistingUnansweredQuestionInsteadOfSavingNew() {
+        @DisplayName("Вопрос найден - проставляет followUpChecked=true")
+        void setsFollowUpCheckedFlag() {
             // given
-            UUID sessionId = UUID.randomUUID();
-            TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).profession(PROFESSION).level(Level.MIDDLE).build();
-            when(trainingSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
-            TrainingQuestion unanswered = TrainingQuestion.builder()
-                    .id(UUID.randomUUID()).questionText("Старый вопрос").orderIndex(1).build();
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(unanswered));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    unanswered.getId(), 1, "Старый вопрос", false, null, null, null);
-            when(trainingQuestionMapper.toDto(unanswered)).thenReturn(expectedResponse);
+            UUID questionId = UUID.randomUUID();
+            TrainingQuestion question = TrainingQuestion.builder().id(questionId).followUpChecked(false).build();
+            when(trainingQuestionRepository.findById(questionId)).thenReturn(Optional.of(question));
 
             // when
-            TrainingQuestionResponse result = trainingWriter.saveQuestion(sessionId, "Новый вопрос", false);
+            trainingWriter.markFollowUpChecked(questionId);
 
             // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingQuestionRepository, never()).save(any());
+            assertThat(question.isFollowUpChecked()).isTrue();
         }
 
         @Test
-        @DisplayName("Нет неотвеченного вопроса - сохраняет новый с orderIndex = countByTrainingSessionId + 1")
-        void savesNewQuestionWithNextOrderIndex() {
+        @DisplayName("Вопрос не найден - NotFoundException")
+        void throwsWhenQuestionNotFound() {
             // given
-            UUID sessionId = UUID.randomUUID();
+            UUID questionId = UUID.randomUUID();
+            when(trainingQuestionRepository.findById(questionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.markFollowUpChecked(questionId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+        }
+    }
+
+    @Nested
+    @DisplayName("SaveFollowUp")
+    class SaveFollowUp {
+
+        @Test
+        @DisplayName("Нормальный путь - сохраняет follow-up с orderIndex = countByParentQuestionId + 1, проставляет followUpChecked отвеченному")
+        void savesNewFollowUpWithNextOrderIndex() {
+            // given
+            UUID answeredId = UUID.randomUUID();
+            UUID caseMainId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).profession(PROFESSION).level(Level.MIDDLE).build();
-            when(trainingSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.countByTrainingSessionId(sessionId)).thenReturn(2L);
+                    .id(UUID.randomUUID()).profession(PROFESSION).level(Level.MIDDLE).build();
+            TrainingQuestion answered = TrainingQuestion.builder()
+                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1)
+                    .followUpChecked(false).build();
+            when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(session.getId())).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.countByParentQuestionId(caseMainId)).thenReturn(2L);
             when(trainingQuestionRepository.save(any(TrainingQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    UUID.randomUUID(), 3, "Новый вопрос", true, null, null, null);
+                    UUID.randomUUID(), 3, "Новое уточнение", true, null, null, null);
             when(trainingQuestionMapper.toDto(any(TrainingQuestion.class))).thenReturn(expectedResponse);
 
             // when
-            TrainingQuestionResponse result = trainingWriter.saveQuestion(sessionId, "Новый вопрос", true);
+            TrainingQuestionResponse result = trainingWriter.saveFollowUp(answeredId, caseMainId, "Новое уточнение");
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
+            assertThat(answered.isFollowUpChecked()).isTrue();
 
             ArgumentCaptor<TrainingQuestion> captor = ArgumentCaptor.forClass(TrainingQuestion.class);
             verify(trainingQuestionRepository).save(captor.capture());
             TrainingQuestion saved = captor.getValue();
             assertThat(saved.getOrderIndex()).isEqualTo(3);
-            assertThat(saved.getQuestionText()).isEqualTo("Новый вопрос");
+            assertThat(saved.getParentQuestionId()).isEqualTo(caseMainId);
+            assertThat(saved.getQuestionText()).isEqualTo("Новое уточнение");
             assertThat(saved.isFollowUp()).isTrue();
             assertThat(saved.getTrainingSession()).isSameAs(session);
         }
 
         @Test
-        @DisplayName("Сессия не найдена - NotFoundException")
-        void throwsWhenSessionNotFound() {
+        @DisplayName("Гонка - findNextUnansweredFollowUp уже нашёл ожидающий follow-up - возвращает его, новый не сохраняется")
+        void returnsExistingPendingFollowUpInsteadOfSavingNew() {
             // given
-            UUID sessionId = UUID.randomUUID();
-            when(trainingSessionRepository.findById(sessionId)).thenReturn(Optional.empty());
+            UUID answeredId = UUID.randomUUID();
+            UUID caseMainId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .id(UUID.randomUUID()).profession(PROFESSION).level(Level.MIDDLE).build();
+            TrainingQuestion answered = TrainingQuestion.builder()
+                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1)
+                    .followUpChecked(false).build();
+            when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+
+            TrainingQuestion pendingFollowUp = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).questionText("Уже создано").orderIndex(1).followUp(true).build();
+            when(trainingQuestionRepository.findNextUnansweredFollowUp(session.getId()))
+                    .thenReturn(Optional.of(pendingFollowUp));
+
+            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
+                    pendingFollowUp.getId(), 1, "Уже создано", true, null, null, null);
+            when(trainingQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
+
+            // when
+            TrainingQuestionResponse result = trainingWriter.saveFollowUp(answeredId, caseMainId, "Новый вопрос");
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(answered.isFollowUpChecked()).isTrue();
+            verify(trainingQuestionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Отвеченный вопрос не найден - NotFoundException")
+        void throwsWhenAnsweredQuestionNotFound() {
+            // given
+            UUID answeredId = UUID.randomUUID();
+            when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> trainingWriter.saveQuestion(sessionId, "Вопрос", false))
+            assertThatThrownBy(() -> trainingWriter.saveFollowUp(answeredId, UUID.randomUUID(), "Уточнение"))
                     .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Session not found");
+                    .hasMessage("Question not found");
         }
 
         @Test
         @DisplayName("Сессия уже завершена - ConflictException")
         void throwsWhenSessionCompleted() {
             // given
-            UUID sessionId = UUID.randomUUID();
+            UUID answeredId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).profession(PROFESSION).level(Level.MIDDLE)
+                    .id(UUID.randomUUID()).profession(PROFESSION).level(Level.MIDDLE)
                     .status(SessionStatus.COMPLETED).build();
-            when(trainingSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+            TrainingQuestion answered = TrainingQuestion.builder()
+                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1).build();
+            when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             // when / then
-            assertThatThrownBy(() -> trainingWriter.saveQuestion(sessionId, "Вопрос", false))
+            assertThatThrownBy(() -> trainingWriter.saveFollowUp(answeredId, UUID.randomUUID(), "Уточнение"))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
+            verify(trainingQuestionRepository, never()).save(any());
         }
     }
 
@@ -318,6 +367,52 @@ class TrainingWriterTest {
             assertThat(session.getReport()).isNotNull();
             assertThat(session.getReport().getAvgScore()).isEqualTo(4.5);
             verify(trainingSessionRepository).save(session);
+        }
+
+        @Test
+        @DisplayName("Отвеченные вопросы содержат уточнения и неотвеченный основной - "
+                + "removeIf убирает уточнения и неотвеченные из session.getQuestions(), "
+                + "в отчёт и в avgScore идут только основные")
+        void removesFollowUpsAndUnansweredQuestionsKeepingOnlyAnsweredMainsInReport() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingQuestion main1 = answeredQuestion(1);
+            TrainingQuestion followUpOfMain1 = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).parentQuestionId(main1.getId())
+                    .questionText("Уточнение").answerText("Ответ на уточнение")
+                    .orderIndex(1).followUp(true).answered(true).build();
+            TrainingQuestion main2 = answeredQuestion(2);
+            TrainingQuestion unansweredMain = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).questionText("Неотвеченный вопрос")
+                    .orderIndex(3).followUp(false).answered(false).build();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).profession(PROFESSION).level(Level.MIDDLE)
+                    .questions(new ArrayList<>(List.of(main1, followUpOfMain1, main2, unansweredMain))).build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport llmReport = new LlmTrainingReport(
+                    List.of(new LlmTrainingCaseReview(1, "Хорошо", 4),
+                            new LlmTrainingCaseReview(2, "Отлично", 5)),
+                    "Общий развёрнутый фидбэк по тренировке");
+
+            TrainingReportResponse expectedResponse = new TrainingReportResponse(
+                    UUID.randomUUID(), sessionId, PROFESSION, null, Level.MIDDLE, 4.5,
+                    llmReport.overallFeedback(), null, List.of());
+            when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
+                    .thenReturn(expectedResponse);
+
+            // when
+            TrainingReportResponse result = trainingWriter.completeReport(sessionId, llmReport);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(session.getQuestions()).containsExactly(main1, main2);
+            assertThat(session.getReport().getAvgScore()).isEqualTo(4.5);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<TrainingQuestion>> mainsCaptor = ArgumentCaptor.forClass(List.class);
+            verify(trainingReportMapper).toResponse(any(TrainingReport.class), eq(session), mainsCaptor.capture());
+            assertThat(mainsCaptor.getValue()).containsExactly(main1, main2);
         }
 
         @Test
@@ -538,34 +633,67 @@ class TrainingWriterTest {
     class GroupCases {
 
         @Test
-        @DisplayName("Уточняющие вопросы группируются с предшествующим основным в один кейс")
-        void groupsFollowUpsWithPrecedingMainQuestion() {
+        @DisplayName("Уточнения группируются с основным вопросом по parentQuestionId (сортировка по orderIndex), независимо от порядка в исходном списке")
+        void groupsFollowUpsByParentQuestionIdRegardlessOfListOrder() {
             // given
-            TrainingQuestion main1 = TrainingQuestion.builder().orderIndex(1).followUp(false).build();
-            TrainingQuestion followUp1 = TrainingQuestion.builder().orderIndex(2).followUp(true).build();
-            TrainingQuestion main2 = TrainingQuestion.builder().orderIndex(3).followUp(false).build();
+            UUID main1Id = UUID.randomUUID();
+            UUID main2Id = UUID.randomUUID();
+            TrainingQuestion main1 = TrainingQuestion.builder().id(main1Id).orderIndex(1).followUp(false).build();
+            TrainingQuestion main2 = TrainingQuestion.builder().id(main2Id).orderIndex(2).followUp(false).build();
+            TrainingQuestion main1FollowUp2 = TrainingQuestion.builder()
+                    .parentQuestionId(main1Id).orderIndex(2).followUp(true).build();
+            TrainingQuestion main1FollowUp1 = TrainingQuestion.builder()
+                    .parentQuestionId(main1Id).orderIndex(1).followUp(true).build();
+            TrainingQuestion main2FollowUp1 = TrainingQuestion.builder()
+                    .parentQuestionId(main2Id).orderIndex(1).followUp(true).build();
+
+            // перемешанный порядок в исходном списке
+            List<TrainingQuestion> answered = List.of(main2FollowUp1, main2, main1FollowUp2, main1, main1FollowUp1);
 
             // when
-            List<List<TrainingQuestion>> result = TrainingWriter.groupCases(List.of(main1, followUp1, main2));
+            List<List<TrainingQuestion>> result = TrainingWriter.groupCases(answered);
 
             // then
             assertThat(result).hasSize(2);
-            assertThat(result.get(0)).containsExactly(main1, followUp1);
-            assertThat(result.get(1)).containsExactly(main2);
+            assertThat(result.get(0)).containsExactly(main1, main1FollowUp1, main1FollowUp2);
+            assertThat(result.get(1)).containsExactly(main2, main2FollowUp1);
         }
 
         @Test
-        @DisplayName("Список начинается с уточняющего вопроса - всё равно открывает новый кейс, а не падает")
-        void startsNewCaseWhenListStartsWithFollowUp() {
+        @DisplayName("Основной вопрос без уточнений - кейс из одного элемента")
+        void mainWithoutFollowUpsFormsSingleElementCase() {
             // given
-            TrainingQuestion followUp = TrainingQuestion.builder().orderIndex(1).followUp(true).build();
+            TrainingQuestion main = TrainingQuestion.builder().id(UUID.randomUUID()).orderIndex(1).followUp(false).build();
 
             // when
-            List<List<TrainingQuestion>> result = TrainingWriter.groupCases(List.of(followUp));
+            List<List<TrainingQuestion>> result = TrainingWriter.groupCases(List.of(main));
 
             // then
             assertThat(result).hasSize(1);
-            assertThat(result.get(0)).containsExactly(followUp);
+            assertThat(result.get(0)).containsExactly(main);
+        }
+
+        @Test
+        @DisplayName("Уточнение без своего основного вопроса в списке - не попадает ни в один кейс")
+        void orphanFollowUpWithoutMainInListIsDropped() {
+            // given
+            TrainingQuestion main = TrainingQuestion.builder().id(UUID.randomUUID()).orderIndex(1).followUp(false).build();
+            TrainingQuestion orphanFollowUp = TrainingQuestion.builder()
+                    .parentQuestionId(UUID.randomUUID()).orderIndex(1).followUp(true).build();
+
+            // when
+            List<List<TrainingQuestion>> result = TrainingWriter.groupCases(List.of(main, orphanFollowUp));
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).containsExactly(main);
+        }
+
+        @Test
+        @DisplayName("Пустой список отвеченных - пустой список кейсов")
+        void emptyAnsweredListReturnsEmptyCases() {
+            // when / then
+            assertThat(TrainingWriter.groupCases(List.of())).isEmpty();
         }
     }
 }

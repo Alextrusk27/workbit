@@ -333,10 +333,13 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     private void checkHasMainQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
                                        List<String> generatedQuestions) {
-        if (bankQuestions.isEmpty() && generatedQuestions.isEmpty()) {
-            log.error("No main questions for new training session [profession={}, topic={}, level={}]",
-                    session.getProfession(), session.getTopic(), session.getLevel());
-            throw new LlmException("Generated questions are empty");
+        int questions = bankQuestions.size() + generatedQuestions.size();
+        if (questions < MIN_ANSWERED_TO_FINISH) {
+            log.error("Only {} main questions for new training session, {} required "
+                            + "[profession={}, topic={}, level={}]",
+                    questions, MIN_ANSWERED_TO_FINISH, session.getProfession(), session.getTopic(),
+                    session.getLevel());
+            throw new LlmException("Not enough questions for a training session");
         }
     }
 

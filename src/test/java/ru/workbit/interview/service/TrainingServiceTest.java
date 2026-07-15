@@ -321,7 +321,7 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул null-список - LlmException, сессия не создаётся")
+        @DisplayName("Банк пуст и LLM вернул null-список - LlmException (недостаточно вопросов), сессия не создаётся")
         void throwsWhenBankEmptyAndLlmReturnsNullList() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
@@ -338,12 +338,12 @@ class TrainingServiceTest {
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(LlmException.class)
-                    .hasMessage("Generated questions are empty");
+                    .hasMessage("Not enough questions for a training session");
             verify(trainingWriter, never()).createSession(any(), any(), any());
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул только blank-строки - LlmException, сессия не создаётся")
+        @DisplayName("Банк пуст и LLM вернул только blank-строки - LlmException (недостаточно вопросов), сессия не создаётся")
         void throwsWhenBankEmptyAndLlmReturnsOnlyBlankStrings() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
@@ -361,8 +361,83 @@ class TrainingServiceTest {
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(LlmException.class)
-                    .hasMessage("Generated questions are empty");
+                    .hasMessage("Not enough questions for a training session");
             verify(trainingWriter, never()).createSession(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Суммарно 2 вопроса (2 из банка, LLM вернул 0) - LlmException, сессия не создаётся")
+        void throwsWhenTotalQuestionsBelowThresholdFromBank() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(2);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Not enough questions for a training session");
+            verify(trainingWriter, never()).createSession(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Суммарно 2 вопроса (1 из банка, 1 от LLM) - LlmException, сессия не создаётся")
+        void throwsWhenTotalQuestionsBelowThresholdMixedSources() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(1);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+            when(llmService.generateTrainingQuestions(any()))
+                    .thenReturn(new LlmTrainingQuestions(List.of("Единственный сгенерированный")));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Not enough questions for a training session");
+            verify(trainingWriter, never()).createSession(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Суммарно ровно 3 вопроса (порог не строгий) - сессия создаётся")
+        void createsSessionWhenExactlyAtThreshold() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(3);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
         }
 
         @ParameterizedTest

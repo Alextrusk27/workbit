@@ -48,6 +48,12 @@ public class TrainingController {
     @Value("${app.security.rate-limit.suggest.window}")
     private Duration suggestRateWindow;
 
+    @Value("${app.security.rate-limit.normalize.limit}")
+    private int normalizeRateLimit;
+
+    @Value("${app.security.rate-limit.normalize.window}")
+    private Duration normalizeRateWindow;
+
     @GetMapping("/options")
     @Loggable(logResult = true)
     @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает популярные профессии из словаря (подсказки для быстрого выбора, свободный ввод тоже допустим), допустимые уровни, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
@@ -90,6 +96,24 @@ public class TrainingController {
     ) {
         rateLimiter.check("suggest:" + ClientIp.from(httpRequest), suggestRateLimit, suggestRateWindow);
         return ResponseEntity.ok(trainingService.suggestTopics(profession, query));
+    }
+
+    @PostMapping("/normalize")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Распознавание введённых профессии и темы", description = "Проверяет свободный ввод через LLM: распознаваема ли профессия/тема, подходит ли тема профессии, и возвращает канонические варианты для подтверждения. Предназначен для случая, когда ввод не выбран из подсказок словаря; выбор предложенного варианта необязателен.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Результат распознавания"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull NormalizeInputResponse> normalizeInput(
+            @RequestBody @Valid NormalizeInputRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("normalize:" + ClientIp.from(httpRequest), normalizeRateLimit, normalizeRateWindow);
+        return ResponseEntity.ok(trainingService.normalizeInput(request));
     }
 
     @PostMapping("/sessions")

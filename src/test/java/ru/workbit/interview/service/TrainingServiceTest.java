@@ -16,6 +16,8 @@ import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.TopicDictRepository;
 import ru.workbit.interview.dto.CreateSessionRequest;
+import ru.workbit.interview.dto.NormalizeInputRequest;
+import ru.workbit.interview.dto.NormalizeInputResponse;
 import ru.workbit.interview.dto.TrainingOptionsResponse;
 import ru.workbit.interview.dto.TrainingQuestionResponse;
 import ru.workbit.interview.dto.TrainingReportResponse;
@@ -29,6 +31,8 @@ import ru.workbit.interview.model.mapper.TrainingReportMapper;
 import ru.workbit.interview.model.mapper.TrainingSessionMapper;
 import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestion;
 import ru.workbit.llm.dto.LlmTrainingQuestionRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
@@ -391,6 +395,100 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).containsExactly("Spring Boot", "Spring Security");
+        }
+    }
+
+    @Nested
+    @DisplayName("NormalizeInput")
+    class NormalizeInput {
+
+        @Test
+        @DisplayName("Полный ввод с профессией и темой - стрипает поля в LLM-запросе, собирает ответ из полей LLM-ответа")
+        void fullInputStripsFieldsAndMapsLlmResponse() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest("  джава дев  ", " спринг ");
+            LlmInputNormalization llmResponse = new LlmInputNormalization(
+                    true, List.of("Java-разработчик"), true, List.of("Spring"), true);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().profession()).isEqualTo("джава дев");
+            assertThat(captor.getValue().topic()).isEqualTo("спринг");
+
+            assertThat(result.professionRecognized()).isTrue();
+            assertThat(result.professionSuggestions()).containsExactly("Java-разработчик");
+            assertThat(result.topicRecognized()).isTrue();
+            assertThat(result.topicSuggestions()).containsExactly("Spring");
+            assertThat(result.topicFitsProfession()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Тема null - в LLM-запрос уходит пустая строка, поля темы в ответе - null")
+        void nullTopicSendsEmptyStringAndNullsTopicFields() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, null);
+            LlmInputNormalization llmResponse = new LlmInputNormalization(
+                    true, List.of(PROFESSION), true, List.of("Spring"), true);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().topic()).isEmpty();
+
+            assertThat(result.topicRecognized()).isNull();
+            assertThat(result.topicSuggestions()).isNull();
+            assertThat(result.topicFitsProfession()).isNull();
+        }
+
+        @Test
+        @DisplayName("Тема из пробелов - трактуется как отсутствующая: пустая строка в LLM-запрос, null-поля темы в ответе")
+        void blankTopicSendsEmptyStringAndNullsTopicFields() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, "   ");
+            LlmInputNormalization llmResponse = new LlmInputNormalization(
+                    true, List.of(PROFESSION), true, List.of("Spring"), true);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().topic()).isEmpty();
+
+            assertThat(result.topicRecognized()).isNull();
+            assertThat(result.topicSuggestions()).isNull();
+            assertThat(result.topicFitsProfession()).isNull();
+        }
+
+        @Test
+        @DisplayName("LLM вернул null-списки подсказок - в ответе пустые списки, а не null")
+        void nullSuggestionListsFromLlmBecomeEmptyLists() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, TOPIC);
+            LlmInputNormalization llmResponse = new LlmInputNormalization(
+                    false, null, false, null, false);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            assertThat(result.professionSuggestions()).isNotNull().isEmpty();
+            assertThat(result.topicSuggestions()).isNotNull().isEmpty();
         }
     }
 }

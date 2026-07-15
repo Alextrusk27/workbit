@@ -36,6 +36,7 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 | GET | `/options` | справочник популярных профессий (подсказки для UI), уровней и порогов (кап вопросов, минимум для завершения) | cookie `access_token` |
 | GET | `/suggest/professions` | живые подсказки профессий из словаря по подстроке (для комбобокса) | cookie `access_token` |
 | GET | `/suggest/topics` | живые подсказки тем словаря по подстроке в рамках профессии (для комбобокса) | cookie `access_token` |
+| POST | `/normalize` | распознать через LLM профессию/тему, введённые вручную мимо подсказок, и предложить канонические варианты | cookie `access_token` |
 | POST | `/sessions` | создать тренировочную сессию (без вопросов) | cookie `access_token` |
 | GET | `/sessions` | страница сессий текущего пользователя | cookie `access_token` |
 | GET | `/sessions/{sessionId}` | получить сессию по id | cookie `access_token` |
@@ -97,6 +98,33 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
   по умолчанию `SUGGEST_RATE_LIMIT_LIMIT=60`, `SUGGEST_RATE_LIMIT_WINDOW=1m`). При
   превышении — `429`.
 
+### Распознавание ввода (`POST /normalize`)
+
+Подсказки словаря (`/suggest/*`) покрывают только известные варианты. Если пользователь
+печатает профессию или тему вручную мимо подсказок (например, «джава дев»), `/normalize`
+даёт шаг подтверждения перед созданием сессии: отправляет введённый текст LLM-агенту
+`input-normalizer` (Yandex AI Studio) и возвращает, распознаваем ли ввод и какими
+каноническими названиями его стоит заменить («джава дев» → «Java-разработчик»,
+«QA-инженер (Java)»).
+
+Это подсказка, а не валидация: выбор предложенного варианта необязателен — пользователь
+вправе оставить свой ввод, и `POST /sessions` его примет так же, как принял бы до вызова
+`/normalize`. Сама ручка `/normalize` ничего не создаёт и не сохраняет.
+
+- `profession` анализируется всегда. `topic` — по желанию: если он не передан или
+  пустой/пробельный, тема не анализируется вовсе, и `topicRecognized`,
+  `topicSuggestions`, `topicFitsProfession` в ответе — `null`.
+- `topicFitsProfession` — мягкий сигнал о том, что тема логически не подходит указанной
+  профессии (например, тема из области фронтенда при профессии «Повар»). Это не
+  ограничение контракта: UI может показать предупреждение, но бэк не запрещает создать
+  сессию с таким сочетанием.
+- Вызов платный (обращение к LLM), поэтому ограничен собственным, более строгим лимитом
+  частоты — 10 запросов в минуту с одного IP (`app.security.rate-limit.normalize.limit/window`,
+  по умолчанию `NORMALIZE_RATE_LIMIT_LIMIT=10`, `NORMALIZE_RATE_LIMIT_WINDOW=1m`), отдельным
+  от лимита `/suggest/*`. При превышении — `429`.
+- При недоступности AI-сервиса — `503`, как и у прочих LLM-ручек домена
+  (`.../questions/next`, `.../finish`).
+
 ## Запросы (DTO)
 
 ```java
@@ -106,11 +134,19 @@ record CreateSessionRequest(
     @NotNull Level level)
 
 record SubmitAnswerBody(@NotBlank String answerText)
+
+record NormalizeInputRequest(
+    @NotBlank @Size(max = 100) String profession,
+    @Size(max = 100) String topic)
 ```
 
 `profession` и `level` обязательны; `topic` необязателен (можно не передавать или
 передать `null`; пустая/пробельная строка нормализуется в `null` на бэке). `GET /options`, `POST .../questions/next`, `POST .../finish`,
 `GET .../report` и `DELETE` тела не принимают.
+
+В `NormalizeInputRequest` обязательна только `profession`; `topic` необязателен —
+`null` или пустая/пробельная строка равнозначны отсутствию темы (см. «Распознавание
+ввода» выше).
 
 Пример `CreateSessionRequest`:
 
@@ -119,6 +155,15 @@ record SubmitAnswerBody(@NotBlank String answerText)
   "profession": "Java-разработчик",
   "topic": "Spring Boot",
   "level": "Middle"
+}
+```
+
+Пример `NormalizeInputRequest`:
+
+```json
+{
+  "profession": "джава дев",
+  "topic": "спринг бут"
 }
 ```
 
@@ -141,6 +186,10 @@ record TrainingReportResponse(
     UUID reportId, UUID sessionId, String profession, String topic,
     Level level, Double avgScore, String overallFeedback, Instant generatedAt,
     List<TrainingQuestionResponse> questions)
+
+record NormalizeInputResponse(
+    boolean professionRecognized, List<String> professionSuggestions,
+    Boolean topicRecognized, List<String> topicSuggestions, Boolean topicFitsProfession)
 ```
 
 - **`GET /options`** — `200`, `TrainingOptionsResponse`. `professions` — топ-20
@@ -151,6 +200,11 @@ record TrainingReportResponse(
 - **`GET /suggest/professions`**, **`GET /suggest/topics`** — `200`, тело — просто JSON-массив
   строк (не обёрнут в объект), до 7 элементов; пустой массив — валидный ответ для короткого
   запроса или неизвестной профессии, а не ошибка (см. «Подсказки» выше).
+- **`POST /normalize`** — `200`, `NormalizeInputResponse`. `professionSuggestions` — канонические
+  варианты профессии от LLM, упорядоченные от наиболее вероятного, список может быть пустым,
+  если предложить нечего. Если `topic` не передан или пуст, `topicRecognized`,
+  `topicSuggestions` и `topicFitsProfession` в ответе — `null` (тема не анализировалась, а не
+  «не подходит»).
 - **`POST /sessions`** — `201` с `TrainingSessionResponse` и заголовком `Location`
   (`/sessions/{id}`). Свежесозданная сессия: `status = CREATED`, `answeredCount = 0`,
   вопросов ещё нет — они появляются только через `.../questions/next`.
@@ -188,6 +242,18 @@ record TrainingReportResponse(
   "answerText": null,
   "score": null,
   "feedback": null
+}
+```
+
+Пример `NormalizeInputResponse` (тема передана и не подошла профессии):
+
+```json
+{
+  "professionRecognized": true,
+  "professionSuggestions": ["Java-разработчик", "QA-инженер (Java)"],
+  "topicRecognized": false,
+  "topicSuggestions": ["Spring Boot", "Spring Framework"],
+  "topicFitsProfession": false
 }
 ```
 
@@ -303,13 +369,13 @@ record TrainingReportResponse(
 
 | Код | Когда |
 |---|---|
-| `400` | невалидное тело запроса: пустая или длиннее 100 символов `profession`, `topic` длиннее 100 символов, отсутствующий/невалидный `level`, пустой `answerText`, битый JSON, неверный тип path-параметра (например, `sessionId`/`questionId` не UUID); отсутствующий обязательный query-параметр (`query` у `/suggest/professions`, `query`/`profession` у `/suggest/topics`) |
+| `400` | невалидное тело запроса: пустая или длиннее 100 символов `profession` (в `CreateSessionRequest` и в `NormalizeInputRequest`), `topic` длиннее 100 символов, отсутствующий/невалидный `level`, пустой `answerText`, битый JSON, неверный тип path-параметра (например, `sessionId`/`questionId` не UUID); отсутствующий обязательный query-параметр (`query` у `/suggest/professions`, `query`/`profession` у `/suggest/topics`) |
 | `401` | нет валидного access-токена (ставит Security-фильтр, тело пустое) |
 | `403` | вопрос, на который отправляется ответ, принадлежит другому пользователю |
 | `404` | сессия или вопрос не найдены (в т.ч. чужие — они ищутся сразу с учётом пользователя); отчёт ещё не сформирован |
 | `409` | сессия уже завершена; достигнут лимит основных вопросов (10); вопрос уже отвечен; вопрос не принадлежит указанной в пути сессии; отвечено меньше 3 основных вопросов при попытке завершить |
-| `429` | превышен лимит частоты запросов с одного IP на `/suggest/professions` или `/suggest/topics` — 60 запросов в минуту, лимит отдельный от почтовых ручек `auth` |
-| `503` | AI-сервис недоступен или вернул непригодный ответ — при генерации вопроса (пустой текст вопроса) и при завершении сессии (пустой/слишком короткий итоговый фидбэк, либо ни один ответ не получил пригодной оценки) |
+| `429` | превышен лимит частоты запросов с одного IP: 60 запросов в минуту на `/suggest/professions` или `/suggest/topics`, 10 запросов в минуту на `/normalize` — три независимых счётчика, отдельных друг от друга и от почтовых ручек `auth` |
+| `503` | AI-сервис недоступен или вернул непригодный ответ — при генерации вопроса (пустой текст вопроса), при завершении сессии (пустой/слишком короткий итоговый фидбэк, либо ни один ответ не получил пригодной оценки) и при распознавании ввода на `/normalize` |
 
 `503` отдаётся глобальным обработчиком `LlmException` (`AI service unavailable.`) — на
-ручках, дёргающих LLM: `POST .../questions/next` и `POST .../finish`.
+ручках, дёргающих LLM: `POST .../questions/next`, `POST .../finish` и `POST /normalize`.

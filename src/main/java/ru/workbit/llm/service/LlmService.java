@@ -37,4 +37,9 @@ public class LlmService {
     public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
         return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
     }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
+        return llm.call("input-normalizer", request, LlmInputNormalization.class);
+    }
 }

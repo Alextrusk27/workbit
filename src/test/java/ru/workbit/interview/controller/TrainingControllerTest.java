@@ -12,9 +12,12 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.mockito.ArgumentCaptor;
+import ru.workbit.exception.LlmException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.interview.dto.CreateSessionRequest;
+import ru.workbit.interview.dto.NormalizeInputRequest;
+import ru.workbit.interview.dto.NormalizeInputResponse;
 import ru.workbit.interview.dto.TrainingOptionsResponse;
 import ru.workbit.interview.dto.TrainingSessionResponse;
 import ru.workbit.interview.model.Level;
@@ -405,6 +408,157 @@ class TrainingControllerTest {
             mvc.perform(get(BASE + "/suggest/topics")
                             .param("profession", "Java-разработчик")
                             .param("query", "spr"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /normalize
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("NormalizeInput")
+    class NormalizeInput {
+
+        @Test
+        @DisplayName("Возвращает 200 с телом из сервиса при валидном запросе")
+        void returns200OnHappyPath() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", "спринг");
+            var response = new NormalizeInputResponse(
+                    true, List.of("Java-разработчик"), true, List.of("Spring"), true);
+            when(trainingService.normalizeInput(any())).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.professionRecognized").value(true))
+                    .andExpect(jsonPath("$.professionSuggestions[0]").value("Java-разработчик"))
+                    .andExpect(jsonPath("$.topicFitsProfession").value(true));
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 и передаёт в сервис topic=null, когда topic отсутствует")
+        void returns200WhenTopicMissing() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", null);
+            var response = new NormalizeInputResponse(
+                    true, List.of("Java-разработчик"), null, null, null);
+            when(trainingService.normalizeInput(any())).thenReturn(response);
+            var requestCaptor = ArgumentCaptor.forClass(NormalizeInputRequest.class);
+
+            // when
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isOk());
+
+            // then
+            verify(trainingService).normalizeInput(requestCaptor.capture());
+            assertThat(requestCaptor.getValue().topic()).isNull();
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда profession пустая строка")
+        void returns400WhenProfessionBlank() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("", "спринг");
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда profession длиннее 100 символов")
+        void returns400WhenProfessionTooLong() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("a".repeat(101), "спринг");
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда topic длиннее 100 символов")
+        void returns400WhenTopicTooLong() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", "b".repeat(101));
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 429 и передаёт в rate limiter ключ с префиксом \"normalize:\", когда лимит превышен")
+        void returns429WhenRateLimited() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", "спринг");
+            doThrow(new TooManyRequestsException("Too many requests"))
+                    .when(rateLimiter).check(anyString(), anyInt(), any());
+            var keyCaptor = ArgumentCaptor.forClass(String.class);
+
+            // when
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isTooManyRequests());
+
+            // then
+            verify(rateLimiter).check(keyCaptor.capture(), anyInt(), any(Duration.class));
+            assertThat(keyCaptor.getValue()).startsWith("normalize:");
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 503, когда сервис бросает LlmException")
+        void returns503WhenLlmUnavailable() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", "спринг");
+            when(trainingService.normalizeInput(any())).thenThrow(new LlmException("LLM недоступен"));
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isServiceUnavailable());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("джава дев", "спринг");
+
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(BASE + "/normalize")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

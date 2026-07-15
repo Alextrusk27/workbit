@@ -8,6 +8,9 @@ app:
       suggest:
         limit: ${SUGGEST_RATE_LIMIT_LIMIT:60}
         window: ${SUGGEST_RATE_LIMIT_WINDOW:1m}
+      normalize:
+        limit: ${NORMALIZE_RATE_LIMIT_LIMIT:10}
+        window: ${NORMALIZE_RATE_LIMIT_WINDOW:1m}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:https://workbit.ru}
   mail:
@@ -69,6 +72,7 @@ llm:
       vacancy-questions-generator: ${VACANCY_QUESTIONS_GENERATOR}
       training-question-generator: ${TRAINING_QUESTION_GENERATOR}
       training-reviewer: ${TRAINING_REVIEWER}
+      input-normalizer: ${INPUT_NORMALIZER}
 
 hh:
   api:

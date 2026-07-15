@@ -26,6 +26,8 @@ import ru.workbit.interview.model.mapper.TrainingReportMapper;
 import ru.workbit.interview.model.mapper.TrainingSessionMapper;
 import ru.workbit.interview.repository.TrainingQuestionRepository;
 import ru.workbit.interview.repository.TrainingSessionRepository;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCase;
 import ru.workbit.llm.dto.LlmTrainingFollowUp;
 import ru.workbit.llm.dto.LlmTrainingHistoryItem;
@@ -220,6 +222,20 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 List.of(Level.values()),
                 MAIN_QUESTION_CAP,
                 MIN_ANSWERED_TO_FINISH);
+    }
+
+    public NormalizeInputResponse normalizeInput(NormalizeInputRequest request) {
+        boolean hasTopic = request.topic() != null && !request.topic().isBlank();
+        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
+                request.profession().strip(),
+                hasTopic ? request.topic().strip() : ""));
+
+        return new NormalizeInputResponse(
+                normalized.professionRecognized(),
+                normalized.professionSuggestions() != null ? normalized.professionSuggestions() : List.of(),
+                hasTopic ? normalized.topicRecognized() : null,
+                hasTopic ? (normalized.topicSuggestions() != null ? normalized.topicSuggestions() : List.of()) : null,
+                hasTopic ? normalized.topicFitsProfession() : null);
     }
 
     public List<String> suggestProfessions(String query) {

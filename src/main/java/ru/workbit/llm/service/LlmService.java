@@ -19,6 +19,11 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
+        return llm.call("training-question-generator", request, LlmTrainingQuestions.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
         return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
     }

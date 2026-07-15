@@ -268,4 +268,59 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
                     .contains("Wild One", "Wild Two");
         }
     }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("UpsertAndIncrementUsage")
+    class UpsertAndIncrementUsage {
+
+        @Test
+        @DisplayName("Новое имя создаёт профессию со status AUTO и usage_count 1")
+        void newNameCreatesRowWithDefaults() {
+            // when
+            var returnedId = repository.upsertAndIncrementUsage("Golang Engineer");
+
+            // then
+            var saved = repository.findById(returnedId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Golang Engineer");
+            assertThat(saved.getStatus()).isEqualTo(DictStatus.AUTO);
+            assertThat(saved.getUsageCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Повторный вызов с тем же именем в другом регистре инкрементит usage_count и не меняет каноническое имя")
+        void repeatedCallDifferentCaseIncrementsUsageKeepsCanonicalName() {
+            // given
+            var firstId = repository.upsertAndIncrementUsage("Rust Engineer");
+
+            // when
+            var secondId = repository.upsertAndIncrementUsage("rust engineer");
+
+            // then
+            assertThat(secondId).isEqualTo(firstId);
+            var saved = repository.findById(firstId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Rust Engineer");
+            assertThat(saved.getUsageCount()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Конфликт с сид-профессией инкрементит usage_count, не трогая status и каноническое имя")
+        void conflictsWithSeededProfessionKeepsApprovedStatusAndCanonicalName() {
+            // given — сид из schema.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
+            var seedId = (UUID) em.getEntityManager()
+                    .createNativeQuery("SELECT id FROM content.profession_dict WHERE lower(name) = 'java-разработчик'")
+                    .getSingleResult();
+
+            // when
+            var returnedId = repository.upsertAndIncrementUsage("java-разработчик");
+
+            // then
+            assertThat(returnedId).isEqualTo(seedId);
+            var saved = repository.findById(returnedId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Java-разработчик");
+            assertThat(saved.getStatus()).isEqualTo(DictStatus.APPROVED);
+            assertThat(saved.getUsageCount()).isEqualTo(1);
+        }
+    }
 }

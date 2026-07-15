@@ -19,4 +19,11 @@ public interface TopicDictRepository extends JpaRepository<@NotNull TopicDict, @
             LIMIT :limit
             """, nativeQuery = true)
     List<TopicDict> suggest(String profession, String query, int limit);
+
+    @Query(value = """
+            INSERT INTO content.topic_dict (profession_id, name, usage_count) VALUES (:professionId, :name, 1)
+            ON CONFLICT (profession_id, lower(name)) DO UPDATE SET usage_count = topic_dict.usage_count + 1
+            RETURNING id
+            """, nativeQuery = true)
+    UUID upsertAndIncrementUsage(UUID professionId, String name);
 }

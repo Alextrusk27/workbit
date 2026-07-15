@@ -19,4 +19,11 @@ public interface ProfessionDictRepository extends JpaRepository<@NotNull Profess
             LIMIT :limit
             """, nativeQuery = true)
     List<ProfessionDict> suggest(String query, int limit);
+
+    @Query(value = """
+            INSERT INTO content.profession_dict (name, usage_count) VALUES (:name, 1)
+            ON CONFLICT (lower(name)) DO UPDATE SET usage_count = profession_dict.usage_count + 1
+            RETURNING id
+            """, nativeQuery = true)
+    UUID upsertAndIncrementUsage(String name);
 }

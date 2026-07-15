@@ -225,4 +225,66 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
                     .containsExactly("Qwe Two", "Qwe One");
         }
     }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("UpsertAndIncrementUsage")
+    class UpsertAndIncrementUsage {
+
+        @Test
+        @DisplayName("Новая тема создаётся со status AUTO, usage_count 1 и привязкой к профессии")
+        void newTopicCreatesRowWithDefaults() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Kotlin Engineer"));
+
+            // when
+            var returnedId = repository.upsertAndIncrementUsage(profession.getId(), "Kotlin Basics");
+
+            // then
+            var saved = repository.findById(returnedId).orElseThrow();
+            assertThat(saved.getProfessionId()).isEqualTo(profession.getId());
+            assertThat(saved.getName()).isEqualTo("Kotlin Basics");
+            assertThat(saved.getStatus()).isEqualTo(DictStatus.AUTO);
+            assertThat(saved.getUsageCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Повторный вызов с тем же именем в другом регистре у той же профессии инкрементит usage_count и не меняет каноническое имя")
+        void repeatedCallDifferentCaseIncrementsUsageSameProfession() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Scala Engineer"));
+            var firstId = repository.upsertAndIncrementUsage(profession.getId(), "Coroutines");
+
+            // when
+            var secondId = repository.upsertAndIncrementUsage(profession.getId(), "coroutines");
+
+            // then
+            assertThat(secondId).isEqualTo(firstId);
+            var saved = repository.findById(firstId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Coroutines");
+            assertThat(saved.getUsageCount()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Одинаковое имя темы у разных профессий создаёт две независимые строки")
+        void sameTopicNameDifferentProfessionsCreatesIndependentRows() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Upsert Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Upsert Profession B"));
+
+            // when
+            var idA = repository.upsertAndIncrementUsage(professionA.getId(), "Testing Basics");
+            var idB = repository.upsertAndIncrementUsage(professionB.getId(), "Testing Basics");
+
+            // then
+            assertThat(idA).isNotEqualTo(idB);
+            var savedA = repository.findById(idA).orElseThrow();
+            var savedB = repository.findById(idB).orElseThrow();
+            assertThat(savedA.getProfessionId()).isEqualTo(professionA.getId());
+            assertThat(savedA.getUsageCount()).isEqualTo(1);
+            assertThat(savedB.getProfessionId()).isEqualTo(professionB.getId());
+            assertThat(savedB.getUsageCount()).isEqualTo(1);
+        }
+    }
 }

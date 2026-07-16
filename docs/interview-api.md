@@ -54,7 +54,7 @@ Security-фильтр, а не контроллер, поэтому тело `Ap
 английском. `SessionStatus` кастомного лейбла не имеет, сериализуется по имени
 константы.
 
-- **Level** — `Junior`, `Middle`, `Senior`, `Lead`.
+- **Level** — `Junior`, `Middle`, `Senior`.
 - **SessionStatus** — `CREATED`, `IN_PROGRESS`, `COMPLETED`.
 
 ### Профессия и тема

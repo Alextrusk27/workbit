@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS content.question_bank (
     created          TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT chk_bank_levels
-        CHECK (levels <@ ARRAY['JUNIOR', 'MIDDLE', 'SENIOR', 'LEAD']::varchar[]
+        CHECK (levels <@ ARRAY['JUNIOR', 'MIDDLE', 'SENIOR']::varchar[]
             AND cardinality(levels) >= 1),
     CONSTRAINT chk_bank_source
         CHECK (source IN ('CLAUDE', 'MANUAL'))
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS interview.training_session (
     completed_at    TIMESTAMPTZ,
 
     CONSTRAINT chk_training_level
-        CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR', 'LEAD')),
+        CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR')),
     CONSTRAINT chk_training_status
         CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
     CONSTRAINT chk_training_completed_at

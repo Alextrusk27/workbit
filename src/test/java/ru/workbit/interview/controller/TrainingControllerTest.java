@@ -263,7 +263,7 @@ class TrainingControllerTest {
             // given
             var response = new TrainingOptionsResponse(
                     List.of("Java-разработчик", "Frontend-разработчик"),
-                    List.of(Level.JUNIOR, Level.MIDDLE, Level.SENIOR, Level.LEAD),
+                    List.of(Level.JUNIOR, Level.MIDDLE, Level.SENIOR),
                     10, 3);
             when(trainingService.getOptions()).thenReturn(response);
 

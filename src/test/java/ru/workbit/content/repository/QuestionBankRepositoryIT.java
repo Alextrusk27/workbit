@@ -232,7 +232,7 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Значение вне JUNIOR/MIDDLE/SENIOR/LEAD нарушает CHECK-констрейнт chk_bank_levels")
+        @DisplayName("Значение вне JUNIOR/MIDDLE/SENIOR нарушает CHECK-констрейнт chk_bank_levels")
         void throwsWhenLevelValueInvalid() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));

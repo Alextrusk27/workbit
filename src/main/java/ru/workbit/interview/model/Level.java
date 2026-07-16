@@ -7,8 +7,7 @@ import lombok.Getter;
 public enum Level {
     JUNIOR("Junior"),
     MIDDLE("Middle"),
-    SENIOR("Senior"),
-    LEAD("Lead");
+    SENIOR("Senior");
 
     @JsonValue
     private final String name;

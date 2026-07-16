@@ -110,7 +110,8 @@ public class TrainingController {
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "422", description = "Профессия или тема не распознаны", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull TrainingSessionResponse> createSession(
             @RequestBody @Valid CreateSessionRequest request,

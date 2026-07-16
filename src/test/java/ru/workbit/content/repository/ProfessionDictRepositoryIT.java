@@ -332,6 +332,37 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
+    @DisplayName("FindByNameIgnoreCase")
+    class FindByNameIgnoreCase {
+
+        @Test
+        @DisplayName("Находит запись при другом регистре запроса")
+        void findsRecordWithDifferentCase() {
+            // given
+            var saved = em.persistAndFlush(anApprovedProfession("Golang Developer", 0));
+
+            // when
+            var result = repository.findByNameIgnoreCase("GOLANG developer");
+
+            // then
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(saved.getId());
+        }
+
+        @Test
+        @DisplayName("Возвращает empty для отсутствующего имени")
+        void returnsEmptyForMissingName() {
+            // when
+            var result = repository.findByNameIgnoreCase("Zzz Nonexistent Profession Name");
+
+            // then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
     @DisplayName("UpsertAndIncrementUsage")
     class UpsertAndIncrementUsage {
 

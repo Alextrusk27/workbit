@@ -12,6 +12,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.interview.dto.*;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
@@ -85,6 +86,8 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         session.setProfession(session.getProfession().strip());
         String topic = session.getTopic();
         session.setTopic(topic == null || topic.isBlank() ? null : topic.strip());
+
+        checkInputRecognized(session);
 
         TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
                 session.getProfession(), session.getTopic());
@@ -305,6 +308,33 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     private static String escapeLike(String query) {
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private void checkInputRecognized(TrainingSession session) {
+        Optional<ProfessionDict> profession = professionDictRepository.findByNameIgnoreCase(session.getProfession());
+        boolean professionApproved = profession
+                .filter(p -> p.getStatus() == DictStatus.APPROVED)
+                .isPresent();
+        boolean topicApproved = session.getTopic() == null || (professionApproved && topicDictRepository
+                .existsByProfessionIdAndNameIgnoreCaseAndStatus(
+                        profession.get().getId(), session.getTopic(), DictStatus.APPROVED));
+        if (professionApproved && topicApproved) {
+            return;
+        }
+
+        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
+                session.getProfession(),
+                session.getTopic() != null ? session.getTopic() : ""));
+        if (!professionApproved && !normalized.professionRecognized()) {
+            log.warn("Rejecting training session: profession not recognized [profession={}]",
+                    session.getProfession());
+            throw new UnprocessableEntityException("Profession not recognized");
+        }
+        if (!topicApproved && !normalized.topicRecognized()) {
+            log.warn("Rejecting training session: topic not recognized [profession={}, topic={}]",
+                    session.getProfession(), session.getTopic());
+            throw new UnprocessableEntityException("Topic not recognized");
+        }
     }
 
     private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {

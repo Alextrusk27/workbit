@@ -3,12 +3,15 @@ package ru.workbit.content.repository;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.TopicDict;
 
 import java.util.List;
 import java.util.UUID;
 
 public interface TopicDictRepository extends JpaRepository<@NotNull TopicDict, @NotNull UUID> {
+
+    boolean existsByProfessionIdAndNameIgnoreCaseAndStatus(UUID professionId, String name, DictStatus status);
 
     @Query(value = """
             SELECT t.* FROM content.topic_dict t

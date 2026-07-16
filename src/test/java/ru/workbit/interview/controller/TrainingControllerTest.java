@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.mockito.ArgumentCaptor;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.NormalizeInputRequest;
@@ -226,6 +227,25 @@ class TrainingControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 422, когда сервис не распознал профессию")
+        void returns422WhenProfessionNotRecognized() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Астролог", "Гороскопы", Level.MIDDLE);
+            when(trainingService.create(any(), any()))
+                    .thenThrow(new UnprocessableEntityException("Profession not recognized"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.status").value("UNPROCESSABLE_CONTENT"))
+                    .andExpect(jsonPath("$.message").value("Unprocessable content."))
+                    .andExpect(jsonPath("$.errors[0]").value("Profession not recognized"));
         }
     }
 

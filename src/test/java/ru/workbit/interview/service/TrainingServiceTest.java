@@ -26,6 +26,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.interview.dto.CreateSessionRequest;
 import ru.workbit.interview.dto.NormalizeInputRequest;
 import ru.workbit.interview.dto.NormalizeInputResponse;
@@ -147,6 +148,21 @@ class TrainingServiceTest {
                     .build();
         }
 
+        private void stubProfessionApproved() {
+            ProfessionDict professionDict = ProfessionDict.builder()
+                    .id(professionId)
+                    .name(PROFESSION)
+                    .status(DictStatus.APPROVED)
+                    .build();
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
+        }
+
+        private void stubProfessionAndTopicApproved() {
+            stubProfessionApproved();
+            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+                    .thenReturn(true);
+        }
+
         @Test
         @DisplayName("Банк выдал полные 10 вопросов - LLM не вызывается, в writer уходят 10 банковских и пустой список сгенерированных")
         void fullBankSkipsLlmGeneration() {
@@ -154,6 +170,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -184,6 +201,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -229,6 +247,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -267,6 +286,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -298,6 +318,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -328,6 +349,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -350,6 +372,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -373,6 +396,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -396,6 +420,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -420,6 +445,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(TOPIC);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
 
@@ -450,6 +476,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(PROFESSION, rawTopic, Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(rawTopic);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionApproved();
             when(trainingWriter.upsertDictionaries(PROFESSION, null))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
 
@@ -476,6 +503,199 @@ class TrainingServiceTest {
                     ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
             verify(llmService).generateTrainingQuestions(captor.capture());
             assertThat(captor.getValue().topic()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Словарный быстрый путь: профессия APPROVED, темы нет - LLM normalizeInput не вызывается")
+        void dictionaryFastPathWithoutTopicSkipsLlmNormalization() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionApproved();
+            when(trainingWriter.upsertDictionaries(PROFESSION, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, never()).normalizeInput(any());
+            verifyNoInteractions(topicDictRepository);
+        }
+
+        @Test
+        @DisplayName("Профессия и тема APPROVED в словаре - LLM normalizeInput не вызывается")
+        void dictionaryFastPathWithTopicSkipsLlmNormalization() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndTopicApproved();
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, never()).normalizeInput(any());
+        }
+
+        @Test
+        @DisplayName("Профессия в словаре со статусом AUTO (не APPROVED) - LLM normalizeInput вызывается")
+        void autoStatusProfessionTriggersLlmNormalization() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+
+            ProfessionDict professionDict = ProfessionDict.builder()
+                    .id(professionId).name(PROFESSION).status(DictStatus.AUTO).build();
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService).normalizeInput(new LlmInputNormalizationRequest(PROFESSION, TOPIC));
+        }
+
+        @Test
+        @DisplayName("Профессия не найдена в словаре, LLM не распознал профессию - UnprocessableEntityException, сессия не создаётся")
+        void throwsWhenProfessionNotRecognizedByLlm() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(false, List.of("Java Developer"), true, List.of(), true));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Profession not recognized");
+            verify(llmService, never()).generateTrainingQuestions(any());
+            verifyNoInteractions(trainingWriter, questionBankRepository, topicDictRepository);
+        }
+
+        @Test
+        @DisplayName("Профессия распознана LLM, тема не распознана - UnprocessableEntityException, сессия не создаётся")
+        void throwsWhenTopicNotRecognizedByLlm() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of("Spring Framework"), false));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Topic not recognized");
+            verify(llmService, never()).generateTrainingQuestions(any());
+            verifyNoInteractions(trainingWriter, questionBankRepository);
+        }
+
+        @Test
+        @DisplayName("Профессия APPROVED по словарю, тема мимо словаря, LLM отверг профессию, но признал тему - вердикт LLM по профессии игнорируется, создание проходит")
+        void createsSessionWhenDictionaryApprovesProfessionAndLlmRecognizesTopic() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+
+            ProfessionDict professionDict = ProfessionDict.builder()
+                    .id(professionId).name(PROFESSION).status(DictStatus.APPROVED).build();
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
+            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+                    .thenReturn(false);
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(false, List.of(), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
+        }
+
+        @Test
+        @DisplayName("Профессия и тема мимо словаря, обе распознаны LLM - создание проходит")
+        void createsSessionWhenLlmRecognizesBothProfessionAndTopic() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, TOPIC, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
         }
     }
 

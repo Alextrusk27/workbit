@@ -16,7 +16,7 @@ import {
   useTopicSuggest,
   useTrainingOptions,
 } from '@/features/training/useTraining'
-import { getErrorMessage } from '@/lib/api'
+import { trainingErrorMessage } from '@/features/training/errors'
 import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -207,7 +207,7 @@ function ConfirmPanel({
       recognized: result.professionRecognized,
       suggestions: result.professionSuggestions,
       onPick: onPickProfession,
-      unknown: `Не удалось распознать профессию «${profession}». Можно оставить как есть — но вопросы получатся общими.`,
+      unknown: `Не удалось распознать профессию «${profession}». С такой профессией тренировка не запустится — уточните формулировку или выберите вариант.`,
     },
     {
       key: 'topic',
@@ -216,7 +216,7 @@ function ConfirmPanel({
       recognized: result.topicRecognized ?? true,
       suggestions: result.topicSuggestions ?? [],
       onPick: onPickTopic,
-      unknown: `Не удалось распознать тему «${topic}». Можно оставить как есть.`,
+      unknown: `Не удалось распознать тему «${topic}». Уточните формулировку, выберите вариант или уберите тему — без неё вопросы будут общими по профессии.`,
     },
   ].filter((row) => row.value.trim() !== '')
 
@@ -297,6 +297,14 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
 
   const ready = profession.trim() !== '' && level !== null
 
+  const blocked =
+    checked !== null &&
+    ((!checked.professionRecognized &&
+      !inList(profession, checked.professionSuggestions)) ||
+      (topic.trim() !== '' &&
+        checked.topicRecognized === false &&
+        !inList(topic, checked.topicSuggestions ?? [])))
+
   const start = () => {
     if (level === null) return
     create.mutate(
@@ -314,7 +322,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!ready) return
+    if (!ready || blocked) return
     if (fromDict || checked) {
       start()
       return
@@ -345,7 +353,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-8">
-      {create.isError && <Alert>{getErrorMessage(create.error)}</Alert>}
+      {create.isError && <Alert>{trainingErrorMessage(create.error)}</Alert>}
 
       <SuggestField
         label="Профессия"
@@ -386,7 +394,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
         />
       )}
 
-      <Button type="submit" size="lg" disabled={!ready || pending}>
+      <Button type="submit" size="lg" disabled={!ready || blocked || pending}>
         {create.isPending
           ? 'Создаём…'
           : normalize.isPending

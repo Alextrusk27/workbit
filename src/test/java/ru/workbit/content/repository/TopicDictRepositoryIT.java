@@ -260,6 +260,73 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
+    @DisplayName("ExistsByProfessionIdAndNameIgnoreCaseAndStatus")
+    class ExistsByProfessionIdAndNameIgnoreCaseAndStatus {
+
+        @Test
+        @DisplayName("True для APPROVED-темы своей профессии при другом регистре имени")
+        void trueForApprovedTopicDifferentCase() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Exists Profession"));
+            em.persistAndFlush(anApprovedTopic(profession.getId(), "Rest Api Basics"));
+
+            // when
+            var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
+                    profession.getId(), "REST api basics", DictStatus.APPROVED);
+
+            // then
+            assertThat(result).isTrue();
+        }
+
+        @Test
+        @DisplayName("False, если тема есть, но статус AUTO")
+        void falseWhenTopicIsAutoStatus() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Exists Auto Profession"));
+            em.persistAndFlush(aTopic(profession.getId(), "Auto Only Topic"));
+
+            // when
+            var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
+                    profession.getId(), "auto only topic", DictStatus.APPROVED);
+
+            // then
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("False для той же темы, но другого professionId")
+        void falseForSameTopicDifferentProfessionId() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Exists Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Exists Profession B"));
+            em.persistAndFlush(anApprovedTopic(professionA.getId(), "Databases Basics"));
+
+            // when
+            var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
+                    professionB.getId(), "Databases Basics", DictStatus.APPROVED);
+
+            // then
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("False для отсутствующего имени")
+        void falseForMissingName() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Exists Missing Profession"));
+
+            // when
+            var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
+                    profession.getId(), "Zzz Nonexistent Topic Name", DictStatus.APPROVED);
+
+            // then
+            assertThat(result).isFalse();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
     @DisplayName("UpsertAndIncrementUsage")
     class UpsertAndIncrementUsage {
 

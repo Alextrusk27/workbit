@@ -7,11 +7,14 @@ import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ProfessionDictRepository extends JpaRepository<@NotNull ProfessionDict, @NotNull UUID> {
 
     List<ProfessionDict> findTop20ByStatusOrderByUsageCountDesc(DictStatus status);
+
+    Optional<ProfessionDict> findByNameIgnoreCase(String name);
 
     @Query(value = """
             SELECT * FROM content.profession_dict

@@ -115,6 +115,14 @@ public class ExceptionController {
                         Collections.singletonList(e.getMessage())));
     }
 
+    @ExceptionHandler(UnprocessableEntityException.class)
+    public ResponseEntity<@NotNull ApiError> handleUnprocessableEntity(final UnprocessableEntityException e) {
+        log.warn("Unprocessable entity exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(ApiError.of(HttpStatus.UNPROCESSABLE_CONTENT, "Unprocessable content.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<@NotNull ApiError> handleTooManyRequests(final TooManyRequestsException e) {
         log.warn("Too many requests exception: {}", e.getMessage());

@@ -87,6 +87,10 @@ export function ReportSummary({
         <p className="text-ink mt-3 leading-relaxed whitespace-pre-wrap">
           {overallFeedback}
         </p>
+        <p className="text-muted mt-6 text-xs">
+          Разбор сгенерирован ИИ и может содержать ошибки. Относитесь к оценкам
+          и рекомендациям как к ориентиру.
+        </p>
       </div>
     </div>
   )

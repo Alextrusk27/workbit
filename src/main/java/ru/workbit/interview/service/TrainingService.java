@@ -14,6 +14,7 @@ import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.*;
 import ru.workbit.content.model.BankQuestion;
+import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
@@ -258,7 +259,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     public TrainingOptionsResponse getOptions() {
         return new TrainingOptionsResponse(
-                professionDictRepository.findTop20ByOrderByUsageCountDesc().stream()
+                professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED).stream()
                         .map(ProfessionDict::getName)
                         .toList(),
                 List.of(Level.values()),

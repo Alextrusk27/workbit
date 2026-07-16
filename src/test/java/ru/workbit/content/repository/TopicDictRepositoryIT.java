@@ -51,6 +51,23 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
+    private TopicDict anApprovedTopic(UUID professionId, String name) {
+        return TopicDict.builder()
+                .professionId(professionId)
+                .name(name)
+                .status(DictStatus.APPROVED)
+                .build();
+    }
+
+    private TopicDict anApprovedTopic(UUID professionId, String name, int usageCount) {
+        return TopicDict.builder()
+                .professionId(professionId)
+                .name(name)
+                .usageCount(usageCount)
+                .status(DictStatus.APPROVED)
+                .build();
+    }
+
     // =========================================================================
 
     @Nested
@@ -159,8 +176,8 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
             // given
             var professionA = em.persistAndFlush(aProfession("Zzz Backend Developer"));
             var professionB = em.persistAndFlush(aProfession("Zzz Frontend Developer"));
-            var topicA = em.persistAndFlush(aTopic(professionA.getId(), "Databases Basics"));
-            em.persistAndFlush(aTopic(professionB.getId(), "Databases Basics"));
+            var topicA = em.persistAndFlush(anApprovedTopic(professionA.getId(), "Databases Basics"));
+            em.persistAndFlush(anApprovedTopic(professionB.getId(), "Databases Basics"));
 
             // when
             var result = repository.suggest(professionA.getName(), "databases", 10);
@@ -174,7 +191,7 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void resolvesProfessionCaseInsensitively() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Backend Developer"));
-            var topic = em.persistAndFlush(aTopic(profession.getId(), "Rest Api Basics"));
+            var topic = em.persistAndFlush(anApprovedTopic(profession.getId(), "Rest Api Basics"));
 
             // when
             var result = repository.suggest("zzz BACKEND developer", "rest", 10);
@@ -194,12 +211,26 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
+        @DisplayName("AUTO-тема не попадает в выдачу, даже если имя матчится")
+        void autoStatusTopicIsExcluded() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Auto Topic Profession"));
+            em.persistAndFlush(aTopic(profession.getId(), "Auto Only Topic"));
+
+            // when
+            var result = repository.suggest(profession.getName(), "auto only", 10);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
         @DisplayName("Prefix-совпадения идут раньше substring-совпадений независимо от usage_count")
         void prefixMatchesRankBeforeSubstringMatches() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Ranking Profession"));
-            em.persistAndFlush(aTopic(profession.getId(), "Backend Dev Guru", 100));
-            em.persistAndFlush(aTopic(profession.getId(), "Dev Ninja", 1));
+            em.persistAndFlush(anApprovedTopic(profession.getId(), "Backend Dev Guru", 100));
+            em.persistAndFlush(anApprovedTopic(profession.getId(), "Dev Ninja", 1));
 
             // when
             var result = repository.suggest(profession.getName(), "dev", 10);
@@ -214,8 +245,8 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void sameMatchTypeOrderedByUsageCountDesc() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Usage Profession"));
-            em.persistAndFlush(aTopic(profession.getId(), "Qwe One", 1));
-            em.persistAndFlush(aTopic(profession.getId(), "Qwe Two", 5));
+            em.persistAndFlush(anApprovedTopic(profession.getId(), "Qwe One", 1));
+            em.persistAndFlush(anApprovedTopic(profession.getId(), "Qwe Two", 5));
 
             // when
             var result = repository.suggest(profession.getName(), "qwe", 10);

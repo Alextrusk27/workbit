@@ -45,6 +45,14 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
+    private ProfessionDict anApprovedProfession(String name, int usageCount) {
+        return ProfessionDict.builder()
+                .name(name)
+                .usageCount(usageCount)
+                .status(DictStatus.APPROVED)
+                .build();
+    }
+
     private TopicDict aTopic(UUID professionId, String name) {
         return TopicDict.builder()
                 .professionId(professionId)
@@ -184,7 +192,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Регистронезависимый поиск по подстроке")
         void findsBySubstringCaseInsensitive() {
             // given
-            em.persistAndFlush(aProfession("Zzz Backend Engineer", 0));
+            em.persistAndFlush(anApprovedProfession("Zzz Backend Engineer", 0));
 
             // when
             var result = repository.suggest("BACKEND", 10);
@@ -194,11 +202,24 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
+        @DisplayName("AUTO-запись не попадает в выдачу, даже если имя матчится")
+        void autoStatusRecordIsExcluded() {
+            // given
+            em.persistAndFlush(aProfession("Zzz Auto Engineer"));
+
+            // when
+            var result = repository.suggest("auto engineer", 10);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName).doesNotContain("Zzz Auto Engineer");
+        }
+
+        @Test
         @DisplayName("Prefix-совпадения идут раньше substring-совпадений независимо от usage_count")
         void prefixMatchesRankBeforeSubstringMatches() {
             // given
-            em.persistAndFlush(aProfession("Backend Dev Guru", 100));
-            em.persistAndFlush(aProfession("Dev Ninja", 1));
+            em.persistAndFlush(anApprovedProfession("Backend Dev Guru", 100));
+            em.persistAndFlush(anApprovedProfession("Dev Ninja", 1));
 
             // when
             var result = repository.suggest("dev", 10);
@@ -212,8 +233,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("При равном типе совпадения — порядок по usage_count DESC")
         void sameMatchTypeOrderedByUsageCountDesc() {
             // given
-            em.persistAndFlush(aProfession("Qwe One", 1));
-            em.persistAndFlush(aProfession("Qwe Two", 5));
+            em.persistAndFlush(anApprovedProfession("Qwe One", 1));
+            em.persistAndFlush(anApprovedProfession("Qwe Two", 5));
 
             // when
             var result = repository.suggest("qwe", 10);
@@ -227,9 +248,9 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Limit обрезает количество результатов")
         void limitCutsResults() {
             // given
-            em.persistAndFlush(aProfession("Lim One", 1));
-            em.persistAndFlush(aProfession("Lim Two", 2));
-            em.persistAndFlush(aProfession("Lim Three", 3));
+            em.persistAndFlush(anApprovedProfession("Lim One", 1));
+            em.persistAndFlush(anApprovedProfession("Lim Two", 2));
+            em.persistAndFlush(anApprovedProfession("Lim Three", 3));
 
             // when
             var result = repository.suggest("lim", 2);
@@ -243,8 +264,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Экранированный литерал \\% матчит буквальный процент, а не как wildcard")
         void escapedPercentMatchesLiteral() {
             // given
-            em.persistAndFlush(aProfession("100% Off Sale", 0));
-            em.persistAndFlush(aProfession("100 Percent Off", 0));
+            em.persistAndFlush(anApprovedProfession("100% Off Sale", 0));
+            em.persistAndFlush(anApprovedProfession("100 Percent Off", 0));
 
             // when — репозиторий ждёт уже экранированный ввод (экранирование делает сервис)
             var result = repository.suggest("100\\%", 10);
@@ -257,8 +278,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Неэкранированный % работает как wildcard и матчит всё")
         void unescapedPercentMatchesEverything() {
             // given
-            em.persistAndFlush(aProfession("Wild One", 0));
-            em.persistAndFlush(aProfession("Wild Two", 0));
+            em.persistAndFlush(anApprovedProfession("Wild One", 0));
+            em.persistAndFlush(anApprovedProfession("Wild Two", 0));
 
             // when
             var result = repository.suggest("%", 50);
@@ -266,6 +287,45 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
             // then
             assertThat(result).extracting(ProfessionDict::getName)
                     .contains("Wild One", "Wild Two");
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindTop20ByStatusOrderByUsageCountDesc")
+    class FindTop20ByStatusOrderByUsageCountDesc {
+
+        @Test
+        @DisplayName("Возвращает только APPROVED-профессии, AUTO отфильтрованы")
+        void returnsOnlyApprovedProfessions() {
+            // given
+            em.persistAndFlush(aProfession("Zzz Auto Top Profession"));
+            em.persistAndFlush(anApprovedProfession("Zzz Approved Top Profession", 50));
+
+            // when
+            var result = repository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .contains("Zzz Approved Top Profession")
+                    .doesNotContain("Zzz Auto Top Profession");
+        }
+
+        @Test
+        @DisplayName("Сортирует по usage_count DESC")
+        void ordersByUsageCountDesc() {
+            // given
+            em.persistAndFlush(anApprovedProfession("Zzz High Usage Profession", 100));
+            em.persistAndFlush(anApprovedProfession("Zzz Mid Usage Profession", 50));
+            em.persistAndFlush(anApprovedProfession("Zzz Low Usage Profession", 10));
+
+            // when
+            var result = repository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED);
+
+            // then
+            assertThat(result).extracting(ProfessionDict::getName)
+                    .containsSubsequence("Zzz High Usage Profession", "Zzz Mid Usage Profession", "Zzz Low Usage Profession");
         }
     }
 

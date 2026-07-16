@@ -14,6 +14,7 @@ public interface TopicDictRepository extends JpaRepository<@NotNull TopicDict, @
             SELECT t.* FROM content.topic_dict t
             JOIN content.profession_dict p ON p.id = t.profession_id
             WHERE lower(p.name) = lower(:profession)
+              AND t.status = 'APPROVED'
               AND t.name ILIKE '%' || :query || '%'
             ORDER BY (t.name ILIKE :query || '%') DESC, t.usage_count DESC, t.name
             LIMIT :limit

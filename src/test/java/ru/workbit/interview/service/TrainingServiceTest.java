@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import ru.workbit.content.model.BankQuestion;
+import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.TopicDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
@@ -568,7 +569,8 @@ class TrainingServiceTest {
             // given
             ProfessionDict first = ProfessionDict.builder().id(UUID.randomUUID()).name("Java-разработчик").build();
             ProfessionDict second = ProfessionDict.builder().id(UUID.randomUUID()).name("Python-разработчик").build();
-            when(professionDictRepository.findTop20ByOrderByUsageCountDesc()).thenReturn(List.of(first, second));
+            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
+                    .thenReturn(List.of(first, second));
 
             // when
             TrainingOptionsResponse result = trainingService.getOptions();
@@ -584,7 +586,8 @@ class TrainingServiceTest {
         @DisplayName("Пустой словарь профессий - пустой список professions, а не ошибка")
         void returnsEmptyProfessionsWhenDictionaryEmpty() {
             // given
-            when(professionDictRepository.findTop20ByOrderByUsageCountDesc()).thenReturn(List.of());
+            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
+                    .thenReturn(List.of());
 
             // when
             TrainingOptionsResponse result = trainingService.getOptions();

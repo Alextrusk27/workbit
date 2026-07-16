@@ -78,9 +78,9 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
-        if (session.getTopic() != null && session.getTopic().isBlank()) {
-            session.setTopic(null);
-        }
+        session.setProfession(session.getProfession().strip());
+        String topic = session.getTopic();
+        session.setTopic(topic == null || topic.isBlank() ? null : topic.strip());
 
         TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
                 session.getProfession(), session.getTopic());

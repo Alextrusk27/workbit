@@ -332,7 +332,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             var newer = em.persistAndFlush(answered(aMainQuestion(session, 2), now));
 
             // when
-            var result = repository.findLastAnsweredUnchecked(session.getId());
+            var result = repository.findLastAnsweredWithoutFollowUpCheck(session.getId());
 
             // then
             assertThat(result).isPresent();
@@ -352,7 +352,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             var unchecked = em.persistAndFlush(answered(aMainQuestion(session, 2), now.minusSeconds(60)));
 
             // when
-            var result = repository.findLastAnsweredUnchecked(session.getId());
+            var result = repository.findLastAnsweredWithoutFollowUpCheck(session.getId());
 
             // then
             assertThat(result).isPresent();
@@ -368,7 +368,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             em.persistAndFlush(aMainQuestion(session, 1));
 
             // when / then
-            assertThat(repository.findLastAnsweredUnchecked(session.getId())).isEmpty();
+            assertThat(repository.findLastAnsweredWithoutFollowUpCheck(session.getId())).isEmpty();
         }
     }
 

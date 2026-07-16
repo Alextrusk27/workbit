@@ -58,7 +58,7 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
             ORDER BY q.answeredAt DESC
             LIMIT 1
             """)
-    Optional<TrainingQuestion> findLastAnsweredUnchecked(UUID sessionId);
+    Optional<TrainingQuestion> findLastAnsweredWithoutFollowUpCheck(UUID sessionId);
 
     List<TrainingQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
 }

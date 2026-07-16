@@ -1,22 +1,20 @@
 package ru.workbit.security.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.security.config.RateLimitProperties;
 
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
+@RequiredArgsConstructor
 public class RateLimiterService {
     private static final int CLEANUP_THRESHOLD = 10_000;
 
-    @Value("${app.security.rate-limit.limit}")
-    private int limit;
-
-    @Value("${app.security.rate-limit.window}")
-    private Duration window;
+    private final RateLimitProperties properties;
 
     private final ConcurrentHashMap<String, Window> buckets = new ConcurrentHashMap<>();
 
@@ -24,10 +22,14 @@ public class RateLimiterService {
     }
 
     public void check(String key) {
-        check(key, limit, window);
+        check(key, properties.limit(), properties.window());
     }
 
-    public void check(String key, int limit, Duration window) {
+    public void check(String key, RateLimitProperties.Bucket bucket) {
+        check(key, bucket.limit(), bucket.window());
+    }
+
+    private void check(String key, int limit, Duration window) {
         long now = System.currentTimeMillis();
         long windowMillis = window.toMillis();
 

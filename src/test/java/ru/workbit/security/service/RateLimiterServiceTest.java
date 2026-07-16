@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.security.config.RateLimitProperties;
 
 import java.time.Duration;
 
@@ -21,10 +21,7 @@ class RateLimiterServiceTest {
     private static final int LIMIT = 3;
 
     private RateLimiterService aRateLimiter(int limit, Duration window) {
-        var service = new RateLimiterService();
-        ReflectionTestUtils.setField(service, "limit", limit);
-        ReflectionTestUtils.setField(service, "window", window);
-        return service;
+        return new RateLimiterService(new RateLimitProperties(limit, window, null, null));
     }
 
     @Nested

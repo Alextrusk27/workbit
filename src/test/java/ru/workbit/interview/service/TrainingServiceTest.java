@@ -697,7 +697,7 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             verifyNoInteractions(llmService, trainingWriter);
-            verify(trainingQuestionRepository, never()).findLastAnsweredUnchecked(any());
+            verify(trainingQuestionRepository, never()).findLastAnsweredWithoutFollowUpCheck(any());
         }
 
         @Test
@@ -709,7 +709,7 @@ class TrainingServiceTest {
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.empty());
 
             TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 3);
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
@@ -737,7 +737,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
 
             TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
 
             List<TrainingQuestion> maxFollowUps = IntStream.rangeClosed(1, TrainingService.MAX_FOLLOW_UPS_PER_QUESTION)
                     .mapToObj(i -> answeredFollowUp(UUID.randomUUID(), answered.getId(), i + 1))
@@ -772,7 +772,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
 
             TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
                     .thenReturn(List.of());
             when(llmService.decideTrainingFollowUp(any()))
@@ -806,7 +806,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
 
             TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
                     .thenReturn(List.of());
             when(llmService.decideTrainingFollowUp(any()))
@@ -838,7 +838,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
 
             TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
 
             TrainingQuestion previousFollowUp = answeredFollowUp(UUID.randomUUID(), answered.getId(), 2);
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
@@ -883,7 +883,7 @@ class TrainingServiceTest {
 
             TrainingQuestion caseMain = answeredMain(UUID.randomUUID(), 1);
             TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), caseMain.getId(), 2);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId))
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
                     .thenReturn(Optional.of(lastAnsweredFollowUp));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(caseMain.getId()))
                     .thenReturn(List.of(lastAnsweredFollowUp));
@@ -923,7 +923,7 @@ class TrainingServiceTest {
 
             UUID missingMainId = UUID.randomUUID();
             TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), missingMainId, 2);
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId))
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
                     .thenReturn(Optional.of(lastAnsweredFollowUp));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(missingMainId))
                     .thenReturn(List.of(lastAnsweredFollowUp));
@@ -950,7 +950,7 @@ class TrainingServiceTest {
 
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
                     .thenReturn(Optional.empty(), Optional.of(concurrentFollowUp));
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
                     .thenReturn(List.of());
             when(llmService.decideTrainingFollowUp(any()))
@@ -981,7 +981,7 @@ class TrainingServiceTest {
             TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
                     .thenReturn(Optional.empty(), Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.of(answered));
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
             when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
                     .thenReturn(List.of());
             when(llmService.decideTrainingFollowUp(any()))
@@ -1011,7 +1011,7 @@ class TrainingServiceTest {
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
             when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredUnchecked(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.empty());
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.empty());
 
             // when / then

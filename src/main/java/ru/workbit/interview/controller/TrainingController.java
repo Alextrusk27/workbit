@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -23,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.interview.dto.*;
 import ru.workbit.interview.service.TrainingService;
+import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.RateLimiterService;
 import ru.workbit.util.ClientIp;
@@ -30,7 +30,6 @@ import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
 
 import java.net.URI;
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,18 +40,7 @@ import java.util.UUID;
 public class TrainingController {
     private final TrainingService trainingService;
     private final RateLimiterService rateLimiter;
-
-    @Value("${app.security.rate-limit.suggest.limit}")
-    private int suggestRateLimit;
-
-    @Value("${app.security.rate-limit.suggest.window}")
-    private Duration suggestRateWindow;
-
-    @Value("${app.security.rate-limit.normalize.limit}")
-    private int normalizeRateLimit;
-
-    @Value("${app.security.rate-limit.normalize.window}")
-    private Duration normalizeRateWindow;
+    private final RateLimitProperties rateLimitProperties;
 
     @GetMapping("/options")
     @Loggable(logResult = true)
@@ -77,7 +65,7 @@ public class TrainingController {
             @RequestParam String query,
             HttpServletRequest httpRequest
     ) {
-        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), suggestRateLimit, suggestRateWindow);
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
         return ResponseEntity.ok(trainingService.suggestProfessions(query));
     }
 
@@ -94,7 +82,7 @@ public class TrainingController {
             @RequestParam String query,
             HttpServletRequest httpRequest
     ) {
-        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), suggestRateLimit, suggestRateWindow);
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
         return ResponseEntity.ok(trainingService.suggestTopics(profession, query));
     }
 
@@ -112,7 +100,7 @@ public class TrainingController {
             @RequestBody @Valid NormalizeInputRequest request,
             HttpServletRequest httpRequest
     ) {
-        rateLimiter.check("normalize:" + ClientIp.from(httpRequest), normalizeRateLimit, normalizeRateWindow);
+        rateLimiter.check("normalize:" + ClientIp.from(httpRequest), rateLimitProperties.normalize());
         return ResponseEntity.ok(trainingService.normalizeInput(request));
     }
 

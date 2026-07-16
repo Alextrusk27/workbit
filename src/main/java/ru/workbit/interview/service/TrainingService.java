@@ -42,13 +42,16 @@ import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static ru.workbit.interview.service.TrainingCases.answeredSorted;
+import static ru.workbit.interview.service.TrainingCases.checkSessionNotCompleted;
+import static ru.workbit.interview.service.TrainingCases.groupCases;
 
 @Service
 @RequiredArgsConstructor
@@ -90,7 +93,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         List<String> generatedQuestions = bankQuestions.size() < MAIN_QUESTION_CAP
                 ? generateMissingQuestions(session, bankQuestions)
                 : List.of();
-        checkHasMainQuestions(session, bankQuestions, generatedQuestions);
+        checkEnoughMainQuestions(session, bankQuestions, generatedQuestions);
 
         return trainingWriter.createSession(session, bankQuestions, generatedQuestions);
     }
@@ -142,7 +145,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
     private Optional<TrainingQuestionResponse> askFollowUp(TrainingSession session) {
         Optional<TrainingQuestion> lastAnswered = trainingQuestionRepository
-                .findLastAnsweredUnchecked(session.getId());
+                .findLastAnsweredWithoutFollowUpCheck(session.getId());
         if (lastAnswered.isEmpty()) {
             return Optional.empty();
         }
@@ -213,13 +216,10 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
 
-        List<TrainingQuestion> answered = session.getQuestions().stream()
-                .filter(TrainingQuestion::isAnswered)
-                .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
-                .toList();
+        List<TrainingQuestion> answered = answeredSorted(session);
         checkEnoughAnsweredToFinish(sessionId, answered);
 
-        List<List<TrainingQuestion>> cases = TrainingWriter.groupCases(answered);
+        List<List<TrainingQuestion>> cases = groupCases(answered);
         LlmTrainingReport llmReport = llmService.createTrainingReport(new LlmTrainingReportRequest(
                 session.getProfession(),
                 session.getLevel().getName(),
@@ -246,12 +246,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
             throw new NotFoundException("Report not found");
         }
 
-        List<TrainingQuestion> answered = session.getQuestions().stream()
-                .filter(TrainingQuestion::isAnswered)
-                .sorted(Comparator.comparingInt(TrainingQuestion::getOrderIndex))
-                .toList();
-
-        return trainingReportMapper.toResponse(report, session, answered);
+        return trainingReportMapper.toResponse(report, session, answeredSorted(session));
     }
 
     @Override
@@ -331,8 +326,8 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         return questions;
     }
 
-    private void checkHasMainQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
-                                       List<String> generatedQuestions) {
+    private void checkEnoughMainQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
+                                          List<String> generatedQuestions) {
         int questions = bankQuestions.size() + generatedQuestions.size();
         if (questions < MIN_ANSWERED_TO_FINISH) {
             log.error("Only {} main questions for new training session, {} required "
@@ -383,13 +378,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
             log.warn("Question {} belongs to session {}, but request came with session {}",
                     question.getId(), question.getTrainingSession().getId(), sessionId);
             throw new ConflictException("Invalid session");
-        }
-    }
-
-    private void checkSessionNotCompleted(TrainingSession session) {
-        if (session.getStatus() == SessionStatus.COMPLETED) {
-            log.warn("Session {} is already completed", session.getId());
-            throw new ConflictException("Session already finished");
         }
     }
 

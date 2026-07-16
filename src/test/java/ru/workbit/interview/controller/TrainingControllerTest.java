@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -23,19 +24,18 @@ import ru.workbit.interview.dto.TrainingSessionResponse;
 import ru.workbit.interview.model.Level;
 import ru.workbit.interview.model.SessionStatus;
 import ru.workbit.interview.service.TrainingService;
+import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
 import ru.workbit.security.service.RateLimiterService;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -50,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TrainingController.class)
 @Import({SecurityConfig.class, ExceptionController.class})
+@EnableConfigurationProperties(RateLimitProperties.class)
 @DisplayName("TrainingControllerTest")
 class TrainingControllerTest {
 
@@ -308,7 +309,7 @@ class TrainingControllerTest {
         void returns429WhenRateLimited() throws Exception {
             // given
             doThrow(new TooManyRequestsException("Too many requests"))
-                    .when(rateLimiter).check(anyString(), anyInt(), any());
+                    .when(rateLimiter).check(anyString(), any(RateLimitProperties.Bucket.class));
 
             // when / then
             mvc.perform(get(BASE + "/suggest/professions")
@@ -344,7 +345,7 @@ class TrainingControllerTest {
                     .andExpect(status().isOk());
 
             // then
-            verify(rateLimiter).check(keyCaptor.capture(), anyInt(), any(Duration.class));
+            verify(rateLimiter).check(keyCaptor.capture(), any(RateLimitProperties.Bucket.class));
             assertThat(keyCaptor.getValue()).startsWith("suggest:");
         }
     }
@@ -389,7 +390,7 @@ class TrainingControllerTest {
         void returns429WhenRateLimited() throws Exception {
             // given
             doThrow(new TooManyRequestsException("Too many requests"))
-                    .when(rateLimiter).check(anyString(), anyInt(), any());
+                    .when(rateLimiter).check(anyString(), any(RateLimitProperties.Bucket.class));
 
             // when / then
             mvc.perform(get(BASE + "/suggest/topics")
@@ -518,7 +519,7 @@ class TrainingControllerTest {
             // given
             var request = new NormalizeInputRequest("джава дев", "спринг");
             doThrow(new TooManyRequestsException("Too many requests"))
-                    .when(rateLimiter).check(anyString(), anyInt(), any());
+                    .when(rateLimiter).check(anyString(), any(RateLimitProperties.Bucket.class));
             var keyCaptor = ArgumentCaptor.forClass(String.class);
 
             // when
@@ -529,7 +530,7 @@ class TrainingControllerTest {
                     .andExpect(status().isTooManyRequests());
 
             // then
-            verify(rateLimiter).check(keyCaptor.capture(), anyInt(), any(Duration.class));
+            verify(rateLimiter).check(keyCaptor.capture(), any(RateLimitProperties.Bucket.class));
             assertThat(keyCaptor.getValue()).startsWith("normalize:");
             verifyNoInteractions(trainingService);
         }

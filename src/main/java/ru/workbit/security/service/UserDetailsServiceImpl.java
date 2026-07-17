@@ -26,7 +26,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 user.getId(),
                 user.getEmail(),
                 user.getPassword(),
-                user.isActive(),
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
     }

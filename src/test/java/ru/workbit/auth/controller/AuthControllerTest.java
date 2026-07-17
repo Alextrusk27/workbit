@@ -73,7 +73,7 @@ class AuthControllerTest {
 
     // Вспомогательный метод для создания CustomUserDetails в тестах авторизации
     private CustomUserDetails principal() {
-        return new CustomUserDetails(USER_ID, EMAIL, PASSWORD, true, List.of());
+        return new CustomUserDetails(USER_ID, EMAIL, PASSWORD, List.of());
     }
 
     private TokenResponse tokenResponse() {
@@ -678,14 +678,14 @@ class AuthControllerTest {
         @DisplayName("Возвращает 204, когда передан валидный принципал")
         void returns204WithPrincipal() throws Exception {
             // given
-            doNothing().when(authService).deactivateUser(USER_ID);
+            doNothing().when(authService).deleteUser(USER_ID);
 
             // when / then
             mvc.perform(delete(BASE + "/delete")
                             .with(user(principal())))
                     .andExpect(status().isNoContent());
 
-            verify(authService).deactivateUser(USER_ID);
+            verify(authService).deleteUser(USER_ID);
         }
 
         @Test

@@ -78,7 +78,7 @@ class TrainingControllerTest {
     RateLimiterService rateLimiter;
 
     private CustomUserDetails principal() {
-        return new CustomUserDetails(USER_ID, "user@example.com", "hash", true, List.of());
+        return new CustomUserDetails(USER_ID, "user@example.com", "hash", List.of());
     }
 
     private TrainingSessionResponse sessionResponse(String profession, String topic) {

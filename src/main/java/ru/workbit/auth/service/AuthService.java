@@ -6,7 +6,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.auth.UserReactivatedEvent;
 import ru.workbit.auth.dto.*;
 import ru.workbit.auth.model.VerificationToken;
 import ru.workbit.email.ResetPasswordEmailEvent;
@@ -17,7 +16,6 @@ import ru.workbit.security.service.JWTService;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -53,9 +51,8 @@ public class AuthService {
 
     @Transactional
     public void register(RegistrationRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .map(existing -> reactivate(existing, request.password()))
-                .orElseGet(() -> createUser(request));
+        checkEmailAvailable(request.email());
+        User user = createUser(request);
 
         String verifyToken = verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION);
         eventPublisher.publishEvent(new VerificationEmailEvent(user.getEmail(), verifyToken));
@@ -65,9 +62,6 @@ public class AuthService {
     @Transactional
     public TokenResponse verifyEmail(String token) {
         User user = verificationTokenService.consume(token, VerificationToken.Type.EMAIL_VERIFICATION);
-        if (!user.isActive()) {
-            throw new BadCredentialsException("Invalid token");
-        }
         user.setEmailVerified(true);
         TokenResponse tokens = issueTokens(user);
         log.info("Email verified uid={}", user.getId());
@@ -96,7 +90,6 @@ public class AuthService {
     @Transactional
     public void remindPassword(ForgotPasswordRequest request) {
         userRepository.findByEmail(request.email())
-                .filter(User::isActive)
                 .ifPresent(user -> {
                     String rawToken = verificationTokenService.issue(user, VerificationToken.Type.PASSWORD_RESET);
                     eventPublisher.publishEvent(new ResetPasswordEmailEvent(user.getEmail(), rawToken));
@@ -115,7 +108,6 @@ public class AuthService {
     @Transactional
     public void resendVerification(ResendVerificationRequest request) {
         userRepository.findByEmail(request.email())
-                .filter(User::isActive)
                 .filter(user -> !user.isEmailVerified())
                 .ifPresent(user -> {
                     String rawToken = verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION);
@@ -125,20 +117,23 @@ public class AuthService {
     }
 
     @Transactional
-    public void deactivateUser(UUID userId) {
-        userRepository.findById(userId)
-                .filter(User::isActive)
-                .ifPresent(user -> {
-                    user.setActive(false);
-                    user.setDeactivated(Instant.now());
-                    refreshTokenService.revokeAll(user);
-                    log.info("User deactivated uid={}", user.getId());
-                });
+    public void deleteUser(UUID userId) {
+        userRepository.deleteById(userId);
+        log.info("User deleted uid={}", userId);
     }
 
     private TokenResponse issueTokens(User user) {
         String refreshToken = refreshTokenService.issue(user);
         return new TokenResponse(jwtService.generateToken(user), refreshToken);
+    }
+
+    private void checkEmailAvailable(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (!user.isEmailVerified()) {
+                throw new BadCredentialsException("Email registered but not verified");
+            }
+            throw new BadCredentialsException("Email already in use");
+        });
     }
 
     private User createUser(RegistrationRequest request) {
@@ -149,28 +144,9 @@ public class AuthService {
         return userRepository.save(user);
     }
 
-    private User reactivate(User user, String rawPassword) {
-        if (user.isActive()) {
-            if (!user.isEmailVerified()) {
-                throw new BadCredentialsException("Email registered but not verified");
-            }
-            throw new BadCredentialsException("Email already in use");
-        }
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setEmailVerified(false);
-        user.setActive(true);
-        user.setDeactivated(null);
-        refreshTokenService.revokeAll(user);
-        eventPublisher.publishEvent(new UserReactivatedEvent(user.getId()));
-        return user;
-    }
-
     private User authenticate(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
-        if (!user.isActive()) {
-            throw new BadCredentialsException("Invalid credentials");
-        }
         if (!user.isEmailVerified()) {
             throw new BadCredentialsException("Email not verified");
         }

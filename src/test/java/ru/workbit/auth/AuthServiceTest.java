@@ -23,8 +23,6 @@ import ru.workbit.security.service.JWTService;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,34 +60,21 @@ class AuthServiceTest {
     @InjectMocks
     AuthService authService;
 
-    private User activeVerifiedUser() {
+    private User verifiedUser() {
         return User.builder()
                 .id(USER_ID)
                 .email(EMAIL)
                 .password(ENCODED_PASSWORD)
-                .active(true)
                 .emailVerified(true)
                 .build();
     }
 
-    private User activeUnverifiedUser() {
+    private User unverifiedUser() {
         return User.builder()
                 .id(USER_ID)
                 .email(EMAIL)
                 .password(ENCODED_PASSWORD)
-                .active(true)
                 .emailVerified(false)
-                .build();
-    }
-
-    private User inactiveUser() {
-        return User.builder()
-                .id(USER_ID)
-                .email(EMAIL)
-                .password(ENCODED_PASSWORD)
-                .active(false)
-                .emailVerified(false)
-                .deactivated(Instant.now())
                 .build();
     }
 
@@ -102,10 +87,10 @@ class AuthServiceTest {
     class Login {
 
         @Test
-        @DisplayName("Возвращает токены для активного верифицированного пользователя")
-        void returnsTokensForActiveVerifiedUser() {
+        @DisplayName("Возвращает токены для верифицированного пользователя")
+        void returnsTokensForVerifiedUser() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
             when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
@@ -134,24 +119,10 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("Бросает BadCredentialsException, когда пользователь неактивен")
-        void throwsWhenUserInactive() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(inactiveUser()));
-
-            // when / then
-            assertThatThrownBy(() -> authService.login(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid credentials");
-
-            verifyNoInteractions(passwordEncoder, refreshTokenService, jwtService);
-        }
-
-        @Test
         @DisplayName("Бросает BadCredentialsException, когда email не подтверждён")
         void throwsWhenEmailNotVerified() {
             // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeUnverifiedUser()));
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverifiedUser()));
 
             // when / then
             assertThatThrownBy(() -> authService.login(new LoginRequest(EMAIL, RAW_PASSWORD)))
@@ -165,7 +136,7 @@ class AuthServiceTest {
         @DisplayName("Бросает BadCredentialsException, когда пароль неверный")
         void throwsWhenWrongPassword() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
 
@@ -209,7 +180,7 @@ class AuthServiceTest {
         @DisplayName("Возвращает email и дату регистрации для существующего пользователя")
         void returnsEmailAndCreatedForExistingUser() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
             // when
@@ -246,7 +217,7 @@ class AuthServiceTest {
         void createsNewUserAndPublishesEvent() {
             // given
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-            var savedUser = activeUnverifiedUser();
+            var savedUser = unverifiedUser();
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
             when(passwordEncoder.encode(any())).thenReturn(ENCODED_PASSWORD);
             when(verificationTokenService.issue(any(), eq(VerificationToken.Type.EMAIL_VERIFICATION)))
@@ -264,41 +235,13 @@ class AuthServiceTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
             assertThat(eventCaptor.getValue().token()).isEqualTo(VERIFY_TOKEN);
-
-            verify(eventPublisher, never()).publishEvent(any(UserReactivatedEvent.class));
         }
 
         @Test
-        @DisplayName("Реактивирует деактивированного пользователя и публикует событие верификации")
-        void reactivatesDeactivatedUserAndPublishesEvent() {
+        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с уже занятым email")
+        void throwsWhenEmailAlreadyInUse() {
             // given
-            var existingUser = inactiveUser();
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(existingUser));
-            when(passwordEncoder.encode(any())).thenReturn(ENCODED_PASSWORD);
-            when(verificationTokenService.issue(any(), eq(VerificationToken.Type.EMAIL_VERIFICATION)))
-                    .thenReturn(VERIFY_TOKEN);
-
-            // when
-            authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD));
-
-            // then
-            assertThat(existingUser.isActive()).isTrue();
-            assertThat(existingUser.getDeactivated()).isNull();
-            assertThat(existingUser.isEmailVerified()).isFalse();
-
-            verify(refreshTokenService).revokeAll(existingUser);
-            verify(eventPublisher).publishEvent(any(VerificationEmailEvent.class));
-
-            var reactivatedEventCaptor = ArgumentCaptor.forClass(UserReactivatedEvent.class);
-            verify(eventPublisher).publishEvent(reactivatedEventCaptor.capture());
-            assertThat(reactivatedEventCaptor.getValue().userId()).isEqualTo(existingUser.getId());
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с уже занятым активным email")
-        void throwsWhenActiveEmailAlreadyInUse() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeVerifiedUser()));
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(verifiedUser()));
 
             // when / then
             assertThatThrownBy(() -> authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD)))
@@ -309,10 +252,10 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с активным, но не подтверждённым email")
-        void throwsWhenActiveEmailRegisteredButNotVerified() {
+        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с email, который уже зарегистрирован, но не подтверждён")
+        void throwsWhenEmailRegisteredButNotVerified() {
             // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeUnverifiedUser()));
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverifiedUser()));
 
             // when / then
             assertThatThrownBy(() -> authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD)))
@@ -335,7 +278,7 @@ class AuthServiceTest {
         @DisplayName("Подтверждает email и возвращает токены")
         void verifiesEmailAndReturnsTokens() {
             // given
-            var user = activeUnverifiedUser();
+            var user = unverifiedUser();
             when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.EMAIL_VERIFICATION))
                     .thenReturn(user);
             when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
@@ -348,23 +291,6 @@ class AuthServiceTest {
             assertThat(user.isEmailVerified()).isTrue();
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException, если пользователь неактивен после consume")
-        void throwsWhenUserInactiveAfterConsume() {
-            // given
-            var inactiveUser = inactiveUser();
-            when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.EMAIL_VERIFICATION))
-                    .thenReturn(inactiveUser);
-
-            // when / then
-            assertThatThrownBy(() -> authService.verifyEmail(VERIFY_TOKEN))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid token");
-
-            verifyNoInteractions(jwtService);
-            verify(refreshTokenService, never()).issue(any());
         }
     }
 
@@ -383,7 +309,7 @@ class AuthServiceTest {
         @DisplayName("Меняет пароль и отзывает все сессии")
         void changesPasswordAndRevokesAllSessions() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
             when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(NEW_ENCODED);
@@ -417,7 +343,7 @@ class AuthServiceTest {
         @DisplayName("Бросает BadCredentialsException при неверном старом пароле")
         void throwsWhenOldPasswordWrong() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
 
@@ -443,7 +369,7 @@ class AuthServiceTest {
         @DisplayName("Возвращает новую пару токенов по валидному refresh-токену")
         void returnsNewTokensForValidRefreshToken() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(refreshTokenService.consume(REFRESH_TOKEN)).thenReturn(user);
             when(jwtService.generateToken(user)).thenReturn(ACCESS_TOKEN);
             when(refreshTokenService.issue(user)).thenReturn("new-refresh-token");
@@ -493,10 +419,10 @@ class AuthServiceTest {
     class RemindPassword {
 
         @Test
-        @DisplayName("Публикует событие сброса пароля для активного пользователя")
-        void publishesResetEventForActiveUser() {
+        @DisplayName("Публикует событие сброса пароля для существующего пользователя")
+        void publishesResetEventForExistingUser() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(verificationTokenService.issue(user, VerificationToken.Type.PASSWORD_RESET))
                     .thenReturn(VERIFY_TOKEN);
@@ -523,19 +449,6 @@ class AuthServiceTest {
             // then
             verifyNoInteractions(verificationTokenService, eventPublisher);
         }
-
-        @Test
-        @DisplayName("Ничего не делает, когда пользователь неактивен")
-        void doesNothingWhenUserInactive() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(inactiveUser()));
-
-            // when
-            authService.remindPassword(new ForgotPasswordRequest(EMAIL));
-
-            // then
-            verifyNoInteractions(verificationTokenService, eventPublisher);
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -553,7 +466,7 @@ class AuthServiceTest {
         @DisplayName("Сбрасывает пароль и отзывает все сессии")
         void resetsPasswordAndRevokesAllSessions() {
             // given
-            var user = activeVerifiedUser();
+            var user = verifiedUser();
             when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.PASSWORD_RESET))
                     .thenReturn(user);
             when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(NEW_ENCODED);
@@ -592,10 +505,10 @@ class AuthServiceTest {
     class ResendVerification {
 
         @Test
-        @DisplayName("Повторно отправляет письмо верификации активному неверифицированному пользователю")
-        void resendsVerificationEmailToActiveUnverifiedUser() {
+        @DisplayName("Повторно отправляет письмо верификации неверифицированному пользователю")
+        void resendsVerificationEmailToUnverifiedUser() {
             // given
-            var user = activeUnverifiedUser();
+            var user = unverifiedUser();
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION))
                     .thenReturn(VERIFY_TOKEN);
@@ -624,23 +537,10 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("Ничего не делает, когда пользователь неактивен")
-        void doesNothingWhenUserInactive() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(inactiveUser()));
-
-            // when
-            authService.resendVerification(new ResendVerificationRequest(EMAIL));
-
-            // then
-            verifyNoInteractions(verificationTokenService, eventPublisher);
-        }
-
-        @Test
         @DisplayName("Ничего не делает, когда email уже верифицирован")
         void doesNothingWhenEmailAlreadyVerified() {
             // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeVerifiedUser()));
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(verifiedUser()));
 
             // when
             authService.resendVerification(new ResendVerificationRequest(EMAIL));
@@ -651,53 +551,21 @@ class AuthServiceTest {
     }
 
     // -------------------------------------------------------------------------
-    // deactivateUser
+    // deleteUser
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("DeactivateUser")
-    class DeactivateUser {
+    @DisplayName("DeleteUser")
+    class DeleteUser {
 
         @Test
-        @DisplayName("Деактивирует активного пользователя: active=false, deactivated != null")
-        void deactivatesActiveUser() {
-            // given
-            var user = activeVerifiedUser();
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
+        @DisplayName("Удаляет пользователя по id")
+        void deletesUser() {
             // when
-            authService.deactivateUser(USER_ID);
+            authService.deleteUser(USER_ID);
 
             // then
-            assertThat(user.isActive()).isFalse();
-            assertThat(user.getDeactivated()).isNotNull().isCloseTo(Instant.now(), org.assertj.core.api.Assertions.within(5, ChronoUnit.SECONDS));
-            verify(refreshTokenService).revokeAll(user);
-        }
-
-        @Test
-        @DisplayName("Ничего не делает, когда пользователь не найден")
-        void doesNothingWhenUserNotFound() {
-            // given
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-            // when
-            authService.deactivateUser(USER_ID);
-
-            // then
-            verifyNoInteractions(refreshTokenService);
-        }
-
-        @Test
-        @DisplayName("Ничего не делает, когда пользователь уже неактивен")
-        void doesNothingWhenUserAlreadyInactive() {
-            // given
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(inactiveUser()));
-
-            // when
-            authService.deactivateUser(USER_ID);
-
-            // then
-            verifyNoInteractions(refreshTokenService);
+            verify(userRepository).deleteById(USER_ID);
         }
     }
 }

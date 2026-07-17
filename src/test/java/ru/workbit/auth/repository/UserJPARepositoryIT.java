@@ -33,7 +33,7 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
         return User.builder()
                 .email(email)
                 .password("hashed_password")
-                .build(); // active=true, deactivated=null, emailVerified=false — @Builder.Default
+                .build(); // emailVerified=false, created=now() — @Builder.Default
     }
 
     // =========================================================================
@@ -89,64 +89,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
-    @DisplayName("CheckConstraintActiveDeactivated")
-    class CheckConstraintActiveDeactivated {
-
-        @Test
-        @DisplayName("active=false и deactivated=null нарушает CHECK-констрейнт при flush")
-        void throwsWhenActiveIsFalseAndDeactivatedIsNull() {
-            // given — нарушаем инвариант: active=false, deactivated=null
-            var bad = User.builder()
-                    .email("bad-false@example.com")
-                    .password("hashed_password")
-                    .active(false)
-                    .deactivated(null)
-                    .build();
-
-            // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(bad))
-                    .isInstanceOf(Exception.class);
-        }
-
-        @Test
-        @DisplayName("active=true и deactivated != null нарушает CHECK-констрейнт при flush")
-        void throwsWhenActiveIsTrueAndDeactivatedIsNotNull() {
-            // given — нарушаем инвариант: active=true, deactivated заполнен
-            var bad = User.builder()
-                    .email("bad-true@example.com")
-                    .password("hashed_password")
-                    .active(true)
-                    .deactivated(Instant.now())
-                    .build();
-
-            // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(bad))
-                    .isInstanceOf(Exception.class);
-        }
-
-        @Test
-        @DisplayName("Корректный soft delete (active=false, deactivated != null) сохраняется без ошибок")
-        void softDeleteSavesSuccessfully() {
-            // given
-            var user = em.persistAndFlush(aUser("soft-delete@example.com"));
-
-            // when — деактивируем: соблюдаем инвариант
-            user.setActive(false);
-            user.setDeactivated(Instant.now());
-            em.persistAndFlush(user);
-            em.clear();
-
-            // then — читаем из БД и проверяем состояние
-            var found = repository.findByEmail("soft-delete@example.com");
-            assertThat(found).isPresent();
-            assertThat(found.get().isActive()).isFalse();
-            assertThat(found.get().getDeactivated()).isNotNull();
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
     @DisplayName("SaveAndRead")
     class SaveAndRead {
 
@@ -173,7 +115,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
                     .email("roundtrip@example.com")
                     .password("hashed_roundtrip")
                     .emailVerified(true)
-                    .active(true)
                     .created(now)
                     .build();
 
@@ -184,22 +125,39 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getEmail()).isEqualTo("roundtrip@example.com");
             assertThat(saved.getPassword()).isEqualTo("hashed_roundtrip");
             assertThat(saved.isEmailVerified()).isTrue();
-            assertThat(saved.isActive()).isTrue();
-            assertThat(saved.getDeactivated()).isNull();
             assertThat(saved.getCreated()).isNotNull();
         }
 
         @Test
-        @DisplayName("Дефолты emailVerified=false и active=true применяются из @Builder.Default")
-        void defaultsAreApplied() {
+        @DisplayName("Дефолт emailVerified=false применяется из @Builder.Default")
+        void defaultEmailVerifiedIsApplied() {
             // given / when
             var saved = em.persistFlushFind(aUser("defaults@example.com"));
 
             // then
             assertThat(saved.isEmailVerified()).isFalse();
-            assertThat(saved.isActive()).isTrue();
-            assertThat(saved.getDeactivated()).isNull();
             assertThat(saved.getCreated()).isNotNull();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteById")
+    class DeleteById {
+
+        @Test
+        @DisplayName("Физическое удаление: запись пользователя исчезает из БД")
+        void removesUserRecord() {
+            // given
+            var saved = em.persistAndFlush(aUser("delete-me@example.com"));
+
+            // when
+            repository.deleteById(saved.getId());
+            em.flush();
+
+            // then
+            assertThat(repository.findByEmail("delete-me@example.com")).isEmpty();
         }
     }
 }

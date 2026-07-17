@@ -34,13 +34,7 @@ public class User {
     @Builder.Default
     private boolean emailVerified = false;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean active = true;
-
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private Instant created = Instant.now();
-
-    private Instant deactivated;
 }

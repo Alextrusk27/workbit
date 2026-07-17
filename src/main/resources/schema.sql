@@ -8,15 +8,7 @@ CREATE TABLE IF NOT EXISTS auth.users (
     email          VARCHAR(254) NOT NULL UNIQUE,
     pwd_hash       VARCHAR(255) NOT NULL,
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    active         BOOLEAN NOT NULL DEFAULT TRUE,
-    created        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deactivated    TIMESTAMPTZ,
-
-    CONSTRAINT chk_active_deactivated
-        CHECK (
-            (active = TRUE  AND deactivated IS NULL) OR
-            (active = FALSE AND deactivated IS NOT NULL)
-        )
+    created        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS auth.refresh_token (

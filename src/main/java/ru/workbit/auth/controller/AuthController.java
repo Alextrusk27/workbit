@@ -176,16 +176,16 @@ public class AuthController {
     @DeleteMapping("/delete")
     @Loggable
     @Operation(summary = "Удаление аккаунта",
-            description = "Деактивирует текущего пользователя (soft delete), отзывает все его refresh-токены и гасит cookie access_token и refresh_token. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
+            description = "Безвозвратно удаляет текущего пользователя вместе со всеми его данными: сессиями интервью, ответами, отчётами и токенами. Гасит cookie access_token и refresh_token. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Аккаунт деактивирован"),
+            @ApiResponse(responseCode = "204", description = "Аккаунт и все данные удалены"),
             @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> deleteAccount(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        authService.deactivateUser(userDetails.getId());
+        authService.deleteUser(userDetails.getId());
 
         return withClearCookies(ResponseEntity.noContent()).build();
     }

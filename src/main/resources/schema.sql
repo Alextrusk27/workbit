@@ -4,11 +4,13 @@ CREATE SCHEMA IF NOT EXISTS vacancy;
 CREATE SCHEMA IF NOT EXISTS content;
 
 CREATE TABLE IF NOT EXISTS auth.users (
-    id             UUID PRIMARY KEY,
-    email          VARCHAR(254) NOT NULL UNIQUE,
-    pwd_hash       VARCHAR(255) NOT NULL,
-    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    created        TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                  UUID PRIMARY KEY,
+    email               VARCHAR(254) NOT NULL UNIQUE,
+    pwd_hash            VARCHAR(255) NOT NULL,
+    email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
+    created             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deletion_warned_at  TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS auth.refresh_token (

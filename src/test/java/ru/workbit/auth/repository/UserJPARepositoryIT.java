@@ -11,6 +11,8 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -158,6 +160,149 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(repository.findByEmail("delete-me@example.com")).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindByLastSeenBeforeAndDeletionWarnedAtIsNull")
+    class FindByLastSeenBeforeAndDeletionWarnedAtIsNull {
+
+        private final Instant threshold = Instant.now().minus(30, ChronoUnit.DAYS);
+
+        @Test
+        @DisplayName("Возвращает неактивного пользователя без отметки о предупреждении")
+        void returnsInactiveUserWithoutWarning() {
+            // given
+            var inactive = User.builder()
+                    .email("inactive@example.com")
+                    .password("hashed_password")
+                    .lastSeen(threshold.minus(1, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(inactive);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getEmail()).isEqualTo("inactive@example.com");
+        }
+
+        @Test
+        @DisplayName("Не возвращает активного пользователя со свежим lastSeen")
+        void excludesActiveUser() {
+            // given
+            var active = User.builder()
+                    .email("active@example.com")
+                    .password("hashed_password")
+                    .lastSeen(Instant.now())
+                    .build();
+            em.persistAndFlush(active);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не возвращает уже предупреждённого пользователя, даже с устаревшим lastSeen")
+        void excludesAlreadyWarnedUser() {
+            // given
+            var warned = User.builder()
+                    .email("warned@example.com")
+                    .password("hashed_password")
+                    .lastSeen(threshold.minus(10, ChronoUnit.DAYS))
+                    .deletionWarnedAt(Instant.now().minus(5, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(warned);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteByDeletionWarnedAtBefore")
+    class DeleteByDeletionWarnedAtBefore {
+
+        private final Instant threshold = Instant.now().minus(7, ChronoUnit.DAYS);
+
+        @Test
+        @DisplayName("Удаляет пользователей с deletionWarnedAt старше порога и возвращает корректный count")
+        void deletesUsersWarnedBeforeThresholdAndReturnsCount() {
+            // given
+            var old1 = User.builder()
+                    .email("old-warned-1@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(threshold.minus(1, ChronoUnit.DAYS))
+                    .build();
+            var old2 = User.builder()
+                    .email("old-warned-2@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(threshold.minus(2, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(old1);
+            em.persistAndFlush(old2);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isEqualTo(2);
+            assertThat(repository.findByEmail("old-warned-1@example.com")).isEmpty();
+            assertThat(repository.findByEmail("old-warned-2@example.com")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не удаляет пользователя с deletionWarnedAt = null")
+        void keepsUserWithNullWarnedAt() {
+            // given
+            var noWarning = User.builder()
+                    .email("no-warning@example.com")
+                    .password("hashed_password")
+                    .build();
+            em.persistAndFlush(noWarning);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByEmail("no-warning@example.com")).isPresent();
+        }
+
+        @Test
+        @DisplayName("Не удаляет пользователя со свежим deletionWarnedAt")
+        void keepsUserWithFreshWarnedAt() {
+            // given
+            var freshWarning = User.builder()
+                    .email("fresh-warning@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(Instant.now())
+                    .build();
+            em.persistAndFlush(freshWarning);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByEmail("fresh-warning@example.com")).isPresent();
         }
     }
 }

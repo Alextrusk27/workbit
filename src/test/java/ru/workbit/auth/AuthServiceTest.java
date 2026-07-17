@@ -23,11 +23,14 @@ import ru.workbit.security.service.JWTService;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -91,6 +94,8 @@ class AuthServiceTest {
         void returnsTokensForVerifiedUser() {
             // given
             var user = verifiedUser();
+            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
+            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
             when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
@@ -102,6 +107,8 @@ class AuthServiceTest {
             // then
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
+            assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
+            assertThat(user.getDeletionWarnedAt()).isNull();
         }
 
         @Test
@@ -279,6 +286,8 @@ class AuthServiceTest {
         void verifiesEmailAndReturnsTokens() {
             // given
             var user = unverifiedUser();
+            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
+            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
             when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.EMAIL_VERIFICATION))
                     .thenReturn(user);
             when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
@@ -291,6 +300,8 @@ class AuthServiceTest {
             assertThat(user.isEmailVerified()).isTrue();
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
+            assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
+            assertThat(user.getDeletionWarnedAt()).isNull();
         }
     }
 
@@ -370,6 +381,8 @@ class AuthServiceTest {
         void returnsNewTokensForValidRefreshToken() {
             // given
             var user = verifiedUser();
+            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
+            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
             when(refreshTokenService.consume(REFRESH_TOKEN)).thenReturn(user);
             when(jwtService.generateToken(user)).thenReturn(ACCESS_TOKEN);
             when(refreshTokenService.issue(user)).thenReturn("new-refresh-token");
@@ -380,6 +393,8 @@ class AuthServiceTest {
             // then
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(result.refreshToken()).isEqualTo("new-refresh-token");
+            assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
+            assertThat(user.getDeletionWarnedAt()).isNull();
         }
 
         @Test

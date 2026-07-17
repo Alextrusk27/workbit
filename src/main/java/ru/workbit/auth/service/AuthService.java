@@ -16,6 +16,7 @@ import ru.workbit.security.service.JWTService;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -123,6 +124,8 @@ public class AuthService {
     }
 
     private TokenResponse issueTokens(User user) {
+        user.setLastSeen(Instant.now());
+        user.setDeletionWarnedAt(null);
         String refreshToken = refreshTokenService.issue(user);
         return new TokenResponse(jwtService.generateToken(user), refreshToken);
     }

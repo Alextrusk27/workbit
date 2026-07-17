@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аккаунт скоро будет удалён</title>
+</head>
+<body style="margin:0; padding:0; background:#f7f5f0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="background:#f7f5f0; padding:32px 0;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="max-width:560px; background:#ffffff; border:1px solid #e4dfd3;
+                          border-radius:8px; overflow:hidden;
+                          font-family:'Golos Text', system-ui, -apple-system, Arial, sans-serif;
+                          color:#1a1a1a;">
+                <tr>
+                    <td style="padding:28px 40px 20px; border-bottom:1px solid #d8d3c7;">
+                        <span style="font-family:Georgia,'Times New Roman',serif; font-size:25px;
+                                     font-weight:600; letter-spacing:-0.02em; color:#1a1a1a;">workbit<span style="color:#234c5e;">.</span></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:36px 40px 32px;">
+                        <h1 style="margin:0 0 20px; font-family:Georgia,'Times New Roman',serif;
+                                   font-size:24px; font-weight:600; line-height:1.2; color:#1a1a1a;">
+                            Мы скучаем по вам
+                        </h1>
+                        <p style="margin:0 0 28px; font-size:15px; line-height:1.6; color:#3a382f;">
+                            Вы давно не заходили в Workbit. Если вы не воспользуетесь аккаунтом
+                            в течение 30 дней, мы удалим его вместе со всеми вашими тренировками,
+                            ответами и отчётами — так мы не храним данные, которые вам больше не нужны.
+                            Чтобы сохранить аккаунт, просто войдите.
+                        </p>
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td style="border-radius:4px; background:#234c5e;">
+                                    <a th:href="${loginUrl}"
+                                       style="display:inline-block; padding:14px 28px; color:#ffffff;
+                                              font-size:15px; font-weight:600; text-decoration:none;
+                                              border-radius:4px;">
+                                        Войти в аккаунт
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:20px 40px; border-top:1px solid #d8d3c7; background:#f7f5f0;
+                               font-size:12px; line-height:1.6; color:#6e6a5f;">
+                        Если аккаунт вам больше не нужен, делать ничего не требуется — он будет удалён автоматически.
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

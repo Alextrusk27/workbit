@@ -37,4 +37,11 @@ public class User {
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private Instant created = Instant.now();
+
+    @Column(name = "last_seen", nullable = false)
+    @Builder.Default
+    private Instant lastSeen = Instant.now();
+
+    @Column(name = "deletion_warned_at")
+    private Instant deletionWarnedAt;
 }

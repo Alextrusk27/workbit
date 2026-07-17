@@ -192,7 +192,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions/{sessionId}/finish")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(summary = "Завершить тренировку", description = "Завершает тренировку, запрашивает у LLM поразборный фидбэк по каждому ответу и формирует итоговый отчёт. Доступно после ответа минимум на 3 основных вопроса.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -212,7 +212,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}/report")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(summary = "Получить отчёт по тренировке", description = "Возвращает ранее сформированный отчёт по завершённой тренировке, включая поразборный фидбэк по каждому вопросу.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({

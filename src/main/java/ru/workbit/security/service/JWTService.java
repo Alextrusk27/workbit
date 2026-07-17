@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 public class JWTService {
@@ -28,15 +29,14 @@ public class JWTService {
     public String generateToken(User user) {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
-                .claim("email", user.getEmail())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration.toMillis()))
                 .signWith(getSigningKey())
                 .compact();
     }
 
-    public String extractEmail(String token) {
-        return extractClaims(token).get("email", String.class);
+    public UUID extractUserId(String token) {
+        return UUID.fromString(extractClaims(token).getSubject());
     }
 
     public boolean isTokenValid(String token) {

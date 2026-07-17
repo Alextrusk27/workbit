@@ -10,7 +10,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import ru.workbit.security.service.UserDetailsServiceImpl;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.workbit.auth.dto.*;
@@ -69,7 +69,7 @@ class AuthControllerTest {
     JWTService jwtService;
 
     @MockitoBean
-    UserDetailsService userDetailsService;
+    UserDetailsServiceImpl userDetailsService;
 
     // Вспомогательный метод для создания CustomUserDetails в тестах авторизации
     private CustomUserDetails principal() {

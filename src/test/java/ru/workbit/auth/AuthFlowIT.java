@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.dto.*;
+import ru.workbit.security.service.JWTService;
 
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +52,9 @@ class AuthFlowIT extends AbstractPostgresIT {
 
     @Autowired
     AuthTestConfig.TokenCaptor tokenCaptor;
+
+    @Autowired
+    JWTService jwtService;
 
     // -------------------------------------------------------------------------
     // Вспомогательные методы
@@ -848,6 +852,44 @@ class AuthFlowIT extends AbstractPostgresIT {
                     new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
             assertThat(afterDelete.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("Старый токен удалённого аккаунта не даёт доступ к новому аккаунту с тем же email")
+        void oldAccessTokenOfDeletedAccountDoesNotAuthenticateNewAccountWithSameEmail() {
+            // given — исходный пользователь верифицирован, сохраняем его access-токен
+            var email = uniqueEmail();
+            var oldCookies = registerAndVerify(email);
+            var oldAccessToken = oldCookies.access();
+
+            // when — аккаунт удалён, а тем же email зарегистрирован НОВЫЙ пользователь (другой UUID)
+            rest.exchange(
+                    BASE + "/delete",
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(accessCookieHeaders(oldAccessToken)),
+                    Void.class);
+            var newCookies = registerAndVerify(email);
+
+            // then — старый токен структурно валиден (не истёк по TTL), но принадлежит удалённому пользователю
+            assertThat(jwtService.isTokenValid(oldAccessToken)).isTrue();
+
+            // and — старым токеном /me не даёт доступа к новому аккаунту
+            var meWithOldToken = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(oldAccessToken)),
+                    UserResponse.class);
+            assertThat(meWithOldToken.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(meWithOldToken.getBody()).isNull();
+
+            // and — новым токеном /me корректно возвращает нового пользователя
+            var meWithNewToken = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(newCookies.access())),
+                    UserResponse.class);
+            assertThat(meWithNewToken.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(meWithNewToken.getBody().email()).isEqualTo(email);
         }
     }
 

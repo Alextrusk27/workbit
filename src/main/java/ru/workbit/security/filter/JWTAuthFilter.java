@@ -11,21 +11,21 @@ import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import ru.workbit.auth.service.AuthCookieService;
-import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
+import ru.workbit.security.service.UserDetailsServiceImpl;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class JWTAuthFilter extends OncePerRequestFilter {
     private final JWTService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsServiceImpl userDetailsService;
 
     @Override
     protected void doFilterInternal(@NotNull HttpServletRequest request,
@@ -42,17 +42,13 @@ public class JWTAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String email = jwtService.extractEmail(token);
+        UUID userId = jwtService.extractUserId(token);
         try {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-            if (userDetails.isEnabled()) {
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                if (userDetails instanceof CustomUserDetails details) {
-                    MDC.put("uid", details.getId().toString());
-                }
-            }
+            UserDetails userDetails = userDetailsService.loadUserById(userId);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            MDC.put("uid", userId.toString());
         } catch (UsernameNotFoundException ignored) {
         }
     }

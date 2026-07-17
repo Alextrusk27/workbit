@@ -5,14 +5,17 @@ import lombok.Getter;
 
 @Getter
 public enum Level {
-    JUNIOR("Junior"),
-    MIDDLE("Middle"),
-    SENIOR("Senior");
+    JUNIOR("Junior", "Начинающий"),
+    MIDDLE("Middle", "Уверенный"),
+    SENIOR("Senior", "Продвинутый");
+
+    private final String grade;
 
     @JsonValue
-    private final String name;
+    private final String label;
 
-    Level(String name) {
-        this.name = name;
+    Level(String grade, String label) {
+        this.grade = grade;
+        this.label = label;
     }
 }

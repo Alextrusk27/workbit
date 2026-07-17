@@ -378,7 +378,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
       />
 
       <ChipGroup
-        label="Уровень"
+        label="Уровень сложности"
         options={options.levels}
         value={level}
         onChange={setLevel}

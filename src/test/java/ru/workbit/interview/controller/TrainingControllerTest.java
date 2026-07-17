@@ -275,7 +275,7 @@ class TrainingControllerTest {
                     .andExpect(jsonPath("$.professions[0]").value("Java-разработчик"))
                     .andExpect(jsonPath("$.professions[1]").value("Frontend-разработчик"))
                     .andExpect(jsonPath("$.levels").isArray())
-                    .andExpect(jsonPath("$.levels[0]").value("Junior"))
+                    .andExpect(jsonPath("$.levels[0]").value("Начинающий"))
                     .andExpect(jsonPath("$.questionCap").value(10))
                     .andExpect(jsonPath("$.minAnswersToFinish").value(3));
         }

@@ -171,7 +171,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
 
         LlmTrainingFollowUpDecision decision = llmService.decideTrainingFollowUp(new LlmTrainingFollowUpRequest(
                 session.getProfession(),
-                session.getLevel().getName(),
+                session.getLevel().getGrade(),
                 caseMain.getQuestionText(),
                 caseMain.getAnswerText(),
                 caseFollowUps.stream()
@@ -226,7 +226,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         List<List<TrainingQuestion>> cases = groupCases(answered);
         LlmTrainingReport llmReport = llmService.createTrainingReport(new LlmTrainingReportRequest(
                 session.getProfession(),
-                session.getLevel().getName(),
+                session.getLevel().getGrade(),
                 IntStream.range(0, cases.size())
                         .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
                         .toList()));
@@ -342,7 +342,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         LlmTrainingQuestions generated = llmService.generateTrainingQuestions(new LlmTrainingQuestionsRequest(
                 session.getProfession(),
                 session.getTopic() != null ? session.getTopic() : "",
-                session.getLevel().getName(),
+                session.getLevel().getGrade(),
                 missing,
                 bankQuestions.stream().map(BankQuestion::getText).toList()));
 

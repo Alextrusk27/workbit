@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -61,6 +63,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -696,6 +699,212 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             verify(trainingWriter).createSession(mappedEntity, bank, List.of());
+        }
+
+        @Test
+        @DisplayName("Профессия мимо словаря, LLM распознал и вернул подсказки - сессия создаётся с канонической профессией из первой подсказки, а не с вводом пользователя")
+        void canonicalizesProfessionFromFirstSuggestionWhenNotInDictionary() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of("Java-инженер", "Java Developer"), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries("Java-инженер", null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, "Java-инженер", null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo("Java-инженер");
+            verify(trainingWriter).upsertDictionaries("Java-инженер", null);
+        }
+
+        @Test
+        @DisplayName("Профессия APPROVED в словаре, тема мимо словаря, LLM распознал тему и вернул подсказки - канонизируется только тема, профессия остаётся как есть")
+        void canonicalizesTopicFromFirstSuggestionWhenNotApprovedKeepingProfessionUnchanged() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionApproved();
+            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+                    .thenReturn(false);
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of(), true, List.of("Spring Framework", "Spring MVC"), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, "Spring Framework"))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, "Spring Framework", Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
+            assertThat(mappedEntity.getTopic()).isEqualTo("Spring Framework");
+            verify(trainingWriter).upsertDictionaries(PROFESSION, "Spring Framework");
+        }
+
+        @ParameterizedTest
+        @MethodSource("unusableSuggestionSources")
+        @DisplayName("LLM признал профессию распознанной, но подсказки не пригодны (null/пусто/только blank) - ввод пользователя сохраняется как есть, исключения нет")
+        void keepsUserInputWhenSuggestionsUnusable(List<String> professionSuggestions) {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, professionSuggestions, true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
+            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
+        }
+
+        private static Stream<Arguments> unusableSuggestionSources() {
+            return Stream.of(
+                    Arguments.of((Object) null),
+                    Arguments.of(List.of()),
+                    Arguments.of(Arrays.asList(" ", "", null)));
+        }
+
+        @Test
+        @DisplayName("Первая подсказка длиннее MAX_INPUT_LENGTH - пропускается, берётся следующая пригодная (ровно MAX_INPUT_LENGTH символов - валидна)")
+        void skipsSuggestionLongerThanMaxLength() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+
+            String tooLong = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
+            String atLimit = "B".repeat(TrainingService.MAX_INPUT_LENGTH);
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of(tooLong, atLimit), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(atLimit, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, atLimit, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(atLimit);
+            verify(trainingWriter).upsertDictionaries(atLimit, null);
+        }
+
+        @Test
+        @DisplayName("Все подсказки длиннее MAX_INPUT_LENGTH - пригодных нет, остаётся ввод пользователя")
+        void keepsUserInputWhenAllSuggestionsExceedMaxLength() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+
+            String tooLong1 = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
+            String tooLong2 = "B".repeat(TrainingService.MAX_INPUT_LENGTH + 5);
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of(tooLong1, tooLong2), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(PROFESSION, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, PROFESSION, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
+            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
+        }
+
+        @Test
+        @DisplayName("Подсказка со слешем и пробелами по краям - применяется strip()")
+        void stripsSuggestionWithSlashAndSurroundingWhitespace() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(null);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+
+            String rawSuggestion = "  Java / Kotlin разработчик  ";
+            String strippedSuggestion = "Java / Kotlin разработчик";
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of(rawSuggestion), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(strippedSuggestion, null))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, strippedSuggestion, null, Level.MIDDLE, SessionStatus.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(strippedSuggestion);
+            verify(trainingWriter).upsertDictionaries(strippedSuggestion, null);
         }
     }
 

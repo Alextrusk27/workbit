@@ -66,6 +66,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     public static final int MAX_FOLLOW_UPS_PER_QUESTION = 4;
     public static final int SUGGEST_LIMIT = 7;
     public static final int MIN_SUGGEST_QUERY_LENGTH = 2;
+    public static final int MAX_INPUT_LENGTH = 100;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
@@ -87,7 +88,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         String topic = session.getTopic();
         session.setTopic(topic == null || topic.isBlank() ? null : topic.strip());
 
-        checkInputRecognized(session);
+        canonicalizeInput(session);
 
         TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
                 session.getProfession(), session.getTopic());
@@ -310,7 +311,7 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
-    private void checkInputRecognized(TrainingSession session) {
+    private void canonicalizeInput(TrainingSession session) {
         Optional<ProfessionDict> profession = professionDictRepository.findByNameIgnoreCase(session.getProfession());
         boolean professionApproved = profession
                 .filter(p -> p.getStatus() == DictStatus.APPROVED)
@@ -335,6 +336,29 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                     session.getProfession(), session.getTopic());
             throw new UnprocessableEntityException("Topic not recognized");
         }
+
+        if (!professionApproved) {
+            session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions()));
+        }
+        if (!topicApproved) {
+            session.setTopic(canonical(session.getTopic(), normalized.topicSuggestions()));
+        }
+    }
+
+    private static String canonical(String input, List<String> suggestions) {
+        String canonical = suggestions == null ? null : suggestions.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(String::strip)
+                .filter(s -> s.length() <= MAX_INPUT_LENGTH)
+                .findFirst()
+                .orElse(null);
+
+        if (canonical == null) {
+            log.warn("LLM recognized input but returned no usable canonical name, keeping input as is [input={}]",
+                    input);
+            return input;
+        }
+        return canonical;
     }
 
     private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {

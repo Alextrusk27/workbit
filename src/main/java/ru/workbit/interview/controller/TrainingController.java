@@ -183,7 +183,7 @@ public class TrainingController {
     public ResponseEntity<@NotNull Void> submitAnswer(
             @PathVariable UUID sessionId,
             @PathVariable UUID questionId,
-            @RequestBody @Valid SubmitAnswerBody request,
+            @RequestBody @Valid @Sensitive SubmitAnswerBody request,
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         trainingService.submitAnswer(

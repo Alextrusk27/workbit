@@ -18,8 +18,8 @@ const columns = [
   {
     title: 'Документы',
     links: [
-      { label: 'Политика конфиденциальности', to: '/privacy' },
-      { label: 'Пользовательское соглашение', to: '/user-agreement' },
+      { label: 'Конфиденциальность', to: '/privacy' },
+      { label: 'Соглашение', to: '/user-agreement' },
       { label: 'Оферта', to: '/offer' },
     ],
   },
@@ -29,7 +29,7 @@ export function Footer() {
   return (
     <footer className="border-rule mt-24 border-t">
       <Container className="pt-11 pb-5">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
             <Logo />
             <p className="text-muted mt-3 text-sm">

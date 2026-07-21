@@ -60,10 +60,16 @@ export function Footer() {
             Политика конфиденциальности
           </Link>
           <Link
-            to="/terms"
+            to="/user-agreement"
             className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
           >
-            Условия сервиса
+            Пользовательское соглашение
+          </Link>
+          <Link
+            to="/offer"
+            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+          >
+            Оферта
           </Link>
           {import.meta.env.DEV && (
             <Link

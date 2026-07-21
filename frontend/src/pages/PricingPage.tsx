@@ -95,7 +95,15 @@ export function PricingPage() {
         className="text-muted animate-rise mt-8 text-sm"
         style={{ animationDelay: '320ms' }}
       >
-        Цены указаны для примера и могут измениться до запуска.
+        Цены указаны для примера и могут измениться до запуска. Условия оплаты
+        платного тарифа определяет{' '}
+        <Link
+          to="/offer"
+          className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+        >
+          Публичная оферта
+        </Link>
+        .
       </p>
     </Container>
   )

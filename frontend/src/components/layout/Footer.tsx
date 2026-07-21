@@ -15,13 +15,21 @@ const columns = [
     title: 'Аккаунт',
     links: [{ label: 'Войти', to: '/login' }],
   },
+  {
+    title: 'Документы',
+    links: [
+      { label: 'Политика конфиденциальности', to: '/privacy' },
+      { label: 'Пользовательское соглашение', to: '/user-agreement' },
+      { label: 'Оферта', to: '/offer' },
+    ],
+  },
 ]
 
 export function Footer() {
   return (
     <footer className="border-rule mt-24 border-t">
       <Container className="pt-11 pb-5">
-        <div className="grid gap-10 sm:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
           <div className="max-w-xs">
             <Logo />
             <p className="text-muted mt-3 text-sm">
@@ -53,24 +61,6 @@ export function Footer() {
 
         <div className="text-muted mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs">
           <span>© {new Date().getFullYear()} workbit. Все права защищены.</span>
-          <Link
-            to="/privacy"
-            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
-          >
-            Политика конфиденциальности
-          </Link>
-          <Link
-            to="/user-agreement"
-            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
-          >
-            Пользовательское соглашение
-          </Link>
-          <Link
-            to="/offer"
-            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
-          >
-            Оферта
-          </Link>
           {import.meta.env.DEV && (
             <Link
               to="/brand"

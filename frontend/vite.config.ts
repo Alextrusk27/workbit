@@ -8,10 +8,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: '127.0.0.1',
+    fs: {
+      allow: ['..'],
+    },
   },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@docs': fileURLToPath(new URL('../docs', import.meta.url)),
     },
   },
 })

@@ -100,12 +100,12 @@ export function RegisterPage() {
           <Checkbox checked={acceptTerms} onChange={setAcceptTerms} required>
             Принимаю{' '}
             <Link
-              to="/terms"
+              to="/user-agreement"
               target="_blank"
               rel="noopener noreferrer"
               className="text-accent hover:text-accent-hover underline underline-offset-2"
             >
-              Условия сервиса
+              Пользовательское соглашение
             </Link>
           </Checkbox>
           <Checkbox

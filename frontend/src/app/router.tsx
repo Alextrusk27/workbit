@@ -8,8 +8,6 @@ import { RedirectIfAuthed } from '@/features/auth/RedirectIfAuthed'
 import { HomePage } from '@/pages/HomePage'
 import { FaqPage } from '@/pages/FaqPage'
 import { PricingPage } from '@/pages/PricingPage'
-import { PrivacyPage } from '@/pages/PrivacyPage'
-import { TermsPage } from '@/pages/TermsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ErrorPage } from '@/pages/ErrorPage'
 import { BrandPage } from '@/pages/BrandPage'
@@ -38,8 +36,25 @@ export const router = createBrowserRouter([
           { index: true, element: <HomePage /> },
           { path: 'faq', element: <FaqPage /> },
           { path: 'pricing', element: <PricingPage /> },
-          { path: 'privacy', element: <PrivacyPage /> },
-          { path: 'terms', element: <TermsPage /> },
+          {
+            path: 'privacy',
+            lazy: async () => ({
+              Component: (await import('@/pages/PrivacyPage')).PrivacyPage,
+            }),
+          },
+          {
+            path: 'user-agreement',
+            lazy: async () => ({
+              Component: (await import('@/pages/UserAgreementPage'))
+                .UserAgreementPage,
+            }),
+          },
+          {
+            path: 'offer',
+            lazy: async () => ({
+              Component: (await import('@/pages/OfferPage')).OfferPage,
+            }),
+          },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

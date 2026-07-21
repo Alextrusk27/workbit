@@ -9,7 +9,8 @@ import ru.workbit.training.model.TrainingQuestion;
 public interface TrainingQuestionMapper {
 
     @Mapping(target = "questionId", source = "id")
+    @Mapping(target = "questionText", source = "text")
     @Mapping(target = "score", source = "feedback.score")
-    @Mapping(target = "feedback", source = "feedback.feedbackText")
+    @Mapping(target = "feedback", source = "feedback.text")
     TrainingQuestionResponse toDto(TrainingQuestion question);
 }

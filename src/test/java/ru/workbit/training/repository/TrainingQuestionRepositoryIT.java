@@ -57,7 +57,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)
-                .questionText("Вопрос " + orderIndex)
+                .text("Вопрос " + orderIndex)
                 .orderIndex(orderIndex)
                 .build();
     }
@@ -67,7 +67,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
                 .trainingSession(session)
                 .parentQuestionId(parentQuestionId)
                 .followUp(true)
-                .questionText("Уточнение " + orderIndex)
+                .text("Уточнение " + orderIndex)
                 .orderIndex(orderIndex)
                 .build();
     }
@@ -122,7 +122,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             var reloaded = repository.findById(question.getId());
             assertThat(reloaded).isPresent();
             assertThat(reloaded.get().getBankQuestionId()).isNull();
-            assertThat(reloaded.get().getQuestionText()).isEqualTo("Вопрос 1");
+            assertThat(reloaded.get().getText()).isEqualTo("Вопрос 1");
         }
     }
 
@@ -182,7 +182,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             // when — физическое удаление родителя нативным SQL, чтобы проверить реальный
             // ON DELETE CASCADE в БД, минуя JPA-кеш
             em.getEntityManager()
-                    .createNativeQuery("DELETE FROM training.training_question WHERE id = :id")
+                    .createNativeQuery("DELETE FROM training.question WHERE id = :id")
                     .setParameter("id", parent.getId())
                     .executeUpdate();
             em.flush();
@@ -209,7 +209,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             var bad = TrainingQuestion.builder()
                     .trainingSession(session)
                     .followUp(true)
-                    .questionText("Уточнение без родителя")
+                    .text("Уточнение без родителя")
                     .orderIndex(1)
                     .build();
 
@@ -229,7 +229,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
                     .trainingSession(session)
                     .parentQuestionId(parent.getId())
                     .followUp(false)
-                    .questionText("Не уточнение, но с родителем")
+                    .text("Не уточнение, но с родителем")
                     .orderIndex(1)
                     .build();
 

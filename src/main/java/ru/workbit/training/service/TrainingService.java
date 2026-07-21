@@ -166,10 +166,10 @@ public class TrainingService {
         LlmTrainingFollowUpDecision decision = llmService.decideTrainingFollowUp(new LlmTrainingFollowUpRequest(
                 session.getProfession(),
                 session.getLevel().getGrade(),
-                caseMain.getQuestionText(),
+                caseMain.getText(),
                 caseMain.getAnswerText(),
                 caseFollowUps.stream()
-                        .map(q -> new LlmTrainingFollowUp(q.getQuestionText(), q.getAnswerText()))
+                        .map(q -> new LlmTrainingFollowUp(q.getText(), q.getAnswerText()))
                         .toList()));
 
         if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
@@ -385,11 +385,11 @@ public class TrainingService {
     private static LlmTrainingCase toLlmCase(int index, List<TrainingQuestion> trainingCase) {
         return new LlmTrainingCase(
                 index,
-                trainingCase.getFirst().getQuestionText(),
+                trainingCase.getFirst().getText(),
                 trainingCase.getFirst().getAnswerText(),
                 trainingCase.stream()
                         .skip(1)
-                        .map(q -> new LlmTrainingFollowUp(q.getQuestionText(), q.getAnswerText()))
+                        .map(q -> new LlmTrainingFollowUp(q.getText(), q.getAnswerText()))
                         .toList());
     }
 

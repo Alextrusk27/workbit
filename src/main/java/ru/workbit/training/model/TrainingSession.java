@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "training_session", schema = "training")
+@Table(name = "session", schema = "training")
 @Getter
 @Setter
 @Builder

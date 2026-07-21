@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "training_question", schema = "training")
+@Table(name = "question", schema = "training")
 @Getter
 @Setter
 @Builder
@@ -20,7 +20,7 @@ public class TrainingQuestion {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "training_session_id", nullable = false, updatable = false)
+    @JoinColumn(name = "session_id", nullable = false, updatable = false)
     private TrainingSession trainingSession;
 
     @Column(name = "parent_question_id", updatable = false)
@@ -33,7 +33,7 @@ public class TrainingQuestion {
     private TrainingFeedback feedback;
 
     @Column(nullable = false, updatable = false)
-    private String questionText;
+    private String text;
 
     @Column(nullable = false, updatable = false)
     private int orderIndex;

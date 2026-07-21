@@ -70,8 +70,8 @@ class TrainingWriter {
             questions.add(buildMainQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
                     questions.size() + 1));
         }
-        for (String questionText : generatedQuestions) {
-            questions.add(buildMainQuestion(session, questionText, null, questions.size() + 1));
+        for (String text : generatedQuestions) {
+            questions.add(buildMainQuestion(session, text, null, questions.size() + 1));
         }
 
         session.setQuestions(questions);
@@ -80,12 +80,12 @@ class TrainingWriter {
         return trainingSessionMapper.toResponse(session, 0);
     }
 
-    private static TrainingQuestion buildMainQuestion(TrainingSession session, String questionText,
+    private static TrainingQuestion buildMainQuestion(TrainingSession session, String text,
                                                       UUID bankQuestionId, int orderIndex) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)
-                .questionText(questionText)
+                .text(text)
                 .orderIndex(orderIndex)
                 .build();
     }
@@ -98,7 +98,7 @@ class TrainingWriter {
     }
 
     @Transactional
-    public TrainingQuestionResponse saveFollowUp(UUID answeredQuestionId, UUID caseMainId, String questionText) {
+    public TrainingQuestionResponse saveFollowUp(UUID answeredQuestionId, UUID caseMainId, String text) {
         TrainingQuestion answered = trainingQuestionRepository.findWithSessionById(answeredQuestionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
         TrainingSession session = answered.getTrainingSession();
@@ -114,7 +114,7 @@ class TrainingWriter {
         TrainingQuestion followUp = trainingQuestionRepository.save(TrainingQuestion.builder()
                 .trainingSession(session)
                 .parentQuestionId(caseMainId)
-                .questionText(questionText)
+                .text(text)
                 .orderIndex((int) trainingQuestionRepository.countByParentQuestionId(caseMainId) + 1)
                 .followUp(true)
                 .build());
@@ -170,7 +170,7 @@ class TrainingWriter {
             question.setFeedback(TrainingFeedback.builder()
                     .question(question)
                     .score(review.score())
-                    .feedbackText(review.evaluation())
+                    .text(review.evaluation())
                     .build());
         }
     }
@@ -201,7 +201,7 @@ class TrainingWriter {
         }
     }
 
-    private static boolean isPersistableFeedback(Integer score, String feedbackText) {
-        return score != null && score >= 1 && score <= 5 && feedbackText != null && !feedbackText.isBlank();
+    private static boolean isPersistableFeedback(Integer score, String text) {
+        return score != null && score >= 1 && score <= 5 && text != null && !text.isBlank();
     }
 }

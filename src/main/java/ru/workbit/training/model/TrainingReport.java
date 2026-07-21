@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "training_report", schema = "training")
+@Table(name = "report", schema = "training")
 @Setter
 @Getter
 @Builder
@@ -21,7 +21,7 @@ public class TrainingReport {
     private UUID id;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "training_session_id", nullable = false, updatable = false)
+    @JoinColumn(name = "session_id", nullable = false, updatable = false)
     private TrainingSession trainingSession;
 
     @Column(nullable = false, updatable = false)

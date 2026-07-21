@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "training_feedback", schema = "training")
+@Table(name = "feedback", schema = "training")
 @Getter
 @Setter
 @Builder
@@ -27,7 +27,7 @@ public class TrainingFeedback {
     private int score;
 
     @Column(nullable = false)
-    private String feedbackText;
+    private String text;
 
     @Builder.Default
     @Column(name = "generated_at", nullable = false, updatable = false)

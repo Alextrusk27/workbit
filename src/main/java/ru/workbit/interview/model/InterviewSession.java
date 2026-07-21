@@ -9,13 +9,13 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "vacancy_session", schema = "interview")
+@Table(name = "session", schema = "interview")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VacancySession {
+public class InterviewSession {
     @Id
     @UuidGenerator
     private UUID id;
@@ -41,11 +41,11 @@ public class VacancySession {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    @OneToMany(mappedBy = "vacancySession", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<VacancyQuestion> questions;
+    @OneToMany(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<InterviewQuestion> questions;
 
-    @OneToOne(mappedBy = "vacancySession", orphanRemoval = true, cascade = CascadeType.ALL)
-    private VacancyReport report;
+    @OneToOne(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL)
+    private InterviewReport report;
 
     public enum Status {
         CREATED, IN_PROGRESS, COMPLETED

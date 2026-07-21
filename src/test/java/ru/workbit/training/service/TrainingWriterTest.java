@@ -140,7 +140,7 @@ class TrainingWriterTest {
             TrainingQuestion first = questions.get(0);
             assertThat(first.getBankQuestionId()).isEqualTo(bankId1);
             assertThat(first.getOrderIndex()).isEqualTo(1);
-            assertThat(first.getQuestionText()).isEqualTo("Банковский вопрос 1");
+            assertThat(first.getText()).isEqualTo("Банковский вопрос 1");
             assertThat(first.isFollowUp()).isFalse();
             assertThat(first.getTrainingSession()).isSameAs(session);
 
@@ -151,7 +151,7 @@ class TrainingWriterTest {
             TrainingQuestion third = questions.get(2);
             assertThat(third.getBankQuestionId()).isNull();
             assertThat(third.getOrderIndex()).isEqualTo(3);
-            assertThat(third.getQuestionText()).isEqualTo("Сгенерированный вопрос");
+            assertThat(third.getText()).isEqualTo("Сгенерированный вопрос");
             assertThat(third.isFollowUp()).isFalse();
 
             verify(trainingSessionRepository).save(session);
@@ -222,7 +222,7 @@ class TrainingWriterTest {
             TrainingSession session = TrainingSession.builder()
                     .id(UUID.randomUUID()).profession(PROFESSION).level(TrainingSession.Level.MIDDLE).build();
             TrainingQuestion answered = TrainingQuestion.builder()
-                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1)
+                    .id(answeredId).trainingSession(session).text("Вопрос").orderIndex(1)
                     .followUpChecked(false).build();
             when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
             when(trainingQuestionRepository.findNextUnansweredFollowUp(session.getId())).thenReturn(Optional.empty());
@@ -245,7 +245,7 @@ class TrainingWriterTest {
             TrainingQuestion saved = captor.getValue();
             assertThat(saved.getOrderIndex()).isEqualTo(3);
             assertThat(saved.getParentQuestionId()).isEqualTo(caseMainId);
-            assertThat(saved.getQuestionText()).isEqualTo("Новое уточнение");
+            assertThat(saved.getText()).isEqualTo("Новое уточнение");
             assertThat(saved.isFollowUp()).isTrue();
             assertThat(saved.getTrainingSession()).isSameAs(session);
         }
@@ -259,12 +259,12 @@ class TrainingWriterTest {
             TrainingSession session = TrainingSession.builder()
                     .id(UUID.randomUUID()).profession(PROFESSION).level(TrainingSession.Level.MIDDLE).build();
             TrainingQuestion answered = TrainingQuestion.builder()
-                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1)
+                    .id(answeredId).trainingSession(session).text("Вопрос").orderIndex(1)
                     .followUpChecked(false).build();
             when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             TrainingQuestion pendingFollowUp = TrainingQuestion.builder()
-                    .id(UUID.randomUUID()).questionText("Уже создано").orderIndex(1).followUp(true).build();
+                    .id(UUID.randomUUID()).text("Уже создано").orderIndex(1).followUp(true).build();
             when(trainingQuestionRepository.findNextUnansweredFollowUp(session.getId()))
                     .thenReturn(Optional.of(pendingFollowUp));
 
@@ -303,7 +303,7 @@ class TrainingWriterTest {
                     .id(UUID.randomUUID()).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
                     .status(TrainingSession.Status.COMPLETED).build();
             TrainingQuestion answered = TrainingQuestion.builder()
-                    .id(answeredId).trainingSession(session).questionText("Вопрос").orderIndex(1).build();
+                    .id(answeredId).trainingSession(session).text("Вопрос").orderIndex(1).build();
             when(trainingQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             // when / then
@@ -321,7 +321,7 @@ class TrainingWriterTest {
         private TrainingQuestion answeredQuestion(int orderIndex) {
             return TrainingQuestion.builder()
                     .id(UUID.randomUUID())
-                    .questionText("Вопрос " + orderIndex)
+                    .text("Вопрос " + orderIndex)
                     .answerText("Ответ " + orderIndex)
                     .orderIndex(orderIndex)
                     .followUp(false)
@@ -358,7 +358,7 @@ class TrainingWriterTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(q1.getFeedback().getScore()).isEqualTo(4);
-            assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Хорошо");
+            assertThat(q1.getFeedback().getText()).isEqualTo("Хорошо");
             assertThat(q2.getFeedback().getScore()).isEqualTo(5);
             assertThat(session.getStatus()).isEqualTo(TrainingSession.Status.COMPLETED);
             assertThat(session.getCompletedAt()).isNotNull();
@@ -377,11 +377,11 @@ class TrainingWriterTest {
             TrainingQuestion main1 = answeredQuestion(1);
             TrainingQuestion followUpOfMain1 = TrainingQuestion.builder()
                     .id(UUID.randomUUID()).parentQuestionId(main1.getId())
-                    .questionText("Уточнение").answerText("Ответ на уточнение")
+                    .text("Уточнение").answerText("Ответ на уточнение")
                     .orderIndex(1).followUp(true).answered(true).build();
             TrainingQuestion main2 = answeredQuestion(2);
             TrainingQuestion unansweredMain = TrainingQuestion.builder()
-                    .id(UUID.randomUUID()).questionText("Неотвеченный вопрос")
+                    .id(UUID.randomUUID()).text("Неотвеченный вопрос")
                     .orderIndex(3).followUp(false).answered(false).build();
             TrainingSession session = TrainingSession.builder()
                     .id(sessionId).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
@@ -470,7 +470,7 @@ class TrainingWriterTest {
 
             // then
             assertThat(q1.getFeedback().getScore()).isEqualTo(3);
-            assertThat(q1.getFeedback().getFeedbackText()).isEqualTo("Первый");
+            assertThat(q1.getFeedback().getText()).isEqualTo("Первый");
         }
 
         @Test

@@ -119,7 +119,7 @@ class TrainingServiceTest {
     private TrainingQuestion aQuestion(int orderIndex) {
         return TrainingQuestion.builder()
                 .id(UUID.randomUUID())
-                .questionText("Вопрос " + orderIndex)
+                .text("Вопрос " + orderIndex)
                 .answerText("Ответ " + orderIndex)
                 .orderIndex(orderIndex)
                 .followUp(false)
@@ -1031,7 +1031,7 @@ class TrainingServiceTest {
         private TrainingQuestion answeredMain(UUID id, int orderIndex) {
             return TrainingQuestion.builder()
                     .id(id)
-                    .questionText("Вопрос " + orderIndex)
+                    .text("Вопрос " + orderIndex)
                     .answerText("Ответ " + orderIndex)
                     .orderIndex(orderIndex)
                     .followUp(false)
@@ -1042,7 +1042,7 @@ class TrainingServiceTest {
         private TrainingQuestion unansweredMain(UUID id, int orderIndex) {
             return TrainingQuestion.builder()
                     .id(id)
-                    .questionText("Вопрос " + orderIndex)
+                    .text("Вопрос " + orderIndex)
                     .orderIndex(orderIndex)
                     .followUp(false)
                     .answered(false)
@@ -1053,7 +1053,7 @@ class TrainingServiceTest {
             return TrainingQuestion.builder()
                     .id(id)
                     .parentQuestionId(parentQuestionId)
-                    .questionText("Уточнение " + orderIndex)
+                    .text("Уточнение " + orderIndex)
                     .answerText("Ответ на уточнение " + orderIndex)
                     .orderIndex(orderIndex)
                     .followUp(true)
@@ -1065,7 +1065,7 @@ class TrainingServiceTest {
             return TrainingQuestion.builder()
                     .id(id)
                     .parentQuestionId(parentQuestionId)
-                    .questionText("Уточнение " + orderIndex)
+                    .text("Уточнение " + orderIndex)
                     .orderIndex(orderIndex)
                     .followUp(true)
                     .answered(false)
@@ -1118,7 +1118,7 @@ class TrainingServiceTest {
                     .thenReturn(Optional.of(pendingFollowUp));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    pendingFollowUp.getId(), 2, pendingFollowUp.getQuestionText(), true, null, null, null);
+                    pendingFollowUp.getId(), 2, pendingFollowUp.getText(), true, null, null, null);
             when(trainingQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
 
             // when
@@ -1145,7 +1145,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 3, nextMain.getQuestionText(), false, null, null, null);
+                    nextMain.getId(), 3, nextMain.getText(), false, null, null, null);
             when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
 
             // when
@@ -1178,7 +1178,7 @@ class TrainingServiceTest {
             TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
             when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
 
             // when
@@ -1211,7 +1211,7 @@ class TrainingServiceTest {
             TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
             when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
 
             // when
@@ -1245,7 +1245,7 @@ class TrainingServiceTest {
             TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
             when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
 
             // when
@@ -1293,10 +1293,10 @@ class TrainingServiceTest {
             LlmTrainingFollowUpRequest llmRequest = captor.getValue();
             assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
             assertThat(llmRequest.level()).isEqualTo("Middle");
-            assertThat(llmRequest.question()).isEqualTo(answered.getQuestionText());
+            assertThat(llmRequest.question()).isEqualTo(answered.getText());
             assertThat(llmRequest.answer()).isEqualTo(answered.getAnswerText());
             assertThat(llmRequest.previousFollowUps()).containsExactly(
-                    new LlmTrainingFollowUp(previousFollowUp.getQuestionText(), previousFollowUp.getAnswerText()));
+                    new LlmTrainingFollowUp(previousFollowUp.getText(), previousFollowUp.getAnswerText()));
 
             verify(trainingWriter, never()).markFollowUpChecked(any());
         }
@@ -1335,7 +1335,7 @@ class TrainingServiceTest {
 
             ArgumentCaptor<LlmTrainingFollowUpRequest> captor = ArgumentCaptor.forClass(LlmTrainingFollowUpRequest.class);
             verify(llmService).decideTrainingFollowUp(captor.capture());
-            assertThat(captor.getValue().question()).isEqualTo(caseMain.getQuestionText());
+            assertThat(captor.getValue().question()).isEqualTo(caseMain.getText());
             assertThat(captor.getValue().answer()).isEqualTo(caseMain.getAnswerText());
 
             verify(trainingWriter).saveFollowUp(lastAnsweredFollowUp.getId(), caseMain.getId(), "Ещё уточнение");
@@ -1389,7 +1389,7 @@ class TrainingServiceTest {
                     .thenThrow(new DataIntegrityViolationException("concurrent follow-up"));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    concurrentFollowUp.getId(), 2, concurrentFollowUp.getQuestionText(), true, null, null, null);
+                    concurrentFollowUp.getId(), 2, concurrentFollowUp.getText(), true, null, null, null);
             when(trainingQuestionMapper.toDto(concurrentFollowUp)).thenReturn(expectedResponse);
 
             // when
@@ -1422,7 +1422,7 @@ class TrainingServiceTest {
             TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
             when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getQuestionText(), false, null, null, null);
+                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
             when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
 
             // when
@@ -1460,7 +1460,7 @@ class TrainingServiceTest {
             return TrainingQuestion.builder()
                     .id(UUID.randomUUID())
                     .trainingSession(session)
-                    .questionText("Вопрос")
+                    .text("Вопрос")
                     .orderIndex(1)
                     .answered(false)
                     .build();

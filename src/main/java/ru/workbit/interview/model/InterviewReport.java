@@ -9,20 +9,20 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "vacancy_report", schema = "interview")
+@Table(name = "report", schema = "interview")
 @Setter
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VacancyReport {
+public class InterviewReport {
     @Id
     @UuidGenerator
     private UUID id;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "vacancy_session_id", nullable = false, updatable = false)
-    private VacancySession vacancySession;
+    @JoinColumn(name = "session_id", nullable = false, updatable = false)
+    private InterviewSession session;
 
     @Column(nullable = false, updatable = false)
     private Double avgScore;

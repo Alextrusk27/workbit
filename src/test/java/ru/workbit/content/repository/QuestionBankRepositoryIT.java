@@ -75,7 +75,7 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)
-                .questionText("Вопрос " + orderIndex)
+                .text("Вопрос " + orderIndex)
                 .orderIndex(orderIndex)
                 .build();
     }

@@ -8,26 +8,26 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "vacancy_question", schema = "interview")
+@Table(name = "question", schema = "interview")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VacancyQuestion {
+public class InterviewQuestion {
     @Id
     @UuidGenerator
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vacancy_session_id", nullable = false, updatable = false)
-    private VacancySession vacancySession;
+    @JoinColumn(name = "session_id", nullable = false, updatable = false)
+    private InterviewSession session;
 
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
-    private VacancyFeedback feedback;
+    private InterviewFeedback feedback;
 
     @Column(nullable = false, updatable = false)
-    private String questionText;
+    private String text;
 
     @Column(nullable = false, updatable = false)
     private int orderIndex;

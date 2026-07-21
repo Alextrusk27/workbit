@@ -34,9 +34,9 @@ class OfferProbabilityTest {
                 "СРЕДНЯЯ, MEDIUM",
                 "высокая, HIGH"
         })
-        void resolvesKnownValues(String input, OfferProbability expected) {
+        void resolvesKnownValues(String input, InterviewReport.OfferProbability expected) {
             // when
-            Optional<OfferProbability> result = OfferProbability.fromString(input);
+            Optional<InterviewReport.OfferProbability> result = InterviewReport.OfferProbability.fromString(input);
 
             // then
             assertThat(result).contains(expected);
@@ -46,7 +46,7 @@ class OfferProbabilityTest {
         @DisplayName("Возвращает пустой Optional, когда значение null")
         void returnsEmptyWhenNull() {
             // when
-            Optional<OfferProbability> result = OfferProbability.fromString(null);
+            Optional<InterviewReport.OfferProbability> result = InterviewReport.OfferProbability.fromString(null);
 
             // then
             assertThat(result).isEmpty();
@@ -57,7 +57,7 @@ class OfferProbabilityTest {
         @ValueSource(strings = {"", "   "})
         void returnsEmptyWhenBlank(String input) {
             // when
-            Optional<OfferProbability> result = OfferProbability.fromString(input);
+            Optional<InterviewReport.OfferProbability> result = InterviewReport.OfferProbability.fromString(input);
 
             // then
             assertThat(result).isEmpty();
@@ -68,7 +68,7 @@ class OfferProbabilityTest {
         @ValueSource(strings = {"unknown", "Средне-высокая"})
         void returnsEmptyWhenUnknown(String input) {
             // when
-            Optional<OfferProbability> result = OfferProbability.fromString(input);
+            Optional<InterviewReport.OfferProbability> result = InterviewReport.OfferProbability.fromString(input);
 
             // then
             assertThat(result).isEmpty();

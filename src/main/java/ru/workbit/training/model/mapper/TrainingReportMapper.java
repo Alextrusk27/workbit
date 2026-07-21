@@ -20,6 +20,7 @@ public interface TrainingReportMapper {
     @Mapping(target = "avgScore", source = "report.avgScore")
     @Mapping(target = "overallFeedback", source = "report.overallFeedback")
     @Mapping(target = "generatedAt", source = "report.generatedAt")
+    @Mapping(target = "questions", source = "questions")
     TrainingReportResponse toResponse(TrainingReport report, TrainingSession session,
                                       List<TrainingQuestion> questions);
 }

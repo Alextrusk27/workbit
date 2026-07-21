@@ -31,5 +31,5 @@ public record TrainingSessionResponse(
         @Schema(description = "Момент завершения сессии, null пока сессия не завершена")
         Instant completedAt
 
-) implements SessionResponse {
+) {
 }

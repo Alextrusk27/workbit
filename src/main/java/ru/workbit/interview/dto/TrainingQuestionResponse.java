@@ -29,5 +29,5 @@ public record TrainingQuestionResponse(
                 + "до формирования отчёта null")
         String feedback
 
-) implements QuestionResponse {
+) {
 }

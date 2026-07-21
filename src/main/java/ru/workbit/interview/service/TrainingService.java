@@ -58,8 +58,7 @@ import static ru.workbit.interview.service.TrainingCases.groupCases;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TrainingService extends BaseInterviewService<TrainingSessionResponse, TrainingQuestionResponse,
-        TrainingReportResponse> {
+public class TrainingService {
 
     public static final int MAIN_QUESTION_CAP = 10;
     public static final int MIN_ANSWERED_TO_FINISH = 3;
@@ -80,7 +79,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
     private final TrainingQuestionMapper trainingQuestionMapper;
     private final TrainingReportMapper trainingReportMapper;
 
-    @Override
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
@@ -103,7 +101,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         return trainingWriter.createSession(session, bankQuestions, generatedQuestions);
     }
 
-    @Override
     public TrainingSessionResponse get(UUID sessionId, UUID userId) {
         return trainingSessionRepository.findByIdAndUserId(sessionId, userId)
                 .map(session -> trainingSessionMapper.toResponse(session, (int) trainingQuestionRepository
@@ -111,7 +108,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 .orElseThrow(() -> new NotFoundException("Session not found"));
     }
 
-    @Override
     public Page<@NotNull TrainingSessionResponse> getAll(UUID userId, Pageable pageable) {
         Page<@NotNull TrainingSession> sessions = trainingSessionRepository.findAllByUserId(userId, pageable);
 
@@ -127,7 +123,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
                 answered.getOrDefault(session.getId(), 0L).intValue()));
     }
 
-    @Override
     public TrainingQuestionResponse nextQuestion(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
@@ -193,7 +188,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         }
     }
 
-    @Override
     @Transactional
     public void submitAnswer(SubmitAnswerRequest request) {
         TrainingQuestion question = trainingQuestionRepository.findWithSessionById(request.questionId())
@@ -214,7 +208,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         }
     }
 
-    @Override
     public TrainingReportResponse createReport(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
@@ -240,7 +233,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         }
     }
 
-    @Override
     public TrainingReportResponse getReport(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
@@ -254,7 +246,6 @@ public class TrainingService extends BaseInterviewService<TrainingSessionRespons
         return trainingReportMapper.toResponse(report, session, answeredSorted(session));
     }
 
-    @Override
     @Transactional
     public void delete(UUID sessionId, UUID userId) {
         checkUserSession(sessionId, userId);

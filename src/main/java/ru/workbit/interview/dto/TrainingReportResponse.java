@@ -35,5 +35,5 @@ public record TrainingReportResponse(
         @Schema(description = "Отвеченные вопросы сессии с поразборным фидбэком")
         List<TrainingQuestionResponse> questions
 
-) implements ReportResponse {
+) {
 }

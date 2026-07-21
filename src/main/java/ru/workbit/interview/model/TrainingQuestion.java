@@ -23,6 +23,12 @@ public class TrainingQuestion {
     @JoinColumn(name = "training_session_id", nullable = false, updatable = false)
     private TrainingSession trainingSession;
 
+    @Column(name = "parent_question_id", updatable = false)
+    private UUID parentQuestionId;
+
+    @Column(name = "bank_question_id", updatable = false)
+    private UUID bankQuestionId;
+
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
     private TrainingFeedback feedback;
 
@@ -35,6 +41,10 @@ public class TrainingQuestion {
     @Builder.Default
     @Column(name = "follow_up", nullable = false, updatable = false)
     private boolean followUp = false;
+
+    @Builder.Default
+    @Column(name = "follow_up_checked", nullable = false)
+    private boolean followUpChecked = false;
 
     @Builder.Default
     private boolean answered = false;

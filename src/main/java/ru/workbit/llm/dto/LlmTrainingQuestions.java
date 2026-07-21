@@ -2,8 +2,7 @@ package ru.workbit.llm.dto;
 
 import java.util.List;
 
-public record LlmGeneratedQuestions(
-        String title,
+public record LlmTrainingQuestions(
         List<String> questions
 ) {
 }

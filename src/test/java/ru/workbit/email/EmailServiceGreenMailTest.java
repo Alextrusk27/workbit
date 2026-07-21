@@ -148,6 +148,39 @@ class EmailServiceGreenMailTest {
     }
 
     @Nested
+    @DisplayName("SendAccountDeletionWarningMail")
+    class SendAccountDeletionWarningMail {
+
+        private static final String SUBJECT = "Ваш аккаунт Workbit скоро будет удалён";
+        private static final String EXPECTED_URL = BASE_URL + "/login";
+
+        @Test
+        @DisplayName("Доставляет письмо с корректными заголовками на SMTP-сервер")
+        void deliversMailWithCorrectHeaders() throws Exception {
+            // when
+            service.sendAccountDeletionWarningMail(TO);
+
+            // then
+            var message = singleReceivedMessage();
+            assertThat(message.getSubject()).isEqualTo(SUBJECT);
+            assertThat(message.getFrom()[0].toString()).isEqualTo(FROM_MAIL);
+            assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
+        }
+
+        @Test
+        @DisplayName("Подставляет loginUrl и текст предупреждения в HTML-тело письма")
+        void rendersLoginUrlAndWarningInBody() throws Exception {
+            // when
+            service.sendAccountDeletionWarningMail(TO);
+
+            // then
+            var body = htmlBody(singleReceivedMessage());
+            assertThat(body).contains(EXPECTED_URL);
+            assertThat(body).contains("30 дней");
+        }
+    }
+
+    @Nested
     @DisplayName("OnVerificationEmailRequested")
     class OnVerificationEmailRequested {
 
@@ -177,6 +210,23 @@ class EmailServiceGreenMailTest {
             // then
             var message = singleReceivedMessage();
             assertThat(message.getSubject()).isEqualTo("Изменение пароля для аккаунта");
+            assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
+        }
+    }
+
+    @Nested
+    @DisplayName("OnAccountDeletionWarningRequested")
+    class OnAccountDeletionWarningRequested {
+
+        @Test
+        @DisplayName("Доставляет письмо по данным из события")
+        void deliversMailFromEvent() throws Exception {
+            // when
+            service.onAccountDeletionWarningRequested(new AccountDeletionWarningEmailEvent(TO));
+
+            // then
+            var message = singleReceivedMessage();
+            assertThat(message.getSubject()).isEqualTo("Ваш аккаунт Workbit скоро будет удалён");
             assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
         }
     }

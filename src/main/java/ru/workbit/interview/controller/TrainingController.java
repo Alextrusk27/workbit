@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -21,11 +22,15 @@ import org.springframework.web.bind.annotation.*;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.interview.dto.*;
 import ru.workbit.interview.service.TrainingService;
+import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.RateLimiterService;
+import ru.workbit.util.ClientIp;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,10 +39,12 @@ import java.util.UUID;
 @Tag(name = "Training", description = "Тренировочное AI-собеседование: сессии, генерация вопросов, ответы, отчёт")
 public class TrainingController {
     private final TrainingService trainingService;
+    private final RateLimiterService rateLimiter;
+    private final RateLimitProperties rateLimitProperties;
 
     @GetMapping("/options")
     @Loggable(logResult = true)
-    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает допустимые профессии, уровни и типы компании, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
+    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает популярные профессии из словаря (подсказки для быстрого выбора, свободный ввод тоже допустим), допустимые уровни, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Справочник значений")
@@ -46,13 +53,65 @@ public class TrainingController {
         return ResponseEntity.ok(trainingService.getOptions());
     }
 
+    @GetMapping("/suggest/professions")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Подсказки профессий", description = "Возвращает до 7 профессий из словаря по подстроке: сначала совпадения по началу названия, затем по популярности. Запрос короче 2 символов даёт пустой список.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Список подсказок, возможно пустой"),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<String>> suggestProfessions(
+            @RequestParam String query,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
+        return ResponseEntity.ok(trainingService.suggestProfessions(query));
+    }
+
+    @GetMapping("/suggest/topics")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Подсказки тем", description = "Возвращает до 7 тем словаря для указанной профессии по подстроке: сначала совпадения по началу названия, затем по популярности. Неизвестная профессия или запрос короче 2 символов дают пустой список.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Список подсказок, возможно пустой"),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<String>> suggestTopics(
+            @RequestParam String profession,
+            @RequestParam String query,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
+        return ResponseEntity.ok(trainingService.suggestTopics(profession, query));
+    }
+
+    @PostMapping("/normalize")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Распознавание введённых профессии и темы", description = "Проверяет свободный ввод через LLM: распознаваема ли профессия/тема, подходит ли тема профессии, и возвращает канонические варианты для подтверждения. Предназначен для случая, когда ввод не выбран из подсказок словаря; выбор предложенного варианта необязателен.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Результат распознавания"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull NormalizeInputResponse> normalizeInput(
+            @RequestBody @Valid NormalizeInputRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        rateLimiter.check("normalize:" + ClientIp.from(httpRequest), rateLimitProperties.normalize());
+        return ResponseEntity.ok(trainingService.normalizeInput(request));
+    }
+
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по выбранной профессии, уровню и типу компании. Вопросы заранее не генерируются: первый вопрос запрашивается отдельным вызовом.")
+    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по указанной профессии (свободный ввод), необязательной теме и уровню. Вопросы заранее не генерируются: первый вопрос запрашивается отдельным вызовом.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "422", description = "Профессия или тема не распознаны", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull TrainingSessionResponse> createSession(
             @RequestBody @Valid CreateSessionRequest request,
@@ -124,7 +183,7 @@ public class TrainingController {
     public ResponseEntity<@NotNull Void> submitAnswer(
             @PathVariable UUID sessionId,
             @PathVariable UUID questionId,
-            @RequestBody @Valid SubmitAnswerBody request,
+            @RequestBody @Valid @Sensitive SubmitAnswerBody request,
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         trainingService.submitAnswer(
@@ -133,7 +192,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions/{sessionId}/finish")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(summary = "Завершить тренировку", description = "Завершает тренировку, запрашивает у LLM поразборный фидбэк по каждому ответу и формирует итоговый отчёт. Доступно после ответа минимум на 3 основных вопроса.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -153,7 +212,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}/report")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(summary = "Получить отчёт по тренировке", description = "Возвращает ранее сформированный отчёт по завершённой тренировке, включая поразборный фидбэк по каждому вопросу.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({

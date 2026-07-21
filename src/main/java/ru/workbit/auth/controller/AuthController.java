@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -20,6 +21,8 @@ import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.RateLimiterService;
+import ru.workbit.util.ClientIp;
 import ru.workbit.util.annotation.Loggable;
 
 import static ru.workbit.auth.service.AuthCookieService.REFRESH_COOKIE_NAME;
@@ -31,6 +34,7 @@ import static ru.workbit.auth.service.AuthCookieService.REFRESH_COOKIE_NAME;
 public class AuthController {
     private final AuthService authService;
     private final AuthCookieService cookieService;
+    private final RateLimiterService rateLimiter;
 
     @PostMapping("/register")
     @Loggable
@@ -38,9 +42,12 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Пользователь создан, письмо отправлено"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Email уже используется", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "401", description = "Email уже используется", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> register(@RequestBody @Valid RegistrationRequest request) {
+    public ResponseEntity<@NotNull Void> register(@RequestBody @Valid RegistrationRequest request,
+                                                  HttpServletRequest httpRequest) {
+        rateLimiter.check("register:" + ClientIp.from(httpRequest));
         authService.register(request);
         return ResponseEntity.ok().build();
     }
@@ -64,9 +71,12 @@ public class AuthController {
             description = "Если активный пользователь с неподтверждённым email существует, отправляет письмо повторно. Ответ всегда 200.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Запрос принят"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> resendVerification(@RequestBody @Valid ResendVerificationRequest request) {
+    public ResponseEntity<@NotNull Void> resendVerification(@RequestBody @Valid ResendVerificationRequest request,
+                                                            HttpServletRequest httpRequest) {
+        rateLimiter.check("resend-verification:" + ClientIp.from(httpRequest));
         authService.resendVerification(request);
         return ResponseEntity.ok().build();
     }
@@ -140,9 +150,12 @@ public class AuthController {
             description = "Если активный пользователь с таким email существует, отправляет письмо со ссылкой сброса. Ответ всегда 200 (не раскрывает наличие email).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Запрос принят"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+    public ResponseEntity<@NotNull Void> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request,
+                                                        HttpServletRequest httpRequest) {
+        rateLimiter.check("forgot-password:" + ClientIp.from(httpRequest));
         authService.remindPassword(request);
         return ResponseEntity.ok().build();
     }
@@ -163,16 +176,16 @@ public class AuthController {
     @DeleteMapping("/delete")
     @Loggable
     @Operation(summary = "Удаление аккаунта",
-            description = "Деактивирует текущего пользователя (soft delete), отзывает все его refresh-токены и гасит cookie access_token и refresh_token. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
+            description = "Безвозвратно удаляет текущего пользователя вместе со всеми его данными: сессиями интервью, ответами, отчётами и токенами. Гасит cookie access_token и refresh_token. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Аккаунт деактивирован"),
+            @ApiResponse(responseCode = "204", description = "Аккаунт и все данные удалены"),
             @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> deleteAccount(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        authService.deactivateUser(userDetails.getId());
+        authService.deleteUser(userDetails.getId());
 
         return withClearCookies(ResponseEntity.noContent()).build();
     }

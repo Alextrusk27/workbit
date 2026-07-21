@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.dto.*;
+import ru.workbit.security.service.JWTService;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "jwt.secret=test-secret-key-that-is-at-least-32-bytes-long-enough-for-hmac",
         "jwt.expiration=3600000",
+        "app.security.rate-limit.limit=1000",
         "app.mail.from-name=Workbit",
         "app.mail.from-mail=noreply@workbit.ru",
         "app.mail.base-url=https://workbit.ru",
@@ -39,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthFlowIT extends AbstractPostgresIT {
 
     private static final String BASE = "/api/v1/auth";
+    private static final String TRAINING_SESSIONS = "/api/v1/interview/training/sessions";
     private static final String PASSWORD = "P@ssw0rd123";
     private static final String NEW_PASSWORD = "N3wP@ssw0rd!";
     private static final String ACCESS_COOKIE = "access_token";
@@ -49,6 +52,9 @@ class AuthFlowIT extends AbstractPostgresIT {
 
     @Autowired
     AuthTestConfig.TokenCaptor tokenCaptor;
+
+    @Autowired
+    JWTService jwtService;
 
     // -------------------------------------------------------------------------
     // Вспомогательные методы
@@ -194,29 +200,6 @@ class AuthFlowIT extends AbstractPostgresIT {
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        }
-
-        @Test
-        @DisplayName("Реактивирует деактивированного пользователя и возвращает 200")
-        void reactivatesDeactivatedUser() {
-            // given — зарегистрировать, верифицировать, залогиниться, удалить
-            var email = uniqueEmail();
-            var cookies = registerAndVerify(email);
-            rest.exchange(
-                    BASE + "/delete",
-                    HttpMethod.DELETE,
-                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
-                    Void.class);
-
-            // when — повторная регистрация с тем же email
-            var response = rest.postForEntity(
-                    BASE + "/register",
-                    new RegistrationRequest(email, NEW_PASSWORD),
-                    Void.class);
-
-            // then — реактивация, 200, новый токен верификации
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(tokenCaptor.getVerificationToken(email)).isNotNull();
         }
     }
 
@@ -377,28 +360,6 @@ class AuthFlowIT extends AbstractPostgresIT {
             register(email);
 
             // when
-            var response = rest.postForEntity(
-                    BASE + "/login",
-                    new LoginRequest(email, PASSWORD),
-                    Void.class);
-
-            // then
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        }
-
-        @Test
-        @DisplayName("Возвращает 401 для деактивированного пользователя")
-        void returns401ForDeactivatedUser() {
-            // given — зарегистрирован, верифицирован, затем деактивирован
-            var email = uniqueEmail();
-            var cookies = registerAndVerify(email);
-            rest.exchange(
-                    BASE + "/delete",
-                    HttpMethod.DELETE,
-                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
-                    Void.class);
-
-            // when — пытаемся войти
             var response = rest.postForEntity(
                     BASE + "/login",
                     new LoginRequest(email, PASSWORD),
@@ -771,8 +732,8 @@ class AuthFlowIT extends AbstractPostgresIT {
     class DeleteAccount {
 
         @Test
-        @DisplayName("Деактивирует пользователя (soft delete), возвращает 204 и гасит cookie")
-        void deactivatesUserAndClearsCookies() {
+        @DisplayName("Удаляет пользователя физически, возвращает 204, гасит cookie и освобождает email")
+        void deletesUserAndClearsCookies() {
             // given
             var email = uniqueEmail();
             var cookies = registerAndVerify(email);
@@ -784,10 +745,25 @@ class AuthFlowIT extends AbstractPostgresIT {
                     new HttpEntity<>(accessCookieHeaders(cookies.access())),
                     Void.class);
 
-            // then
+            // then — удаление прошло, куки погашены
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
             assertThat(extractCookieMaxAge(response, ACCESS_COOKIE)).isEqualTo("0");
             assertThat(extractCookieMaxAge(response, REFRESH_COOKIE)).isEqualTo("0");
+
+            // and — повторный логин с теми же учётными данными даёт 401 (пользователя больше нет)
+            var loginResponse = rest.postForEntity(
+                    BASE + "/login",
+                    new LoginRequest(email, PASSWORD),
+                    Void.class);
+            assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+            // and — email освободился, регистрация с ним снова проходит успешно
+            var registerResponse = rest.postForEntity(
+                    BASE + "/register",
+                    new RegistrationRequest(email, PASSWORD),
+                    Void.class);
+            assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(tokenCaptor.getVerificationToken(email)).isNotNull();
         }
 
         @Test
@@ -847,6 +823,73 @@ class AuthFlowIT extends AbstractPostgresIT {
                     new HttpEntity<>(refreshCookieHeaders(cookies.refresh())),
                     Void.class);
             assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("После удаления старый access-токен теряет доступ к тренировочным сессиям пользователя")
+        void afterDeleteOldAccessTokenLosesAccessToSessions() {
+            // given — токен действителен, доступ к списку сессий есть
+            var email = uniqueEmail();
+            var cookies = registerAndVerify(email);
+            var beforeDelete = rest.exchange(
+                    TRAINING_SESSIONS,
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    Void.class);
+            assertThat(beforeDelete.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+            // when — удаляем аккаунт
+            rest.exchange(
+                    BASE + "/delete",
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    Void.class);
+
+            // then — тем же access-токеном список сессий больше недоступен
+            var afterDelete = rest.exchange(
+                    TRAINING_SESSIONS,
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    Void.class);
+            assertThat(afterDelete.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("Старый токен удалённого аккаунта не даёт доступ к новому аккаунту с тем же email")
+        void oldAccessTokenOfDeletedAccountDoesNotAuthenticateNewAccountWithSameEmail() {
+            // given — исходный пользователь верифицирован, сохраняем его access-токен
+            var email = uniqueEmail();
+            var oldCookies = registerAndVerify(email);
+            var oldAccessToken = oldCookies.access();
+
+            // when — аккаунт удалён, а тем же email зарегистрирован НОВЫЙ пользователь (другой UUID)
+            rest.exchange(
+                    BASE + "/delete",
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(accessCookieHeaders(oldAccessToken)),
+                    Void.class);
+            var newCookies = registerAndVerify(email);
+
+            // then — старый токен структурно валиден (не истёк по TTL), но принадлежит удалённому пользователю
+            assertThat(jwtService.isTokenValid(oldAccessToken)).isTrue();
+
+            // and — старым токеном /me не даёт доступа к новому аккаунту
+            var meWithOldToken = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(oldAccessToken)),
+                    UserResponse.class);
+            assertThat(meWithOldToken.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(meWithOldToken.getBody()).isNull();
+
+            // and — новым токеном /me корректно возвращает нового пользователя
+            var meWithNewToken = rest.exchange(
+                    BASE + "/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(newCookies.access())),
+                    UserResponse.class);
+            assertThat(meWithNewToken.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(meWithNewToken.getBody().email()).isEqualTo(email);
         }
     }
 

@@ -2,28 +2,39 @@ import { apiFetch } from '@/lib/api'
 
 export type Profession = string
 export type Level = string
-export type CompanyType = string
 
 export type SessionStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED'
 
 export interface TrainingOptions {
   professions: Profession[]
   levels: Level[]
-  companyTypes: CompanyType[]
   questionCap: number
   minAnswersToFinish: number
 }
 
 export interface CreateTrainingRequest {
   profession: Profession
+  topic: string | null
   level: Level
-  companyType: CompanyType
+}
+
+export interface NormalizeInputRequest {
+  profession: string
+  topic: string | null
+}
+
+export interface NormalizeInputResponse {
+  professionRecognized: boolean
+  professionSuggestions: string[]
+  topicRecognized: boolean | null
+  topicSuggestions: string[] | null
+  topicFitsProfession: boolean | null
 }
 
 export interface TrainingSession {
   id: string
   profession: Profession
-  companyType: CompanyType
+  topic: string | null
   level: Level
   status: SessionStatus
   answeredCount: number
@@ -45,7 +56,7 @@ export interface TrainingReport {
   reportId: string
   sessionId: string
   profession: Profession
-  companyType: CompanyType
+  topic: string | null
   level: Level
   avgScore: number | null
   overallFeedback: string
@@ -68,6 +79,22 @@ const BASE = '/interview/training'
 
 export const trainingApi = {
   options: () => apiFetch<TrainingOptions>(`${BASE}/options`),
+
+  suggestProfessions: (query: string) =>
+    apiFetch<Profession[]>(
+      `${BASE}/suggest/professions?query=${encodeURIComponent(query)}`,
+    ),
+
+  suggestTopics: (profession: string, query: string) =>
+    apiFetch<string[]>(
+      `${BASE}/suggest/topics?profession=${encodeURIComponent(profession)}&query=${encodeURIComponent(query)}`,
+    ),
+
+  normalizeInput: (data: NormalizeInputRequest) =>
+    apiFetch<NormalizeInputResponse>(`${BASE}/normalize`, {
+      method: 'POST',
+      body: data,
+    }),
 
   createSession: (data: CreateTrainingRequest) =>
     apiFetch<TrainingSession>(`${BASE}/sessions`, {

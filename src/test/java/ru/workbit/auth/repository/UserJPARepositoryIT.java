@@ -11,6 +11,8 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,7 +35,7 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
         return User.builder()
                 .email(email)
                 .password("hashed_password")
-                .build(); // active=true, deactivated=null, emailVerified=false — @Builder.Default
+                .build(); // emailVerified=false, created=now() — @Builder.Default
     }
 
     // =========================================================================
@@ -89,64 +91,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
-    @DisplayName("CheckConstraintActiveDeactivated")
-    class CheckConstraintActiveDeactivated {
-
-        @Test
-        @DisplayName("active=false и deactivated=null нарушает CHECK-констрейнт при flush")
-        void throwsWhenActiveIsFalseAndDeactivatedIsNull() {
-            // given — нарушаем инвариант: active=false, deactivated=null
-            var bad = User.builder()
-                    .email("bad-false@example.com")
-                    .password("hashed_password")
-                    .active(false)
-                    .deactivated(null)
-                    .build();
-
-            // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(bad))
-                    .isInstanceOf(Exception.class);
-        }
-
-        @Test
-        @DisplayName("active=true и deactivated != null нарушает CHECK-констрейнт при flush")
-        void throwsWhenActiveIsTrueAndDeactivatedIsNotNull() {
-            // given — нарушаем инвариант: active=true, deactivated заполнен
-            var bad = User.builder()
-                    .email("bad-true@example.com")
-                    .password("hashed_password")
-                    .active(true)
-                    .deactivated(Instant.now())
-                    .build();
-
-            // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(bad))
-                    .isInstanceOf(Exception.class);
-        }
-
-        @Test
-        @DisplayName("Корректный soft delete (active=false, deactivated != null) сохраняется без ошибок")
-        void softDeleteSavesSuccessfully() {
-            // given
-            var user = em.persistAndFlush(aUser("soft-delete@example.com"));
-
-            // when — деактивируем: соблюдаем инвариант
-            user.setActive(false);
-            user.setDeactivated(Instant.now());
-            em.persistAndFlush(user);
-            em.clear();
-
-            // then — читаем из БД и проверяем состояние
-            var found = repository.findByEmail("soft-delete@example.com");
-            assertThat(found).isPresent();
-            assertThat(found.get().isActive()).isFalse();
-            assertThat(found.get().getDeactivated()).isNotNull();
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
     @DisplayName("SaveAndRead")
     class SaveAndRead {
 
@@ -173,7 +117,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
                     .email("roundtrip@example.com")
                     .password("hashed_roundtrip")
                     .emailVerified(true)
-                    .active(true)
                     .created(now)
                     .build();
 
@@ -184,22 +127,182 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getEmail()).isEqualTo("roundtrip@example.com");
             assertThat(saved.getPassword()).isEqualTo("hashed_roundtrip");
             assertThat(saved.isEmailVerified()).isTrue();
-            assertThat(saved.isActive()).isTrue();
-            assertThat(saved.getDeactivated()).isNull();
             assertThat(saved.getCreated()).isNotNull();
         }
 
         @Test
-        @DisplayName("Дефолты emailVerified=false и active=true применяются из @Builder.Default")
-        void defaultsAreApplied() {
+        @DisplayName("Дефолт emailVerified=false применяется из @Builder.Default")
+        void defaultEmailVerifiedIsApplied() {
             // given / when
             var saved = em.persistFlushFind(aUser("defaults@example.com"));
 
             // then
             assertThat(saved.isEmailVerified()).isFalse();
-            assertThat(saved.isActive()).isTrue();
-            assertThat(saved.getDeactivated()).isNull();
             assertThat(saved.getCreated()).isNotNull();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteById")
+    class DeleteById {
+
+        @Test
+        @DisplayName("Физическое удаление: запись пользователя исчезает из БД")
+        void removesUserRecord() {
+            // given
+            var saved = em.persistAndFlush(aUser("delete-me@example.com"));
+
+            // when
+            repository.deleteById(saved.getId());
+            em.flush();
+
+            // then
+            assertThat(repository.findByEmail("delete-me@example.com")).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindByLastSeenBeforeAndDeletionWarnedAtIsNull")
+    class FindByLastSeenBeforeAndDeletionWarnedAtIsNull {
+
+        private final Instant threshold = Instant.now().minus(30, ChronoUnit.DAYS);
+
+        @Test
+        @DisplayName("Возвращает неактивного пользователя без отметки о предупреждении")
+        void returnsInactiveUserWithoutWarning() {
+            // given
+            var inactive = User.builder()
+                    .email("inactive@example.com")
+                    .password("hashed_password")
+                    .lastSeen(threshold.minus(1, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(inactive);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getEmail()).isEqualTo("inactive@example.com");
+        }
+
+        @Test
+        @DisplayName("Не возвращает активного пользователя со свежим lastSeen")
+        void excludesActiveUser() {
+            // given
+            var active = User.builder()
+                    .email("active@example.com")
+                    .password("hashed_password")
+                    .lastSeen(Instant.now())
+                    .build();
+            em.persistAndFlush(active);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не возвращает уже предупреждённого пользователя, даже с устаревшим lastSeen")
+        void excludesAlreadyWarnedUser() {
+            // given
+            var warned = User.builder()
+                    .email("warned@example.com")
+                    .password("hashed_password")
+                    .lastSeen(threshold.minus(10, ChronoUnit.DAYS))
+                    .deletionWarnedAt(Instant.now().minus(5, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(warned);
+
+            // when
+            List<User> result = repository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(threshold);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteByDeletionWarnedAtBefore")
+    class DeleteByDeletionWarnedAtBefore {
+
+        private final Instant threshold = Instant.now().minus(7, ChronoUnit.DAYS);
+
+        @Test
+        @DisplayName("Удаляет пользователей с deletionWarnedAt старше порога и возвращает корректный count")
+        void deletesUsersWarnedBeforeThresholdAndReturnsCount() {
+            // given
+            var old1 = User.builder()
+                    .email("old-warned-1@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(threshold.minus(1, ChronoUnit.DAYS))
+                    .build();
+            var old2 = User.builder()
+                    .email("old-warned-2@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(threshold.minus(2, ChronoUnit.DAYS))
+                    .build();
+            em.persistAndFlush(old1);
+            em.persistAndFlush(old2);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isEqualTo(2);
+            assertThat(repository.findByEmail("old-warned-1@example.com")).isEmpty();
+            assertThat(repository.findByEmail("old-warned-2@example.com")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не удаляет пользователя с deletionWarnedAt = null")
+        void keepsUserWithNullWarnedAt() {
+            // given
+            var noWarning = User.builder()
+                    .email("no-warning@example.com")
+                    .password("hashed_password")
+                    .build();
+            em.persistAndFlush(noWarning);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByEmail("no-warning@example.com")).isPresent();
+        }
+
+        @Test
+        @DisplayName("Не удаляет пользователя со свежим deletionWarnedAt")
+        void keepsUserWithFreshWarnedAt() {
+            // given
+            var freshWarning = User.builder()
+                    .email("fresh-warning@example.com")
+                    .password("hashed_password")
+                    .deletionWarnedAt(Instant.now())
+                    .build();
+            em.persistAndFlush(freshWarning);
+
+            // when
+            int deleted = repository.deleteByDeletionWarnedAtBefore(threshold);
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByEmail("fresh-warning@example.com")).isPresent();
         }
     }
 }

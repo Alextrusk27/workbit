@@ -17,20 +17,40 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Общая обвязка над OpenAIClient: сборка structured-параметров из request-DTO,
  * подстановка переменных в промпт и извлечение типизированного ответа модели.
+ * Ответы с CJK-вкраплениями (иероглифы, кана, хангыль — редкий дефект qwen)
+ * перезапрашиваются один раз, при повторном срабатывании символы вырезаются.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LlmClient {
+    private static final Pattern CJK =
+            Pattern.compile("[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]");
+
     private final OpenAIClient client;
     private final YandexAiProperties props;
     private final ObjectMapper objectMapper;
 
     public <T> T call(String agentKey, Object request, Class<T> responseType) {
+        T result = callOnce(agentKey, request, responseType);
+        if (!containsCjk(result)) {
+            return result;
+        }
+        log.warn("LLM response contains CJK characters [agent={}], retrying once", agentKey);
+        T retried = callOnce(agentKey, request, responseType);
+        if (!containsCjk(retried)) {
+            return retried;
+        }
+        log.warn("LLM response contains CJK characters after retry [agent={}], stripping them", agentKey);
+        return stripCjk(retried, responseType);
+    }
+
+    private <T> T callOnce(String agentKey, Object request, Class<T> responseType) {
         log.debug("LLM request [agent={}]: {}", agentKey, objectMapper.writeValueAsString(request));
         StructuredResponseCreateParams<T> params = buildParams(agentKey, request, responseType);
         try {
@@ -67,5 +87,16 @@ public class LlmClient {
                         .build())
                 .text(responseType)
                 .build();
+    }
+
+    private boolean containsCjk(Object result) {
+        return CJK.matcher(objectMapper.writeValueAsString(result)).find();
+    }
+
+    private <T> T stripCjk(T result, Class<T> responseType) {
+        String cleaned = CJK.matcher(objectMapper.writeValueAsString(result))
+                .replaceAll("")
+                .replaceAll(" {2,}", " ");
+        return objectMapper.readValue(cleaned, responseType);
     }
 }

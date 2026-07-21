@@ -14,27 +14,22 @@ public class LlmService {
     private final LlmClient llm;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmAnswerEvaluation evaluateAnswer(LlmAnswerEvaluationRequest request) {
-        return llm.call("answer-evaluator", request, LlmAnswerEvaluation.class);
+    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
+        return llm.call("training-question-generator", request, LlmTrainingQuestions.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmReport createReport(LlmReportRequest request) {
-        return llm.call("interview-reviewer", Map.of("JSON_STRING", request), LlmReport.class);
-    }
-
-    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmGeneratedQuestions generateVacancyQuestions(LlmQuestionGenerationRequest request) {
-        return llm.call("vacancy-questions-generator", request, LlmGeneratedQuestions.class);
-    }
-
-    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestion generateTrainingQuestion(LlmTrainingQuestionRequest request) {
-        return llm.call("training-question-generator", request, LlmTrainingQuestion.class);
+    public LlmTrainingFollowUpDecision decideTrainingFollowUp(LlmTrainingFollowUpRequest request) {
+        return llm.call("training-follow-up", request, LlmTrainingFollowUpDecision.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
         return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
+        return llm.call("input-normalizer", request, LlmInputNormalization.class);
     }
 }

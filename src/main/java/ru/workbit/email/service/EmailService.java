@@ -11,6 +11,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import ru.workbit.email.AccountDeletionWarningEmailEvent;
 import ru.workbit.email.ResetPasswordEmailEvent;
 import ru.workbit.email.VerificationEmailEvent;
 import ru.workbit.email.properties.MailProperties;
@@ -36,6 +37,14 @@ public class EmailService {
     public void onResetPasswordEmailRequested(ResetPasswordEmailEvent event) {
         try {
             sendResetPasswordMail(event.email(), event.token());
+        } catch (EmailSendException ignored) {
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onAccountDeletionWarningRequested(AccountDeletionWarningEmailEvent event) {
+        try {
+            sendAccountDeletionWarningMail(event.email());
         } catch (EmailSendException ignored) {
         }
     }
@@ -83,6 +92,29 @@ public class EmailService {
         } catch (MessagingException e) {
             log.error("Failed to send reset password email", e);
             throw new EmailSendException("Failed to send reset password email", e);
+        }
+    }
+
+    public void sendAccountDeletionWarningMail(String to) {
+        Context context = new Context();
+        context.setVariable("loginUrl", mailProperties.baseUrl() + "/login");
+
+        String html = templateEngine.process("email/account-deletion-warning", context);
+
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            helper.setFrom(mailProperties.fromMail());
+            helper.setTo(to);
+            helper.setSubject("Ваш аккаунт Workbit скоро будет удалён");
+            helper.setText(html, true);
+
+            mailSender.send(mimeMessage);
+            log.info("Account deletion warning email sent");
+        } catch (MessagingException e) {
+            log.error("Failed to send account deletion warning email", e);
+            throw new EmailSendException("Failed to send account deletion warning email", e);
         }
     }
 

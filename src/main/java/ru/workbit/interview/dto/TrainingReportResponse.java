@@ -1,9 +1,7 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.CompanyType;
 import ru.workbit.interview.model.Level;
-import ru.workbit.interview.model.Profession;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,10 +15,10 @@ public record TrainingReportResponse(
         UUID sessionId,
 
         @Schema(description = "Профессия, по которой проводилось собеседование", example = "Java-разработчик")
-        Profession profession,
+        String profession,
 
-        @Schema(description = "Тип компании, под который стилизовались вопросы", example = "Продуктовая компания")
-        CompanyType companyType,
+        @Schema(description = "Тема тренировки, null если не задана", example = "Spring Boot")
+        String topic,
 
         @Schema(description = "Целевой уровень кандидата", example = "Middle")
         Level level,

@@ -2,6 +2,7 @@ package ru.workbit.interview.repository;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.interview.model.VacancySession;
 
@@ -24,4 +25,8 @@ public interface VacancySessionRepository extends JpaRepository<@NotNull Vacancy
             WHERE vs.id = :id
             """)
     Optional<VacancySession> findWithQuestionsById(@NotNull UUID id);
+
+    @Modifying
+    @Query("DELETE FROM VacancySession vs WHERE vs.userId = :userId")
+    void deleteAllByUserId(@NotNull UUID userId);
 }

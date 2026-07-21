@@ -26,10 +26,6 @@ public class VacancyQuestion {
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
     private VacancyFeedback feedback;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, updatable = false)
-    private Category category;
-
     @Column(nullable = false, updatable = false)
     private String questionText;
 

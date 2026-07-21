@@ -29,7 +29,7 @@ public class VacancySession {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private SessionStatus status = SessionStatus.CREATED;
+    private Status status = Status.CREATED;
 
     @Column(name = "total_questions", nullable = false)
     private int totalQuestions;
@@ -46,4 +46,8 @@ public class VacancySession {
 
     @OneToOne(mappedBy = "vacancySession", orphanRemoval = true, cascade = CascadeType.ALL)
     private VacancyReport report;
+
+    public enum Status {
+        CREATED, IN_PROGRESS, COMPLETED
+    }
 }

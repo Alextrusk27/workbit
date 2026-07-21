@@ -1,4 +1,5 @@
 CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS training;
 CREATE SCHEMA IF NOT EXISTS interview;
 CREATE SCHEMA IF NOT EXISTS vacancy;
 CREATE SCHEMA IF NOT EXISTS content;
@@ -99,7 +100,7 @@ CREATE TABLE IF NOT EXISTS content.question_bank (
 CREATE INDEX IF NOT EXISTS idx_question_bank_selector
     ON content.question_bank (profession_id, topic_id);
 
-CREATE TABLE IF NOT EXISTS interview.training_session (
+CREATE TABLE IF NOT EXISTS training.training_session (
     id              UUID PRIMARY KEY,
     user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     profession      VARCHAR(100) NOT NULL,
@@ -132,10 +133,10 @@ CREATE TABLE IF NOT EXISTS interview.vacancy_session (
         CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
 );
 
-CREATE TABLE IF NOT EXISTS interview.training_question (
+CREATE TABLE IF NOT EXISTS training.training_question (
     id                  UUID PRIMARY KEY,
-    training_session_id UUID NOT NULL REFERENCES interview.training_session(id) ON DELETE CASCADE,
-    parent_question_id  UUID REFERENCES interview.training_question(id) ON DELETE CASCADE,
+    training_session_id UUID NOT NULL REFERENCES training.training_session(id) ON DELETE CASCADE,
+    parent_question_id  UUID REFERENCES training.training_question(id) ON DELETE CASCADE,
     bank_question_id    UUID REFERENCES content.question_bank(id) ON DELETE SET NULL,
     question_text     TEXT NOT NULL,
     order_index       INT NOT NULL,
@@ -158,15 +159,12 @@ CREATE TABLE IF NOT EXISTS interview.training_question (
 CREATE TABLE IF NOT EXISTS interview.vacancy_question (
     id                 UUID PRIMARY KEY,
     vacancy_session_id UUID NOT NULL REFERENCES interview.vacancy_session(id) ON DELETE CASCADE,
-    category      VARCHAR(32) NOT NULL,
     question_text TEXT NOT NULL,
     order_index   INT NOT NULL,
     answered      BOOL DEFAULT FALSE,
     answer_text   TEXT,
     answered_at   TIMESTAMPTZ,
 
-    CONSTRAINT chk_vacancy_question_category
-        CHECK (category = 'VACANCY'),
     CONSTRAINT chk_vacancy_question_order_index
         CHECK (order_index BETWEEN 1 AND 20),
     CONSTRAINT chk_vacancy_answer_has_text_and_timestamp
@@ -174,9 +172,9 @@ CREATE TABLE IF NOT EXISTS interview.vacancy_question (
 );
 
 
-CREATE TABLE IF NOT EXISTS interview.training_feedback (
+CREATE TABLE IF NOT EXISTS training.training_feedback (
     id            UUID PRIMARY KEY,
-    question_id   UUID NOT NULL UNIQUE REFERENCES interview.training_question(id) ON DELETE CASCADE,
+    question_id   UUID NOT NULL UNIQUE REFERENCES training.training_question(id) ON DELETE CASCADE,
     score         INT NOT NULL,
     feedback_text TEXT NOT NULL,
     generated_at  TIMESTAMPTZ NOT NULL,
@@ -196,9 +194,9 @@ CREATE TABLE IF NOT EXISTS interview.vacancy_feedback (
         CHECK (score BETWEEN 1 AND 5)
 );
 
-CREATE TABLE IF NOT EXISTS interview.training_report (
+CREATE TABLE IF NOT EXISTS training.training_report (
     id                  UUID PRIMARY KEY,
-    training_session_id UUID NOT NULL UNIQUE REFERENCES interview.training_session(id) ON DELETE CASCADE,
+    training_session_id UUID NOT NULL UNIQUE REFERENCES training.training_session(id) ON DELETE CASCADE,
     avg_score         DOUBLE PRECISION NOT NULL,
     overall_feedback  TEXT NOT NULL,
     generated_at      TIMESTAMPTZ NOT NULL,
@@ -232,13 +230,13 @@ CREATE INDEX IF NOT EXISTS idx_verification_token_token_hash
     ON auth.verification_token(token_hash);
 
 CREATE INDEX IF NOT EXISTS idx_training_session_user_id
-    ON interview.training_session(user_id);
+    ON training.training_session(user_id);
 CREATE INDEX IF NOT EXISTS idx_vacancy_session_user_id
     ON interview.vacancy_session(user_id);
 CREATE INDEX IF NOT EXISTS idx_training_question_session_id
-    ON interview.training_question(training_session_id);
+    ON training.training_question(training_session_id);
 CREATE INDEX IF NOT EXISTS idx_training_question_bank_question_id
-    ON interview.training_question(bank_question_id);
+    ON training.training_question(bank_question_id);
 CREATE INDEX IF NOT EXISTS idx_vacancy_question_session_id
     ON interview.vacancy_question(vacancy_session_id);
 

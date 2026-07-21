@@ -12,9 +12,8 @@ import ru.workbit.auth.model.User;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.TopicDict;
-import ru.workbit.interview.model.Level;
-import ru.workbit.interview.model.TrainingQuestion;
-import ru.workbit.interview.model.TrainingSession;
+import ru.workbit.training.model.TrainingQuestion;
+import ru.workbit.training.model.TrainingSession;
 
 import java.util.List;
 import java.util.UUID;
@@ -68,7 +67,7 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         return TrainingSession.builder()
                 .userId(userId)
                 .profession("Java-разработчик")
-                .level(Level.JUNIOR)
+                .level(TrainingSession.Level.JUNIOR)
                 .build();
     }
 

@@ -33,7 +33,7 @@ public class VacancyService {
     public VacancyData fetch(String url) {
         String vacancyId = getVacancyId(url);
         HhVacancyResponse hhVacancy = getActiveVacancy(vacancyId);
-        return vacancyMapper.toVacancyData(hhVacancy, Long.parseLong(vacancyId), canonicalUrl(vacancyId),
+        return vacancyMapper.toVacancyData(hhVacancy, VacancySnapshot.Source.HH, vacancyId, canonicalUrl(vacancyId),
                 sanitize(hhVacancy.description()));
     }
 
@@ -42,8 +42,8 @@ public class VacancyService {
         return vacancyMapper.toPreview(getActiveVacancy(vacancyId), canonicalUrl(vacancyId));
     }
 
-    public UUID saveSnapshot(VacancyData data, String name) {
-        return vacancySnapshotRepository.save(vacancyMapper.toSnapshot(data, name)).getId();
+    public UUID saveSnapshot(VacancyData data) {
+        return vacancySnapshotRepository.save(vacancyMapper.toSnapshot(data)).getId();
     }
 
     public VacancySnapshotView getSnapshotView(UUID id) {

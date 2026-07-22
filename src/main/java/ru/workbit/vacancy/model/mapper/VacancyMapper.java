@@ -16,12 +16,11 @@ public interface VacancyMapper {
     @Mapping(target = "employer", source = "response.employer.name")
     @Mapping(target = "experience", source = "response.experience.name")
     @Mapping(target = "description", source = "description")
-    VacancyData toVacancyData(HhVacancyResponse response, Long hhVacancyId, String url, String description);
+    VacancyData toVacancyData(HhVacancyResponse response, VacancySnapshot.Source source, String sourceId, String url, String description);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "fetchedAt", ignore = true)
-    @Mapping(target = "name", source = "name")
-    VacancySnapshot toSnapshot(VacancyData data, String name);
+    VacancySnapshot toSnapshot(VacancyData data);
 
     @Mapping(target = "employer", source = "response.employer.name")
     @Mapping(target = "experience", source = "response.experience.name")

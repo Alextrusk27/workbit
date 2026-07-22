@@ -154,9 +154,11 @@ class VacancyServiceTest {
             HhVacancyResponse hhVacancy = anHhVacancyResponse(false);
             when(hhClient.getHhVacancy("123456")).thenReturn(hhVacancy);
 
-            VacancyData expected = new VacancyData(123456L, "https://hh.ru/vacancy/123456", "Java-разработчик",
+            VacancyData expected = new VacancyData(VacancySnapshot.Source.HH, "123456",
+                    "https://hh.ru/vacancy/123456", "Java-разработчик",
                     "ООО Ромашка", "От 3 до 6 лет", List.of("Java"), "Описание");
-            when(vacancyMapper.toVacancyData(hhVacancy, 123456L, "https://hh.ru/vacancy/123456", "Описание"))
+            when(vacancyMapper.toVacancyData(hhVacancy, VacancySnapshot.Source.HH, "123456",
+                    "https://hh.ru/vacancy/123456", "Описание"))
                     .thenReturn(expected);
 
             // when
@@ -224,15 +226,15 @@ class VacancyServiceTest {
         @DisplayName("Сохраняет снапшот через маппер и возвращает его id")
         void savesSnapshotAndReturnsId() {
             // given
-            VacancyData data = new VacancyData(123L, "https://hh.ru/vacancy/123", "Java-разработчик",
-                    "ООО Ромашка", "От 3 до 6 лет", List.of("Java"), "Описание");
+            VacancyData data = new VacancyData(VacancySnapshot.Source.HH, "123", "https://hh.ru/vacancy/123",
+                    "Java-разработчик", "ООО Ромашка", "От 3 до 6 лет", List.of("Java"), "Описание");
             UUID snapshotId = UUID.randomUUID();
             VacancySnapshot mappedSnapshot = aSnapshot(snapshotId);
-            when(vacancyMapper.toSnapshot(data, "Java-разработчик")).thenReturn(mappedSnapshot);
+            when(vacancyMapper.toSnapshot(data)).thenReturn(mappedSnapshot);
             when(vacancySnapshotRepository.save(mappedSnapshot)).thenReturn(aSnapshot(snapshotId));
 
             // when
-            var result = vacancyService.saveSnapshot(data, "Java-разработчик");
+            var result = vacancyService.saveSnapshot(data);
 
             // then
             assertThat(result).isEqualTo(snapshotId);

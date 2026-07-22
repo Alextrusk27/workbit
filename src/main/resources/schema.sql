@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS auth.verification_token (
 
 CREATE TABLE IF NOT EXISTS vacancy.snapshot (
     id            UUID PRIMARY KEY,
-    hh_vacancy_id BIGINT,
+    source        VARCHAR(32),
+    source_id     TEXT,
     url           TEXT,
     name          VARCHAR(255) NOT NULL,
     employer      VARCHAR(255),
@@ -47,9 +48,14 @@ CREATE TABLE IF NOT EXISTS vacancy.snapshot (
     description   TEXT NOT NULL,
     fetched_at    TIMESTAMPTZ NOT NULL,
 
-    CONSTRAINT chk_snapshot_hh_pair
-        CHECK ((hh_vacancy_id IS NULL) = (url IS NULL))
+    CONSTRAINT chk_snapshot_source_pair
+        CHECK ((source IS NULL) = (url IS NULL) AND (source IS NULL) = (source_id IS NULL)),
+    CONSTRAINT chk_snapshot_source
+        CHECK (source IS NULL OR source IN ('HH'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_snapshot_source_id
+    ON vacancy.snapshot(source, source_id);
 
 CREATE TABLE IF NOT EXISTS content.profession_dict (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -22,8 +22,11 @@ public class VacancySnapshot {
     @UuidGenerator
     private UUID id;
 
-    @Column(name = "hh_vacancy_id")
-    private Long hhVacancyId;
+    @Enumerated(EnumType.STRING)
+    private Source source;
+
+    @Column(name = "source_id")
+    private String sourceId;
 
     private String url;
 
@@ -44,4 +47,8 @@ public class VacancySnapshot {
     @Builder.Default
     @Column(name = "fetched_at", nullable = false, updatable = false)
     private Instant fetchedAt = Instant.now();
+
+    public enum Source {
+        HH
+    }
 }

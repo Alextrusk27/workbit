@@ -59,7 +59,7 @@ export function HubPage() {
       <h1 className="text-ink mt-4 text-3xl sm:text-4xl">С чего начнём?</h1>
       <p className="text-muted mt-4 max-w-xl">
         Тренажёр отрабатывает вопросы под профессию и уровень. Интервью готовит
-        к конкретной вакансии — этот режим сейчас на переработке.
+        к конкретной вакансии с hh.ru и оценивает шансы на оффер.
       </p>
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2">
@@ -73,8 +73,7 @@ export function HubPage() {
           to="/app/interview"
           eyebrow="Интервью"
           title="Интервью под вакансию"
-          description="Собеседование под конкретную вакансию с hh.ru. Режим временно недоступен — скоро вернётся."
-          badge="Скоро"
+          description="Собеседование под конкретную вакансию с hh.ru. Вопросы по её требованиям, а в конце — разбор и вероятность оффера."
         />
       </div>
     </Container>

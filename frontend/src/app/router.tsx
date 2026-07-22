@@ -22,7 +22,10 @@ import { TrainingListPage } from '@/pages/training/TrainingListPage'
 import { NewTrainingPage } from '@/pages/training/NewTrainingPage'
 import { TrainingSessionPage } from '@/pages/training/TrainingSessionPage'
 import { TrainingReportPage } from '@/pages/training/TrainingReportPage'
-import { InterviewStubPage } from '@/pages/interview/InterviewStubPage'
+import { InterviewListPage } from '@/pages/interview/InterviewListPage'
+import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
+import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
+import { InterviewReportPage } from '@/pages/interview/InterviewReportPage'
 
 export const router = createBrowserRouter([
   {
@@ -95,7 +98,16 @@ export const router = createBrowserRouter([
                 path: 'training/:sessionId/report',
                 element: <TrainingReportPage />,
               },
-              { path: 'interview', element: <InterviewStubPage /> },
+              { path: 'interview', element: <InterviewListPage /> },
+              { path: 'interview/new', element: <NewInterviewPage /> },
+              {
+                path: 'interview/:sessionId',
+                element: <InterviewSessionPage />,
+              },
+              {
+                path: 'interview/:sessionId/report',
+                element: <InterviewReportPage />,
+              },
             ],
           },
         ],

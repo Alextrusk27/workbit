@@ -19,8 +19,11 @@ public record InterviewSessionResponse(
         @Schema(description = "Статус сессии")
         InterviewSession.Status status,
 
-        @Schema(description = "Количество вопросов, на которые уже дан ответ", example = "3")
+        @Schema(description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)", example = "3")
         int answeredCount,
+
+        @Schema(description = "Общее количество основных вопросов интервью", example = "10")
+        int totalQuestions,
 
         @Schema(description = "Момент создания сессии")
         Instant created,

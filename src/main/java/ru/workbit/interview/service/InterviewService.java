@@ -22,6 +22,9 @@ import ru.workbit.interview.model.mapper.InterviewSessionMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewFollowUp;
+import ru.workbit.llm.dto.LlmInterviewFollowUpDecision;
+import ru.workbit.llm.dto.LlmInterviewFollowUpRequest;
 import ru.workbit.llm.dto.LlmInterviewQuestions;
 import ru.workbit.llm.dto.LlmInterviewQuestionsRequest;
 import ru.workbit.llm.dto.LlmInterviewReport;
@@ -34,19 +37,21 @@ import ru.workbit.vacancy.service.VacancyService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
 import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
+import static ru.workbit.interview.service.InterviewSessions.groupCases;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class InterviewService {
 
-    public static final int MIN_ANSWERED_TO_FINISH = 3;
+    public static final int MAX_FOLLOW_UPS_PER_QUESTION = 2;
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -72,7 +77,8 @@ public class InterviewService {
         InterviewSession session = interviewSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        int answeredCount = (int) interviewQuestionRepository.countBySessionIdAndAnsweredTrue(sessionId);
+        int answeredCount = (int) interviewQuestionRepository
+                .countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId);
         return interviewSessionMapper.toResponse(session, vacancy, answeredCount);
     }
 
@@ -102,12 +108,65 @@ public class InterviewService {
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
 
-        return interviewQuestionRepository.findNextUnanswered(sessionId)
-                .map(interviewQuestionMapper::toDto)
+        Optional<InterviewQuestion> pendingFollowUp = interviewQuestionRepository
+                .findNextUnansweredFollowUp(sessionId);
+        if (pendingFollowUp.isPresent()) {
+            return interviewQuestionMapper.toDto(pendingFollowUp.get());
+        }
+
+        return askFollowUp(session)
+                .or(() -> interviewQuestionRepository.findNextUnansweredMain(sessionId)
+                        .map(interviewQuestionMapper::toDto))
                 .orElseThrow(() -> {
                     log.warn("Interview session {} has no unanswered questions left", sessionId);
                     return new ConflictException("No questions left");
                 });
+    }
+
+    private Optional<InterviewQuestionResponse> askFollowUp(InterviewSession session) {
+        Optional<InterviewQuestion> lastAnswered = interviewQuestionRepository
+                .findLastAnsweredWithoutFollowUpCheck(session.getId());
+        if (lastAnswered.isEmpty()) {
+            return Optional.empty();
+        }
+
+        InterviewQuestion answered = lastAnswered.get();
+        UUID caseMainId = answered.isFollowUp() ? answered.getParentQuestionId() : answered.getId();
+        List<InterviewQuestion> caseFollowUps = interviewQuestionRepository
+                .findAllByParentQuestionIdOrderByOrderIndex(caseMainId);
+
+        if (caseFollowUps.size() >= MAX_FOLLOW_UPS_PER_QUESTION) {
+            interviewWriter.markFollowUpChecked(answered.getId());
+            return Optional.empty();
+        }
+
+        InterviewQuestion caseMain = answered.isFollowUp()
+                ? interviewQuestionRepository.findById(caseMainId)
+                        .orElseThrow(() -> new NotFoundException("Question not found"))
+                : answered;
+
+        VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
+        LlmInterviewFollowUpDecision decision = llmService.decideInterviewFollowUp(new LlmInterviewFollowUpRequest(
+                vacancy.name(),
+                vacancy.experience(),
+                caseMain.getText(),
+                caseMain.getAnswerText(),
+                caseFollowUps.stream()
+                        .map(q -> new LlmInterviewFollowUp(q.getText(), q.getAnswerText()))
+                        .toList()));
+
+        if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
+            interviewWriter.markFollowUpChecked(answered.getId());
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(interviewWriter.saveFollowUp(answered.getId(), caseMainId, decision.question()));
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent request already created a follow-up for interview session {}", session.getId());
+            return interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())
+                    .map(interviewQuestionMapper::toDto);
+        }
     }
 
     @Transactional
@@ -137,15 +196,15 @@ public class InterviewService {
         checkSessionNotCompleted(session);
 
         List<InterviewQuestion> answered = answeredSorted(session);
-        checkEnoughAnsweredToFinish(sessionId, answered);
+        checkAllQuestionsAnswered(session, answered);
 
+        List<List<InterviewQuestion>> cases = groupCases(answered);
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
         LlmInterviewReport llmReport = llmService.createInterviewReport(new LlmInterviewReportRequest(
                 vacancy.name(),
                 vacancy.experience(),
-                IntStream.range(0, answered.size())
-                        .mapToObj(i -> new LlmInterviewAnswer(
-                                i + 1, answered.get(i).getText(), answered.get(i).getAnswerText()))
+                IntStream.range(0, cases.size())
+                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
                         .toList()));
 
         try {
@@ -203,12 +262,24 @@ public class InterviewService {
         return questions;
     }
 
-    private void checkEnoughAnsweredToFinish(UUID sessionId, List<InterviewQuestion> answered) {
-        if (answered.size() < MIN_ANSWERED_TO_FINISH) {
-            log.warn("Interview session {} has only {} answered questions, {} required to finish",
-                    sessionId, answered.size(), MIN_ANSWERED_TO_FINISH);
-            throw new ConflictException("Not enough answered questions to finish");
+    private void checkAllQuestionsAnswered(InterviewSession session, List<InterviewQuestion> answered) {
+        long answeredMain = answered.stream().filter(q -> !q.isFollowUp()).count();
+        if (answeredMain < session.getTotalQuestions()) {
+            log.warn("Interview session {} has only {} of {} answered questions, cannot finish",
+                    session.getId(), answeredMain, session.getTotalQuestions());
+            throw new ConflictException("Not all questions answered");
         }
+    }
+
+    private static LlmInterviewAnswer toLlmAnswer(int index, List<InterviewQuestion> interviewCase) {
+        return new LlmInterviewAnswer(
+                index,
+                interviewCase.getFirst().getText(),
+                interviewCase.getFirst().getAnswerText(),
+                interviewCase.stream()
+                        .skip(1)
+                        .map(q -> new LlmInterviewFollowUp(q.getText(), q.getAnswerText()))
+                        .toList());
     }
 
     private void checkQuestionOwnership(InterviewQuestion question, UUID userId) {

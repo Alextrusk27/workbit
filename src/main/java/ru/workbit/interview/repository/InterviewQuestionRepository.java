@@ -17,14 +17,14 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
         long getCount();
     }
 
-    Optional<InterviewQuestion> findBySessionIdAndOrderIndex(UUID sessionId, int orderIndex);
+    long countBySessionIdAndFollowUpFalseAndAnsweredTrue(UUID sessionId);
 
-    long countBySessionIdAndAnsweredTrue(UUID sessionId);
+    long countByParentQuestionId(UUID parentQuestionId);
 
     @Query("""
             SELECT q.session.id AS sessionId, COUNT(q) AS count
             FROM InterviewQuestion q
-            WHERE q.session.id IN :sessionIds AND q.answered = true
+            WHERE q.session.id IN :sessionIds AND q.answered = true AND q.followUp = false
             GROUP BY q.session.id
             """)
     List<AnsweredCount> countAnsweredBySessionIds(List<UUID> sessionIds);
@@ -38,9 +38,27 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
 
     @Query("""
             SELECT q FROM InterviewQuestion q
-            WHERE q.session.id = :sessionId AND q.answered = false
+            WHERE q.session.id = :sessionId AND q.answered = false AND q.followUp = true
             ORDER BY q.orderIndex
             LIMIT 1
             """)
-    Optional<InterviewQuestion> findNextUnanswered(UUID sessionId);
+    Optional<InterviewQuestion> findNextUnansweredFollowUp(UUID sessionId);
+
+    @Query("""
+            SELECT q FROM InterviewQuestion q
+            WHERE q.session.id = :sessionId AND q.answered = false AND q.followUp = false
+            ORDER BY q.orderIndex
+            LIMIT 1
+            """)
+    Optional<InterviewQuestion> findNextUnansweredMain(UUID sessionId);
+
+    @Query("""
+            SELECT q FROM InterviewQuestion q
+            WHERE q.session.id = :sessionId AND q.answered = true AND q.followUpChecked = false
+            ORDER BY q.answeredAt DESC
+            LIMIT 1
+            """)
+    Optional<InterviewQuestion> findLastAnsweredWithoutFollowUpCheck(UUID sessionId);
+
+    List<InterviewQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
 }

@@ -71,6 +71,7 @@ llm:
       training-follow-up: ${TRAINING_FOLLOW_UP}
       training-reviewer: ${TRAINING_REVIEWER}
       interview-question-generator: ${INTERVIEW_QUESTION_GENERATOR}
+      interview-follow-up: ${INTERVIEW_FOLLOW_UP}
       interview-reviewer: ${INTERVIEW_REVIEWER}
       input-normalizer: ${INPUT_NORMALIZER}
 

@@ -23,6 +23,9 @@ public class InterviewQuestion {
     @JoinColumn(name = "session_id", nullable = false, updatable = false)
     private InterviewSession session;
 
+    @Column(name = "parent_question_id", updatable = false)
+    private UUID parentQuestionId;
+
     @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
     private InterviewFeedback feedback;
 
@@ -31,6 +34,14 @@ public class InterviewQuestion {
 
     @Column(nullable = false, updatable = false)
     private int orderIndex;
+
+    @Builder.Default
+    @Column(name = "follow_up", nullable = false, updatable = false)
+    private boolean followUp = false;
+
+    @Builder.Default
+    @Column(name = "follow_up_checked", nullable = false)
+    private boolean followUpChecked = false;
 
     @Builder.Default
     private boolean answered = false;

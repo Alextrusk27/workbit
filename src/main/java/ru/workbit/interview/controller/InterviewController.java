@@ -87,7 +87,7 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Получить следующий вопрос", description = "Возвращает первый неотвеченный вопрос сессии по порядку. Вопросы генерируются заранее при создании сессии. Когда все вопросы отвечены, возвращает 409.")
+    @Operation(summary = "Получить следующий вопрос", description = "Возвращает очередной неотвеченный основной вопрос (вопросы генерируются заранее при создании сессии) либо уточняющий вопрос (followUp: true), который LLM формирует по последнему ответу при необходимости. Уточняющие не входят в счётчик основных вопросов, на один основной — не больше 2. Когда все вопросы отвечены, возвращает 409.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопрос возвращён"),
@@ -125,12 +125,12 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/finish")
     @Loggable(logArgs = true)
-    @Operation(summary = "Завершить интервью", description = "Завершает интервью, запрашивает у LLM поразборный фидбэк по каждому ответу и формирует итоговый отчёт с оценкой вероятности оффера. Доступно после ответа минимум на 3 вопроса.")
+    @Operation(summary = "Завершить интервью", description = "Завершает интервью, запрашивает у LLM поразборный фидбэк по каждому ответу (с учётом ответов на уточняющие вопросы) и формирует итоговый отчёт с оценкой вероятности оффера. Доступно только после ответа на все основные вопросы — досрочного завершения нет. Уточняющие вопросы при завершении удаляются, в отчёте остаются только основные.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Отчёт сформирован"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Отвечено меньше 3 вопросов или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Отвечены не все основные вопросы или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewReportResponse> finishSession(

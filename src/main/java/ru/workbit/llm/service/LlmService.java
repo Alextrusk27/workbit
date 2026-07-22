@@ -29,6 +29,16 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmInterviewQuestions generateInterviewQuestions(LlmInterviewQuestionsRequest request) {
+        return llm.call("interview-question-generator", request, LlmInterviewQuestions.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmInterviewReport createInterviewReport(LlmInterviewReportRequest request) {
+        return llm.call("interview-reviewer", Map.of("JSON_STRING", request), LlmInterviewReport.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
         return llm.call("input-normalizer", request, LlmInputNormalization.class);
     }

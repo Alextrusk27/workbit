@@ -1,8 +1,8 @@
 CREATE SCHEMA IF NOT EXISTS auth;
-CREATE SCHEMA IF NOT EXISTS training;
-CREATE SCHEMA IF NOT EXISTS interview;
 CREATE SCHEMA IF NOT EXISTS vacancy;
 CREATE SCHEMA IF NOT EXISTS content;
+CREATE SCHEMA IF NOT EXISTS training;
+CREATE SCHEMA IF NOT EXISTS interview;
 
 CREATE TABLE IF NOT EXISTS auth.users (
     id                  UUID PRIMARY KEY,
@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS auth.refresh_token (
     created     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id
+    ON auth.refresh_token(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_token_hash
+    ON auth.refresh_token(token_hash);
+
 CREATE TABLE IF NOT EXISTS auth.verification_token (
     id          UUID PRIMARY KEY,
     user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -35,6 +40,11 @@ CREATE TABLE IF NOT EXISTS auth.verification_token (
     CONSTRAINT chk_type
         CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_verification_token_user_id
+    ON auth.verification_token(user_id);
+CREATE INDEX IF NOT EXISTS idx_verification_token_token_hash
+    ON auth.verification_token(token_hash);
 
 CREATE TABLE IF NOT EXISTS vacancy.snapshot (
     id            UUID PRIMARY KEY,
@@ -124,20 +134,8 @@ CREATE TABLE IF NOT EXISTS training.session (
         CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
 );
 
-CREATE TABLE IF NOT EXISTS interview.session (
-    id                  UUID PRIMARY KEY,
-    user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    vacancy_snapshot_id UUID NOT NULL REFERENCES vacancy.snapshot(id),
-    status              VARCHAR(32) NOT NULL,
-    total_questions     INT NOT NULL,
-    created             TIMESTAMPTZ NOT NULL,
-    completed_at        TIMESTAMPTZ,
-
-    CONSTRAINT chk_session_status
-        CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
-    CONSTRAINT chk_session_completed_at
-        CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
-);
+CREATE INDEX IF NOT EXISTS idx_session_user_id
+    ON training.session(user_id);
 
 CREATE TABLE IF NOT EXISTS training.question (
     id                 UUID PRIMARY KEY,
@@ -162,36 +160,14 @@ CREATE TABLE IF NOT EXISTS training.question (
         UNIQUE NULLS NOT DISTINCT (session_id, parent_question_id, order_index)
 );
 
-CREATE TABLE IF NOT EXISTS interview.question (
-    id            UUID PRIMARY KEY,
-    session_id    UUID NOT NULL REFERENCES interview.session(id) ON DELETE CASCADE,
-    text          TEXT NOT NULL,
-    order_index   INT NOT NULL,
-    answered      BOOL DEFAULT FALSE,
-    answer_text   TEXT,
-    answered_at   TIMESTAMPTZ,
-
-    CONSTRAINT chk_question_order_index
-        CHECK (order_index BETWEEN 1 AND 20),
-    CONSTRAINT chk_question_answer_has_text_and_timestamp
-        CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL))
-);
-
+CREATE INDEX IF NOT EXISTS idx_question_session_id
+    ON training.question(session_id);
+CREATE INDEX IF NOT EXISTS idx_question_bank_question_id
+    ON training.question(bank_question_id);
 
 CREATE TABLE IF NOT EXISTS training.feedback (
     id            UUID PRIMARY KEY,
     question_id   UUID NOT NULL UNIQUE REFERENCES training.question(id) ON DELETE CASCADE,
-    score         INT NOT NULL,
-    text          TEXT NOT NULL,
-    generated_at  TIMESTAMPTZ NOT NULL,
-
-    CONSTRAINT chk_feedback_score
-        CHECK (score BETWEEN 1 AND 5)
-);
-
-CREATE TABLE IF NOT EXISTS interview.feedback (
-    id            UUID PRIMARY KEY,
-    question_id   UUID NOT NULL UNIQUE REFERENCES interview.question(id) ON DELETE CASCADE,
     score         INT NOT NULL,
     text          TEXT NOT NULL,
     generated_at  TIMESTAMPTZ NOT NULL,
@@ -211,6 +187,53 @@ CREATE TABLE IF NOT EXISTS training.report (
         CHECK (avg_score BETWEEN 1.0 AND 5.0)
 );
 
+CREATE TABLE IF NOT EXISTS interview.session (
+    id                  UUID PRIMARY KEY,
+    user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    vacancy_snapshot_id UUID NOT NULL REFERENCES vacancy.snapshot(id),
+    status              VARCHAR(32) NOT NULL,
+    total_questions     INT NOT NULL,
+    created             TIMESTAMPTZ NOT NULL,
+    completed_at        TIMESTAMPTZ,
+
+    CONSTRAINT chk_session_status
+        CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
+    CONSTRAINT chk_session_completed_at
+        CHECK (status != 'COMPLETED' OR completed_at IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_user_id
+    ON interview.session(user_id);
+
+CREATE TABLE IF NOT EXISTS interview.question (
+    id            UUID PRIMARY KEY,
+    session_id    UUID NOT NULL REFERENCES interview.session(id) ON DELETE CASCADE,
+    text          TEXT NOT NULL,
+    order_index   INT NOT NULL,
+    answered      BOOL DEFAULT FALSE,
+    answer_text   TEXT,
+    answered_at   TIMESTAMPTZ,
+
+    CONSTRAINT chk_question_order_index
+        CHECK (order_index BETWEEN 1 AND 20),
+    CONSTRAINT chk_question_answer_has_text_and_timestamp
+        CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_question_session_id
+    ON interview.question(session_id);
+
+CREATE TABLE IF NOT EXISTS interview.feedback (
+    id            UUID PRIMARY KEY,
+    question_id   UUID NOT NULL UNIQUE REFERENCES interview.question(id) ON DELETE CASCADE,
+    score         INT NOT NULL,
+    text          TEXT NOT NULL,
+    generated_at  TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_feedback_score
+        CHECK (score BETWEEN 1 AND 5)
+);
+
 CREATE TABLE IF NOT EXISTS interview.report (
     id                UUID PRIMARY KEY,
     session_id        UUID NOT NULL UNIQUE REFERENCES interview.session(id) ON DELETE CASCADE,
@@ -224,31 +247,6 @@ CREATE TABLE IF NOT EXISTS interview.report (
     CONSTRAINT chk_report_offer_probability
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
-
-CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id
-    ON auth.refresh_token(user_id);
-CREATE INDEX IF NOT EXISTS idx_refresh_token_token_hash
-    ON auth.refresh_token(token_hash);
-
-CREATE INDEX IF NOT EXISTS idx_verification_token_user_id
-    ON auth.verification_token(user_id);
-CREATE INDEX IF NOT EXISTS idx_verification_token_token_hash
-    ON auth.verification_token(token_hash);
-
-CREATE INDEX IF NOT EXISTS idx_session_user_id
-    ON training.session(user_id);
-CREATE INDEX IF NOT EXISTS idx_question_session_id
-    ON training.question(session_id);
-CREATE INDEX IF NOT EXISTS idx_question_bank_question_id
-    ON training.question(bank_question_id);
-
-CREATE INDEX IF NOT EXISTS idx_session_user_id
-    ON interview.session(user_id);
-CREATE INDEX IF NOT EXISTS idx_question_session_id
-    ON interview.question(session_id);
-
-CREATE INDEX IF NOT EXISTS idx_snapshot_hh_id
-    ON vacancy.snapshot(hh_vacancy_id);
 
 INSERT INTO content.profession_dict (name, status) VALUES
     ('Java-разработчик', 'APPROVED'),

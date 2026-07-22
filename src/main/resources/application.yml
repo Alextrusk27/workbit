@@ -70,6 +70,8 @@ llm:
       training-question-generator: ${TRAINING_QUESTION_GENERATOR}
       training-follow-up: ${TRAINING_FOLLOW_UP}
       training-reviewer: ${TRAINING_REVIEWER}
+      interview-question-generator: ${INTERVIEW_QUESTION_GENERATOR}
+      interview-reviewer: ${INTERVIEW_REVIEWER}
       input-normalizer: ${INPUT_NORMALIZER}
 
 hh:

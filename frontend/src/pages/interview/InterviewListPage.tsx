@@ -234,7 +234,8 @@ function SessionCard({
               {STATUS_LABELS[session.status]}
             </span>
             <span className="tabular-nums">
-              {session.answeredCount} вопросов отвечено
+              {session.answeredCount} / {session.totalQuestions} вопросов
+              отвечено
             </span>
             <span>{formatDate(session.created)}</span>
           </div>

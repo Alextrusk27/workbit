@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/Textarea'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import {
   interviewApi,
-  MIN_ANSWERS_TO_FINISH,
   type InterviewQuestion,
   type InterviewReport,
   type InterviewSession,
@@ -84,6 +83,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
   const report = finish.data ?? null
   const startedRef = useRef(false)
+  const finishStartedRef = useRef(false)
   const inFlight = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -118,6 +118,13 @@ function SessionRun({ session }: { session: InterviewSession }) {
     loadNext()
   }, [loadNext])
 
+  const finishMutate = finish.mutate
+  useEffect(() => {
+    if (loadState !== 'done' || finishStartedRef.current) return
+    finishStartedRef.current = true
+    finishMutate(session.id)
+  }, [loadState, finishMutate, session.id])
+
   useEffect(() => {
     if (!bottomRef.current) return
     const reduced = window.matchMedia(
@@ -145,15 +152,12 @@ function SessionRun({ session }: { session: InterviewSession }) {
                 : it,
             ),
           )
-          setAnswered((c) => c + 1)
+          if (!item.q.followUp) setAnswered((c) => c + 1)
           loadNext()
         },
       },
     )
   }
-
-  const canFinish = answered >= MIN_ANSWERS_TO_FINISH && !finish.isPending
-  const remaining = Math.max(0, MIN_ANSWERS_TO_FINISH - answered)
 
   return (
     <Container className="py-10 sm:py-14">
@@ -173,7 +177,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
               aria-live="polite"
               className="text-muted shrink-0 font-mono text-xs"
             >
-              Отвечено: {answered}
+              {Math.min(answered, session.totalQuestions)} /{' '}
+              {session.totalQuestions}
             </p>
           )}
         </div>
@@ -206,6 +211,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
                   <li key={item.q.questionId}>
                     <QuestionEntry
                       orderIndex={item.q.orderIndex}
+                      followUp={item.q.followUp}
                       questionText={item.q.questionText}
                       answerText={item.answer}
                     />
@@ -231,14 +237,12 @@ function SessionRun({ session }: { session: InterviewSession }) {
               </div>
             )}
 
-            <FinishBar
-              allAnswered={loadState === 'done'}
-              canFinish={canFinish}
-              remaining={remaining}
-              pending={finish.isPending}
-              error={finish.isError ? getErrorMessage(finish.error) : null}
-              onFinish={() => finish.mutate(session.id)}
-            />
+            {loadState === 'done' && (
+              <FinishBar
+                error={finish.isError ? getErrorMessage(finish.error) : null}
+                onRetry={() => finish.mutate(session.id)}
+              />
+            )}
           </>
         )}
 
@@ -273,9 +277,15 @@ function CurrentQuestion({
 
   return (
     <div>
-      <p className="text-muted font-mono text-xs">
-        Вопрос {question.orderIndex}
-      </p>
+      {question.followUp ? (
+        <span className="bg-accent/10 text-accent rounded-sm px-2 py-0.5 font-mono text-xs">
+          Уточняющий вопрос
+        </span>
+      ) : (
+        <p className="text-muted font-mono text-xs">
+          Вопрос {question.orderIndex}
+        </p>
+      )}
       <h1 className="text-ink font-display mt-1.5 text-2xl leading-snug break-words">
         {question.questionText}
       </h1>
@@ -313,57 +323,32 @@ function CurrentQuestion({
 }
 
 function FinishBar({
-  allAnswered,
-  canFinish,
-  remaining,
-  pending,
   error,
-  onFinish,
+  onRetry,
 }: {
-  allAnswered: boolean
-  canFinish: boolean
-  remaining: number
-  pending: boolean
   error: string | null
-  onFinish: () => void
+  onRetry: () => void
 }) {
-  if (pending) {
+  if (error) {
     return (
-      <div className="border-rule mt-10 border-t pt-8 text-center">
-        <p role="status" className="text-ink font-display text-xl">
-          Формируем разбор…
-        </p>
-        <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-          Рецензент читает ваши ответы, оценивает их и прикидывает шансы на
-          оффер. Это может занять несколько секунд.
-        </p>
+      <div className="border-rule mt-10 border-t pt-8">
+        <Alert>{error}</Alert>
+        <Button variant="secondary" className="mt-4" onClick={onRetry}>
+          Повторить
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="border-rule mt-10 border-t pt-8">
-      {allAnswered && (
-        <p className="text-muted mb-4 text-sm">
-          Вопросы закончились — интервью можно завершить.
-        </p>
-      )}
-      {error && (
-        <div className="mb-4">
-          <Alert>{error}</Alert>
-        </div>
-      )}
-      {canFinish ? (
-        <Button size="lg" variant="secondary" onClick={onFinish}>
-          Завершить и получить разбор
-        </Button>
-      ) : (
-        <p className="text-muted text-sm">
-          Ответьте ещё на {remaining}{' '}
-          {remaining === 1 ? 'вопрос' : remaining < 5 ? 'вопроса' : 'вопросов'},
-          чтобы завершить интервью.
-        </p>
-      )}
+    <div className="border-rule mt-10 border-t pt-8 text-center">
+      <p role="status" className="text-ink font-display text-xl">
+        Формируем разбор…
+      </p>
+      <p className="text-muted mx-auto mt-2 max-w-md text-sm">
+        Все вопросы отвечены. Рецензент читает ваши ответы, оценивает их и
+        прикидывает шансы на оффер. Это может занять несколько секунд.
+      </p>
     </div>
   )
 }

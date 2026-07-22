@@ -10,16 +10,24 @@ import { cn } from '@/lib/cn'
 /** Отвеченный вопрос в режиме чтения: текст вопроса и ответ пользователя. */
 export function QuestionEntry({
   orderIndex,
+  followUp,
   questionText,
   answerText,
 }: {
   orderIndex: number
+  followUp: boolean
   questionText: string
   answerText: string | null
 }) {
   return (
     <div>
-      <p className="text-muted font-mono text-xs">Вопрос {orderIndex}</p>
+      {followUp ? (
+        <span className="bg-accent/10 text-accent rounded-sm px-2 py-0.5 font-mono text-xs">
+          Уточняющий вопрос
+        </span>
+      ) : (
+        <p className="text-muted font-mono text-xs">Вопрос {orderIndex}</p>
+      )}
       <h3 className="text-ink font-display mt-1.5 text-lg leading-snug break-words">
         {questionText}
       </h3>
@@ -33,12 +41,14 @@ export function QuestionEntry({
   )
 }
 
-/** Вопрос в отчёте: ответ кандидата и пометка рецензента с оценкой. */
+/** Вопрос в отчёте: ответ кандидата и пометка рецензента с оценкой за весь
+ *  кейс (уточнения в отчёт не попадают — их удаляют при завершении). */
 export function CaseEntry({ question }: { question: InterviewQuestion }) {
   return (
     <div>
       <QuestionEntry
         orderIndex={question.orderIndex}
+        followUp={question.followUp}
         questionText={question.questionText}
         answerText={question.answerText}
       />

@@ -2,11 +2,6 @@ import { apiFetch } from '@/lib/api'
 
 export type SessionStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED'
 
-/** Минимум отвеченных вопросов для завершения интервью. Зеркалит
- *  InterviewService.MIN_ANSWERED_TO_FINISH на бэке — у интервью нет /options-ручки,
- *  как у тренажёра. Финальный гейт всё равно за бэком (409 при нехватке). */
-export const MIN_ANSWERS_TO_FINISH = 3
-
 export interface CreateInterviewRequest {
   vacancyUrl: string
 }
@@ -17,6 +12,7 @@ export interface InterviewSession {
   employer: string
   status: SessionStatus
   answeredCount: number
+  totalQuestions: number
   created: string
   completedAt: string | null
 }
@@ -25,6 +21,7 @@ export interface InterviewQuestion {
   questionId: string
   orderIndex: number
   questionText: string
+  followUp: boolean
   answerText: string | null
   score: number | null
   feedback: string | null

@@ -18,3 +18,14 @@ export function useVacancyPreview(url: string) {
     staleTime: 5 * 60_000,
   })
 }
+
+export function useVacancyStatus(url: string | null) {
+  const trimmed = (url ?? '').trim()
+  return useQuery({
+    queryKey: ['vacancy', 'status', trimmed],
+    queryFn: () => vacancyApi.status(trimmed),
+    enabled: isHhVacancyUrl(trimmed),
+    retry: false,
+    staleTime: 30 * 60_000,
+  })
+}

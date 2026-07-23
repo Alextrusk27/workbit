@@ -5,7 +5,6 @@ import java.util.List;
 public record LlmInterviewQuestionsRequest(
         String name,
         String employer,
-        String experience,
         List<String> keySkills,
         String description,
         int minCount,

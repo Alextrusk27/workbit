@@ -29,13 +29,13 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewQuestions generateInterviewQuestions(LlmInterviewQuestionsRequest request) {
-        return llm.call("interview-question-generator", request, LlmInterviewQuestions.class);
+    public LlmInterviewQuestions generateInterviewQuestions(String experience, LlmInterviewQuestionsRequest request) {
+        return llm.call("interview-question-generator-" + experienceGrade(experience), request, LlmInterviewQuestions.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewFollowUpDecision decideInterviewFollowUp(LlmInterviewFollowUpRequest request) {
-        return llm.call("interview-follow-up", request, LlmInterviewFollowUpDecision.class);
+    public LlmInterviewFollowUpDecision decideInterviewFollowUp(String experience, LlmInterviewFollowUpRequest request) {
+        return llm.call("interview-follow-up-" + experienceGrade(experience), request, LlmInterviewFollowUpDecision.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
@@ -46,5 +46,14 @@ public class LlmService {
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
         return llm.call("input-normalizer", request, LlmInputNormalization.class);
+    }
+
+    private static String experienceGrade(String experience) {
+        return switch (experience == null ? "" : experience) {
+            case "Нет опыта" -> "noexp";
+            case "От 3 до 6 лет" -> "middle";
+            case "Более 6 лет" -> "senior";
+            default -> "junior";
+        };
     }
 }

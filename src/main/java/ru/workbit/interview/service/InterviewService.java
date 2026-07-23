@@ -66,7 +66,8 @@ public class InterviewService {
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
 
-        LlmInterviewQuestions llmQuestions = llmService.generateInterviewQuestions(toQuestionsRequest(vacancyData));
+        LlmInterviewQuestions llmQuestions = llmService.generateInterviewQuestions(
+                vacancyData.experience(), toQuestionsRequest(vacancyData));
         List<String> questions = usableQuestions(llmQuestions, vacancyData);
 
         InterviewSession session = interviewWriter.createSession(vacancyData, userId, questions);
@@ -146,9 +147,9 @@ public class InterviewService {
                 : answered;
 
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        LlmInterviewFollowUpDecision decision = llmService.decideInterviewFollowUp(new LlmInterviewFollowUpRequest(
+        LlmInterviewFollowUpDecision decision = llmService.decideInterviewFollowUp(
+                vacancy.experience(), new LlmInterviewFollowUpRequest(
                 vacancy.name(),
-                vacancy.experience(),
                 caseMain.getText(),
                 caseMain.getAnswerText(),
                 caseFollowUps.stream()
@@ -241,7 +242,6 @@ public class InterviewService {
         return new LlmInterviewQuestionsRequest(
                 vacancyData.name(),
                 vacancyData.employer(),
-                vacancyData.experience(),
                 vacancyData.keySkills(),
                 vacancyData.description(),
                 LlmInterviewQuestionsRequest.MIN_COUNT,

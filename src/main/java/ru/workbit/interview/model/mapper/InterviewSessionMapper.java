@@ -12,11 +12,15 @@ public interface InterviewSessionMapper {
 
     @Mapping(target = "vacancyName", source = "vacancyData.name")
     @Mapping(target = "employer", source = "vacancyData.employer")
+    @Mapping(target = "vacancyUrl", source = "vacancyData.url")
+    @Mapping(target = "experience", source = "vacancyData.experience")
     @Mapping(target = "answeredCount", source = "answeredCount")
     InterviewSessionResponse toResponse(InterviewSession interviewSession, VacancyData vacancyData, int answeredCount);
 
     @Mapping(target = "vacancyName", source = "vacancy.name")
     @Mapping(target = "employer", source = "vacancy.employer")
+    @Mapping(target = "vacancyUrl", source = "vacancy.url")
+    @Mapping(target = "experience", source = "vacancy.experience")
     @Mapping(target = "answeredCount", source = "answeredCount")
     InterviewSessionResponse toResponse(InterviewSession interviewSession, VacancySnapshotView vacancy, int answeredCount);
 }

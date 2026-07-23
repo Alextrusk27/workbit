@@ -16,6 +16,12 @@ public record InterviewSessionResponse(
         @Schema(description = "Название работодателя", example = "ООО Ромашка")
         String employer,
 
+        @Schema(description = "Ссылка на вакансию", example = "https://hh.ru/vacancy/123456")
+        String vacancyUrl,
+
+        @Schema(description = "Требуемый опыт работы из вакансии, null если не указан", example = "От 1 года до 3 лет")
+        String experience,
+
         @Schema(description = "Статус сессии")
         InterviewSession.Status status,
 

@@ -16,6 +16,8 @@ import {
   useInterviewReport,
   useInterviewSessions,
 } from '@/features/interview/useInterview'
+import type { VacancyStatus } from '@/features/vacancy/api'
+import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -28,6 +30,12 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'IN_PROGRESS', label: STATUS_LABELS.IN_PROGRESS },
   { key: 'COMPLETED', label: STATUS_LABELS.COMPLETED },
 ]
+
+const VACANCY_STATUS_LABELS: Record<VacancyStatus, string> = {
+  ACTIVE: 'активна',
+  ARCHIVED: 'в архиве',
+  NOT_FOUND: 'удалена',
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -161,6 +169,25 @@ function EmptyState() {
   )
 }
 
+function VacancyLine({ session }: { session: InterviewSession }) {
+  const { data } = useVacancyStatus(session.vacancyUrl)
+  if (!session.vacancyUrl) return null
+  return (
+    <div className="text-muted mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <a
+        href={session.vacancyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-accent hover:text-accent-hover transition-colors"
+      >
+        Вакансия на hh.ru ↗
+      </a>
+      {data && <span>{VACANCY_STATUS_LABELS[data.status]}</span>}
+      {session.experience && <span>Опыт: {session.experience}</span>}
+    </div>
+  )
+}
+
 function CardResult({ sessionId }: { sessionId: string }) {
   const { data, isLoading } = useInterviewReport(sessionId)
   if (isLoading) return <Skeleton className="mt-2 h-4 w-40" />
@@ -239,6 +266,7 @@ function SessionCard({
             </span>
             <span>{formatDate(session.created)}</span>
           </div>
+          <VacancyLine session={session} />
           {completed ? (
             <CardResult sessionId={session.id} />
           ) : (

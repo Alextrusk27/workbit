@@ -10,6 +10,8 @@ export interface InterviewSession {
   id: string
   vacancyName: string
   employer: string
+  vacancyUrl: string | null
+  experience: string | null
   status: SessionStatus
   answeredCount: number
   totalQuestions: number

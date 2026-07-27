@@ -201,7 +201,7 @@ public class InterviewService {
 
         List<List<InterviewQuestion>> cases = groupCases(answered);
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        LlmInterviewReport llmReport = llmService.createInterviewReport(new LlmInterviewReportRequest(
+        LlmInterviewReport llmReport = llmService.createInterviewReport(vacancy.experience(), new LlmInterviewReportRequest(
                 vacancy.name(),
                 vacancy.experience(),
                 IntStream.range(0, cases.size())

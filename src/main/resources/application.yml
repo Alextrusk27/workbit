@@ -78,7 +78,10 @@ llm:
       interview-follow-up-junior: ${IFU_JUNIOR}
       interview-follow-up-middle: ${IFU_MIDDLE}
       interview-follow-up-senior: ${IFU_SENIOR}
-      interview-reviewer: ${INTERVIEW_REVIEWER}
+      interview-reviewer-noexp: ${IRV_NOEXP}
+      interview-reviewer-junior: ${IRV_JUNIOR}
+      interview-reviewer-middle: ${IRV_MIDDLE}
+      interview-reviewer-senior: ${IRV_SENIOR}
       input-normalizer: ${INPUT_NORMALIZER}
 
 hh:

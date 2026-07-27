@@ -39,8 +39,8 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewReport createInterviewReport(LlmInterviewReportRequest request) {
-        return llm.call("interview-reviewer", Map.of("JSON_STRING", request), LlmInterviewReport.class);
+    public LlmInterviewReport createInterviewReport(String experience, LlmInterviewReportRequest request) {
+        return llm.call("interview-reviewer-" + experienceGrade(experience), Map.of("JSON_STRING", request), LlmInterviewReport.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

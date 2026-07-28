@@ -92,7 +92,8 @@ public class InterviewController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопрос возвращён"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Неотвеченных вопросов не осталось или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "409", description = "Неотвеченных вопросов не осталось или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewQuestionResponse> nextQuestion(
             @PathVariable UUID sessionId,

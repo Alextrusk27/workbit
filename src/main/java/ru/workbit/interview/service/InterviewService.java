@@ -84,7 +84,7 @@ public class InterviewService {
     }
 
     public List<InterviewSessionResponse> getAll(UUID userId) {
-        List<InterviewSession> sessions = interviewSessionRepository.findAllByUserId(userId);
+        List<InterviewSession> sessions = interviewSessionRepository.findAllByUserIdOrderByCreatedDesc(userId);
 
         Map<UUID, Long> answered = interviewQuestionRepository
                 .countAnsweredBySessionIds(sessions.stream().map(InterviewSession::getId).toList())

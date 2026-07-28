@@ -301,7 +301,7 @@ class InterviewServiceTest {
                     vacancySnapshotIdA, 10);
             InterviewSession second = aSession(sessionWithoutAnswers, userId, InterviewSession.Status.CREATED,
                     vacancySnapshotIdB, 8);
-            when(interviewSessionRepository.findAllByUserId(userId)).thenReturn(List.of(first, second));
+            when(interviewSessionRepository.findAllByUserIdOrderByCreatedDesc(userId)).thenReturn(List.of(first, second));
 
             InterviewQuestionRepository.AnsweredCount answeredCount = mock(InterviewQuestionRepository.AnsweredCount.class);
             when(answeredCount.getSessionId()).thenReturn(sessionWithAnswers);

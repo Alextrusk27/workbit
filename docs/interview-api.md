@@ -105,8 +105,7 @@ record InterviewReportResponse(
   бэке, но, как и в тренажёре, отдаются по одному через `.../questions/next`.
 - **`GET /sessions`** — `200`, `List<InterviewSessionResponse>` — все сессии текущего
   пользователя целиком, без пагинации (в отличие от `training`, где та же ручка отдаёт
-  `PagedModel`). Порядок в запросе репозитория не задан явно (нет `ORDER BY`), так что полагаться
-  на «новые сначала» не стоит, даже если так выглядит на практике.
+  `PagedModel`). Порядок гарантирован: новые первыми, по убыванию `created`.
 - **`GET /sessions/{sessionId}`** — `200`, `InterviewSessionResponse` с актуальным
   `answeredCount`.
 - **`POST .../questions/next`** — `200`, `InterviewQuestionResponse`. Возвращает неотвеченный

@@ -247,6 +247,7 @@ CREATE TABLE IF NOT EXISTS interview.report (
     avg_score         DOUBLE PRECISION NOT NULL,
     offer_probability VARCHAR(32) NOT NULL,
     overall_feedback  TEXT NOT NULL,
+    recommendations   TEXT,
     generated_at      TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT chk_report_avg_score

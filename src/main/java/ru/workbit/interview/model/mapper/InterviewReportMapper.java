@@ -17,6 +17,7 @@ public interface InterviewReportMapper {
     @Mapping(target = "avgScore", source = "report.avgScore")
     @Mapping(target = "offerProbability", source = "report.offerProbability")
     @Mapping(target = "overallFeedback", source = "report.overallFeedback")
+    @Mapping(target = "recommendations", source = "report.recommendations")
     @Mapping(target = "generatedAt", source = "report.generatedAt")
     @Mapping(target = "questions", source = "questions")
     InterviewReportResponse toResponse(InterviewReport report, InterviewSession session,

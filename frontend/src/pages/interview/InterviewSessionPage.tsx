@@ -373,6 +373,7 @@ function FinishedView({ report }: { report: InterviewReport }) {
             avgScore={report.avgScore}
             offerProbability={report.offerProbability}
             overallFeedback={report.overallFeedback}
+            recommendations={report.recommendations}
           />
         </div>
       </div>

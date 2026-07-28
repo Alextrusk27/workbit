@@ -23,6 +23,9 @@ public record InterviewReportResponse(
         @Schema(description = "Итоговый текстовый фидбэк по интервью от LLM")
         String overallFeedback,
 
+        @Schema(description = "Рекомендации, что проработать перед реальным собеседованием; может отсутствовать")
+        String recommendations,
+
         @Schema(description = "Момент формирования отчёта")
         Instant generatedAt,
 

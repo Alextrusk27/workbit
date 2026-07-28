@@ -37,6 +37,9 @@ public class InterviewReport {
     @Size(min = 10)
     private String overallFeedback;
 
+    @Column(updatable = false)
+    private String recommendations;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private Instant generatedAt = Instant.now();

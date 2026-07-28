@@ -74,6 +74,7 @@ export function InterviewReportPage() {
           avgScore={report.avgScore}
           offerProbability={report.offerProbability}
           overallFeedback={report.overallFeedback}
+          recommendations={report.recommendations}
         />
       </div>
 

@@ -39,6 +39,7 @@ export interface InterviewReport {
   avgScore: number | null
   offerProbability: OfferProbability
   overallFeedback: string
+  recommendations: string | null
   generatedAt: string
   questions: InterviewQuestion[]
 }

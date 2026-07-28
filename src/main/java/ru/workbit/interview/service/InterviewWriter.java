@@ -113,6 +113,7 @@ public class InterviewWriter {
                 .avgScore(avgScore)
                 .offerProbability(offerProbability)
                 .overallFeedback(llmReport.overallFeedback())
+                .recommendations(normalizeRecommendations(llmReport.recommendations()))
                 .build());
         session.setStatus(InterviewSession.Status.COMPLETED);
         session.setCompletedAt(Instant.now());
@@ -207,5 +208,9 @@ public class InterviewWriter {
 
     private static boolean isPersistableFeedback(Integer score, String text) {
         return score != null && score >= 1 && score <= 5 && text != null && !text.isBlank();
+    }
+
+    private static String normalizeRecommendations(String recommendations) {
+        return recommendations == null || recommendations.isBlank() ? null : recommendations;
     }
 }

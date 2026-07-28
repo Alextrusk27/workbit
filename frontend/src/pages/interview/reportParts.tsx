@@ -82,15 +82,18 @@ export function OfferBadge({ value }: { value: OfferProbability }) {
   )
 }
 
-/** Итог разбора: средний балл, вероятность оффера и текстовый вывод рецензента. */
+/** Итог разбора: средний балл, вероятность оффера, текстовый вывод рецензента
+ *  и рекомендации к подготовке (если рецензент их дал). */
 export function ReportSummary({
   avgScore,
   offerProbability,
   overallFeedback,
+  recommendations,
 }: {
   avgScore: number | null
   offerProbability: OfferProbability
   overallFeedback: string
+  recommendations: string | null
 }) {
   return (
     <div>
@@ -127,6 +130,16 @@ export function ReportSummary({
         <p className="text-ink mt-3 leading-relaxed whitespace-pre-wrap">
           {overallFeedback}
         </p>
+        {recommendations && (
+          <>
+            <h2 className="text-ink font-display mt-8 text-xl">
+              Что проработать
+            </h2>
+            <p className="text-ink mt-3 leading-relaxed whitespace-pre-wrap">
+              {recommendations}
+            </p>
+          </>
+        )}
         <p className="text-muted mt-6 text-xs">
           Разбор сгенерирован ИИ и может содержать ошибки. Относитесь к оценкам
           и рекомендациям как к ориентиру.

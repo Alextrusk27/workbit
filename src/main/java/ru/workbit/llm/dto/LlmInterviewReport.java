@@ -5,6 +5,7 @@ import java.util.List;
 public record LlmInterviewReport(
         List<LlmInterviewAnswerReview> answers,
         String offerProbability,
-        String overallFeedback
+        String overallFeedback,
+        String recommendations
 ) {
 }

@@ -8,7 +8,16 @@ export interface VacancyPreview {
   url: string
 }
 
+export type VacancyStatus = 'ACTIVE' | 'ARCHIVED' | 'NOT_FOUND'
+
+export interface VacancyStatusResponse {
+  status: VacancyStatus
+}
+
 export const vacancyApi = {
   preview: (url: string) =>
     apiFetch<VacancyPreview>('/vacancies/preview', { query: { url } }),
+
+  status: (url: string) =>
+    apiFetch<VacancyStatusResponse>('/vacancies/status', { query: { url } }),
 }

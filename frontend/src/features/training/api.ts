@@ -75,7 +75,7 @@ export interface SubmitAnswerVars {
   answerText: string
 }
 
-const BASE = '/interview/training'
+const BASE = '/training'
 
 export const trainingApi = {
   options: () => apiFetch<TrainingOptions>(`${BASE}/options`),

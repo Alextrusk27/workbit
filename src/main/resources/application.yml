@@ -70,6 +70,18 @@ llm:
       training-question-generator: ${TRAINING_QUESTION_GENERATOR}
       training-follow-up: ${TRAINING_FOLLOW_UP}
       training-reviewer: ${TRAINING_REVIEWER}
+      interview-question-generator-noexp: ${IQG_NOEXP}
+      interview-question-generator-junior: ${IQG_JUNIOR}
+      interview-question-generator-middle: ${IQG_MIDDLE}
+      interview-question-generator-senior: ${IQG_SENIOR}
+      interview-follow-up-noexp: ${IFU_NOEXP}
+      interview-follow-up-junior: ${IFU_JUNIOR}
+      interview-follow-up-middle: ${IFU_MIDDLE}
+      interview-follow-up-senior: ${IFU_SENIOR}
+      interview-reviewer-noexp: ${IRV_NOEXP}
+      interview-reviewer-junior: ${IRV_JUNIOR}
+      interview-reviewer-middle: ${IRV_MIDDLE}
+      interview-reviewer-senior: ${IRV_SENIOR}
       input-normalizer: ${INPUT_NORMALIZER}
 
 hh:

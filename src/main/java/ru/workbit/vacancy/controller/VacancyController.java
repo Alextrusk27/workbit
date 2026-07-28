@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.vacancy.dto.VacancyPreviewResponse;
+import ru.workbit.vacancy.dto.VacancyStatusResponse;
 import ru.workbit.vacancy.service.VacancyService;
 
 @RestController
@@ -40,5 +41,21 @@ public class VacancyController {
             @Parameter(description = "Ссылка на вакансию hh.ru", example = "https://hh.ru/vacancy/123456")
             @RequestParam String url) {
         return vacancyService.preview(url);
+    }
+
+    @GetMapping("/status")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Текущий статус вакансии", description = "Проверяет по ссылке, доступна ли вакансия на hh.ru: активна, в архиве или удалена. Результат кешируется на сервере на 30 минут.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Статус вакансии"),
+            @ApiResponse(responseCode = "400", description = "Отсутствует параметр url или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "hh.ru недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public VacancyStatusResponse status(
+            @Parameter(description = "Ссылка на вакансию hh.ru", example = "https://hh.ru/vacancy/123456")
+            @RequestParam String url) {
+        return vacancyService.getStatus(url);
     }
 }

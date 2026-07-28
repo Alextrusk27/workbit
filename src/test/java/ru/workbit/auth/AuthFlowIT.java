@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthFlowIT extends AbstractPostgresIT {
 
     private static final String BASE = "/api/v1/auth";
-    private static final String TRAINING_SESSIONS = "/api/v1/interview/training/sessions";
+    private static final String TRAINING_SESSIONS = "/api/v1/training/sessions";
     private static final String PASSWORD = "P@ssw0rd123";
     private static final String NEW_PASSWORD = "N3wP@ssw0rd!";
     private static final String ACCESS_COOKIE = "access_token";

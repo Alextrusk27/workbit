@@ -17,8 +17,8 @@ public interface QuestionBankRepository extends JpaRepository<@NotNull BankQuest
               AND :level = ANY(qb.levels)
               AND NOT EXISTS (
                   SELECT 1
-                  FROM interview.training_question tq
-                  JOIN interview.training_session ts ON ts.id = tq.training_session_id
+                  FROM training.question tq
+                  JOIN training.session ts ON ts.id = tq.session_id
                   WHERE tq.bank_question_id = qb.id
                     AND ts.user_id = :userId)
             ORDER BY random()

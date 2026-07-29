@@ -18,13 +18,16 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class SttWebSocketHandler extends AbstractWebSocketHandler {
     private static final String RECOGNITION = "recognition";
+    private static final String RECEIVED_BYTES = "receivedBytes";
     private static final String STOP = "stop";
+    private static final long MAX_SESSION_BYTES = 4L * 60 * 16_000 * 2;
     private static final int SEND_TIME_LIMIT_MS = 10_000;
     private static final int SEND_BUFFER_LIMIT = 256 * 1024;
     private static final CloseStatus RECOGNITION_FAILED =
@@ -37,6 +40,7 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         WebSocketSession sink =
                 new ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, SEND_BUFFER_LIMIT);
+        session.getAttributes().put(RECEIVED_BYTES, new AtomicLong());
         session.getAttributes().put(RECOGNITION, client.open(new Bridge(sink)));
     }
 
@@ -57,6 +61,13 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
         ByteBuffer payload = message.getPayload();
         byte[] audio = new byte[payload.remaining()];
         payload.get(audio);
+
+        AtomicLong received = (AtomicLong) session.getAttributes().get(RECEIVED_BYTES);
+        if (received != null && received.addAndGet(audio.length) > MAX_SESSION_BYTES) {
+            log.info("Speech session exceeded the audio limit [session={}]", session.getId());
+            recognition.close();
+            return;
+        }
         recognition.send(audio);
     }
 

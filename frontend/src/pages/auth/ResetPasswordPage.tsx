@@ -24,16 +24,13 @@ export function ResetPasswordPage() {
   if (!token) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Ссылка неполная</h1>
+        <h1 className="text-ink text-[28px]">Ссылка неполная</h1>
         <p className="text-muted mt-3 text-sm">
           В ссылке нет токена сброса. Откройте её из письма целиком или
           запросите сброс заново.
         </p>
         <p className="mt-8 text-sm">
-          <Link
-            to="/forgot-password"
-            className="text-accent hover:text-accent-hover"
-          >
+          <Link to="/forgot-password" className="text-indigo hover:text-violet">
             Запросить сброс
           </Link>
         </p>
@@ -44,12 +41,12 @@ export function ResetPasswordPage() {
   if (reset.isSuccess) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Пароль обновлён</h1>
+        <h1 className="text-ink text-[28px]">Пароль обновлён</h1>
         <p className="text-muted mt-3 text-sm">
           Теперь войдите с новым паролем.
         </p>
         <p className="mt-8 text-sm">
-          <Link to="/login" className="text-accent hover:text-accent-hover">
+          <Link to="/login" className="text-indigo hover:text-violet">
             Ко входу
           </Link>
         </p>
@@ -59,7 +56,7 @@ export function ResetPasswordPage() {
 
   return (
     <>
-      <h1 className="text-ink text-3xl">Новый пароль</h1>
+      <h1 className="text-ink text-[28px]">Новый пароль</h1>
       <p className="text-muted mt-2 text-sm">
         Придумайте новый пароль для входа.
       </p>

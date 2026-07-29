@@ -1,42 +1,59 @@
-import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { buttonClasses } from '@/components/ui/buttonStyles'
+import type { Plan } from '@/content/plans'
 import { cn } from '@/lib/cn'
 
-/** Карточка тарифа-переключатель: клик/Enter/Space выбирает план, выбранный
- *  подсвечивается акцентной рамкой. Внутреннее наполнение и отступы (padding)
- *  задаёт вызывающий через children и className. */
-export function PlanCard({
-  selected,
-  onSelect,
-  className,
-  children,
-}: {
-  selected: boolean
-  onSelect: () => void
+interface PlanCardProps {
+  plan: Plan
+  features: string[]
+  to: string
   className?: string
-  children: ReactNode
-}) {
+}
+
+/** Карточка тарифа: цена, состав и переход к оформлению. */
+export function PlanCard({ plan, features, to, className }: PlanCardProps) {
   return (
     <div
-      role="radio"
-      aria-checked={selected}
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
       className={cn(
-        'flex h-full cursor-pointer touch-manipulation flex-col rounded-lg border transition-colors',
-        'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-        selected
-          ? 'border-accent bg-paper-2/50 ring-accent ring-1'
-          : 'border-rule hover:border-ink/30',
+        'relative flex h-full flex-col rounded-2xl border p-8 sm:px-[30px]',
+        plan.featured
+          ? 'border-violet/50 bg-grad-plan shadow-plan'
+          : 'border-line bg-card',
         className,
       )}
     >
-      {children}
+      {plan.featured && (
+        <span className="bg-grad absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3.5 py-[5px] text-xs font-semibold whitespace-nowrap text-white">
+          Популярный
+        </span>
+      )}
+      <h3 className="text-ink text-[19px] font-bold">{plan.name}</h3>
+      <p className="text-muted mt-1 text-sm">{plan.audience}</p>
+      <p className="text-ink mt-4.5 text-[40px] leading-none font-extrabold tracking-[-0.03em] tabular-nums">
+        {plan.price}
+        <span className="text-muted ml-1.5 text-[15px] font-medium tracking-normal">
+          {plan.period}
+        </span>
+      </p>
+      <ul className="mt-5.5 flex grow flex-col gap-2.5">
+        {features.map((f) => (
+          <li key={f} className="text-muted flex gap-2.5 text-[14.5px]">
+            <span aria-hidden className="text-indigo shrink-0 font-bold">
+              ✓
+            </span>
+            {f}
+          </li>
+        ))}
+      </ul>
+      <Link
+        to={to}
+        className={buttonClasses({
+          variant: plan.featured ? 'primary' : 'secondary',
+          className: 'mt-6.5 w-full',
+        })}
+      >
+        {plan.cta}
+      </Link>
     </div>
   )
 }

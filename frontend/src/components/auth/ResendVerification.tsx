@@ -39,7 +39,7 @@ export function ResendVerification({
         type="button"
         onClick={onResend}
         disabled={cooldown > 0 || resend.isPending}
-        className="text-accent hover:text-accent-hover text-sm transition-colors disabled:opacity-60"
+        className="text-indigo hover:text-violet text-sm transition-colors disabled:opacity-60"
       >
         {label}
       </button>

@@ -1,110 +1,76 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { PlanCard } from '@/components/ui/PlanCard'
+import { CtaPanel } from '@/components/marketing/CtaPanel'
+import { PageHero } from '@/components/marketing/PageHero'
+import { Reveal } from '@/components/marketing/Reveal'
 import { plans } from '@/content/plans'
+import { useAuth } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
-
-function Dash() {
-  return (
-    <span className="text-accent shrink-0" aria-hidden>
-      —
-    </span>
-  )
-}
 
 export function PricingPage() {
   usePageTitle('Тарифы')
-  const [selected, setSelected] = useState(
-    () => (plans.find((p) => p.featured) ?? plans[0]).name,
-  )
+  const { isAuthenticated } = useAuth()
+  const startTo = isAuthenticated ? '/app' : '/register'
+
   return (
-    <Container className="py-16 sm:py-24">
-      <p className="text-muted animate-rise font-mono text-xs tracking-[0.2em] uppercase">
-        Тарифы
-      </p>
-      <h1
-        className="text-ink animate-rise mt-4 max-w-2xl text-4xl sm:text-5xl"
-        style={{ animationDelay: '80ms' }}
-      >
-        Один тренажёр, два режима
-      </h1>
-      <p
-        className="text-muted animate-rise mt-5 max-w-xl text-lg"
-        style={{ animationDelay: '160ms' }}
+    <>
+      <PageHero
+        title={
+          <>
+            Один тренажёр, <span className="text-grad">два режима</span>
+          </>
+        }
       >
         Начните бесплатно, чтобы понять формат. Переходите на Про, когда
         готовитесь всерьёз и нужен глубокий разбор.
-      </p>
+      </PageHero>
 
-      <div
-        role="radiogroup"
-        aria-label="Выбор тарифа"
-        className="animate-rise mt-12 grid items-stretch gap-5 sm:grid-cols-2"
-        style={{ animationDelay: '240ms' }}
-      >
-        {plans.map((p) => {
-          const isSelected = selected === p.name
-          return (
-            <PlanCard
-              key={p.name}
-              selected={isSelected}
-              onSelect={() => setSelected(p.name)}
-              className="p-7 sm:p-9"
+      <section className="py-22">
+        <Container>
+          <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {plans.map((p, i) => (
+              <Reveal key={p.name} delay={i * 0.05}>
+                <PlanCard plan={p} features={p.features} to={startTo} />
+              </Reveal>
+            ))}
+          </div>
+
+          <p className="text-dim mt-7 text-center text-[13.5px]">
+            Цены указаны для примера и могут измениться до запуска. Условия
+            оплаты платного тарифа определяет{' '}
+            <Link
+              to="/offer"
+              className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
             >
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-ink font-display text-2xl">{p.name}</h2>
-                {p.featured && (
-                  <span className="bg-accent text-paper rounded-sm px-2 py-0.5 font-mono text-xs tracking-wide">
-                    Популярный
-                  </span>
-                )}
-              </div>
-              <p className="mt-5">
-                <span className="text-ink font-display text-4xl tabular-nums">
-                  {p.price}
-                </span>
-                <span className="text-muted ml-2 text-sm">{p.note}</span>
-              </p>
-              <ul className="mt-7 grow space-y-3">
-                {p.features.map((f) => (
-                  <li key={f} className="text-ink/85 flex gap-3">
-                    <Dash />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                to="/login"
-                onClick={(e) => e.stopPropagation()}
-                className={buttonClasses({
-                  variant: isSelected ? 'primary' : 'secondary',
-                  size: 'lg',
-                  className: 'mt-8 w-full',
-                })}
-              >
-                {p.cta}
-              </Link>
-            </PlanCard>
-          )
-        })}
-      </div>
+              Публичная оферта
+            </Link>
+            .
+          </p>
+        </Container>
+      </section>
 
-      <p
-        className="text-muted animate-rise mt-8 text-sm"
-        style={{ animationDelay: '320ms' }}
-      >
-        Цены указаны для примера и могут измениться до запуска. Условия оплаты
-        платного тарифа определяет{' '}
-        <Link
-          to="/offer"
-          className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
-        >
-          Публичная оферта
-        </Link>
-        .
-      </p>
-    </Container>
+      <section className="pb-22">
+        <Container>
+          <Reveal>
+            <CtaPanel
+              title="Остались вопросы?"
+              actions={
+                <Link
+                  to="/faq"
+                  className={buttonClasses({ variant: 'secondary' })}
+                >
+                  Открыть FAQ
+                </Link>
+              }
+            >
+              Загляните в FAQ — там коротко о формате, профессиях и оценке
+              ответов.
+            </CtaPanel>
+          </Reveal>
+        </Container>
+      </section>
+    </>
   )
 }

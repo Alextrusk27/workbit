@@ -6,6 +6,8 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { RedirectIfAuthed } from '@/features/auth/RedirectIfAuthed'
 import { HomePage } from '@/pages/HomePage'
+import { AiInterviewPage } from '@/pages/AiInterviewPage'
+import { SkillsTrainerPage } from '@/pages/SkillsTrainerPage'
 import { FaqPage } from '@/pages/FaqPage'
 import { PricingPage } from '@/pages/PricingPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -37,6 +39,8 @@ export const router = createBrowserRouter([
         errorElement: <ErrorPage />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'ai-interview', element: <AiInterviewPage /> },
+          { path: 'skills-trainer', element: <SkillsTrainerPage /> },
           { path: 'faq', element: <FaqPage /> },
           { path: 'pricing', element: <PricingPage /> },
           {

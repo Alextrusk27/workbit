@@ -1,113 +1,126 @@
-@import '@fontsource-variable/literata';
-@import '@fontsource-variable/golos-text';
-@import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/inter';
 @import 'tailwindcss';
 
-/* Дизайн-система «Спокойный эксперт» — редакционный премиум.
-   Токены — источник истины; менять здесь, не хардкодить цвета в компонентах. */
 @theme {
-  /* Палитра */
-  --color-paper: #f7f5f0; /* бумага — фон */
-  --color-paper-2: #efece4; /* поверхности, карточки */
-  --color-ink: #1a1a1a; /* чернила — основной текст */
-  --color-muted: #6e6a5f; /* вторичный текст */
-  --color-rule: #d8d3c7; /* тонкие линии, границы */
-  --color-accent: #234c5e; /* акцент — глубокий петролёвый синий */
-  --color-accent-hover: #1b3b49;
-  --color-pine: #1f3d34; /* вторичный акцент — хвоя */
-  --color-edit: #3b6e93; /* «синий карандаш» — только пометки рецензента */
+  --color-canvas: #faf9fb;
+  --color-canvas-2: #f3f2f8;
+  --color-card: #ffffff;
+  --color-line: rgba(23, 22, 43, 0.09);
+  --color-line-hover: rgba(99, 102, 241, 0.45);
+  --color-divider: rgba(23, 22, 43, 0.08);
+  --color-glass: rgba(23, 22, 43, 0.04);
+  --color-glass-hover: rgba(23, 22, 43, 0.07);
+  --color-glass-line: rgba(23, 22, 43, 0.18);
+  --color-surface: #f3f2f9;
+  --color-surface-line: rgba(23, 22, 43, 0.06);
+  --color-pop: #ffffff;
+  --color-ink: #17162b;
+  --color-muted: #5b5f73;
+  --color-dim: #8a8ea3;
+  --color-indigo: #6366f1;
+  --color-violet: #8b5cf6;
+  --color-cyan: #0891b2;
+  --color-star: #f59e0b;
+  --color-star-off: rgba(23, 22, 43, 0.18);
+  --color-ok: #16a34a;
+  --color-danger: #dc2626;
 
-  /* Типографика */
-  --font-display: 'Literata Variable', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Golos Text Variable', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
-  --text-body-sm: 0.95rem; /* мелкий текст карточек и описаний */
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
 
-  /* Скругления — сдержанные, редакционные */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
 
-  /* Тень «приподнятой» карточки (hero-карусель) */
-  --shadow-lift: 0 18px 45px -28px rgba(26, 26, 26, 0.4);
-
-  /* Базовая анимация входа контента — на загрузке и по скроллу (useReveal).
-     Точечные «живые» штрихи (перо MarginNote, заполнение Stars) — на transition.
-     Всё гасится reduced-motion глобальным правилом ниже. */
-  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-  @keyframes rise {
-    from {
-      opacity: 0;
-      transform: translateY(14px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
+  --shadow-btn: 0 8px 24px rgba(99, 102, 241, 0.35);
+  --shadow-btn-hover: 0 12px 32px rgba(99, 102, 241, 0.5);
+  --shadow-plan: 0 16px 48px rgba(99, 102, 241, 0.18);
+  --shadow-chat: 0 24px 64px rgba(23, 22, 43, 0.14);
+  --shadow-pop: 0 16px 48px rgba(23, 22, 43, 0.16);
 }
 
 @layer base {
-  html {
+  :root {
     color-scheme: light;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+    --grad-brand: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #0891b2);
+    --grad-btn: linear-gradient(135deg, #6366f1, #8b5cf6);
+    --grad-plan: linear-gradient(
+      180deg,
+      rgba(139, 92, 246, 0.07),
+      var(--color-card)
+    );
+    --nav-bg: rgba(250, 249, 251, 0.8);
+    --hero-glow: 0.12;
   }
 
-  /* Тёмная тема — «кабинет при лампе»: тёплая тёмная бумага, те же чернильные
-     принципы, акценты осветлены до контраста на тёмном. Класс dark на <html>
-     ставят инлайн-скрипт в index.html (до первой отрисовки) и ThemeToggle;
-     выбор — в localStorage 'theme', без него — prefers-color-scheme. */
   .dark {
     color-scheme: dark;
-    --color-paper: #1c1a17;
-    --color-paper-2: #262320;
-    --color-ink: #eae6dc;
-    --color-muted: #a39c8d;
-    --color-rule: #3b362e;
-    --color-accent: #7fb0c4;
-    --color-accent-hover: #93c0d2;
-    --color-pine: #8fb8a8;
-    --color-edit: #82aed2;
-    --shadow-lift: 0 18px 45px -28px rgba(0, 0, 0, 0.7);
+    --color-canvas: #0a0e1a;
+    --color-canvas-2: #0f1424;
+    --color-card: rgba(255, 255, 255, 0.03);
+    --color-line: rgba(255, 255, 255, 0.08);
+    --color-line-hover: rgba(129, 140, 248, 0.4);
+    --color-divider: rgba(255, 255, 255, 0.06);
+    --color-glass: rgba(255, 255, 255, 0.05);
+    --color-glass-hover: rgba(255, 255, 255, 0.09);
+    --color-glass-line: rgba(255, 255, 255, 0.16);
+    --color-surface: rgba(255, 255, 255, 0.05);
+    --color-surface-line: rgba(255, 255, 255, 0.07);
+    --color-pop: #131829;
+    --color-ink: #e8eaf2;
+    --color-muted: #9aa3b8;
+    --color-dim: #6b7490;
+    --color-indigo: #818cf8;
+    --color-violet: #a78bfa;
+    --color-cyan: #67e8f9;
+    --color-star: #fbbf24;
+    --color-star-off: rgba(255, 255, 255, 0.22);
+    --color-ok: #4ade80;
+    --color-danger: #f87171;
+
+    --grad-brand: linear-gradient(135deg, #818cf8, #a78bfa 55%, #67e8f9);
+    --grad-plan: linear-gradient(
+      180deg,
+      rgba(139, 92, 246, 0.08),
+      rgba(255, 255, 255, 0.02)
+    );
+    --nav-bg: rgba(10, 14, 26, 0.75);
+    --hero-glow: 0.22;
+
+    --shadow-chat: 0 24px 64px rgba(0, 0, 0, 0.45);
+    --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.35);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: var(--color-paper);
+    background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-  }
-
-  /* Тонкое бумажное зерно поверх фона — снимает «плоскость» заливки.
-     Статичное, без движения; fixed и pointer-events:none, чтобы не мешало. */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0.05;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  /* На тёмном зерно светлит фон — чуть приглушаем. */
-  .dark body::before {
-    opacity: 0.04;
+    transition:
+      background-color 0.25s,
+      color 0.25s;
   }
 
   h1,
   h2,
   h3,
   h4 {
-    font-family: var(--font-display);
-    font-weight: 600;
-    line-height: 1.1;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
     text-wrap: balance;
   }
 
@@ -120,13 +133,146 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-indigo);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
 
   ::selection {
-    background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    background-color: color-mix(in srgb, var(--color-indigo) 22%, transparent);
+  }
+}
+
+@utility text-grad {
+  background-image: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-grad {
+  background-image: var(--grad-btn);
+}
+
+@utility bg-grad-plan {
+  background-image: var(--grad-plan);
+}
+
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-dim);
+  }
+}
+
+@utility glow-hero {
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -40% -20% auto;
+    height: 140%;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        600px 400px at 30% 20%,
+        rgba(99, 102, 241, var(--hero-glow)),
+        transparent 65%
+      ),
+      radial-gradient(
+        700px 500px at 75% 30%,
+        rgba(139, 92, 246, calc(var(--hero-glow) * 0.82)),
+        transparent 65%
+      ),
+      radial-gradient(
+        500px 400px at 55% 70%,
+        rgba(103, 232, 249, calc(var(--hero-glow) * 0.32)),
+        transparent 65%
+      );
+  }
+}
+
+@utility glow-page {
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -60% -20% auto;
+    height: 160%;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        600px 360px at 35% 20%,
+        rgba(99, 102, 241, var(--hero-glow)),
+        transparent 65%
+      ),
+      radial-gradient(
+        700px 420px at 70% 25%,
+        rgba(139, 92, 246, calc(var(--hero-glow) * 0.8)),
+        transparent 65%
+      );
+  }
+}
+
+@utility caret-type {
+  &::after {
+    content: '▍';
+    margin-left: 1px;
+    animation: caret-blink 0.8s steps(1) infinite;
+  }
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Эквалайзер голосовой записи: 12 полосок с разной фазой — на CSS, чтобы
+   бесконечная анимация шла на композиторе и не дёргала React-дерево. */
+@utility wave-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: wave-bar 0.8s ease-in-out infinite;
+}
+
+@keyframes wave-bar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@utility mic-pulse {
+  animation: mic-pulse 1.4s infinite;
+}
+
+@keyframes mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(248, 113, 113, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0);
   }
 }
 
@@ -135,7 +281,7 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    animation-delay: 0s !important; /* иначе fill-mode both держит opacity: 0 всю задержку */
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

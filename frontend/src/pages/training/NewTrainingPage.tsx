@@ -1,6 +1,7 @@
 import type { FormEvent, KeyboardEvent } from 'react'
 import { useId, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
@@ -20,6 +21,15 @@ import { trainingErrorMessage } from '@/features/training/errors'
 import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
 import { usePageTitle } from '@/lib/usePageTitle'
+
+const pillClass = (selected: boolean) =>
+  cn(
+    'touch-manipulation rounded-full border px-4 py-[7px] text-[13.5px] font-medium transition',
+    'focus-visible:outline-indigo focus-visible:outline-2 focus-visible:outline-offset-2',
+    selected
+      ? 'border-indigo/35 bg-indigo/12 text-ink'
+      : 'border-line text-muted hover:border-glass-line hover:text-ink',
+  )
 
 function ChipGroup({
   label,
@@ -49,31 +59,24 @@ function ChipGroup({
 
   return (
     <fieldset>
-      <legend className="text-ink text-sm font-medium">{label}</legend>
+      <legend className="text-muted text-[13.5px] font-semibold">
+        {label}
+      </legend>
       <div className="mt-3 flex flex-wrap gap-2" role="radiogroup">
-        {options.map((opt, i) => {
-          const selected = opt === value
-          return (
-            <button
-              key={opt}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={i === activeIndex ? 0 : -1}
-              onClick={() => onChange(opt)}
-              onKeyDown={(e) => onKeyDown(e, i)}
-              className={cn(
-                'touch-manipulation rounded-md border px-4 py-2 text-sm transition-colors',
-                'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-                selected
-                  ? 'border-accent bg-accent text-paper'
-                  : 'border-rule text-ink hover:border-ink/30 hover:bg-paper-2',
-              )}
-            >
-              {opt}
-            </button>
-          )
-        })}
+        {options.map((opt, i) => (
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={opt === value}
+            tabIndex={i === activeIndex ? 0 : -1}
+            onClick={() => onChange(opt)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+            className={pillClass(opt === value)}
+          >
+            {opt}
+          </button>
+        ))}
       </div>
     </fieldset>
   )
@@ -160,7 +163,7 @@ function SuggestField({
         <ul
           id={listId}
           role="listbox"
-          className="border-rule bg-paper absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border py-1 shadow-lg"
+          className="border-line bg-pop shadow-pop absolute z-20 mt-1.5 max-h-60 w-full overflow-auto rounded-lg border p-1.5"
         >
           {suggestions.map((s, i) => (
             <li key={s}>
@@ -172,8 +175,8 @@ function SuggestField({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(s)}
                 className={cn(
-                  'block w-full px-3 py-2 text-left text-sm transition-colors',
-                  i === active ? 'bg-paper-2 text-ink' : 'text-ink',
+                  'text-ink block w-full rounded-sm px-3 py-2 text-left text-sm transition-colors',
+                  i === active && 'bg-glass',
                 )}
               >
                 {s}
@@ -221,8 +224,8 @@ function ConfirmPanel({
   ].filter((row) => row.value.trim() !== '')
 
   return (
-    <div className="border-rule bg-paper-2/60 rounded-lg border p-5">
-      <p className="text-ink text-sm font-medium">Проверьте ввод</p>
+    <div className="border-line bg-glass rounded-xl border p-5">
+      <p className="text-ink text-sm font-semibold">Проверьте ввод</p>
 
       <div className="mt-4 space-y-5">
         {rows.map((row) => (
@@ -231,7 +234,7 @@ function ConfirmPanel({
               {row.label}: <span className="text-ink">{row.value}</span>
             </p>
             {!row.recognized && (
-              <p className="text-muted mt-1.5 text-xs">{row.unknown}</p>
+              <p className="text-dim mt-1.5 text-xs">{row.unknown}</p>
             )}
             {row.suggestions.length > 0 && (
               <div className="mt-2.5 flex flex-wrap gap-2">
@@ -240,13 +243,7 @@ function ConfirmPanel({
                     key={s}
                     type="button"
                     onClick={() => row.onPick(s)}
-                    className={cn(
-                      'touch-manipulation rounded-md border px-3 py-1.5 text-sm transition-colors',
-                      'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-                      s === row.value
-                        ? 'border-accent bg-accent text-paper'
-                        : 'border-rule text-ink hover:border-ink/30 hover:bg-paper',
-                    )}
+                    className={pillClass(s === row.value)}
                   >
                     {s}
                   </button>
@@ -258,7 +255,7 @@ function ConfirmPanel({
       </div>
 
       {result.topicFitsProfession === false && (
-        <p className="text-muted mt-5 text-xs">
+        <p className="text-dim mt-5 text-xs">
           Тема «{topic}» не выглядит темой для профессии «{profession}» —
           продолжить можно, но вопросы могут получиться неожиданными.
         </p>
@@ -352,7 +349,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
   const pending = create.isPending || normalize.isPending
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 space-y-8">
+    <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-6">
       {create.isError && <Alert>{trainingErrorMessage(create.error)}</Alert>}
 
       <SuggestField
@@ -367,8 +364,8 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
       />
 
       <SuggestField
-        label="Тема (необязательно)"
-        hint="Технология или область знаний — без темы вопросы будут общими по профессии"
+        label="Навык (необязательно)"
+        hint="Технология или область знаний — без навыка вопросы будут общими по профессии"
         placeholder="Spring Boot"
         value={topic}
         suggestions={topicOptions}
@@ -394,7 +391,7 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
         />
       )}
 
-      <Button type="submit" size="lg" disabled={!ready || blocked || pending}>
+      <Button type="submit" disabled={!ready || blocked || pending}>
         {create.isPending
           ? 'Создаём…'
           : normalize.isPending
@@ -410,35 +407,28 @@ export function NewTrainingPage() {
   const { data: options, isLoading, isError } = useTrainingOptions()
 
   return (
-    <Container className="py-12 sm:py-16">
-      <Link
-        to="/app/training"
-        className="text-accent hover:text-accent-hover text-sm transition-colors"
+    <Container>
+      <AppPageHeader
+        back={{ to: '/app/training', label: 'Тренажёр' }}
+        eyebrow="Новая тренировка навыка"
+        title="Соберём тренировку под вас"
       >
-        ← Тренажёр
-      </Link>
-      <p className="text-muted mt-8 font-mono text-xs tracking-[0.2em] uppercase">
-        Новая тренировка
-      </p>
-      <h1 className="text-ink mt-4 text-3xl sm:text-4xl">
-        Соберём тренировку под вас
-      </h1>
-      <p className="text-muted mt-4 max-w-xl">
-        Назовите профессию, при желании — тему, и выберите уровень. Вопросы
-        подберёт рецензент, а разбор придёт в конце.
-      </p>
+        Тренировка — это прокачка одного навыка. Укажите профессию, при желании
+        — навык, и выберите уровень. Вопросы подберёт рецензент, а разбор придёт
+        в конце.
+      </AppPageHeader>
 
-      <div className="mt-10 max-w-2xl">
-        {isLoading && <p className="text-muted text-sm">Загрузка…</p>}
+      {isLoading && <p className="text-muted mt-10 text-sm">Загрузка…</p>}
 
-        {(isError || (!isLoading && !options)) && (
+      {(isError || (!isLoading && !options)) && (
+        <div className="mt-10 max-w-160">
           <Alert>
             Не удалось загрузить параметры тренировки. Обновите страницу.
           </Alert>
-        )}
+        </div>
+      )}
 
-        {options && <TrainingForm options={options} />}
-      </div>
+      {options && <TrainingForm options={options} />}
     </Container>
   )
 }

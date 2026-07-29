@@ -33,10 +33,10 @@ export function LoginPage() {
 
   return (
     <>
-      <h1 className="text-ink text-3xl">Вход</h1>
+      <h1 className="text-ink text-[28px]">Вход</h1>
       <p className="text-muted mt-2 text-sm">
         Ещё нет аккаунта?{' '}
-        <Link to="/register" className="text-accent hover:text-accent-hover">
+        <Link to="/register" className="text-indigo hover:text-violet">
           Зарегистрироваться
         </Link>
       </p>

@@ -1,16 +1,15 @@
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function NotFoundPage() {
   usePageTitle('Страница не найдена')
   return (
     <Container className="py-24 text-center sm:py-32">
-      <p className="text-accent font-mono text-sm tracking-[0.2em] uppercase">
-        404
-      </p>
-      <h1 className="text-ink mt-4 text-3xl sm:text-4xl">
+      <Eyebrow className="text-indigo">404</Eyebrow>
+      <h1 className="text-ink mt-4 text-[clamp(28px,3.6vw,40px)]">
         Страница не найдена
       </h1>
       <p className="text-muted mx-auto mt-4 max-w-md">

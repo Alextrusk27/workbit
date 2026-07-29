@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
+import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 const STAR =
@@ -22,10 +23,8 @@ function Row({ count }: { count: number }) {
   )
 }
 
-/** Оценка звёздами с дробным заполнением (шаг 0.5 и любой процент). Цвет
- *  заполненных звёзд — currentColor (наследуется от контекста), пустых — rule.
- *  `animate` — заполнить от 0 до значения при монтировании (сигнатурный штрих;
- *  по умолчанию выключено, чтобы списки оценок оставались спокойными). */
+/** Оценка звёздами с дробным заполнением. `animate` — заполнение от нуля при
+ *  появлении (сигнатурный штрих разбора). */
 export function Stars({
   value,
   max = 5,
@@ -39,40 +38,31 @@ export function Stars({
 }) {
   const pct = Math.max(0, Math.min(1, value / max)) * 100
   const rounded = Math.round(value * 2) / 2
-  const [width, setWidth] = useState(animate ? 0 : pct)
-
-  useEffect(() => {
-    if (!animate) {
-      setWidth(pct)
-      return
-    }
-    const id = requestAnimationFrame(() => setWidth(pct))
-    return () => cancelAnimationFrame(id)
-  }, [animate, pct])
+  const filled = `inset(0 ${100 - pct}% 0 0)`
 
   return (
     <span
       role="img"
       aria-label={`Оценка ${String(rounded).replace('.', ',')} из ${max}`}
       className={cn(
-        'relative inline-flex align-middle leading-none',
+        'text-star relative inline-flex align-middle leading-none',
         className,
       )}
     >
-      <span className="text-rule flex">
+      <span className="text-star-off flex">
         <Row count={max} />
       </span>
-      <span
-        className="absolute inset-0 flex overflow-hidden"
-        style={{
-          width: `${width}%`,
-          transition: animate
-            ? 'width 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
-            : undefined,
+      <motion.span
+        className="absolute inset-0 flex"
+        initial={animate ? { clipPath: 'inset(0 100% 0 0)' } : false}
+        animate={{ clipPath: filled }}
+        transition={{
+          duration: motionTokens.duration.slow,
+          ease: motionTokens.easing.smooth,
         }}
       >
         <Row count={max} />
-      </span>
+      </motion.span>
     </span>
   )
 }

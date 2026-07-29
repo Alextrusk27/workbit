@@ -41,7 +41,7 @@ export function RegisterPage() {
   if (register.isSuccess) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Проверьте почту</h1>
+        <h1 className="text-ink text-[28px]">Проверьте почту</h1>
         <p className="text-muted mt-3 text-sm leading-relaxed">
           Мы отправили письмо со ссылкой подтверждения на{' '}
           <span className="text-ink">{email}</span>. Перейдите по ней, чтобы
@@ -49,7 +49,7 @@ export function RegisterPage() {
         </p>
         <ResendVerification email={email} initialCooldown={60} />
         <p className="mt-8 text-sm">
-          <Link to="/login" className="text-accent hover:text-accent-hover">
+          <Link to="/login" className="text-indigo hover:text-violet">
             Вернуться ко входу
           </Link>
         </p>
@@ -59,10 +59,10 @@ export function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-ink text-3xl">Регистрация</h1>
+      <h1 className="text-ink text-[28px]">Регистрация</h1>
       <p className="text-muted mt-2 text-sm">
         Уже есть аккаунт?{' '}
-        <Link to="/login" className="text-accent hover:text-accent-hover">
+        <Link to="/login" className="text-indigo hover:text-violet">
           Войти
         </Link>
       </p>
@@ -103,7 +103,7 @@ export function RegisterPage() {
               to="/user-agreement"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:text-accent-hover underline underline-offset-2"
+              className="text-indigo hover:text-violet underline underline-offset-2"
             >
               Пользовательское соглашение
             </Link>
@@ -118,13 +118,13 @@ export function RegisterPage() {
               to="/privacy"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:text-accent-hover underline underline-offset-2"
+              className="text-indigo hover:text-violet underline underline-offset-2"
             >
               Политикой конфиденциальности
             </Link>
           </Checkbox>
           {consentError && !consentGiven && (
-            <p role="alert" className="text-accent text-sm">
+            <p role="alert" className="text-danger text-sm">
               Отметьте оба пункта, чтобы продолжить.
             </p>
           )}

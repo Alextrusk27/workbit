@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { DictationHints } from '@/components/speech/DictationHints'
+import { MicButton } from '@/components/speech/MicButton'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
@@ -7,6 +9,7 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import { Textarea } from '@/components/ui/Textarea'
+import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { trainingApi } from '@/features/training/api'
 import type { TrainingQuestion, TrainingSession } from '@/features/training/api'
 import { sessionSubtitle } from '@/features/training/labels'
@@ -244,17 +247,18 @@ function CurrentQuestion({
   error: string | null
   onSubmit: (text: string) => void
 }) {
-  const [answer, setAnswer] = useState('')
+  const { text, setText, dictation, recording, canSend, send, toggleMic } =
+    useDictatedAnswer(onSubmit, { disabled: false, pending })
 
   useEffect(() => {
-    if (!answer.trim()) return
+    if (!text.trim()) return
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [answer])
+  }, [text])
 
   return (
     <div>
@@ -274,11 +278,12 @@ function CurrentQuestion({
       <div className="mt-5.5">
         <Textarea
           label="Ваш ответ"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           placeholder="Отвечайте так, как отвечали бы на собеседовании…"
           disabled={pending}
         />
+        <DictationHints dictation={dictation} />
 
         {error && (
           <div className="mt-4">
@@ -286,13 +291,16 @@ function CurrentQuestion({
           </div>
         )}
 
-        <Button
-          className="mt-4.5"
-          onClick={() => answer.trim() && onSubmit(answer)}
-          disabled={!answer.trim() || pending}
-        >
-          {pending ? 'Сохраняем ответ…' : 'Ответить'}
-        </Button>
+        <div className="mt-4.5 flex items-center gap-3">
+          <Button onClick={send} disabled={!canSend}>
+            {pending ? 'Сохраняем ответ…' : 'Ответить'}
+          </Button>
+          <MicButton
+            recording={recording}
+            disabled={pending || dictation.state === 'stopping'}
+            onClick={toggleMic}
+          />
+        </div>
         <p className="text-dim mt-3 text-[12.5px]">
           Оценок по ходу нет — весь разбор придёт в конце, при завершении
           тренировки.

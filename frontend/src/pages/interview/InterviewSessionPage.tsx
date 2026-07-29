@@ -10,7 +10,9 @@ import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
-import { IconMic, IconSend } from '@/components/marketing/icons'
+import { IconSend } from '@/components/marketing/icons'
+import { DictationHints } from '@/components/speech/DictationHints'
+import { MicButton } from '@/components/speech/MicButton'
 import {
   interviewApi,
   type InterviewQuestion,
@@ -22,9 +24,8 @@ import {
   useInterviewSession,
   useSubmitInterviewAnswer,
 } from '@/features/interview/useInterview'
-import { useDictation } from '@/features/speech/useDictation'
+import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
-import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function InterviewSessionPage() {
@@ -306,16 +307,17 @@ function Composer({
   pending: boolean
   onSend: (text: string) => void
 }) {
-  const [text, setText] = useState('')
-  const [awaitingText, setAwaitingText] = useState(false)
+  const {
+    text,
+    setText,
+    dictation,
+    recording,
+    busy,
+    canSend,
+    send,
+    toggleMic,
+  } = useDictatedAnswer(onSend, { disabled, pending })
   const ref = useRef<HTMLTextAreaElement>(null)
-
-  const dictation = useDictation((chunk) =>
-    setText((prev) => (prev ? `${prev} ${chunk}` : chunk)),
-  )
-  const recording =
-    dictation.state === 'starting' || dictation.state === 'listening'
-  const dictating = dictation.state !== 'idle'
 
   useEffect(() => {
     const ta = ref.current
@@ -334,34 +336,6 @@ function Composer({
     return () => window.removeEventListener('beforeunload', warn)
   }, [text])
 
-  const submit = useCallback(
-    (value: string) => {
-      onSend(value)
-      setText('')
-    },
-    [onSend],
-  )
-
-  useEffect(() => {
-    if (!awaitingText || dictation.state !== 'idle') return
-    setAwaitingText(false)
-    const value = text.trim()
-    if (value) submit(value)
-  }, [awaitingText, dictation.state, text, submit])
-
-  const send = () => {
-    if (disabled || pending || awaitingText) return
-    if (dictating) {
-      setAwaitingText(true)
-      dictation.stop()
-      return
-    }
-    const value = text.trim()
-    if (!value) return
-    dictation.cancel()
-    submit(value)
-  }
-
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -369,26 +343,13 @@ function Composer({
     }
   }
 
-  const canSend =
-    !disabled && !pending && !awaitingText && (text.trim() !== '' || dictating)
-
   return (
     <>
-      <button
-        type="button"
-        onClick={() => (recording ? dictation.stop() : dictation.start())}
+      <MicButton
+        recording={recording}
         disabled={disabled || pending || dictation.state === 'stopping'}
-        aria-label={recording ? 'Остановить запись' : 'Ответить голосом'}
-        aria-pressed={recording}
-        className={cn(
-          'grid size-9 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-45',
-          recording
-            ? 'border-danger/40 bg-danger/12 text-danger mic-pulse'
-            : 'border-line bg-glass text-muted hover:bg-glass-hover hover:text-ink',
-        )}
-      >
-        <IconMic className="size-4" />
-      </button>
+        onClick={toggleMic}
+      />
 
       <div className="min-w-0 flex-1">
         <textarea
@@ -406,34 +367,17 @@ function Composer({
           }
           className="border-line bg-surface text-ink placeholder:text-dim focus:border-indigo focus:ring-indigo/18 max-h-30 min-h-9.5 w-full resize-none rounded-md border px-3 py-2.5 text-[13.5px] transition-colors focus:ring-[3px] focus:outline-none disabled:opacity-60"
         />
-        {dictation.partial && (
-          <p className="text-dim mt-1.5 text-[12.5px]">{dictation.partial}</p>
-        )}
-        {dictation.notice && (
-          <p role="status" className="text-dim mt-1.5 text-[12.5px]">
-            {dictation.notice}
-          </p>
-        )}
-        {dictation.state === 'stopping' && (
-          <p className="text-dim mt-1.5 text-[12.5px]">Расшифровываю…</p>
-        )}
-        {dictation.error && (
-          <p role="status" className="text-danger mt-1.5 text-[12.5px]">
-            {dictation.error}
-          </p>
-        )}
+        <DictationHints dictation={dictation} />
       </div>
 
       <button
         type="button"
         onClick={send}
         disabled={!canSend}
-        aria-label={
-          pending || awaitingText ? 'Отправляем ответ' : 'Отправить ответ'
-        }
+        aria-label={pending || busy ? 'Отправляем ответ' : 'Отправить ответ'}
         className="bg-grad grid size-9 shrink-0 place-items-center rounded-full text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] transition hover:-translate-y-px disabled:pointer-events-none disabled:opacity-45"
       >
-        {pending || awaitingText ? (
+        {pending || busy ? (
           <Spinner className="size-4 border-white" />
         ) : (
           <IconSend className="size-[15px]" />

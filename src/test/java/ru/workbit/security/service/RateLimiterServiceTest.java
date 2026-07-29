@@ -21,7 +21,7 @@ class RateLimiterServiceTest {
     private static final int LIMIT = 3;
 
     private RateLimiterService aRateLimiter(int limit, Duration window) {
-        return new RateLimiterService(new RateLimitProperties(limit, window, null, null));
+        return new RateLimiterService(new RateLimitProperties(limit, window, null, null, null));
     }
 
     @Nested

@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -16,13 +17,13 @@ export function TrainingReportPage() {
 
   if (isLoading) {
     return (
-      <Container className="py-12 sm:py-16">
+      <Container>
         <div role="status">
           <span className="sr-only">Загрузка разбора…</span>
           <Skeleton className="h-4 w-32" />
           <Skeleton className="mt-4 h-9 w-64" />
           <Skeleton className="mt-3 h-4 w-48" />
-          <Skeleton className="mt-8 h-28 sm:max-w-xs" />
+          <Skeleton className="mt-8 h-28" />
           <Skeleton className="mt-8 h-24" />
         </div>
       </Container>
@@ -31,7 +32,7 @@ export function TrainingReportPage() {
 
   if (isError || !report) {
     return (
-      <Container className="py-16">
+      <Container>
         <Alert>{getErrorMessage(error)}</Alert>
       </Container>
     )
@@ -45,20 +46,14 @@ export function TrainingReportPage() {
     .join(' · ')
 
   return (
-    <Container className="py-12 sm:py-16">
-      <Link
-        to="/app/training"
-        className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
+    <Container>
+      <AppPageHeader
+        back={{ to: '/app/training', label: 'Тренажёр' }}
+        eyebrow="Разбор тренировки"
+        title={report.profession}
       >
-        ← Тренажёр
-      </Link>
-      <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-        Разбор тренировки
-      </p>
-      <h1 className="text-ink mt-4 text-3xl break-words sm:text-4xl">
-        {report.profession}
-      </h1>
-      <p className="text-muted mt-2 text-sm">{subtitle}</p>
+        {subtitle}
+      </AppPageHeader>
 
       <div className="mt-8">
         <ReportSummary
@@ -68,22 +63,30 @@ export function TrainingReportPage() {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-ink font-display text-xl">Ответы с пометками</h2>
-        <ol className="mt-6 space-y-8">
+        <h2 className="text-ink text-[21px] font-bold tracking-[-0.015em]">
+          Ответы с пометками
+        </h2>
+        <ol className="mt-6">
           {report.questions.map((q) => (
-            <li key={q.questionId}>
+            <li
+              key={q.questionId}
+              className="border-divider mt-8 border-t pt-8 first:mt-0 first:border-0 first:pt-0"
+            >
               <CaseEntry question={q} />
             </li>
           ))}
         </ol>
       </div>
 
-      <div className="mt-12">
+      <div className="mt-12 flex flex-wrap gap-3.5">
         <Link
           to="/app/training"
           className={buttonClasses({ variant: 'secondary' })}
         >
           К списку тренировок
+        </Link>
+        <Link to="/app/training/new" className={buttonClasses()}>
+          Новая тренировка
         </Link>
       </div>
     </Container>

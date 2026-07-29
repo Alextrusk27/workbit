@@ -1,15 +1,19 @@
+import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { ChatBubble } from '@/components/chat/ChatBubble'
+import { ChatShell } from '@/components/chat/ChatShell'
+import { TypingDots } from '@/components/chat/TypingDots'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Textarea } from '@/components/ui/Textarea'
-import { buttonClasses } from '@/components/ui/buttonStyles'
+import { Spinner } from '@/components/ui/Spinner'
+import { IconMic, IconSend } from '@/components/marketing/icons'
 import {
   interviewApi,
   type InterviewQuestion,
-  type InterviewReport,
   type InterviewSession,
 } from '@/features/interview/api'
 import { sessionSubtitle } from '@/features/interview/labels'
@@ -20,7 +24,6 @@ import {
 } from '@/features/interview/useInterview'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { CaseEntry, QuestionEntry, ReportSummary } from './reportParts'
 
 export function InterviewSessionPage() {
   usePageTitle('Интервью')
@@ -35,12 +38,12 @@ export function InterviewSessionPage() {
 
   if (isLoading) {
     return (
-      <Container className="py-10 sm:py-14">
+      <Container>
         <div role="status">
           <span className="sr-only">Загрузка интервью…</span>
           <Skeleton className="h-3 w-48" />
           <Skeleton className="mt-8 h-8 w-3/4" />
-          <Skeleton className="mt-6 h-32 w-full" />
+          <Skeleton className="mt-6 h-96 w-full" />
         </div>
       </Container>
     )
@@ -48,7 +51,7 @@ export function InterviewSessionPage() {
 
   if (isError || !session) {
     return (
-      <Container className="py-16">
+      <Container>
         <Alert>{getErrorMessage(error)}</Alert>
       </Container>
     )
@@ -70,6 +73,7 @@ interface LiveItem {
 }
 
 function SessionRun({ session }: { session: InterviewSession }) {
+  const navigate = useNavigate()
   const [items, setItems] = useState<LiveItem[]>([])
   const [answered, setAnswered] = useState(session.answeredCount)
   const [loadState, setLoadState] = useState<
@@ -81,11 +85,10 @@ function SessionRun({ session }: { session: InterviewSession }) {
   const submit = useSubmitInterviewAnswer()
   const finish = useFinishInterview()
 
-  const report = finish.data ?? null
   const startedRef = useRef(false)
   const finishStartedRef = useRef(false)
   const inFlight = useRef(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const loadNext = useCallback(async () => {
     if (inFlight.current) return
@@ -118,277 +121,273 @@ function SessionRun({ session }: { session: InterviewSession }) {
     loadNext()
   }, [loadNext])
 
+  // Все основные вопросы отвечены (next вернул 409) — завершаем сами и уходим
+  // на страницу разбора; guard-ref защищает от повторного вызова.
   const finishMutate = finish.mutate
+  const finishSession = useCallback(() => {
+    finishMutate(session.id, {
+      onSuccess: () =>
+        navigate(`/app/interview/${session.id}/report`, { replace: true }),
+    })
+  }, [finishMutate, navigate, session.id])
+
   useEffect(() => {
     if (loadState !== 'done' || finishStartedRef.current) return
     finishStartedRef.current = true
-    finishMutate(session.id)
-  }, [loadState, finishMutate, session.id])
+    finishSession()
+  }, [loadState, finishSession])
 
   useEffect(() => {
-    if (!bottomRef.current) return
-    const reduced = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches
-    bottomRef.current.scrollIntoView({
-      behavior: reduced ? 'auto' : 'smooth',
-      block: 'end',
-    })
-  }, [items.length, report])
+    const body = bodyRef.current
+    if (body) body.scrollTop = body.scrollHeight
+  }, [items, loadState])
 
-  const onAnswer = (item: LiveItem, text: string) => {
+  const current = items.find((it) => it.answer === null) ?? null
+
+  const onSend = (text: string) => {
+    if (!current) return
     submit.mutate(
       {
         sessionId: session.id,
-        questionId: item.q.questionId,
+        questionId: current.q.questionId,
         answerText: text,
       },
       {
         onSuccess: () => {
           setItems((prev) =>
             prev.map((it) =>
-              it.q.questionId === item.q.questionId
+              it.q.questionId === current.q.questionId
                 ? { ...it, answer: text }
                 : it,
             ),
           )
-          if (!item.q.followUp) setAnswered((c) => c + 1)
+          if (!current.q.followUp) setAnswered((c) => c + 1)
           loadNext()
         },
       },
     )
   }
 
+  const finishing = loadState === 'done'
+
   return (
-    <Container className="py-10 sm:py-14">
-      <div>
-        <Link
-          to="/app/interview"
-          className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
+    <Container>
+      <Link
+        to="/app/interview"
+        className="text-indigo hover:text-violet mb-7 inline-block text-sm transition-colors"
+      >
+        ← Интервью
+      </Link>
+
+      <div className="flex items-baseline justify-between gap-4">
+        <Eyebrow className="break-words">{session.vacancyName}</Eyebrow>
+        <p
+          aria-live="polite"
+          className="text-dim text-[13px] whitespace-nowrap tabular-nums"
         >
-          ← Интервью
-        </Link>
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-muted font-mono text-xs tracking-[0.2em] break-words uppercase">
-            {session.vacancyName}
-          </p>
-          {!report && (
-            <p
-              aria-live="polite"
-              className="text-muted shrink-0 font-mono text-xs"
-            >
-              {Math.min(answered, session.totalQuestions)} /{' '}
-              {session.totalQuestions}
-            </p>
-          )}
-        </div>
-        <p className="text-muted mt-1 text-sm">{sessionSubtitle(session)}</p>
-
-        {resumed && !report && (
-          <p className="text-muted mt-4 text-xs">
-            Прошлые ответы этой сессии появятся в разборе после завершения.
-          </p>
-        )}
-
-        {report ? (
-          <FinishedView report={report} />
-        ) : (
-          <>
-            <ol className="mt-8 space-y-10">
-              {items.map((item) =>
-                item.answer === null ? (
-                  <li key={item.q.questionId}>
-                    <CurrentQuestion
-                      question={item.q}
-                      pending={submit.isPending}
-                      error={
-                        submit.isError ? getErrorMessage(submit.error) : null
-                      }
-                      onSubmit={(text) => onAnswer(item, text)}
-                    />
-                  </li>
-                ) : (
-                  <li key={item.q.questionId}>
-                    <QuestionEntry
-                      orderIndex={item.q.orderIndex}
-                      followUp={item.q.followUp}
-                      questionText={item.q.questionText}
-                      answerText={item.answer}
-                    />
-                  </li>
-                ),
-              )}
-            </ol>
-
-            {loadState === 'loading' && (
-              <div role="status" className="mt-10">
-                <span className="sr-only">Загружаем следующий вопрос…</span>
-                <Skeleton className="h-6 w-2/3" />
-                <Skeleton className="mt-4 h-24 w-full" />
-              </div>
-            )}
-
-            {loadState === 'error' && (
-              <div className="mt-8">
-                <Alert>{loadError}</Alert>
-                <Button variant="secondary" className="mt-4" onClick={loadNext}>
-                  Повторить
-                </Button>
-              </div>
-            )}
-
-            {loadState === 'done' && (
-              <FinishBar
-                error={finish.isError ? getErrorMessage(finish.error) : null}
-                onRetry={() => finish.mutate(session.id)}
-              />
-            )}
-          </>
-        )}
-
-        <div ref={bottomRef} />
+          {Math.min(answered, session.totalQuestions)} /{' '}
+          {session.totalQuestions}
+        </p>
       </div>
+      <p className="text-muted mt-1.5 text-sm">{sessionSubtitle(session)}</p>
+
+      {resumed && (
+        <p className="text-dim mt-4 text-xs">
+          Прошлые ответы этой сессии появятся в разборе после завершения.
+        </p>
+      )}
+
+      <ChatShell
+        className="mt-6"
+        name="AI-интервьюер"
+        status={finishing ? 'формируем разбор' : 'интервью идёт'}
+        bodyRef={bodyRef}
+        bodyClassName="h-[min(56vh,500px)]"
+        footer={
+          <Composer
+            disabled={!current || finishing}
+            pending={submit.isPending}
+            onSend={onSend}
+          />
+        }
+      >
+        {items.map((item) => (
+          <ChatMessages key={item.q.questionId} item={item} items={items} />
+        ))}
+
+        {loadState === 'loading' && (
+          <ChatBubble role="bot">
+            <TypingDots />
+          </ChatBubble>
+        )}
+
+        {finishing && !finish.isError && (
+          <ChatBubble role="bot" who="Интервью завершено">
+            <Spinner className="mr-2.5" />
+            Спасибо, это был последний вопрос. Формирую разбор: оценки по
+            каждому ответу, правки и вероятность оффера…
+          </ChatBubble>
+        )}
+      </ChatShell>
+
+      <p className="text-dim mt-3 text-[12.5px]">
+        Оценок по ходу нет — весь разбор придёт в конце. Enter — отправить,
+        Shift+Enter — новая строка.
+      </p>
+
+      {submit.isError && (
+        <div className="mt-4">
+          <Alert>{getErrorMessage(submit.error)}</Alert>
+        </div>
+      )}
+
+      {loadState === 'error' && (
+        <div className="mt-4">
+          <Alert>{loadError}</Alert>
+          <Button variant="secondary" className="mt-4" onClick={loadNext}>
+            Повторить
+          </Button>
+        </div>
+      )}
+
+      {finish.isError && (
+        <div className="mt-4">
+          <Alert>{getErrorMessage(finish.error)}</Alert>
+          <Button variant="secondary" className="mt-4" onClick={finishSession}>
+            Повторить
+          </Button>
+        </div>
+      )}
     </Container>
   )
 }
 
-function CurrentQuestion({
-  question,
+/** Пара сообщений: вопрос рецензента и ответ кандидата, если он уже дан.
+ *  Уточняющий вопрос показывается с цитатой ответа, к которому он задан. */
+function ChatMessages({ item, items }: { item: LiveItem; items: LiveItem[] }) {
+  const index = items.indexOf(item)
+  const previousAnswer = items
+    .slice(0, index)
+    .filter((it) => it.answer !== null)
+    .at(-1)?.answer
+
+  return (
+    <>
+      <ChatBubble
+        role="bot"
+        who={
+          item.q.followUp ? 'Уточняющий вопрос' : `Вопрос ${item.q.orderIndex}`
+        }
+        quote={
+          item.q.followUp && previousAnswer
+            ? { name: 'Вы', text: previousAnswer }
+            : undefined
+        }
+      >
+        {item.q.questionText}
+      </ChatBubble>
+      {item.answer !== null && (
+        <ChatBubble role="user" who="Вы">
+          {item.answer}
+        </ChatBubble>
+      )}
+    </>
+  )
+}
+
+function Composer({
+  disabled,
   pending,
-  error,
-  onSubmit,
+  onSend,
 }: {
-  question: InterviewQuestion
+  disabled: boolean
   pending: boolean
-  error: string | null
-  onSubmit: (text: string) => void
+  onSend: (text: string) => void
 }) {
-  const [answer, setAnswer] = useState('')
+  const [text, setText] = useState('')
+  const [voiceHint, setVoiceHint] = useState(false)
+  const ref = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!answer.trim()) return
+    const ta = ref.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
+  }, [text])
+
+  useEffect(() => {
+    if (!text.trim()) return
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [answer])
+  }, [text])
 
-  return (
-    <div>
-      {question.followUp ? (
-        <span className="bg-accent/10 text-accent rounded-sm px-2 py-0.5 font-mono text-xs">
-          Уточняющий вопрос
-        </span>
-      ) : (
-        <p className="text-muted font-mono text-xs">
-          Вопрос {question.orderIndex}
-        </p>
-      )}
-      <h1 className="text-ink font-display mt-1.5 text-2xl leading-snug break-words">
-        {question.questionText}
-      </h1>
-
-      <div className="mt-6">
-        <Textarea
-          label="Ваш ответ"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Отвечайте так, как отвечали бы на собеседовании…"
-          disabled={pending}
-        />
-
-        {error && (
-          <div className="mt-4">
-            <Alert>{error}</Alert>
-          </div>
-        )}
-
-        <Button
-          size="lg"
-          className="mt-5"
-          onClick={() => answer.trim() && onSubmit(answer)}
-          disabled={!answer.trim() || pending}
-        >
-          {pending ? 'Сохраняем ответ…' : 'Ответить'}
-        </Button>
-        <p className="text-muted mt-3 text-xs">
-          Оценок по ходу нет — весь разбор придёт в конце, при завершении
-          интервью.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function FinishBar({
-  error,
-  onRetry,
-}: {
-  error: string | null
-  onRetry: () => void
-}) {
-  if (error) {
-    return (
-      <div className="border-rule mt-10 border-t pt-8">
-        <Alert>{error}</Alert>
-        <Button variant="secondary" className="mt-4" onClick={onRetry}>
-          Повторить
-        </Button>
-      </div>
-    )
+  const send = () => {
+    const value = text.trim()
+    if (!value || disabled || pending) return
+    onSend(value)
+    setText('')
   }
 
-  return (
-    <div className="border-rule mt-10 border-t pt-8 text-center">
-      <p role="status" className="text-ink font-display text-xl">
-        Формируем разбор…
-      </p>
-      <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Все вопросы отвечены. Рецензент читает ваши ответы, оценивает их и
-        прикидывает шансы на оффер. Это может занять несколько секунд.
-      </p>
-    </div>
-  )
-}
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      send()
+    }
+  }
 
-function FinishedView({ report }: { report: InterviewReport }) {
-  return (
-    <div className="mt-8">
-      <ol className="space-y-10">
-        {report.questions.map((q) => (
-          <li key={q.questionId}>
-            <CaseEntry question={q} />
-          </li>
-        ))}
-      </ol>
+  const canSend = text.trim() !== '' && !disabled && !pending
 
-      <div className="border-rule mt-12 border-t pt-10">
-        <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-          Разбор интервью
-        </p>
-        <div className="mt-6">
-          <ReportSummary
-            avgScore={report.avgScore}
-            offerProbability={report.offerProbability}
-            overallFeedback={report.overallFeedback}
-            recommendations={report.recommendations}
-          />
-        </div>
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setVoiceHint(true)}
+        aria-label="Ответить голосом — появится позже"
+        className="border-line bg-glass text-muted hover:bg-glass-hover hover:text-ink grid size-9 shrink-0 place-items-center rounded-full border transition-colors"
+      >
+        <IconMic className="size-4" />
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <textarea
+          ref={ref}
+          rows={1}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={disabled || pending}
+          aria-label="Ваш ответ"
+          placeholder={
+            disabled
+              ? 'Дождитесь следующего вопроса…'
+              : 'Отвечайте так, как отвечали бы на собеседовании…'
+          }
+          className="border-line bg-surface text-ink placeholder:text-dim focus:border-indigo focus:ring-indigo/18 max-h-30 min-h-9.5 w-full resize-none rounded-md border px-3 py-2.5 text-[13.5px] transition-colors focus:ring-[3px] focus:outline-none disabled:opacity-60"
+        />
+        {voiceHint && (
+          <p role="status" className="text-dim mt-1.5 text-[12.5px]">
+            Голосовые ответы появятся позже — пока отвечайте текстом.
+          </p>
+        )}
       </div>
 
-      <div className="mt-12 flex flex-wrap gap-3">
-        <Link to="/app/interview" className={buttonClasses()}>
-          К списку интервью
-        </Link>
-        <Link
-          to="/app/interview/new"
-          className={buttonClasses({ variant: 'secondary' })}
-        >
-          Новое интервью
-        </Link>
-      </div>
-    </div>
+      <button
+        type="button"
+        onClick={send}
+        disabled={!canSend}
+        aria-label={pending ? 'Отправляем ответ' : 'Отправить ответ'}
+        className="bg-grad grid size-9 shrink-0 place-items-center rounded-full text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] transition hover:-translate-y-px disabled:pointer-events-none disabled:opacity-45"
+      >
+        {pending ? (
+          <Spinner className="size-4 border-white" />
+        ) : (
+          <IconSend className="size-[15px]" />
+        )}
+      </button>
+    </>
   )
 }

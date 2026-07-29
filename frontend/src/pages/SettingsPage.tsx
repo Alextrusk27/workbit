@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
@@ -18,22 +19,22 @@ export function SettingsPage() {
   const { user } = useAuth()
 
   return (
-    <Container className="py-12 sm:py-16">
-      <div className="max-w-xl">
-        <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-          Настройки
-        </p>
-        <h1 className="text-ink mt-4 text-3xl sm:text-4xl">Аккаунт</h1>
+    <Container className="max-w-160">
+      <AppPageHeader
+        back={{ to: '/app', label: 'Личный кабинет' }}
+        eyebrow="Настройки"
+        title="Аккаунт"
+      >
         {user && (
-          <p className="text-muted mt-2 text-sm">
+          <>
             Вы вошли как <span className="text-ink">{user.email}</span>
-          </p>
+          </>
         )}
+      </AppPageHeader>
 
-        <div className="mt-12 space-y-14">
-          <ChangePasswordSection />
-          <DeleteAccountSection />
-        </div>
+      <div className="mt-12 space-y-12">
+        <ChangePasswordSection />
+        <DeleteAccountSection />
       </div>
     </Container>
   )
@@ -59,12 +60,12 @@ function ChangePasswordSection() {
 
   return (
     <section>
-      <h2 className="text-ink font-display text-xl">Смена пароля</h2>
+      <h2 className="text-ink text-[21px] font-bold">Смена пароля</h2>
       <p className="text-muted mt-2 text-sm">
         После смены пароля активные сессии на других устройствах завершатся.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-5">
+      <form onSubmit={onSubmit} className="mt-6 space-y-4.5">
         {change.isError && <Alert>{getErrorMessage(change.error)}</Alert>}
         {change.isSuccess && <Alert tone="success">Пароль обновлён.</Alert>}
         <Field
@@ -110,9 +111,9 @@ function DeleteAccountSection() {
   }
 
   return (
-    <section className="border-rule border-t pt-14">
-      <h2 className="text-ink font-display text-xl">Удаление аккаунта</h2>
-      <p className="text-muted mt-2 max-w-md text-sm">
+    <section className="border-divider border-t pt-12">
+      <h2 className="text-ink text-[21px] font-bold">Удаление аккаунта</h2>
+      <p className="text-muted mt-2 max-w-[48ch] text-sm">
         Аккаунт и вся история интервью удаляются безвозвратно. Восстановить их
         будет нельзя.
       </p>
@@ -123,14 +124,14 @@ function DeleteAccountSection() {
         </div>
       )}
 
-      <button
-        type="button"
+      <Button
+        variant="danger"
         onClick={onDelete}
         disabled={del.isPending}
-        className="border-accent/40 text-accent hover:bg-accent/5 mt-6 rounded-md border px-4 py-2 text-sm transition-colors disabled:opacity-50"
+        className="mt-6"
       >
         {del.isPending ? 'Удаляем…' : 'Удалить аккаунт'}
-      </button>
+      </Button>
     </section>
   )
 }

@@ -21,13 +21,13 @@ export function ForgotPasswordPage() {
   if (forgot.isSuccess) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Письмо отправлено</h1>
+        <h1 className="text-ink text-[28px]">Письмо отправлено</h1>
         <p className="text-muted mt-3 text-sm leading-relaxed">
           Если аккаунт с адресом <span className="text-ink">{email}</span>{' '}
           существует, мы отправили на него ссылку для сброса пароля.
         </p>
         <p className="mt-8 text-sm">
-          <Link to="/login" className="text-accent hover:text-accent-hover">
+          <Link to="/login" className="text-indigo hover:text-violet">
             Вернуться ко входу
           </Link>
         </p>
@@ -37,7 +37,7 @@ export function ForgotPasswordPage() {
 
   return (
     <>
-      <h1 className="text-ink text-3xl">Забыли пароль?</h1>
+      <h1 className="text-ink text-[28px]">Забыли пароль?</h1>
       <p className="text-muted mt-2 text-sm">
         Укажите email — пришлём ссылку для сброса.
       </p>

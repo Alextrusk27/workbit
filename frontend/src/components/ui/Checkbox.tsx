@@ -23,9 +23,9 @@ export function Checkbox({
         checked={checked}
         required={required}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-accent mt-0.5 size-4 shrink-0"
+        className="accent-indigo mt-0.5 size-4 shrink-0"
       />
-      <label htmlFor={id} className="text-muted text-sm leading-snug">
+      <label htmlFor={id} className="text-muted text-[13.5px] leading-snug">
         {children}
       </label>
     </div>

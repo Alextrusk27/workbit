@@ -10,16 +10,16 @@ export function ThemeToggle({ className }: { className?: string }) {
       onClick={toggle}
       aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'}
       className={cn(
-        'text-muted hover:bg-paper-2 hover:text-ink inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-md transition-colors',
+        'text-muted hover:bg-glass hover:text-ink inline-flex size-9 touch-manipulation items-center justify-center rounded-md transition-colors',
         className,
       )}
     >
       <svg
         viewBox="0 0 24 24"
-        className="size-5"
+        className="size-[18px]"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"

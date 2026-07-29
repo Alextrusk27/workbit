@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { UserMenu } from '@/components/layout/UserMenu'
 import { useAuth } from '@/features/auth/useAuth'
+import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 const links = [
-  { label: 'AI-интервью', to: '/#how' },
-  { label: 'FAQ', to: '/faq' },
+  { label: 'AI-интервью', to: '/ai-interview' },
+  { label: 'Тренажёр навыков', to: '/skills-trainer' },
   { label: 'Тарифы', to: '/pricing' },
 ]
 
-function desktopLinkClass(isActive: boolean): string {
+function navLinkClass(isActive: boolean): string {
   return cn(
-    'text-sm text-ink/75 transition-colors hover:text-ink',
-    isActive && 'text-ink underline decoration-accent underline-offset-8',
+    'text-muted hover:text-ink text-[14.5px] font-medium whitespace-nowrap transition-colors',
+    isActive && 'text-ink',
   )
 }
 
@@ -24,13 +27,8 @@ export function Header() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+  const reduce = useReducedMotion()
 
-  // Залогинен — ведём в ЛК, иначе на вход (иначе кнопка гнала на повторный логин).
-  const account = isAuthenticated
-    ? { to: '/app', label: 'Личный кабинет' }
-    : { to: '/login', label: 'Войти' }
-
-  // Закрывать меню при смене роута и по Escape.
   useEffect(() => setOpen(false), [location])
   useEffect(() => {
     if (!open) return
@@ -40,47 +38,51 @@ export function Header() {
   }, [open])
 
   return (
-    <header className="border-rule bg-paper/85 sticky top-0 z-40 border-b backdrop-blur">
+    <header
+      className="border-divider sticky top-0 z-50 border-b backdrop-blur-xl"
+      style={{ backgroundColor: 'var(--nav-bg)' }}
+    >
       <Container>
-        <div className="flex h-16 items-center justify-between gap-6">
+        <div className="relative flex h-17 items-center gap-8">
           <Link to="/" className="rounded-sm" aria-label="workbit — на главную">
             <Logo />
           </Link>
 
           <nav
             aria-label="Основная навигация"
-            className="hidden items-center gap-8 md:flex"
+            className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-7 lg:flex"
           >
-            {links.map((l) =>
-              l.to.includes('#') ? (
-                <Link key={l.to} to={l.to} className={desktopLinkClass(false)}>
-                  {l.label}
-                </Link>
-              ) : (
-                <NavLink
-                  key={l.to}
-                  to={l.to}
-                  className={({ isActive }) => desktopLinkClass(isActive)}
-                >
-                  {l.label}
-                </NavLink>
-              ),
-            )}
+            {links.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                className={({ isActive }) => navLinkClass(isActive)}
+              >
+                {l.label}
+              </NavLink>
+            ))}
           </nav>
 
-          <div className="-mr-2 flex items-center gap-1 md:mr-0 md:gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <div className="hidden md:block">
-              <Link
-                to={account.to}
-                className={buttonClasses({ variant: 'secondary' })}
-              >
-                {account.label}
-              </Link>
-            </div>
+            {isAuthenticated ? (
+              <UserMenu />
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-muted hover:text-ink hidden text-[14.5px] font-medium transition-colors sm:block"
+                >
+                  Войти
+                </Link>
+                <Link to="/register" className={buttonClasses({ size: 'sm' })}>
+                  Начать бесплатно
+                </Link>
+              </>
+            )}
             <button
               type="button"
-              className="text-ink inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-md md:hidden"
+              className="text-ink -mr-2 inline-flex size-10 touch-manipulation items-center justify-center rounded-md lg:hidden"
               aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
               aria-expanded={open}
               aria-controls="mobile-nav"
@@ -111,36 +113,59 @@ export function Header() {
         </div>
       </Container>
 
-      {open && (
-        <nav
-          id="mobile-nav"
-          aria-label="Мобильная навигация"
-          className="border-rule bg-paper border-t md:hidden"
-        >
-          <Container>
-            <ul className="flex flex-col py-2">
-              {links.map((l) => (
-                <li key={l.to}>
-                  <Link to={l.to} className="text-ink block py-3 text-base">
-                    {l.label}
+      <AnimatePresence>
+        {open && (
+          <motion.nav
+            key="mobile-nav"
+            id="mobile-nav"
+            aria-label="Мобильная навигация"
+            className="border-divider bg-canvas overflow-hidden border-t lg:hidden"
+            initial={
+              reduce
+                ? { opacity: 0 }
+                : { opacity: 0, y: -motionTokens.distance.sm }
+            }
+            animate={{ opacity: 1, y: 0 }}
+            exit={
+              reduce
+                ? { opacity: 0 }
+                : { opacity: 0, y: -motionTokens.distance.sm }
+            }
+            transition={{
+              duration: motionTokens.duration.fast,
+              ease: motionTokens.easing.sharp,
+            }}
+          >
+            <Container>
+              <ul className="flex flex-col py-2">
+                {links.map((l) => (
+                  <li key={l.to}>
+                    <Link to={l.to} className="text-ink block py-3 text-base">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link to="/faq" className="text-ink block py-3 text-base">
+                    FAQ
                   </Link>
                 </li>
-              ))}
-              <li className="py-3">
-                <Link
-                  to={account.to}
-                  className={buttonClasses({
-                    variant: 'secondary',
-                    className: 'w-full',
-                  })}
-                >
-                  {account.label}
-                </Link>
-              </li>
-            </ul>
-          </Container>
-        </nav>
-      )}
+                <li className="py-3">
+                  <Link
+                    to={isAuthenticated ? '/app' : '/login'}
+                    className={buttonClasses({
+                      variant: 'secondary',
+                      className: 'w-full',
+                    })}
+                  >
+                    {isAuthenticated ? 'Личный кабинет' : 'Войти'}
+                  </Link>
+                </li>
+              </ul>
+            </Container>
+          </motion.nav>
+        )}
+      </AnimatePresence>
     </header>
   )
 }

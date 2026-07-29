@@ -30,12 +30,12 @@ export function VerifyEmailPage() {
   if (!token) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Ссылка неполная</h1>
+        <h1 className="text-ink text-[28px]">Ссылка неполная</h1>
         <p className="text-muted mt-3 text-sm">
           В ссылке нет токена подтверждения. Откройте её из письма целиком.
         </p>
         <p className="mt-8 text-sm">
-          <Link to="/login" className="text-accent hover:text-accent-hover">
+          <Link to="/login" className="text-indigo hover:text-violet">
             Вернуться ко входу
           </Link>
         </p>
@@ -46,7 +46,7 @@ export function VerifyEmailPage() {
   if (verify.isError) {
     return (
       <>
-        <h1 className="text-ink text-3xl">Не удалось подтвердить</h1>
+        <h1 className="text-ink text-[28px]">Не удалось подтвердить</h1>
         <div className="mt-4">
           <Alert>{getErrorMessage(verify.error)}</Alert>
         </div>
@@ -55,7 +55,7 @@ export function VerifyEmailPage() {
           подтверждение заново.
         </p>
         <p className="mt-8 text-sm">
-          <Link to="/login" className="text-accent hover:text-accent-hover">
+          <Link to="/login" className="text-indigo hover:text-violet">
             Ко входу
           </Link>
         </p>

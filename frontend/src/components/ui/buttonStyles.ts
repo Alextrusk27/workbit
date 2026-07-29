@@ -1,23 +1,26 @@
 import { cn } from '@/lib/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost'
-export type ButtonSize = 'md' | 'lg'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonSize = 'sm' | 'md' | 'lg'
 
 const base =
-  'inline-flex items-center justify-center gap-2 font-medium rounded-md touch-manipulation ' +
-  'transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none ' +
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+  'inline-flex items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap ' +
+  'touch-manipulation transition disabled:opacity-45 disabled:pointer-events-none ' +
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo'
 
 const variants: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-paper hover:bg-accent-hover',
+  primary:
+    'bg-grad text-white shadow-btn hover:-translate-y-px hover:shadow-btn-hover',
   secondary:
-    'border border-rule bg-transparent text-ink hover:bg-paper-2 hover:border-ink/30',
-  ghost: 'bg-transparent text-ink hover:bg-paper-2',
+    'border border-line bg-glass text-ink hover:bg-glass-hover hover:border-glass-line',
+  ghost: 'bg-transparent text-muted hover:bg-glass hover:text-ink',
+  danger: 'border border-danger/40 text-danger hover:bg-danger/8',
 }
 
 const sizes: Record<ButtonSize, string> = {
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-6 text-base',
+  sm: 'h-10 px-[18px] text-sm',
+  md: 'h-11 px-6 text-[15px]',
+  lg: 'h-12 px-7 text-base',
 }
 
 /** Классы кнопки без элемента — чтобы одинаково оформлять `<button>` и ссылки

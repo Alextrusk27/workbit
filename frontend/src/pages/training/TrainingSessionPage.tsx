@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Spinner } from '@/components/ui/Spinner'
 import { Textarea } from '@/components/ui/Textarea'
-import { buttonClasses } from '@/components/ui/buttonStyles'
 import { trainingApi } from '@/features/training/api'
-import type {
-  TrainingQuestion,
-  TrainingReport,
-  TrainingSession,
-} from '@/features/training/api'
+import type { TrainingQuestion, TrainingSession } from '@/features/training/api'
 import { sessionSubtitle } from '@/features/training/labels'
 import {
   useFinishSession,
@@ -21,7 +18,7 @@ import {
 } from '@/features/training/useTraining'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { CaseEntry, QuestionEntry, ReportSummary } from './reportParts'
+import { QuestionEntry } from './reportParts'
 
 export function TrainingSessionPage() {
   usePageTitle('Тренировка')
@@ -31,7 +28,7 @@ export function TrainingSessionPage() {
 
   if (isLoading) {
     return (
-      <Container className="py-10 sm:py-14">
+      <Container>
         <div role="status">
           <span className="sr-only">Загрузка тренировки…</span>
           <Skeleton className="h-3 w-48" />
@@ -44,7 +41,7 @@ export function TrainingSessionPage() {
 
   if (isError || !session) {
     return (
-      <Container className="py-16">
+      <Container>
         <Alert>{getErrorMessage(error)}</Alert>
       </Container>
     )
@@ -66,6 +63,7 @@ interface LiveItem {
 }
 
 function SessionRun({ session }: { session: TrainingSession }) {
+  const navigate = useNavigate()
   const options = useTrainingOptions()
   const cap = options.data?.questionCap ?? 10
   const min = options.data?.minAnswersToFinish ?? 3
@@ -81,7 +79,6 @@ function SessionRun({ session }: { session: TrainingSession }) {
   const submit = useSubmitAnswer()
   const finish = useFinishSession()
 
-  const report = finish.data ?? null
   const startedRef = useRef(false)
   const inFlight = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -126,7 +123,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
       behavior: reduced ? 'auto' : 'smooth',
       block: 'end',
     })
-  }, [items.length, report])
+  }, [items.length])
 
   const onAnswer = (item: LiveItem, text: string) => {
     submit.mutate(
@@ -151,96 +148,87 @@ function SessionRun({ session }: { session: TrainingSession }) {
     )
   }
 
+  const onFinish = () => {
+    finish.mutate(session.id, {
+      onSuccess: () =>
+        navigate(`/app/training/${session.id}/report`, { replace: true }),
+    })
+  }
+
   const canFinish = answeredMain >= min && !finish.isPending
   const remaining = Math.max(0, min - answeredMain)
 
   return (
-    <Container className="py-10 sm:py-14">
-      <div>
-        <Link
-          to="/app/training"
-          className="text-accent hover:text-accent-hover mb-6 inline-block text-sm transition-colors"
+    <Container>
+      <div className="flex items-baseline justify-between gap-4">
+        <Eyebrow>{session.profession}</Eyebrow>
+        <p
+          aria-live="polite"
+          className="text-dim text-[13px] whitespace-nowrap tabular-nums"
         >
-          ← Тренажёр
-        </Link>
-        <div className="flex items-center justify-between">
-          <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-            {session.profession}
-          </p>
-          {!report && (
-            <p aria-live="polite" className="text-muted font-mono text-xs">
-              {Math.min(answeredMain, cap)} / {cap}
-            </p>
-          )}
-        </div>
-        <p className="text-muted mt-1 text-sm">{sessionSubtitle(session)}</p>
-
-        {resumed && !report && (
-          <p className="text-muted mt-4 text-xs">
-            Прошлые ответы этой сессии появятся в разборе после завершения.
-          </p>
-        )}
-
-        {report ? (
-          <FinishedView report={report} />
-        ) : (
-          <>
-            <ol className="mt-8 space-y-10">
-              {items.map((item) =>
-                item.answer === null ? (
-                  <li key={item.q.questionId}>
-                    <CurrentQuestion
-                      question={item.q}
-                      pending={submit.isPending}
-                      error={
-                        submit.isError ? getErrorMessage(submit.error) : null
-                      }
-                      onSubmit={(text) => onAnswer(item, text)}
-                    />
-                  </li>
-                ) : (
-                  <li key={item.q.questionId}>
-                    <QuestionEntry
-                      orderIndex={item.q.orderIndex}
-                      followUp={item.q.followUp}
-                      questionText={item.q.questionText}
-                      answerText={item.answer}
-                    />
-                  </li>
-                ),
-              )}
-            </ol>
-
-            {loadState === 'loading' && (
-              <div role="status" className="mt-10">
-                <span className="sr-only">Готовим следующий вопрос…</span>
-                <Skeleton className="h-6 w-2/3" />
-                <Skeleton className="mt-4 h-24 w-full" />
-              </div>
-            )}
-
-            {loadState === 'error' && (
-              <div className="mt-8">
-                <Alert>{loadError}</Alert>
-                <Button variant="secondary" className="mt-4" onClick={loadNext}>
-                  Повторить
-                </Button>
-              </div>
-            )}
-
-            <FinishBar
-              capReached={loadState === 'cap'}
-              canFinish={canFinish}
-              remaining={remaining}
-              pending={finish.isPending}
-              error={finish.isError ? getErrorMessage(finish.error) : null}
-              onFinish={() => finish.mutate(session.id)}
-            />
-          </>
-        )}
-
-        <div ref={bottomRef} />
+          {Math.min(answeredMain, cap)} / {cap}
+        </p>
       </div>
+      <p className="text-muted mt-1.5 text-sm">{sessionSubtitle(session)}</p>
+
+      {resumed && (
+        <p className="text-dim mt-4 text-xs">
+          Прошлые ответы этой сессии появятся в разборе после завершения.
+        </p>
+      )}
+
+      <ol className="mt-9">
+        {items.map((item) => (
+          <li
+            key={item.q.questionId}
+            className="border-divider mt-8 border-t pt-8 first:mt-0 first:border-0 first:pt-0"
+          >
+            {item.answer === null ? (
+              <CurrentQuestion
+                question={item.q}
+                pending={submit.isPending}
+                error={submit.isError ? getErrorMessage(submit.error) : null}
+                onSubmit={(text) => onAnswer(item, text)}
+              />
+            ) : (
+              <QuestionEntry
+                orderIndex={item.q.orderIndex}
+                followUp={item.q.followUp}
+                questionText={item.q.questionText}
+                answerText={item.answer}
+              />
+            )}
+          </li>
+        ))}
+      </ol>
+
+      {loadState === 'loading' && (
+        <div role="status" className="mt-10">
+          <span className="sr-only">Готовим следующий вопрос…</span>
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="mt-4 h-24 w-full" />
+        </div>
+      )}
+
+      {loadState === 'error' && (
+        <div className="mt-8">
+          <Alert>{loadError}</Alert>
+          <Button variant="secondary" className="mt-4" onClick={loadNext}>
+            Повторить
+          </Button>
+        </div>
+      )}
+
+      <FinishBar
+        capReached={loadState === 'cap'}
+        canFinish={canFinish}
+        remaining={remaining}
+        pending={finish.isPending}
+        error={finish.isError ? getErrorMessage(finish.error) : null}
+        onFinish={onFinish}
+      />
+
+      <div ref={bottomRef} />
     </Container>
   )
 }
@@ -271,19 +259,19 @@ function CurrentQuestion({
   return (
     <div>
       {question.followUp ? (
-        <span className="bg-accent/10 text-accent rounded-sm px-2 py-0.5 font-mono text-xs">
+        <span className="bg-indigo/12 text-indigo rounded-sm px-2.5 py-[3px] text-xs font-semibold">
           Уточняющий вопрос
         </span>
       ) : (
-        <p className="text-muted font-mono text-xs">
+        <Eyebrow className="tracking-[0.08em]">
           Вопрос {question.orderIndex}
-        </p>
+        </Eyebrow>
       )}
-      <h1 className="text-ink font-display mt-1.5 text-2xl leading-snug break-words">
+      <h1 className="text-ink mt-2 text-[21px] leading-snug font-bold break-words">
         {question.questionText}
       </h1>
 
-      <div className="mt-6">
+      <div className="mt-5.5">
         <Textarea
           label="Ваш ответ"
           value={answer}
@@ -299,14 +287,13 @@ function CurrentQuestion({
         )}
 
         <Button
-          size="lg"
-          className="mt-5"
+          className="mt-4.5"
           onClick={() => answer.trim() && onSubmit(answer)}
           disabled={!answer.trim() || pending}
         >
           {pending ? 'Сохраняем ответ…' : 'Ответить'}
         </Button>
-        <p className="text-muted mt-3 text-xs">
+        <p className="text-dim mt-3 text-[12.5px]">
           Оценок по ходу нет — весь разбор придёт в конце, при завершении
           тренировки.
         </p>
@@ -332,20 +319,21 @@ function FinishBar({
 }) {
   if (pending) {
     return (
-      <div className="border-rule mt-10 border-t pt-8 text-center">
-        <p role="status" className="text-ink font-display text-xl">
+      <div className="border-divider mt-12 border-t pt-9 text-center">
+        <p role="status" className="text-ink text-[19px] font-bold">
+          <Spinner className="mr-2.5" />
           Формируем разбор…
         </p>
-        <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-          Рецензент читает ваши ответы и готовит итоговую оценку. Это может
-          занять несколько секунд.
+        <p className="text-muted mx-auto mt-2.5 max-w-[46ch] text-sm">
+          Рецензент читает ваши ответы и оценивает их. Это может занять
+          несколько секунд.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="border-rule mt-10 border-t pt-8">
+    <div className="border-divider mt-12 border-t pt-9">
       {capReached && (
         <p className="text-muted mb-4 text-sm">
           Достигнут лимит вопросов — тренировку можно завершить.
@@ -357,7 +345,7 @@ function FinishBar({
         </div>
       )}
       {canFinish ? (
-        <Button size="lg" variant="secondary" onClick={onFinish}>
+        <Button variant="secondary" onClick={onFinish}>
           Завершить и получить разбор
         </Button>
       ) : (
@@ -367,44 +355,6 @@ function FinishBar({
           чтобы завершить тренировку.
         </p>
       )}
-    </div>
-  )
-}
-
-function FinishedView({ report }: { report: TrainingReport }) {
-  return (
-    <div className="mt-8">
-      <ol className="space-y-10">
-        {report.questions.map((q) => (
-          <li key={q.questionId}>
-            <CaseEntry question={q} />
-          </li>
-        ))}
-      </ol>
-
-      <div className="border-rule mt-12 border-t pt-10">
-        <p className="text-muted font-mono text-xs tracking-[0.2em] uppercase">
-          Разбор тренировки
-        </p>
-        <div className="mt-6">
-          <ReportSummary
-            avgScore={report.avgScore}
-            overallFeedback={report.overallFeedback}
-          />
-        </div>
-      </div>
-
-      <div className="mt-12 flex flex-wrap gap-3">
-        <Link to="/app/training" className={buttonClasses()}>
-          К списку тренировок
-        </Link>
-        <Link
-          to="/app/training/new"
-          className={buttonClasses({ variant: 'secondary' })}
-        >
-          Новая тренировка
-        </Link>
-      </div>
     </div>
   )
 }

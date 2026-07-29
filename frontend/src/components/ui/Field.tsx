@@ -4,11 +4,9 @@ import { cn } from '@/lib/cn'
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
-  /** Подпись-подсказка под полем (напр. «минимум 8 символов»). */
   hint?: string
 }
 
-/** Поле формы с подписью в стиле дизайн-системы. */
 export function Field({
   label,
   hint,
@@ -30,7 +28,10 @@ export function Field({
       : {}
   return (
     <div className={className}>
-      <label htmlFor={inputId} className="text-ink block text-sm font-medium">
+      <label
+        htmlFor={inputId}
+        className="text-muted block text-[13.5px] font-semibold"
+      >
         {label}
       </label>
       <input
@@ -38,16 +39,16 @@ export function Field({
         type={type}
         aria-describedby={hintId}
         className={cn(
-          'border-rule bg-paper text-ink mt-2 h-11 w-full rounded-md border px-3 text-base',
-          'placeholder:text-muted/70 transition-colors',
-          'hover:border-ink/30 focus:border-accent focus:outline-none',
-          'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+          'border-line bg-surface text-ink mt-[7px] h-12 w-full rounded-md border px-3.5 text-[15px]',
+          'placeholder:text-dim transition-colors',
+          'focus:border-indigo focus:ring-indigo/18 focus:ring-[3px] focus:outline-none',
+          'disabled:cursor-not-allowed disabled:opacity-50',
         )}
         {...emailProps}
         {...props}
       />
       {hint && (
-        <p id={hintId} className="text-muted mt-1.5 text-xs">
+        <p id={hintId} className="text-dim mt-[7px] text-[12.5px]">
           {hint}
         </p>
       )}

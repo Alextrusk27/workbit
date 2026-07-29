@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Stars } from '@/components/ui/Stars'
-import { useReveal } from '@/lib/useReveal'
+import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 interface MarginNoteProps {
@@ -10,31 +11,32 @@ interface MarginNoteProps {
   className?: string
 }
 
-/** Сигнатура продукта: пометка рецензента «на полях» — как правка синим
- *  карандашом. При появлении во вьюпорте штрих карандаша прочерчивается сверху
- *  вниз, а оценка «дорисовывается» звёздами. Используется для подачи фидбэка
- *  LLM (feedback/score). */
+/** Сигнатура продукта: пометка рецензента «на полях». Полоса прочерчивается
+ *  сверху вниз при появлении, оценка дорисовывается звёздами. */
 export function MarginNote({ children, score, className }: MarginNoteProps) {
-  const { ref, shown } = useReveal<HTMLElement>()
+  const reduce = useReducedMotion()
   return (
     <aside
-      ref={ref}
       className={cn(
-        'text-edit font-display relative pl-3 text-sm italic',
+        'bg-glass text-muted relative rounded-r-lg py-3.5 pr-5 pl-4.5 text-sm',
         className,
       )}
     >
-      <span
+      <motion.span
         aria-hidden
-        className="bg-edit absolute top-0 left-0 h-full w-0.5 origin-top"
-        style={{
-          transform: shown ? 'scaleY(1)' : 'scaleY(0)',
-          transition: 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+        className="bg-indigo absolute top-0 left-0 h-full w-0.5 origin-top"
+        initial={reduce ? false : { scaleY: 0 }}
+        whileInView={{ scaleY: 1 }}
+        viewport={{ once: true, margin: '-40px' }}
+        transition={{
+          duration: motionTokens.duration.slow,
+          ease: motionTokens.easing.smooth,
         }}
       />
       {score !== undefined && (
-        <span className="mb-1 block min-h-[1.4em] text-sm not-italic">
-          {shown && <Stars value={score} animate />}
+        <span className="mb-1.5 flex items-center gap-2 text-[13px]">
+          <Stars value={score} animate={!reduce} />
+          <span className="text-dim">{score} из 5</span>
         </span>
       )}
       {children}

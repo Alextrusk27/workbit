@@ -4,8 +4,8 @@ import { cn } from '@/lib/cn'
 type AlertTone = 'error' | 'success'
 
 const tones: Record<AlertTone, string> = {
-  error: 'border-accent/40 bg-accent/5 text-ink',
-  success: 'border-pine/40 bg-pine/5 text-ink',
+  error: 'border-danger/30 bg-danger/8 text-danger',
+  success: 'border-ok/30 bg-ok/8 text-ok',
 }
 
 /** Небольшой баннер сообщения в формах. */
@@ -19,7 +19,7 @@ export function Alert({
   return (
     <p
       role="alert"
-      className={cn('rounded-md border px-3 py-2.5 text-sm', tones[tone])}
+      className={cn('rounded-md border px-4 py-3 text-sm', tones[tone])}
     >
       {children}
     </p>

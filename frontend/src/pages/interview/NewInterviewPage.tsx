@@ -1,9 +1,11 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Field } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
 import type { VacancyPreview } from '@/features/vacancy/api'
@@ -24,17 +26,15 @@ function PreviewCard({ preview }: { preview: VacancyPreview }) {
   ].filter((r) => r.value)
 
   return (
-    <div className="border-rule bg-paper-2/60 animate-rise rounded-lg border p-5">
-      <p className="text-muted font-mono text-xs tracking-[0.15em] uppercase">
-        Вакансия
-      </p>
-      <h2 className="text-ink font-display mt-2 text-xl break-words">
+    <div className="border-line bg-card rounded-xl border px-6 py-5.5">
+      <Eyebrow>Вакансия</Eyebrow>
+      <h2 className="text-ink mt-2 text-[19px] font-bold tracking-[-0.01em] break-words">
         {preview.name}
       </h2>
-      <dl className="mt-4 space-y-1.5 text-sm">
+      <dl className="mt-3.5 flex flex-col gap-1.5 text-sm">
         {rows.map((r) => (
           <div key={r.label} className="flex flex-wrap gap-x-2">
-            <dt className="text-muted">{r.label}:</dt>
+            <dt className="text-dim">{r.label}:</dt>
             <dd className="text-ink">{r.value}</dd>
           </div>
         ))}
@@ -72,7 +72,7 @@ function InterviewForm() {
       : null
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 space-y-6">
+    <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-4.5">
       {create.isError && (
         <Alert>{interviewCreateErrorMessage(create.error)}</Alert>
       )}
@@ -90,14 +90,17 @@ function InterviewForm() {
       />
 
       {trimmed !== '' && !validUrl && (
-        <p className="text-muted text-xs">
+        <p className="text-dim text-[12.5px]">
           Вставьте прямую ссылку на вакансию hh.ru вида
           https://hh.ru/vacancy/123456.
         </p>
       )}
 
       {validUrl && preview.isLoading && (
-        <div role="status" className="border-rule rounded-lg border p-5">
+        <div
+          role="status"
+          className="border-line bg-card rounded-xl border px-6 py-5.5"
+        >
           <span className="sr-only">Загрузка вакансии…</span>
           <Skeleton className="h-3 w-20" />
           <Skeleton className="mt-3 h-6 w-2/3" />
@@ -112,12 +115,11 @@ function InterviewForm() {
       <div>
         <Button
           type="submit"
-          size="lg"
           disabled={!validUrl || preview.isError || create.isPending}
         >
           {create.isPending ? 'Готовим вопросы…' : 'Начать интервью'}
         </Button>
-        <p className="text-muted mt-3 text-xs">
+        <p className="text-dim mt-3 text-[12.5px]">
           Рецензент прочитает вакансию и составит вопросы под неё — это займёт
           несколько секунд.
         </p>
@@ -130,27 +132,17 @@ export function NewInterviewPage() {
   usePageTitle('Новое интервью')
 
   return (
-    <Container className="py-12 sm:py-16">
-      <Link
-        to="/app/interview"
-        className="text-accent hover:text-accent-hover text-sm transition-colors"
+    <Container>
+      <AppPageHeader
+        back={{ to: '/app/interview', label: 'Интервью' }}
+        eyebrow="Новое интервью"
+        title="Интервью под вакансию"
       >
-        ← Интервью
-      </Link>
-      <p className="text-muted mt-8 font-mono text-xs tracking-[0.2em] uppercase">
-        Новое интервью
-      </p>
-      <h1 className="text-ink mt-4 text-3xl sm:text-4xl">
-        Интервью под вакансию
-      </h1>
-      <p className="text-muted mt-4 max-w-xl">
         Вставьте ссылку на вакансию с hh.ru. Рецензент подберёт вопросы под её
         требования, а в конце разберёт ваши ответы и оценит шансы на оффер.
-      </p>
+      </AppPageHeader>
 
-      <div className="mt-10 max-w-2xl">
-        <InterviewForm />
-      </div>
+      <InterviewForm />
     </Container>
   )
 }

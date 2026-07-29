@@ -5,7 +5,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn('bg-ink/8 animate-pulse rounded-md', className)}
+      className={cn('bg-glass-hover animate-pulse rounded-md', className)}
     />
   )
 }

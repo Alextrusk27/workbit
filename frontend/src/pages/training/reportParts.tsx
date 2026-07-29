@@ -1,3 +1,4 @@
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Stars } from '@/components/ui/Stars'
 import type { TrainingQuestion } from '@/features/training/api'
@@ -17,21 +18,18 @@ export function QuestionEntry({
   return (
     <div>
       {followUp ? (
-        <span className="bg-accent/10 text-accent rounded-sm px-2 py-0.5 font-mono text-xs">
+        <span className="bg-indigo/12 text-indigo rounded-sm px-2.5 py-[3px] text-xs font-semibold">
           Уточняющий вопрос
         </span>
       ) : (
-        <p className="text-muted font-mono text-xs">Вопрос {orderIndex}</p>
+        <Eyebrow className="tracking-[0.08em]">Вопрос {orderIndex}</Eyebrow>
       )}
-      <h3 className="text-ink font-display mt-1.5 text-lg leading-snug break-words">
+      <h3 className="text-ink mt-2 text-lg leading-snug font-bold break-words">
         {questionText}
       </h3>
-      <div className="border-rule bg-paper-2/60 mt-3 rounded-md border p-4">
-        <p className="text-muted mb-1 text-xs">Ваш ответ</p>
-        <p className="text-ink break-words whitespace-pre-wrap">
-          {answerText || <span className="text-muted italic">Без ответа</span>}
-        </p>
-      </div>
+      <p className="text-muted mt-3 break-words whitespace-pre-wrap">
+        {answerText || <span className="text-dim italic">Без ответа</span>}
+      </p>
     </div>
   )
 }
@@ -56,7 +54,7 @@ export function CaseEntry({ question }: { question: TrainingQuestion }) {
   )
 }
 
-/** Итог разбора: средний балл звёздами и текстовый вывод рецензента. */
+/** Итог разбора: средний балл и текстовый вывод рецензента. */
 export function ReportSummary({
   avgScore,
   overallFeedback,
@@ -65,29 +63,32 @@ export function ReportSummary({
   overallFeedback: string
 }) {
   return (
-    <div>
-      <div className="border-rule bg-paper-2/60 rounded-lg border p-5 sm:max-w-xs">
-        <p className="text-muted text-xs">Средняя оценка</p>
+    <div className="grid gap-5 sm:grid-cols-3">
+      <div className="border-line bg-card rounded-xl border p-6">
+        <Eyebrow>Средний балл</Eyebrow>
         {avgScore != null ? (
           <>
-            <div className="text-accent mt-2 text-2xl">
+            <p className="text-ink mt-2.5 text-[34px] leading-none font-extrabold tracking-[-0.02em] tabular-nums">
+              {avgScore.toFixed(1).replace('.', ',')}
+              <span className="text-muted ml-1 text-[17px] font-medium">
+                / 5
+              </span>
+            </p>
+            <p className="mt-2 text-sm">
               <Stars value={Math.round(avgScore * 2) / 2} />
-            </div>
-            <p className="text-muted mt-1.5 font-mono text-sm">
-              {avgScore.toFixed(1).replace('.', ',')} из 5
             </p>
           </>
         ) : (
-          <p className="text-muted mt-2 text-sm">Оценка недоступна</p>
+          <p className="text-muted mt-2.5 text-sm">Оценка недоступна</p>
         )}
       </div>
 
-      <div className="mt-8">
-        <h2 className="text-ink font-display text-xl">Итог рецензента</h2>
-        <p className="text-ink mt-3 leading-relaxed whitespace-pre-wrap">
+      <div className="border-line bg-card rounded-xl border p-6 sm:col-span-2">
+        <Eyebrow>Итог рецензента</Eyebrow>
+        <p className="text-muted mt-3 max-w-[78ch] text-[15px] whitespace-pre-wrap">
           {overallFeedback}
         </p>
-        <p className="text-muted mt-6 text-xs">
+        <p className="text-dim mt-4 text-xs">
           Разбор сгенерирован ИИ и может содержать ошибки. Относитесь к оценкам
           и рекомендациям как к ориентиру.
         </p>

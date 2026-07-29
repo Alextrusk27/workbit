@@ -84,6 +84,12 @@ llm:
       interview-reviewer-senior: ${IRV_SENIOR}
       input-normalizer: ${INPUT_NORMALIZER}
 
+speech:
+  yandex:
+    api-key: ${YANDEX_API_KEY}
+    host: stt.api.cloud.yandex.net
+    port: 443
+
 hh:
   api:
     base-url: https://api.hh.ru

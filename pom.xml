@@ -4,10 +4,6 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ru.workbit</groupId>
-    <artifactId>workbit</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -15,22 +11,39 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
+    <groupId>ru.workbit</groupId>
+    <artifactId>workbit</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
     <properties>
         <java.version>25</java.version>
-        <maven.compiler.source>23</maven.compiler.source>
-        <maven.compiler.target>23</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
         <bouncycastle.version>1.84</bouncycastle.version>
-        <mapstruct.version>1.6.3</mapstruct.version>
-        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <greenmail.version>2.1.4</greenmail.version>
+        <grpc.version>1.83.0</grpc.version>
+        <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
         <jsonwebtoken.version>0.13.0</jsonwebtoken.version>
+        <jsoup.version>1.21.1</jsoup.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <openai.version>4.41.0</openai.version>
+        <protobuf.version>3.25.9</protobuf.version>
+        <protobuf-maven-plugin.version>5.1.7</protobuf-maven-plugin.version>
         <springdoc.version>3.0.3</springdoc.version>
         <ulid.creator.version>5.2.4</ulid.creator.version>
-        <greenmail.version>2.1.4</greenmail.version>
-        <openai.version>4.41.0</openai.version>
-        <jsoup.version>1.21.1</jsoup.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -92,7 +105,6 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
-            <scope>compile</scope>
         </dependency>
 
         <dependency>
@@ -157,6 +169,22 @@
             <version>${openai.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Тесты: версии управляются Spring Boot BOM -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -211,6 +239,33 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>io.github.ascopes</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>${protobuf-maven-plugin.version}</version>
+                <configuration>
+                    <protoc>${protobuf.version}</protoc>
+                    <embedSourcesInClassOutputs>false</embedSourcesInClassOutputs>
+                    <sourceDirectories>
+                        <sourceDirectory>${project.basedir}/src/main/proto</sourceDirectory>
+                    </sourceDirectories>
+                    <plugins>
+                        <plugin kind="binary-maven">
+                            <groupId>io.grpc</groupId>
+                            <artifactId>protoc-gen-grpc-java</artifactId>
+                            <version>${grpc.version}</version>
+                        </plugin>
+                    </plugins>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- JDK 23+ не запускает процессоры с classpath по умолчанию: объявляем явно -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -14,6 +14,8 @@ import yandex.cloud.api.ai.stt.v3.RecognizerGrpc;
 public class SpeechKitConfig {
     private static final Metadata.Key<String> AUTHORIZATION =
             Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER);
+    private static final Metadata.Key<String> DATA_LOGGING =
+            Metadata.Key.of("x-data-logging-enabled", Metadata.ASCII_STRING_MARSHALLER);
 
     @Bean(destroyMethod = "shutdown")
     public ManagedChannel speechKitChannel(SpeechProperties props) {
@@ -26,6 +28,7 @@ public class SpeechKitConfig {
     public RecognizerGrpc.RecognizerStub recognizerStub(ManagedChannel speechKitChannel, SpeechProperties props) {
         Metadata headers = new Metadata();
         headers.put(AUTHORIZATION, "Api-Key " + props.apiKey());
+        headers.put(DATA_LOGGING, "false");
         return RecognizerGrpc.newStub(speechKitChannel)
                 .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
     }

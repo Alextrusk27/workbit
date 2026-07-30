@@ -11,6 +11,9 @@ app:
       normalize:
         limit: ${NORMALIZE_RATE_LIMIT_LIMIT:10}
         window: ${NORMALIZE_RATE_LIMIT_WINDOW:1m}
+      stt:
+        limit: ${STT_RATE_LIMIT_LIMIT:60}
+        window: ${STT_RATE_LIMIT_WINDOW:1h}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:https://workbit.ru}
   mail:
@@ -83,6 +86,12 @@ llm:
       interview-reviewer-middle: ${IRV_MIDDLE}
       interview-reviewer-senior: ${IRV_SENIOR}
       input-normalizer: ${INPUT_NORMALIZER}
+
+speech:
+  yandex:
+    api-key: ${YANDEX_API_KEY}
+    host: stt.api.cloud.yandex.net
+    port: 443
 
 hh:
   api:

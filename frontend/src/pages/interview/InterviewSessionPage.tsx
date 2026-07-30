@@ -10,7 +10,9 @@ import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
-import { IconMic, IconSend } from '@/components/marketing/icons'
+import { IconSend } from '@/components/marketing/icons'
+import { DictationHints } from '@/components/speech/DictationHints'
+import { MicButton } from '@/components/speech/MicButton'
 import {
   interviewApi,
   type InterviewQuestion,
@@ -22,6 +24,7 @@ import {
   useInterviewSession,
   useSubmitInterviewAnswer,
 } from '@/features/interview/useInterview'
+import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -304,8 +307,16 @@ function Composer({
   pending: boolean
   onSend: (text: string) => void
 }) {
-  const [text, setText] = useState('')
-  const [voiceHint, setVoiceHint] = useState(false)
+  const {
+    text,
+    setText,
+    dictation,
+    recording,
+    busy,
+    canSend,
+    send,
+    toggleMic,
+  } = useDictatedAnswer(onSend, { disabled, pending })
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -325,13 +336,6 @@ function Composer({
     return () => window.removeEventListener('beforeunload', warn)
   }, [text])
 
-  const send = () => {
-    const value = text.trim()
-    if (!value || disabled || pending) return
-    onSend(value)
-    setText('')
-  }
-
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -339,18 +343,13 @@ function Composer({
     }
   }
 
-  const canSend = text.trim() !== '' && !disabled && !pending
-
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setVoiceHint(true)}
-        aria-label="Ответить голосом — появится позже"
-        className="border-line bg-glass text-muted hover:bg-glass-hover hover:text-ink grid size-9 shrink-0 place-items-center rounded-full border transition-colors"
-      >
-        <IconMic className="size-4" />
-      </button>
+      <MicButton
+        recording={recording}
+        disabled={disabled || pending || dictation.state === 'stopping'}
+        onClick={toggleMic}
+      />
 
       <div className="min-w-0 flex-1">
         <textarea
@@ -368,21 +367,17 @@ function Composer({
           }
           className="border-line bg-surface text-ink placeholder:text-dim focus:border-indigo focus:ring-indigo/18 max-h-30 min-h-9.5 w-full resize-none rounded-md border px-3 py-2.5 text-[13.5px] transition-colors focus:ring-[3px] focus:outline-none disabled:opacity-60"
         />
-        {voiceHint && (
-          <p role="status" className="text-dim mt-1.5 text-[12.5px]">
-            Голосовые ответы появятся позже — пока отвечайте текстом.
-          </p>
-        )}
+        <DictationHints dictation={dictation} />
       </div>
 
       <button
         type="button"
         onClick={send}
         disabled={!canSend}
-        aria-label={pending ? 'Отправляем ответ' : 'Отправить ответ'}
+        aria-label={pending || busy ? 'Отправляем ответ' : 'Отправить ответ'}
         className="bg-grad grid size-9 shrink-0 place-items-center rounded-full text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] transition hover:-translate-y-px disabled:pointer-events-none disabled:opacity-45"
       >
-        {pending ? (
+        {pending || busy ? (
           <Spinner className="size-4 border-white" />
         ) : (
           <IconSend className="size-[15px]" />

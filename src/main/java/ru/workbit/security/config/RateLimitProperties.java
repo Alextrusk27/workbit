@@ -9,7 +9,8 @@ public record RateLimitProperties(
         int limit,
         Duration window,
         Bucket suggest,
-        Bucket normalize
+        Bucket normalize,
+        Bucket stt
 ) {
     public record Bucket(int limit, Duration window) {
     }

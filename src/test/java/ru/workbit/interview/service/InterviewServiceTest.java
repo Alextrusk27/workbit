@@ -154,6 +154,7 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             verify(interviewWriter).createSession(vacancyData, userId, questions);
+            verify(llmService, times(1)).generateInterviewQuestions(vacancyData.experience(), expectedRequest);
         }
 
         @Test
@@ -234,6 +235,50 @@ class InterviewServiceTest {
             assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Not enough questions for an interview session");
+            verify(interviewWriter, never()).createSession(any(), any(), any());
+            verifyNoInteractions(interviewSessionMapper);
+        }
+
+        @Test
+        @DisplayName("Первый вызов вернул меньше MIN_COUNT, ретрай вернул достаточно - сессия создаётся из вопросов ретрая, LLM вызван дважды")
+        void retriesAndCreatesSessionWhenRetrySucceeds() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            LlmInterviewQuestions firstAttempt = new LlmInterviewQuestions(List.of("В1", "В2", "В3", "В4"));
+            List<String> retryQuestions = List.of("П1", "П2", "П3", "П4", "П5");
+            LlmInterviewQuestions secondAttempt = new LlmInterviewQuestions(retryQuestions);
+            when(llmService.generateInterviewQuestions(any(), any())).thenReturn(firstAttempt, secondAttempt);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), retryQuestions.size());
+            when(interviewWriter.createSession(vacancyData, userId, retryQuestions)).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(eq(createdSession), eq(vacancyData), eq(0)))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(llmService, times(2)).generateInterviewQuestions(any(), any());
+            verify(interviewWriter).createSession(vacancyData, userId, retryQuestions);
+        }
+
+        @Test
+        @DisplayName("Оба вызова вернули меньше MIN_COUNT - LlmException, LLM вызван дважды (не больше), сессия не создаётся")
+        void throwsAfterRetryWhenBothAttemptsBelowMinCount() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+            when(llmService.generateInterviewQuestions(any(), any()))
+                    .thenReturn(new LlmInterviewQuestions(List.of("В1", "В2", "В3", "В4")));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Not enough questions for an interview session");
+            verify(llmService, times(2)).generateInterviewQuestions(any(), any());
             verify(interviewWriter, never()).createSession(any(), any(), any());
             verifyNoInteractions(interviewSessionMapper);
         }

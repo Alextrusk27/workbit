@@ -66,9 +66,7 @@ public class InterviewService {
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
 
-        LlmInterviewQuestions llmQuestions = llmService.generateInterviewQuestions(
-                vacancyData.experience(), toQuestionsRequest(vacancyData));
-        List<String> questions = usableQuestions(llmQuestions, vacancyData);
+        List<String> questions = generateQuestions(vacancyData);
 
         InterviewSession session = interviewWriter.createSession(vacancyData, userId, questions);
         return interviewSessionMapper.toResponse(session, vacancyData, 0);
@@ -249,17 +247,29 @@ public class InterviewService {
         );
     }
 
-    private List<String> usableQuestions(LlmInterviewQuestions llmQuestions, VacancyData vacancyData) {
-        List<String> questions = llmQuestions.questions() == null ? List.of() : llmQuestions.questions().stream()
-                .filter(q -> q != null && !q.isBlank())
-                .limit(LlmInterviewQuestionsRequest.MAX_COUNT)
-                .toList();
+    private List<String> generateQuestions(VacancyData vacancyData) {
+        LlmInterviewQuestionsRequest request = toQuestionsRequest(vacancyData);
+        List<String> questions = usableQuestions(
+                llmService.generateInterviewQuestions(vacancyData.experience(), request));
         if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
-            log.error("LLM returned only {} usable interview questions, {} required [url={}]",
+            log.warn("LLM returned only {} usable interview questions, {} required, retrying [url={}]",
+                    questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
+            questions = usableQuestions(
+                    llmService.generateInterviewQuestions(vacancyData.experience(), request));
+        }
+        if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
+            log.error("LLM returned only {} usable interview questions after retry, {} required [url={}]",
                     questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
             throw new LlmException("Not enough questions for an interview session");
         }
         return questions;
+    }
+
+    private static List<String> usableQuestions(LlmInterviewQuestions llmQuestions) {
+        return llmQuestions.questions() == null ? List.of() : llmQuestions.questions().stream()
+                .filter(q -> q != null && !q.isBlank())
+                .limit(LlmInterviewQuestionsRequest.MAX_COUNT)
+                .toList();
     }
 
     private void checkAllQuestionsAnswered(InterviewSession session, List<InterviewQuestion> answered) {

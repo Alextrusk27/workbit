@@ -38,6 +38,7 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 public class InterviewWriter {
 
     private static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    private static final int MAX_WEAKEST_SKILL_LENGTH = 100;
     private static final double MIN_REVIEWED_ANSWERS_RATIO = 0.5;
 
     private final InterviewSessionRepository interviewSessionRepository;
@@ -114,6 +115,7 @@ public class InterviewWriter {
                 .offerProbability(offerProbability)
                 .overallFeedback(llmReport.overallFeedback())
                 .recommendations(normalizeRecommendations(llmReport.recommendations()))
+                .weakestSkill(normalizeWeakestSkill(sessionId, llmReport.weakestSkill()))
                 .build());
         session.setStatus(InterviewSession.Status.COMPLETED);
         session.setCompletedAt(Instant.now());
@@ -212,5 +214,17 @@ public class InterviewWriter {
 
     private static String normalizeRecommendations(String recommendations) {
         return recommendations == null || recommendations.isBlank() ? null : recommendations;
+    }
+
+    private static String normalizeWeakestSkill(UUID sessionId, String weakestSkill) {
+        if (weakestSkill == null || weakestSkill.isBlank()) {
+            return null;
+        }
+        String trimmed = weakestSkill.trim();
+        if (trimmed.length() > MAX_WEAKEST_SKILL_LENGTH) {
+            log.warn("LLM returned too long weakest skill for interview session {}, skipping it", sessionId);
+            return null;
+        }
+        return trimmed;
     }
 }

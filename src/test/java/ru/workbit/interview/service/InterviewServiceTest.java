@@ -866,7 +866,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null, null);
             when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
 
             InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
@@ -898,7 +898,7 @@ class InterviewServiceTest {
 
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null, null);
             when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
             when(interviewWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("already completed"));

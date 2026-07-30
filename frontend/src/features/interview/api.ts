@@ -40,6 +40,7 @@ export interface InterviewReport {
   offerProbability: OfferProbability
   overallFeedback: string
   recommendations: string | null
+  weakestSkill: string | null
   generatedAt: string
   questions: InterviewQuestion[]
 }

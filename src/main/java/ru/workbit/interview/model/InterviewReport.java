@@ -40,6 +40,10 @@ public class InterviewReport {
     @Column(updatable = false)
     private String recommendations;
 
+    @Column(updatable = false)
+    @Size(max = 100)
+    private String weakestSkill;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private Instant generatedAt = Instant.now();

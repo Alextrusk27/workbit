@@ -8,7 +8,7 @@ import {
   useInterviewReport,
   useInterviewSession,
 } from '@/features/interview/useInterview'
-import { sessionSubtitle } from '@/features/interview/labels'
+import { sessionSubtitle, trainingLevelCode } from '@/features/interview/labels'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { CaseEntry, ReportSummary } from './reportParts'
@@ -54,6 +54,12 @@ export function InterviewReportPage() {
     .filter(Boolean)
     .join(' · ')
 
+  const trainingParams = new URLSearchParams({
+    skill: report.weakestSkill ?? '',
+    level: trainingLevelCode(session?.experience ?? null),
+  })
+  if (session) trainingParams.set('profession', session.vacancyName)
+
   return (
     <Container>
       <AppPageHeader
@@ -70,6 +76,8 @@ export function InterviewReportPage() {
           offerProbability={report.offerProbability}
           overallFeedback={report.overallFeedback}
           recommendations={report.recommendations}
+          weakestSkill={report.weakestSkill}
+          trainingTo={`/app/training/new?${trainingParams}`}
           answeredCount={report.questions.length}
         />
       </div>

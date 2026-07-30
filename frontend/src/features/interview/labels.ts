@@ -20,6 +20,18 @@ export function sessionSubtitle(session: {
   return session.employer || 'Работодатель не указан'
 }
 
+/** Код уровня тренировки по требуемому опыту вакансии: строки hh.ru разложены
+ *  как в грейдовом роутинге бэка, «нет опыта» и нераспознанное — начальный. */
+export type TrainingLevelCode = 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+
+export function trainingLevelCode(
+  experience: string | null,
+): TrainingLevelCode {
+  if (experience === 'От 3 до 6 лет') return 'MIDDLE'
+  if (experience === 'Более 6 лет') return 'SENIOR'
+  return 'JUNIOR'
+}
+
 /** Тон для подсветки вероятности оффера. В палитре нет красного, поэтому
  *  «низкая» — нейтральный тон, «средняя» — акцент, «высокая» — pine. */
 export type OfferTone = 'low' | 'mid' | 'high'

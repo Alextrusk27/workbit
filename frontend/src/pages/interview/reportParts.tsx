@@ -89,12 +89,16 @@ export function ReportSummary({
   offerProbability,
   overallFeedback,
   recommendations,
+  weakestSkill,
+  trainingTo,
   answeredCount,
 }: {
   avgScore: number | null
   offerProbability: OfferProbability
   overallFeedback: string
   recommendations: string | null
+  weakestSkill: string | null
+  trainingTo: string
   answeredCount: number
 }) {
   return (
@@ -146,17 +150,23 @@ export function ReportSummary({
           <p className="text-muted mt-3 max-w-[78ch] text-[15px] whitespace-pre-wrap">
             {recommendations}
           </p>
-          <div className="border-line bg-glass mt-4.5 flex flex-wrap items-center justify-between gap-4 rounded-lg border px-4.5 py-3.5">
-            <p className="text-muted text-[13px]">
-              Слабое место удобно закрыть точечной тренировкой навыка.
+        </div>
+      )}
+
+      {weakestSkill && (
+        <div className="border-line bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border p-6 sm:col-span-2">
+          <div>
+            <Eyebrow>Самое слабое место</Eyebrow>
+            <p className="text-ink mt-2 text-[21px] leading-snug font-bold tracking-[-0.015em] break-words">
+              {weakestSkill}
             </p>
-            <Link
-              to="/app/training/new"
-              className={buttonClasses({ size: 'sm' })}
-            >
-              Тренировать навык
-            </Link>
+            <p className="text-dim mt-1.5 text-[13px]">
+              Тренировка соберёт вопросы только по этому навыку
+            </p>
           </div>
+          <Link to={trainingTo} className={buttonClasses({ size: 'sm' })}>
+            Тренировать навык
+          </Link>
         </div>
       )}
 

@@ -173,7 +173,7 @@ class LlmServiceTest {
         void routesByExperienceGradeAndWrapsRequestAsJsonString(String experience, String expectedSuffix) {
             // given
             var request = new LlmInterviewReportRequest("Java-разработчик", experience, List.of());
-            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы");
+            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы", null);
             when(llm.call(anyString(), any(), eq(LlmInterviewReport.class))).thenReturn(expected);
 
             // when

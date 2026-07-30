@@ -90,7 +90,7 @@ record InterviewQuestionResponse(
 
 record InterviewReportResponse(
     UUID reportId, UUID sessionId, Double avgScore, InterviewReport.OfferProbability offerProbability,
-    String overallFeedback, String recommendations, Instant generatedAt,
+    String overallFeedback, String recommendations, String weakestSkill, Instant generatedAt,
     List<InterviewQuestionResponse> questions)
 ```
 
@@ -171,6 +171,7 @@ record InterviewReportResponse(
   "offerProbability": "Средняя",
   "overallFeedback": "Кандидат уверенно ориентируется в основах, но...",
   "recommendations": "Перед собеседованием стоит повторить типы блокировок и explain analyze.",
+  "weakestSkill": "Индексы в PostgreSQL",
   "generatedAt": "2026-07-28T12:00:00Z",
   "questions": [
     {
@@ -283,6 +284,14 @@ record InterviewReportResponse(
   предусмотрено схемой ответа, но насколько надёжно оно заполняется — зависит от калибровки
   конкретного агента. Так что `null` в `recommendations` не всегда означает «рекомендовать
   нечего» — может быть, что агент этого грейда пока просто не считает нужным его заполнять.
+- **`weakestSkill` — самый слабый навык по итогам интервью, тоже мягкое поле.** Ревьюер называет
+  тему или навык из требований вакансии, раскрытую в ответах слабее всего, коротким названием
+  (1–3 слова, как в справочнике навыков тренажёра) — по нему клиент предлагает точечную
+  тренировку. Пустая или пробельная строка превращается в `null`; слишком длинный ответ LLM
+  (больше 100 символов, столько же в колонке) тоже отбрасывается в `null` — отчёт из-за этого
+  поля не падает и `finish` не блокирует. Поле описано в тексте всех четырёх грейдовых
+  ревьюеров, но гарантии заполнения нет: `null` возможен, и клиенту нужно уметь обходиться
+  без него.
 - **Сессия завершается один раз.** После `finish` статус — `COMPLETED`, проставляется
   `completedAt`. Повторный `finish` на уже завершённой сессии — `409`, отчёт не пересобирается;
   посмотреть его повторно можно только через `GET .../report`. Два параллельных `finish` тоже

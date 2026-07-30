@@ -93,7 +93,7 @@ class InterviewControllerTest {
     private InterviewReportResponse reportResponse(UUID sessionId, String recommendations) {
         return new InterviewReportResponse(
                 UUID.randomUUID(), sessionId, 3.8, InterviewReport.OfferProbability.MEDIUM,
-                "Хороший кандидат, есть пробелы в индексах", recommendations, Instant.now(), List.of());
+                "Хороший кандидат, есть пробелы в индексах", recommendations, null, Instant.now(), List.of());
     }
 
     // -------------------------------------------------------------------------

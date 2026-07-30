@@ -12,6 +12,12 @@ import ru.workbit.speech.ws.SttWebSocketHandler;
 
 import java.util.List;
 
+/**
+ * Публикация распознавания наружу: адрес ручки, лимит по IP и размер буфера под аудио.
+ * Источник рукопожатия Spring проверяет сам — WebSocket правилам CORS не подчиняется;
+ * список берётся из общей настройки {@code app.security.cors.allowed-origins},
+ * чтобы он не разъехался с REST.
+ */
 @Configuration
 @EnableWebSocket
 public class SpeechWebSocketConfig implements WebSocketConfigurer {
@@ -30,6 +36,11 @@ public class SpeechWebSocketConfig implements WebSocketConfigurer {
         this.allowedOrigins = allowedOrigins.toArray(String[]::new);
     }
 
+    /**
+     * Вешает обработчик распознавания на {@code /api/v1/speech/stt}.
+     *
+     * @param registry реестр обработчиков WebSocket
+     */
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, STT_PATH)
@@ -37,6 +48,12 @@ public class SpeechWebSocketConfig implements WebSocketConfigurer {
                 .setAllowedOrigins(allowedOrigins);
     }
 
+    /**
+     * Поднимает предел бинарного сообщения до 64 КБ: дефолтные 8 КБ меньше чанка в 400 мс,
+     * и фрейм с аудио не пролезал бы целиком.
+     *
+     * @return настройки контейнера WebSocket
+     */
     @Bean
     public ServletServerContainerFactoryBean webSocketContainer() {
         ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();

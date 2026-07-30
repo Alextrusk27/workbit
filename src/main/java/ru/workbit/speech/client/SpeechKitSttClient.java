@@ -7,6 +7,11 @@ import ru.workbit.speech.dto.SttResult;
 import yandex.cloud.api.ai.stt.v3.RecognizerGrpc;
 import yandex.cloud.api.ai.stt.v3.Stt;
 
+/**
+ * Клиент потокового распознавания речи Yandex SpeechKit STT v3 (gRPC).
+ * Сессия настраивается один раз при открытии стрима: модель {@code general},
+ * LINEAR16_PCM 16 кГц моно, русский язык, режим реального времени с нормализацией текста.
+ */
 @Component
 @RequiredArgsConstructor
 public class SpeechKitSttClient {
@@ -17,6 +22,13 @@ public class SpeechKitSttClient {
 
     private final RecognizerGrpc.RecognizerStub recognizerStub;
 
+    /**
+     * Открывает двунаправленный стрим распознавания и отправляет в него настройки сессии.
+     * Гипотезы приходят в слушателя из потока gRPC, пока сессия не закрыта.
+     *
+     * @param listener получатель гипотез, ошибок и признака завершения распознавания
+     * @return сессия для отправки аудио; закрыть её обязан вызывающий
+     */
     public SttSession open(SttListener listener) {
         StreamObserver<Stt.StreamingRequest> requests = recognizerStub.recognizeStreaming(responseObserver(listener));
         requests.onNext(Stt.StreamingRequest.newBuilder()

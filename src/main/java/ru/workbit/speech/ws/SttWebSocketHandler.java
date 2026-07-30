@@ -20,6 +20,16 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Мост между браузером и SpeechKit: бинарные фреймы с аудио уходят в распознавание,
+ * гипотезы возвращаются текстовыми сообщениями {@link SttEvent}.
+ * Речь заканчивает команда {@code stop}, а не закрытие сокета клиентом: иначе нормализованный
+ * финал — тот самый текст, который нужен полю ответа — придёт в уже закрытое соединение.
+ * Отсюда же {@link AbstractWebSocketHandler} вместо {@code BinaryWebSocketHandler}:
+ * последний рвёт связь на любом текстовом сообщении.
+ * Объём сессии ограничен четырьмя минутами аудио: клиент не обязан соблюдать собственный
+ * таймер, а SpeechKit тарифицирует всё присланное.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -36,6 +46,13 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
     private final SpeechKitSttClient client;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Открывает распознавание на всё время соединения и заводит счётчик присланного аудио.
+     * Ответы пишутся через {@link ConcurrentWebSocketSessionDecorator}, потому что приходят
+     * из потока gRPC, а не из потока сокета.
+     *
+     * @param session соединение с браузером
+     */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         WebSocketSession sink =
@@ -44,6 +61,12 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
         session.getAttributes().put(RECOGNITION, client.open(new Bridge(sink)));
     }
 
+    /**
+     * Закрывает распознавание вместе с соединением, чтобы стрим не остался висеть при обрыве.
+     *
+     * @param session закрытое соединение
+     * @param status причина закрытия
+     */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         SttSession recognition = recognition(session);
@@ -52,6 +75,13 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
         }
     }
 
+    /**
+     * Передаёт кусок аудио в распознавание. При превышении лимита сессии сам закрывает
+     * отправляющую половину стрима: финал ещё дойдёт, а дальнейшие фреймы уже игнорируются.
+     *
+     * @param session соединение с браузером
+     * @param message фрейм с сырым LPCM 16 кГц моно
+     */
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
         SttSession recognition = recognition(session);
@@ -71,6 +101,12 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
         recognition.send(audio);
     }
 
+    /**
+     * Обрабатывает команду {@code stop} — конец речи. Прочие тексты игнорируются.
+     *
+     * @param session соединение с браузером
+     * @param message текстовое сообщение от клиента
+     */
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         SttSession recognition = recognition(session);
@@ -83,6 +119,10 @@ public class SttWebSocketHandler extends AbstractWebSocketHandler {
         return (SttSession) session.getAttributes().get(RECOGNITION);
     }
 
+    /**
+     * Отдающая сторона моста: перекладывает события распознавания в сообщения WebSocket.
+     * Соединение закрывает сервер — и при ошибке, и когда сервис прислал всё до конца.
+     */
     @RequiredArgsConstructor
     private final class Bridge implements SttListener {
         private final WebSocketSession session;

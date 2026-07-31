@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -46,9 +46,8 @@ function PreviewCard({ preview }: { preview: VacancyPreview }) {
 function InterviewForm() {
   const navigate = useNavigate()
   const create = useCreateInterview()
-  const [params] = useSearchParams()
 
-  const [url, setUrl] = useState(params.get('url') ?? '')
+  const [url, setUrl] = useState('')
   const trimmed = url.trim()
   const debouncedUrl = useDebounced(trimmed)
   const validUrl = isHhVacancyUrl(trimmed)

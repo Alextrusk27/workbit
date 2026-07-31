@@ -20,7 +20,9 @@ import {
   trainingLevelCode,
   VACANCY_STATUS_LABELS,
 } from '@/features/interview/labels'
+import { interviewCreateErrorMessage } from '@/features/interview/errors'
 import {
+  useCreateInterview,
   useDeleteInterviewVacancy,
   useInterviewVacancy,
 } from '@/features/interview/useInterview'
@@ -135,13 +137,22 @@ export function InterviewVacancyPage() {
 function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
   const navigate = useNavigate()
   const del = useDeleteInterviewVacancy()
+  const create = useCreateInterview()
   const [confirming, setConfirming] = useState(false)
   const { data: live } = useVacancyStatus(detail.vacancyUrl)
   const unavailable = live != null && live.status !== 'ACTIVE'
+  const pending = detail.interviews.filter((i) => i.status !== 'COMPLETED')
+  const unfinished = pending[pending.length - 1]
 
-  const retryTo = detail.vacancyUrl
-    ? `/app/interview/new?url=${encodeURIComponent(detail.vacancyUrl)}`
-    : '/app/interview/new'
+  const onRetry = () => {
+    if (!detail.vacancyUrl || create.isPending) return
+    create.mutate(
+      { vacancyUrl: detail.vacancyUrl },
+      {
+        onSuccess: (session) => navigate(`/app/interview/${session.id}`),
+      },
+    )
+  }
 
   const onDelete = () => {
     setConfirming(false)
@@ -190,14 +201,26 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          {unavailable ? (
+          {unfinished ? (
+            <Link
+              to={`/app/interview/${unfinished.sessionId}`}
+              className={buttonClasses()}
+            >
+              Продолжить интервью
+            </Link>
+          ) : unavailable ? (
             <span className="text-dim inline-flex h-11 cursor-not-allowed items-center justify-center rounded-lg bg-[rgba(148,163,184,0.12)] px-6 text-[15px] font-semibold select-none">
               Вакансия недоступна
             </span>
           ) : (
-            <Link to={retryTo} className={buttonClasses()}>
-              Пройти ещё раз
-            </Link>
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={create.isPending}
+              className={buttonClasses()}
+            >
+              {create.isPending ? 'Готовим вопросы…' : 'Пройти ещё раз'}
+            </button>
           )}
           <button
             type="button"
@@ -209,6 +232,12 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
           </button>
         </div>
       </div>
+
+      {create.isError && (
+        <div className="mt-5">
+          <Alert>{interviewCreateErrorMessage(create.error)}</Alert>
+        </div>
+      )}
 
       {del.isError && (
         <div className="mt-5">

@@ -7,7 +7,7 @@ import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import type { InterviewVacancy, SessionStatus } from '@/features/interview/api'
+import type { InterviewVacancy } from '@/features/interview/api'
 import {
   OFFER_TONE,
   STATUS_LABELS,
@@ -20,14 +20,19 @@ import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
 
-type StatusFilter = 'ALL' | SessionStatus
+type StatusFilter = 'ALL' | 'PENDING' | 'COMPLETED'
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'ALL', label: 'Все' },
-  { key: 'CREATED', label: STATUS_LABELS.CREATED },
-  { key: 'IN_PROGRESS', label: STATUS_LABELS.IN_PROGRESS },
+  { key: 'PENDING', label: STATUS_LABELS.IN_PROGRESS },
   { key: 'COMPLETED', label: STATUS_LABELS.COMPLETED },
 ]
+
+function matches(vacancy: InterviewVacancy, filter: StatusFilter): boolean {
+  if (filter === 'ALL') return true
+  const completed = vacancy.status === 'COMPLETED'
+  return filter === 'COMPLETED' ? completed : !completed
+}
 
 const OFFER_INLINE_CLASS = {
   low: 'text-ink',
@@ -81,8 +86,7 @@ export function InterviewListPage() {
 
 function VacancyBrowser({ vacancies }: { vacancies: InterviewVacancy[] }) {
   const [status, setStatus] = useState<StatusFilter>('ALL')
-  const shown =
-    status === 'ALL' ? vacancies : vacancies.filter((v) => v.status === status)
+  const shown = vacancies.filter((v) => matches(v, status))
 
   return (
     <div>
@@ -92,11 +96,7 @@ function VacancyBrowser({ vacancies }: { vacancies: InterviewVacancy[] }) {
             key={f.key}
             selected={f.key === status}
             onClick={() => setStatus(f.key)}
-            count={
-              f.key === 'ALL'
-                ? vacancies.length
-                : vacancies.filter((v) => v.status === f.key).length
-            }
+            count={vacancies.filter((v) => matches(v, f.key)).length}
           >
             {f.label}
           </Chip>

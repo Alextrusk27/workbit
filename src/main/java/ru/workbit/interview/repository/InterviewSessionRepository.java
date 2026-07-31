@@ -22,6 +22,10 @@ public interface InterviewSessionRepository extends JpaRepository<@NotNull Inter
     List<InterviewSession> findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(
             @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds);
 
+    boolean existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+            @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds,
+            @NotNull InterviewSession.Status status);
+
     @Query("""
             SELECT s FROM InterviewSession s
             JOIN FETCH s.questions q

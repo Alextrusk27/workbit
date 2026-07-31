@@ -49,6 +49,7 @@ public class InterviewController {
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Вакансия не найдена или в архиве", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "По этой вакансии уже есть незавершённое интервью", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "hh.ru или AI-сервис недоступны", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewSessionResponse> createSession(

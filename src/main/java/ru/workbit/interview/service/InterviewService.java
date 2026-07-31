@@ -66,6 +66,8 @@ public class InterviewService {
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
 
+        checkNoUnfinishedInterview(vacancyData, userId);
+
         List<String> questions = generateQuestions(vacancyData);
 
         InterviewSession session = interviewWriter.createSession(vacancyData, userId, questions);
@@ -240,6 +242,16 @@ public class InterviewService {
                 LlmInterviewQuestionsRequest.MIN_COUNT,
                 LlmInterviewQuestionsRequest.MAX_COUNT
         );
+    }
+
+    private void checkNoUnfinishedInterview(VacancyData vacancyData, UUID userId) {
+        List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
+        if (!snapshotIds.isEmpty() && interviewSessionRepository
+                .existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                        userId, snapshotIds, InterviewSession.Status.COMPLETED)) {
+            log.warn("User {} already has an unfinished interview for vacancy {}", userId, vacancyData.sourceId());
+            throw new ConflictException("Unfinished interview exists");
+        }
     }
 
     private List<String> generateQuestions(VacancyData vacancyData) {

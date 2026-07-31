@@ -283,6 +283,80 @@ class InterviewServiceTest {
             verify(interviewWriter, never()).createSession(any(), any(), any());
             verifyNoInteractions(interviewSessionMapper);
         }
+
+        @Test
+        @DisplayName("Есть незавершённая сессия по вакансии - ConflictException, LLM и writer не вызываются")
+        void throwsWhenUnfinishedInterviewExistsForVacancy() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<UUID> snapshotIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(snapshotIds);
+            when(interviewSessionRepository.existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                    userId, snapshotIds, InterviewSession.Status.COMPLETED)).thenReturn(true);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Unfinished interview exists");
+            verifyNoInteractions(llmService, interviewWriter);
+        }
+
+        @Test
+        @DisplayName("Снапшоты вакансии есть, но незавершённых сессий нет - сессия создаётся штатно")
+        void createsSessionWhenSnapshotsExistButNoUnfinishedInterview() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<UUID> snapshotIds = List.of(UUID.randomUUID());
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(snapshotIds);
+            when(interviewSessionRepository.existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                    userId, snapshotIds, InterviewSession.Status.COMPLETED)).thenReturn(false);
+
+            List<String> questions = List.of("В1", "В2", "В3", "В4", "В5");
+            when(llmService.generateInterviewQuestions(any(), any())).thenReturn(new LlmInterviewQuestions(questions));
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), questions.size());
+            when(interviewWriter.createSession(vacancyData, userId, questions)).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(eq(createdSession), eq(vacancyData), eq(0)))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(interviewWriter).createSession(vacancyData, userId, questions);
+            verify(llmService, times(1)).generateInterviewQuestions(any(), any());
+        }
+
+        @Test
+        @DisplayName("Снапшотов по sourceId нет - exists не вызывается, сессия создаётся штатно")
+        void createsSessionWhenNoSnapshotsForVacancy() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(List.of());
+
+            List<String> questions = List.of("В1", "В2", "В3", "В4", "В5");
+            when(llmService.generateInterviewQuestions(any(), any())).thenReturn(new LlmInterviewQuestions(questions));
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), questions.size());
+            when(interviewWriter.createSession(vacancyData, userId, questions)).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(eq(createdSession), eq(vacancyData), eq(0)))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(interviewSessionRepository, never())
+                    .existsByUserIdAndVacancySnapshotIdInAndStatusNot(any(), any(), any());
+            verify(interviewWriter).createSession(vacancyData, userId, questions);
+        }
     }
 
     @Nested

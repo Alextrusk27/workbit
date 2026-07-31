@@ -80,6 +80,7 @@ class InterviewSessionMapperTest {
                     .completedAt(completedAt)
                     .build();
             var snapshotView = new VacancySnapshotView(
+                    "654321",
                     "Python-разработчик",
                     "ООО Лютик",
                     "https://hh.ru/vacancy/654321",

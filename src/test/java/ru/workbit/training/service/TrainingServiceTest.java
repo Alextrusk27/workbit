@@ -37,6 +37,7 @@ import ru.workbit.training.dto.TrainingOptionsResponse;
 import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.dto.TrainingTopicMatch;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
@@ -983,6 +984,99 @@ class TrainingServiceTest {
 
             // then
             assertThat(result.getContent()).containsExactly(firstResponse, secondResponse);
+        }
+    }
+
+    @Nested
+    @DisplayName("FindLatestByTopics")
+    class FindLatestByTopics {
+
+        private final UUID userId = UUID.randomUUID();
+
+        private TrainingSession sessionWithTopic(UUID id, String topic, TrainingReport report) {
+            return TrainingSession.builder()
+                    .id(id)
+                    .userId(userId)
+                    .profession(PROFESSION)
+                    .topic(topic)
+                    .level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.COMPLETED)
+                    .report(report)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("По каждой теме возвращает метрики последней сессии")
+        void returnsMatchForEachTopicWithCounts() {
+            // given
+            UUID springSessionId = UUID.randomUUID();
+            UUID javaSessionId = UUID.randomUUID();
+            TrainingReport report = TrainingReport.builder().avgScore(4.5).build();
+            TrainingSession springSession = sessionWithTopic(springSessionId, "Spring Boot", report);
+            TrainingSession javaSession = sessionWithTopic(javaSessionId, "Java Core", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot", "java core")))
+                    .thenReturn(List.of(springSession, javaSession));
+
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(springSessionId))
+                    .thenReturn(7L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(springSessionId))
+                    .thenReturn(10L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(javaSessionId))
+                    .thenReturn(0L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(javaSessionId))
+                    .thenReturn(10L);
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot", "java core"));
+
+            // then
+            assertThat(result).containsExactlyInAnyOrder(
+                    new TrainingTopicMatch(springSessionId, "Spring Boot", TrainingSession.Status.COMPLETED, 4.5, 7, 10),
+                    new TrainingTopicMatch(javaSessionId, "Java Core", TrainingSession.Status.COMPLETED, null, 0, 10));
+        }
+
+        @Test
+        @DisplayName("Несколько сессий с одинаковой темой в разном регистре - берётся первая (последняя по времени), для второй счётчики не считаются")
+        void deduplicatesByLoweredTopicKeepingFirstOccurrence() {
+            // given
+            UUID latestSessionId = UUID.randomUUID();
+            UUID olderSessionId = UUID.randomUUID();
+            TrainingReport latestReport = TrainingReport.builder().avgScore(5.0).build();
+            TrainingSession latestSession = sessionWithTopic(latestSessionId, "SPRING BOOT", latestReport);
+            TrainingSession olderSession = sessionWithTopic(olderSessionId, "spring boot", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot")))
+                    .thenReturn(List.of(latestSession, olderSession));
+
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(latestSessionId))
+                    .thenReturn(4L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(latestSessionId))
+                    .thenReturn(10L);
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot"));
+
+            // then
+            assertThat(result).containsExactly(
+                    new TrainingTopicMatch(latestSessionId, "SPRING BOOT", TrainingSession.Status.COMPLETED, 5.0, 4, 10));
+            verify(trainingQuestionRepository, never())
+                    .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(olderSessionId);
+            verify(trainingQuestionRepository, never())
+                    .countByTrainingSessionIdAndFollowUpFalse(olderSessionId);
+        }
+
+        @Test
+        @DisplayName("Нет сессий по темам - пустой список, счётчики не запрашиваются")
+        void returnsEmptyListWhenNoSessionsMatch() {
+            // given
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("несуществующая тема")))
+                    .thenReturn(List.of());
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("несуществующая тема"));
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(trainingQuestionRepository);
         }
     }
 

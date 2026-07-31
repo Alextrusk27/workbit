@@ -115,7 +115,7 @@ class InterviewServiceTest {
     }
 
     private static VacancySnapshotView aVacancySnapshotView(String experience) {
-        return new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", experience);
+        return new VacancySnapshotView("123", "Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", experience);
     }
 
     @Nested

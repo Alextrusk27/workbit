@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.training.model.TrainingSession;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +20,13 @@ public interface TrainingSessionRepository extends JpaRepository<@NotNull Traini
     Page<@NotNull TrainingSession> findAllByUserId(@NotNull UUID userId, Pageable pageable);
 
     Optional<TrainingSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
+
+    @Query("""
+            SELECT ts FROM TrainingSession ts
+            WHERE ts.userId = :userId AND LOWER(ts.topic) IN :topics
+            ORDER BY ts.created DESC
+            """)
+    List<TrainingSession> findAllByUserIdAndLoweredTopicIn(@NotNull UUID userId, @NotNull Collection<String> topics);
 
     @Query("""
             SELECT ts FROM TrainingSession ts

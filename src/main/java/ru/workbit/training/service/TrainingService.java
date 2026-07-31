@@ -42,6 +42,8 @@ import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -119,6 +121,23 @@ public class TrainingService {
         return sessions.map(session -> trainingSessionMapper.toResponse(
                 session,
                 answered.getOrDefault(session.getId(), 0L).intValue()));
+    }
+
+    public List<TrainingTopicMatch> findLatestByTopics(UUID userId, Collection<String> topics) {
+        Map<String, TrainingSession> latestByTopic = new HashMap<>();
+        for (TrainingSession session : trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, topics)) {
+            latestByTopic.putIfAbsent(session.getTopic().toLowerCase(), session);
+        }
+        return latestByTopic.values().stream()
+                .map(session -> new TrainingTopicMatch(
+                        session.getId(),
+                        session.getTopic(),
+                        session.getStatus(),
+                        session.getReport() == null ? null : session.getReport().getAvgScore(),
+                        (int) trainingQuestionRepository
+                                .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(session.getId()),
+                        (int) trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(session.getId())))
+                .toList();
     }
 
     public TrainingQuestionResponse nextQuestion(UUID sessionId, UUID userId) {

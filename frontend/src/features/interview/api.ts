@@ -8,6 +8,7 @@ export interface CreateInterviewRequest {
 
 export interface InterviewSession {
   id: string
+  vacancyId: string
   vacancyName: string
   employer: string
   vacancyUrl: string | null

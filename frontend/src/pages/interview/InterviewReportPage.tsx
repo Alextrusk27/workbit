@@ -54,6 +54,10 @@ export function InterviewReportPage() {
     .filter(Boolean)
     .join(' · ')
 
+  const backTo = session
+    ? `/app/interview/vacancy/${session.vacancyId}`
+    : '/app/interview'
+
   const trainingParams = new URLSearchParams({
     skill: report.weakestSkill ?? '',
     level: trainingLevelCode(session?.experience ?? null),
@@ -63,7 +67,7 @@ export function InterviewReportPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app/interview', label: 'Интервью' }}
+        back={{ to: backTo, label: session ? 'Вакансия' : 'Мои интервью' }}
         eyebrow="Разбор интервью"
         title={session?.vacancyName ?? 'Интервью по вакансии'}
       >
@@ -99,11 +103,8 @@ export function InterviewReportPage() {
       </div>
 
       <div className="mt-12 flex flex-wrap gap-3.5">
-        <Link
-          to="/app/interview"
-          className={buttonClasses({ variant: 'secondary' })}
-        >
-          К списку интервью
+        <Link to={backTo} className={buttonClasses({ variant: 'secondary' })}>
+          {session ? 'К вакансии' : 'К списку интервью'}
         </Link>
         <Link to="/app/interview/new" className={buttonClasses()}>
           Новое интервью

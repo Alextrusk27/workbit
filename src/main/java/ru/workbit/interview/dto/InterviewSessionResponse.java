@@ -10,6 +10,9 @@ public record InterviewSessionResponse(
         @Schema(description = "Идентификатор сессии")
         UUID id,
 
+        @Schema(description = "Идентификатор вакансии", example = "123456")
+        String vacancyId,
+
         @Schema(description = "Название вакансии", example = "Java-разработчик")
         String vacancyName,
 

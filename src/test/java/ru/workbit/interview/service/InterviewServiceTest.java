@@ -145,8 +145,8 @@ class InterviewServiceTest {
             when(interviewWriter.createSession(vacancyData, userId, questions)).thenReturn(createdSession);
 
             InterviewSessionResponse expectedResponse = new InterviewSessionResponse(
-                    createdSession.getId(), vacancyData.name(), vacancyData.employer(), vacancyData.url(),
-                    vacancyData.experience(), InterviewSession.Status.CREATED, 0, 5, null, null);
+                    createdSession.getId(), vacancyData.sourceId(), vacancyData.name(), vacancyData.employer(),
+                    vacancyData.url(), vacancyData.experience(), InterviewSession.Status.CREATED, 0, 5, null, null);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0)).thenReturn(expectedResponse);
 
             // when

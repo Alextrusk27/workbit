@@ -87,8 +87,8 @@ record SubmitAnswerBody(@NotBlank String answerText)
 
 ```java
 record InterviewSessionResponse(
-    UUID id, String vacancyName, String employer, String vacancyUrl, String experience,
-    InterviewSession.Status status, int answeredCount, int totalQuestions,
+    UUID id, String vacancyId, String vacancyName, String employer, String vacancyUrl,
+    String experience, InterviewSession.Status status, int answeredCount, int totalQuestions,
     Instant created, Instant completedAt)
 
 record InterviewQuestionResponse(
@@ -108,7 +108,9 @@ record InterviewReportResponse(
   сохранённого снапшота вакансии; `vacancyUrl` в ответе — всегда канонический вид
   `https://hh.ru/vacancy/{id}`, даже если в запросе была ссылка на поддомен или с лишними
   query-параметрами. `experience` — как есть в вакансии hh.ru (например, «От 1 года до 3 лет»),
-  `null`, если в вакансии не указан. Список вопросов в ответе нет — они уже сгенерированы на
+  `null`, если в вакансии не указан. `vacancyId` — тот же идентификатор вакансии, что в ручках
+  `/vacancies` ниже (числовой id вакансии на hh.ru строкой): по нему фронт ведёт со страницы
+  прогона на страницу вакансии. Список вопросов в ответе нет — они уже сгенерированы на
   бэке, но, как и в тренажёре, отдаются по одному через `.../questions/next`.
 - **`GET /sessions`** — `200`, `List<InterviewSessionResponse>` — все сессии текущего
   пользователя целиком, без пагинации (в отличие от `training`, где та же ручка отдаёт
@@ -139,6 +141,7 @@ record InterviewReportResponse(
 ```json
 {
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "vacancyId": "123456",
   "vacancyName": "Java-разработчик",
   "employer": "ООО Ромашка",
   "vacancyUrl": "https://hh.ru/vacancy/123456",

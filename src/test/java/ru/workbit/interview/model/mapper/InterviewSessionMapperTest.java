@@ -57,6 +57,7 @@ class InterviewSessionMapperTest {
 
             // then
             assertThat(dto.id()).isEqualTo(session.getId());
+            assertThat(dto.vacancyId()).isEqualTo("123456");
             assertThat(dto.vacancyName()).isEqualTo("Java-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Ромашка");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/123456");
@@ -92,6 +93,7 @@ class InterviewSessionMapperTest {
 
             // then
             assertThat(dto.id()).isEqualTo(session.getId());
+            assertThat(dto.vacancyId()).isEqualTo("654321");
             assertThat(dto.vacancyName()).isEqualTo("Python-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Лютик");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/654321");

@@ -4,6 +4,7 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { StatusTag } from '@/components/app/StatusTag'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
@@ -162,13 +163,14 @@ function CardScore({ sessionId }: { sessionId: string }) {
 
 function SessionCard({ session }: { session: TrainingSession }) {
   const del = useDeleteSession()
+  const [confirming, setConfirming] = useState(false)
   const completed = session.status === 'COMPLETED'
   const openHref = completed
     ? `/app/training/${session.id}/report`
     : `/app/training/${session.id}`
 
   const onDelete = () => {
-    if (!window.confirm('Удалить эту тренировку? Действие необратимо.')) return
+    setConfirming(false)
     del.mutate(session.id)
   }
 
@@ -211,13 +213,21 @@ function SessionCard({ session }: { session: TrainingSession }) {
         </Link>
         <button
           type="button"
-          onClick={onDelete}
+          onClick={() => setConfirming(true)}
           disabled={del.isPending}
           className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
         >
           Удалить
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Удалить тренировку?"
+        text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором. Действие необратимо.`}
+        onConfirm={onDelete}
+        onClose={() => setConfirming(false)}
+      />
     </li>
   )
 }

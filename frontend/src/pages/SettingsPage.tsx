@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Field } from '@/components/ui/Field'
 import {
@@ -97,14 +98,10 @@ function ChangePasswordSection() {
 function DeleteAccountSection() {
   const navigate = useNavigate()
   const del = useDeleteAccount()
+  const [confirming, setConfirming] = useState(false)
 
   const onDelete = () => {
-    if (
-      !window.confirm(
-        'Удалить аккаунт? Все интервью и отчёты будут потеряны. Действие необратимо.',
-      )
-    )
-      return
+    setConfirming(false)
     del.mutate(undefined, {
       onSuccess: () => navigate('/', { replace: true }),
     })
@@ -126,12 +123,20 @@ function DeleteAccountSection() {
 
       <Button
         variant="danger"
-        onClick={onDelete}
+        onClick={() => setConfirming(true)}
         disabled={del.isPending}
         className="mt-6"
       >
         {del.isPending ? 'Удаляем…' : 'Удалить аккаунт'}
       </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Удалить аккаунт?"
+        text="Все интервью и отчёты будут потеряны. Действие необратимо."
+        onConfirm={onDelete}
+        onClose={() => setConfirming(false)}
+      />
     </section>
   )
 }

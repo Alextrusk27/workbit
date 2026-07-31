@@ -26,6 +26,7 @@ import { TrainingSessionPage } from '@/pages/training/TrainingSessionPage'
 import { TrainingReportPage } from '@/pages/training/TrainingReportPage'
 import { InterviewListPage } from '@/pages/interview/InterviewListPage'
 import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
+import { InterviewVacancyPage } from '@/pages/interview/InterviewVacancyPage'
 import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
 import { InterviewReportPage } from '@/pages/interview/InterviewReportPage'
 
@@ -104,6 +105,10 @@ export const router = createBrowserRouter([
               },
               { path: 'interview', element: <InterviewListPage /> },
               { path: 'interview/new', element: <NewInterviewPage /> },
+              {
+                path: 'interview/vacancy/:vacancyId',
+                element: <InterviewVacancyPage />,
+              },
               {
                 path: 'interview/:sessionId',
                 element: <InterviewSessionPage />,

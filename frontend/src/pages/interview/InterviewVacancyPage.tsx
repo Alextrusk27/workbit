@@ -70,6 +70,21 @@ function completedAttempts(detail: InterviewVacancyDetail): InterviewAttempt[] {
   )
 }
 
+/** Динамика: суммарное изменение оценки по линейному тренду точек графика
+ *  (наклон МНК-прямой × число интервалов), округлённое до десятых. */
+function trendDelta(scores: number[]): number {
+  const n = scores.length
+  const meanX = (n - 1) / 2
+  const meanY = scores.reduce((a, b) => a + b, 0) / n
+  let num = 0
+  let den = 0
+  scores.forEach((y, x) => {
+    num += (x - meanX) * (y - meanY)
+    den += (x - meanX) ** 2
+  })
+  return Math.round((num / den) * (n - 1) * 10) / 10
+}
+
 function OfferValue({
   value,
   className,
@@ -288,10 +303,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
   const completed = completedAttempts(detail)
   const best = completed.reduce((a, b) => (b.avgScore! > a.avgScore! ? b : a))
   const delta =
-    points.length >= 2
-      ? points[points.length - 1].avgScore! -
-        points[points.length - 2].avgScore!
-      : null
+    points.length >= 2 ? trendDelta(points.map((p) => p.avgScore!)) : null
 
   const xs = points.map((_, i) => 10 + i * 20)
   const ys = points.map((p) => ((5 - p.avgScore!) / 4) * 100)
@@ -326,24 +338,29 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
             <p
               className={cn(
                 'm-0 text-[19px] font-bold tabular-nums',
-                delta == null && 'text-dim',
+                !delta && 'text-dim',
                 delta != null && delta > 0 && 'text-ok',
                 delta != null && delta < 0 && 'text-danger',
-                delta === 0 && 'text-dim',
               )}
             >
               {delta == null
                 ? '—'
                 : `${delta > 0 ? '+' : ''}${formatScore(delta)}`}
             </p>
-            <p className="text-dim mt-[3px] text-xs">Динамика</p>
+            <p className="text-dim mt-[3px] flex items-center gap-1.5 text-xs">
+              Динамика
+              <HintTip text="Общее направление оценок на графике — от первой попытки к последней" />
+            </p>
           </div>
           {best.offerProbability && (
             <div>
               <p className="m-0 text-[19px] font-bold">
                 <OfferValue value={best.offerProbability} />
               </p>
-              <p className="text-dim mt-[3px] text-xs">Оффер</p>
+              <p className="text-dim mt-[3px] flex items-center gap-1.5 text-xs">
+                Оффер
+                <HintTip text="Вероятность оффера в лучшем интервью" />
+              </p>
             </div>
           )}
         </div>

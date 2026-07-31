@@ -235,12 +235,7 @@ public class TrainingService {
         checkEnoughAnsweredToFinish(sessionId, answered);
 
         List<List<TrainingQuestion>> cases = groupCases(answered);
-        LlmTrainingReport llmReport = llmService.createTrainingReport(new LlmTrainingReportRequest(
-                session.getProfession(),
-                session.getLevel().getGrade(),
-                IntStream.range(0, cases.size())
-                        .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
-                        .toList()));
+        LlmTrainingReport llmReport = requestReport(sessionId, session, cases);
 
         try {
             return trainingWriter.completeReport(sessionId, llmReport);
@@ -399,6 +394,35 @@ public class TrainingService {
                     session.getLevel());
             throw new LlmException("Not enough questions for a training session");
         }
+    }
+
+    /**
+     * Запрос отчёта с одним повторным вызовом на вырожденный ответ-заглушку: Studio изредка отдаёт
+     * шаблон схемы вместо отчёта ("string" в полях, один case) — тот же класс сбоя, что у
+     * интервью-ревьюера и генераторов вопросов. Итоговую валидацию делает completeReport.
+     */
+    private LlmTrainingReport requestReport(UUID sessionId, TrainingSession session,
+                                            List<List<TrainingQuestion>> cases) {
+        LlmTrainingReportRequest request = new LlmTrainingReportRequest(
+                session.getProfession(),
+                session.getLevel().getGrade(),
+                IntStream.range(0, cases.size())
+                        .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
+                        .toList());
+        LlmTrainingReport report = llmService.createTrainingReport(request);
+        if (isUsableReport(report, cases.size())) {
+            return report;
+        }
+        log.warn("LLM returned degenerate training report for session {}, retrying once", sessionId);
+        return llmService.createTrainingReport(request);
+    }
+
+    private static boolean isUsableReport(LlmTrainingReport report, int casesCount) {
+        return report.overallFeedback() != null
+                && !report.overallFeedback().isBlank()
+                && report.overallFeedback().length() >= TrainingWriter.MIN_OVERALL_FEEDBACK_LENGTH
+                && report.cases() != null
+                && report.cases().size() >= casesCount * TrainingWriter.MIN_REVIEWED_CASES_RATIO;
     }
 
     private static LlmTrainingCase toLlmCase(int index, List<TrainingQuestion> trainingCase) {

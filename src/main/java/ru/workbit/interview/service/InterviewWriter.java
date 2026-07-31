@@ -37,9 +37,9 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 @RequiredArgsConstructor
 public class InterviewWriter {
 
-    private static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    static final double MIN_REVIEWED_ANSWERS_RATIO = 0.5;
     private static final int MAX_WEAKEST_SKILL_LENGTH = 100;
-    private static final double MIN_REVIEWED_ANSWERS_RATIO = 0.5;
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;

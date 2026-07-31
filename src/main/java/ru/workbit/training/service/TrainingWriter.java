@@ -40,8 +40,8 @@ import static ru.workbit.training.service.TrainingCases.groupCases;
 @RequiredArgsConstructor
 class TrainingWriter {
 
-    private static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
-    private static final double MIN_REVIEWED_CASES_RATIO = 0.5;
+    static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    static final double MIN_REVIEWED_CASES_RATIO = 0.5;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;

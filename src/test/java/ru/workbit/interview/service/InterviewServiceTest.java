@@ -29,6 +29,7 @@ import ru.workbit.interview.model.mapper.InterviewSessionMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewAnswerReview;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
 import ru.workbit.llm.dto.LlmInterviewFollowUpDecision;
 import ru.workbit.llm.dto.LlmInterviewFollowUpRequest;
@@ -911,7 +912,10 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    "Средняя", "Итоговый фидбэк по интервью", null, null);
             when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
 
             InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
@@ -924,7 +928,7 @@ class InterviewServiceTest {
             assertThat(result).isEqualTo(expectedResponse);
 
             ArgumentCaptor<LlmInterviewReportRequest> captor = ArgumentCaptor.forClass(LlmInterviewReportRequest.class);
-            verify(llmService).createInterviewReport(eq(vacancy.experience()), captor.capture());
+            verify(llmService, times(1)).createInterviewReport(eq(vacancy.experience()), captor.capture());
             assertThat(captor.getValue()).isEqualTo(new LlmInterviewReportRequest(
                     vacancy.name(), vacancy.experience(), List.of(
                             new LlmInterviewAnswer(1, main1.getText(), main1.getAnswerText(),
@@ -943,7 +947,9 @@ class InterviewServiceTest {
 
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", "Итоговый фидбэк по интервью", null, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ", 4)),
+                    "Средняя", "Итоговый фидбэк по интервью", null, null);
             when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
             when(interviewWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("already completed"));
@@ -952,6 +958,105 @@ class InterviewServiceTest {
             assertThatThrownBy(() -> interviewService.createReport(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM - вырожденный шаблон-заглушка - ретрай возвращает пригодный отчёт, LLM вызван дважды с одинаковым request")
+        void retriesReportWhenFirstResponseIsDegenerateTemplate() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport degenerateReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "string", 3)), "string", "string", null, null);
+            LlmInterviewReport usableReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    "Средняя", "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(eq(vacancy.experience()), any()))
+                    .thenReturn(degenerateReport, usableReport);
+
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            ArgumentCaptor<LlmInterviewReportRequest> captor = ArgumentCaptor.forClass(LlmInterviewReportRequest.class);
+            verify(llmService, times(2)).createInterviewReport(eq(vacancy.experience()), captor.capture());
+            assertThat(captor.getAllValues()).hasSize(2);
+            assertThat(captor.getAllValues().get(0)).isEqualTo(captor.getAllValues().get(1));
+            verify(interviewWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM пригодный - ретрай не требуется, ровно один вызов")
+        void doesNotRetryWhenFirstResponseIsUsable() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport usableReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    "Средняя", "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(usableReport);
+
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(1)).createInterviewReport(eq(vacancy.experience()), any());
+            verify(interviewWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Оба ответа LLM вырожденные - вызван дважды (не больше), writer-у уходит второй ответ")
+        void delegatesSecondDegenerateResponseWhenBothAttemptsAreDegenerate() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport firstDegenerate = new LlmInterviewReport(List.of(), "string", "string", null, null);
+            LlmInterviewReport secondDegenerate = new LlmInterviewReport(List.of(), "string", "string2", null, null);
+            when(llmService.createInterviewReport(eq(vacancy.experience()), any()))
+                    .thenReturn(firstDegenerate, secondDegenerate);
+            when(interviewWriter.completeReport(sessionId, secondDegenerate))
+                    .thenThrow(new LlmException("Interview report has no usable overall feedback"));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createReport(sessionId, userId))
+                    .isInstanceOf(LlmException.class);
+            verify(llmService, times(2)).createInterviewReport(eq(vacancy.experience()), any());
+            verify(interviewWriter).completeReport(sessionId, secondDegenerate);
         }
     }
 

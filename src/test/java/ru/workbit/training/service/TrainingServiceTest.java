@@ -48,6 +48,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingFollowUp;
 import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
 import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
@@ -72,6 +73,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -1692,6 +1694,18 @@ class TrainingServiceTest {
     @DisplayName("CreateReport")
     class CreateReport {
 
+        private LlmTrainingReport usableReport(int casesCount) {
+            return new LlmTrainingReport(
+                    IntStream.rangeClosed(1, casesCount)
+                            .mapToObj(i -> new LlmTrainingCaseReview(i, "Хороший ответ по кейсу " + i, 4))
+                            .toList(),
+                    "Итоговый фидбэк по тренировке");
+        }
+
+        private LlmTrainingReport degenerateReport(String overallFeedback) {
+            return new LlmTrainingReport(List.of(), overallFeedback);
+        }
+
         @Test
         @DisplayName("Передаёт profession сессии как есть в LlmTrainingReportRequest")
         void passesSessionProfessionAsIsToLlmRequest() {
@@ -1702,7 +1716,7 @@ class TrainingServiceTest {
             session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmTrainingReport llmReport = new LlmTrainingReport(List.of(), "Общий фидбэк по тренировке");
+            LlmTrainingReport llmReport = usableReport(3);
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
@@ -1780,7 +1794,7 @@ class TrainingServiceTest {
             session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmTrainingReport llmReport = new LlmTrainingReport(List.of(), "Общий фидбэк по тренировке");
+            LlmTrainingReport llmReport = usableReport(3);
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
             when(trainingWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("session already completed concurrently"));
@@ -1789,6 +1803,84 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM - вырожденный шаблон-заглушка - ретрай возвращает пригодный отчёт, LLM вызван дважды с одинаковым request")
+        void retriesReportWhenFirstResponseIsDegenerateTemplate() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport degenerateReport = degenerateReport("string");
+            LlmTrainingReport usableReport = usableReport(3);
+            when(llmService.createTrainingReport(any())).thenReturn(degenerateReport, usableReport);
+
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            ArgumentCaptor<LlmTrainingReportRequest> captor = ArgumentCaptor.forClass(LlmTrainingReportRequest.class);
+            verify(llmService, times(2)).createTrainingReport(captor.capture());
+            assertThat(captor.getAllValues()).hasSize(2);
+            assertThat(captor.getAllValues().get(0)).isEqualTo(captor.getAllValues().get(1));
+            verify(trainingWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM пригодный - ретрай не требуется, ровно один вызов")
+        void doesNotRetryWhenFirstResponseIsUsable() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport usableReport = usableReport(3);
+            when(llmService.createTrainingReport(any())).thenReturn(usableReport);
+
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(1)).createTrainingReport(any());
+            verify(trainingWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Оба ответа LLM вырожденные - вызван дважды (не больше), writer-у уходит второй ответ")
+        void delegatesSecondDegenerateResponseWhenBothAttemptsAreDegenerate() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport firstDegenerate = degenerateReport("string");
+            LlmTrainingReport secondDegenerate = degenerateReport("string2");
+            when(llmService.createTrainingReport(any())).thenReturn(firstDegenerate, secondDegenerate);
+            when(trainingWriter.completeReport(sessionId, secondDegenerate))
+                    .thenThrow(new LlmException("Training report has no usable overall feedback"));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(LlmException.class);
+            verify(llmService, times(2)).createTrainingReport(any());
+            verify(trainingWriter).completeReport(sessionId, secondDegenerate);
         }
     }
 

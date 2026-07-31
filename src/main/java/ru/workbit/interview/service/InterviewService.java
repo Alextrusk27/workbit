@@ -199,12 +199,7 @@ public class InterviewService {
 
         List<List<InterviewQuestion>> cases = groupCases(answered);
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        LlmInterviewReport llmReport = llmService.createInterviewReport(vacancy.experience(), new LlmInterviewReportRequest(
-                vacancy.name(),
-                vacancy.experience(),
-                IntStream.range(0, cases.size())
-                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
-                        .toList()));
+        LlmInterviewReport llmReport = requestReport(sessionId, vacancy, cases);
 
         try {
             return interviewWriter.completeReport(sessionId, llmReport);
@@ -279,6 +274,36 @@ public class InterviewService {
                     session.getId(), answeredMain, session.getTotalQuestions());
             throw new ConflictException("Not all questions answered");
         }
+    }
+
+    /**
+     * Запрос отчёта с одним повторным вызовом на вырожденный ответ-заглушку: Studio изредка отдаёт
+     * шаблон схемы вместо отчёта ("string" в полях, один answer) — тот же класс сбоя, что и у
+     * генератора вопросов в {@link #generateQuestions}. Итоговую валидацию делает completeReport.
+     */
+    private LlmInterviewReport requestReport(UUID sessionId, VacancySnapshotView vacancy,
+                                             List<List<InterviewQuestion>> cases) {
+        LlmInterviewReportRequest request = new LlmInterviewReportRequest(
+                vacancy.name(),
+                vacancy.experience(),
+                IntStream.range(0, cases.size())
+                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
+                        .toList());
+        LlmInterviewReport report = llmService.createInterviewReport(vacancy.experience(), request);
+        if (isUsableReport(report, cases.size())) {
+            return report;
+        }
+        log.warn("LLM returned degenerate interview report for session {}, retrying once", sessionId);
+        return llmService.createInterviewReport(vacancy.experience(), request);
+    }
+
+    private static boolean isUsableReport(LlmInterviewReport report, int casesCount) {
+        return report.overallFeedback() != null
+                && !report.overallFeedback().isBlank()
+                && report.overallFeedback().length() >= InterviewWriter.MIN_OVERALL_FEEDBACK_LENGTH
+                && InterviewReport.OfferProbability.fromString(report.offerProbability()).isPresent()
+                && report.answers() != null
+                && report.answers().size() >= casesCount * InterviewWriter.MIN_REVIEWED_ANSWERS_RATIO;
     }
 
     private static LlmInterviewAnswer toLlmAnswer(int index, List<InterviewQuestion> interviewCase) {

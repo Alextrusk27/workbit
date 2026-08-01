@@ -66,9 +66,9 @@ public class InterviewService {
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
 
-        LlmInterviewQuestions llmQuestions = llmService.generateInterviewQuestions(
-                vacancyData.experience(), toQuestionsRequest(vacancyData));
-        List<String> questions = usableQuestions(llmQuestions, vacancyData);
+        checkNoUnfinishedInterview(vacancyData, userId);
+
+        List<String> questions = generateQuestions(vacancyData);
 
         InterviewSession session = interviewWriter.createSession(vacancyData, userId, questions);
         return interviewSessionMapper.toResponse(session, vacancyData, 0);
@@ -201,12 +201,7 @@ public class InterviewService {
 
         List<List<InterviewQuestion>> cases = groupCases(answered);
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        LlmInterviewReport llmReport = llmService.createInterviewReport(vacancy.experience(), new LlmInterviewReportRequest(
-                vacancy.name(),
-                vacancy.experience(),
-                IntStream.range(0, cases.size())
-                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
-                        .toList()));
+        LlmInterviewReport llmReport = requestReport(sessionId, vacancy, cases);
 
         try {
             return interviewWriter.completeReport(sessionId, llmReport);
@@ -249,17 +244,39 @@ public class InterviewService {
         );
     }
 
-    private List<String> usableQuestions(LlmInterviewQuestions llmQuestions, VacancyData vacancyData) {
-        List<String> questions = llmQuestions.questions() == null ? List.of() : llmQuestions.questions().stream()
-                .filter(q -> q != null && !q.isBlank())
-                .limit(LlmInterviewQuestionsRequest.MAX_COUNT)
-                .toList();
+    private void checkNoUnfinishedInterview(VacancyData vacancyData, UUID userId) {
+        List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
+        if (!snapshotIds.isEmpty() && interviewSessionRepository
+                .existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                        userId, snapshotIds, InterviewSession.Status.COMPLETED)) {
+            log.warn("User {} already has an unfinished interview for vacancy {}", userId, vacancyData.sourceId());
+            throw new ConflictException("Unfinished interview exists");
+        }
+    }
+
+    private List<String> generateQuestions(VacancyData vacancyData) {
+        LlmInterviewQuestionsRequest request = toQuestionsRequest(vacancyData);
+        List<String> questions = usableQuestions(
+                llmService.generateInterviewQuestions(vacancyData.experience(), request));
         if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
-            log.error("LLM returned only {} usable interview questions, {} required [url={}]",
+            log.warn("LLM returned only {} usable interview questions, {} required, retrying [url={}]",
+                    questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
+            questions = usableQuestions(
+                    llmService.generateInterviewQuestions(vacancyData.experience(), request));
+        }
+        if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
+            log.error("LLM returned only {} usable interview questions after retry, {} required [url={}]",
                     questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
             throw new LlmException("Not enough questions for an interview session");
         }
         return questions;
+    }
+
+    private static List<String> usableQuestions(LlmInterviewQuestions llmQuestions) {
+        return llmQuestions.questions() == null ? List.of() : llmQuestions.questions().stream()
+                .filter(q -> q != null && !q.isBlank())
+                .limit(LlmInterviewQuestionsRequest.MAX_COUNT)
+                .toList();
     }
 
     private void checkAllQuestionsAnswered(InterviewSession session, List<InterviewQuestion> answered) {
@@ -269,6 +286,36 @@ public class InterviewService {
                     session.getId(), answeredMain, session.getTotalQuestions());
             throw new ConflictException("Not all questions answered");
         }
+    }
+
+    /**
+     * Запрос отчёта с одним повторным вызовом на вырожденный ответ-заглушку: Studio изредка отдаёт
+     * шаблон схемы вместо отчёта ("string" в полях, один answer) — тот же класс сбоя, что и у
+     * генератора вопросов в {@link #generateQuestions}. Итоговую валидацию делает completeReport.
+     */
+    private LlmInterviewReport requestReport(UUID sessionId, VacancySnapshotView vacancy,
+                                             List<List<InterviewQuestion>> cases) {
+        LlmInterviewReportRequest request = new LlmInterviewReportRequest(
+                vacancy.name(),
+                vacancy.experience(),
+                IntStream.range(0, cases.size())
+                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
+                        .toList());
+        LlmInterviewReport report = llmService.createInterviewReport(vacancy.experience(), request);
+        if (isUsableReport(report, cases.size())) {
+            return report;
+        }
+        log.warn("LLM returned degenerate interview report for session {}, retrying once", sessionId);
+        return llmService.createInterviewReport(vacancy.experience(), request);
+    }
+
+    private static boolean isUsableReport(LlmInterviewReport report, int casesCount) {
+        return report.overallFeedback() != null
+                && !report.overallFeedback().isBlank()
+                && report.overallFeedback().length() >= InterviewWriter.MIN_OVERALL_FEEDBACK_LENGTH
+                && InterviewReport.OfferProbability.fromString(report.offerProbability()).isPresent()
+                && report.answers() != null
+                && report.answers().size() >= casesCount * InterviewWriter.MIN_REVIEWED_ANSWERS_RATIO;
     }
 
     private static LlmInterviewAnswer toLlmAnswer(int index, List<InterviewQuestion> interviewCase) {

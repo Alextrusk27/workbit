@@ -19,9 +19,12 @@ import ru.workbit.interview.dto.CreateInterviewSessionRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
+import ru.workbit.interview.dto.InterviewVacancyDetailResponse;
+import ru.workbit.interview.dto.InterviewVacancyResponse;
 import ru.workbit.interview.dto.SubmitAnswerBody;
 import ru.workbit.interview.dto.SubmitAnswerRequest;
 import ru.workbit.interview.service.InterviewService;
+import ru.workbit.interview.service.InterviewVacancyService;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
@@ -36,6 +39,7 @@ import java.util.UUID;
 @Tag(name = "Interview", description = "AI-интервью по вакансии: сессии, вопросы, ответы, отчёт с оценкой вероятности оффера")
 public class InterviewController {
     private final InterviewService interviewService;
+    private final InterviewVacancyService interviewVacancyService;
 
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
@@ -45,6 +49,7 @@ public class InterviewController {
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Вакансия не найдена или в архиве", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "По этой вакансии уже есть незавершённое интервью", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "hh.ru или AI-сервис недоступны", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewSessionResponse> createSession(
@@ -172,6 +177,50 @@ public class InterviewController {
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         interviewService.delete(sessionId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/vacancies")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Список вакансий пользователя", description = "Группирует интервью текущего пользователя по вакансиям и возвращает сводку по каждой: лучший результат, вероятность оффера лучшей попытки, число завершённых интервью и статус последнего. Вакансии с недавними интервью первыми.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Список вакансий")
+    })
+    public ResponseEntity<@NotNull List<InterviewVacancyResponse>> getAllVacancies(
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(interviewVacancyService.getAll(userDetails.getId()));
+    }
+
+    @GetMapping("/vacancies/{vacancyId}")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Детали вакансии", description = "Возвращает вакансию с интервью по ней (старые первыми, у завершённых — оценка и вероятность оффера) и рекомендованными тренировками по отстающим навыкам из отчётов. Тренировка сопоставляется навыку по теме; для начатой возвращаются её статус и прогресс.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Вакансия найдена"),
+            @ApiResponse(responseCode = "404", description = "У пользователя нет интервью по этой вакансии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull InterviewVacancyDetailResponse> getVacancy(
+            @PathVariable String vacancyId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(interviewVacancyService.get(vacancyId, userDetails.getId()));
+    }
+
+    @DeleteMapping("/vacancies/{vacancyId}")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Удалить вакансию", description = "Удаляет все интервью пользователя по вакансии вместе с вопросами, ответами и отчётами.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Вакансия удалена"),
+            @ApiResponse(responseCode = "404", description = "У пользователя нет интервью по этой вакансии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull Void> deleteVacancy(
+            @PathVariable String vacancyId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        interviewVacancyService.delete(vacancyId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 }

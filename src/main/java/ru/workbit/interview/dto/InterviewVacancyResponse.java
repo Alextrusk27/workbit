@@ -1,15 +1,12 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
 
 import java.time.Instant;
-import java.util.UUID;
 
-public record InterviewSessionResponse(
-        @Schema(description = "Идентификатор сессии")
-        UUID id,
-
+public record InterviewVacancyResponse(
         @Schema(description = "Идентификатор вакансии", example = "123456")
         String vacancyId,
 
@@ -25,19 +22,19 @@ public record InterviewSessionResponse(
         @Schema(description = "Требуемый опыт работы из вакансии, null если не указан", example = "От 1 года до 3 лет")
         String experience,
 
-        @Schema(description = "Статус сессии")
+        @Schema(description = "Статус последнего интервью по вакансии")
         InterviewSession.Status status,
 
-        @Schema(description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)", example = "3")
-        int answeredCount,
+        @Schema(description = "Количество завершённых интервью по вакансии", example = "3")
+        int completedCount,
 
-        @Schema(description = "Общее количество основных вопросов интервью", example = "10")
-        int totalQuestions,
+        @Schema(description = "Лучшая средняя оценка среди завершённых интервью, null если завершённых нет", example = "4.0")
+        Double bestScore,
 
-        @Schema(description = "Момент создания сессии")
-        Instant created,
+        @Schema(description = "Вероятность оффера лучшей попытки, null если завершённых интервью нет")
+        InterviewReport.OfferProbability bestOffer,
 
-        @Schema(description = "Момент завершения сессии, null пока сессия не завершена")
-        Instant completedAt
+        @Schema(description = "Момент создания последнего интервью по вакансии")
+        Instant lastActivity
 ) {
 }

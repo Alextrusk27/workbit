@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.interview.model.InterviewSession;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,13 @@ public interface InterviewSessionRepository extends JpaRepository<@NotNull Inter
     List<InterviewSession> findAllByUserIdOrderByCreatedDesc(@NotNull UUID userId);
 
     Optional<InterviewSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
+
+    List<InterviewSession> findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(
+            @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds);
+
+    boolean existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+            @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds,
+            @NotNull InterviewSession.Status status);
 
     @Query("""
             SELECT s FROM InterviewSession s

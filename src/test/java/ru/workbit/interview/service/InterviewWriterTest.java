@@ -283,11 +283,11 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4),
                             new LlmInterviewAnswerReview(2, "Отлично", 5)),
-                    "Высокая", OVERALL_FEEDBACK, "Подтянуть алгоритмы");
+                    "Высокая", OVERALL_FEEDBACK, "Подтянуть алгоритмы", null);
 
             InterviewReportResponse expectedResponse = new InterviewReportResponse(
                     UUID.randomUUID(), sessionId, 4.5, InterviewReport.OfferProbability.HIGH,
-                    OVERALL_FEEDBACK, "Подтянуть алгоритмы", null, List.of());
+                    OVERALL_FEEDBACK, "Подтянуть алгоритмы", null, null, List.of());
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
 
@@ -332,11 +332,11 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4),
                             new LlmInterviewAnswerReview(2, "Отлично", 5)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             InterviewReportResponse expectedResponse = new InterviewReportResponse(
                     UUID.randomUUID(), sessionId, 4.5, InterviewReport.OfferProbability.MEDIUM,
-                    OVERALL_FEEDBACK, null, null, List.of());
+                    OVERALL_FEEDBACK, null, null, null, List.of());
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
 
@@ -371,12 +371,12 @@ class InterviewWriterTest {
                     List.of(new LlmInterviewAnswerReview(1, "Норм", 3),
                             new LlmInterviewAnswerReview(2, "Хорошо", 4),
                             new LlmInterviewAnswerReview(3, "Хорошо", 4)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 3.7, InterviewReport.OfferProbability.MEDIUM,
-                            OVERALL_FEEDBACK, null, null, List.of()));
+                            OVERALL_FEEDBACK, null, null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -399,12 +399,12 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4),
                             new LlmInterviewAnswerReview(99, "Вне диапазона", 5)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 4.0, InterviewReport.OfferProbability.MEDIUM,
-                            OVERALL_FEEDBACK, null, null, List.of()));
+                            OVERALL_FEEDBACK, null, null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -428,12 +428,12 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Первый", 3),
                             new LlmInterviewAnswerReview(1, "Второй", 5)),
-                    "Низкая", OVERALL_FEEDBACK, null);
+                    "Низкая", OVERALL_FEEDBACK, null, null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 3.0, InterviewReport.OfferProbability.LOW,
-                            OVERALL_FEEDBACK, null, null, List.of()));
+                            OVERALL_FEEDBACK, null, null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -457,7 +457,7 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Оценка вне диапазона", 6),
                             new LlmInterviewAnswerReview(2, "   ", 4)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -481,12 +481,12 @@ class InterviewWriterTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Без оценки", null),
                             new LlmInterviewAnswerReview(2, "Отлично", 5)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 5.0, InterviewReport.OfferProbability.MEDIUM,
-                            OVERALL_FEEDBACK, null, null, List.of()));
+                            OVERALL_FEEDBACK, null, null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -506,7 +506,7 @@ class InterviewWriterTest {
                     .id(sessionId).questions(new ArrayList<>(List.of(q1))).build();
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(null, "Средняя", OVERALL_FEEDBACK, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(null, "Средняя", OVERALL_FEEDBACK, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -528,11 +528,11 @@ class InterviewWriterTest {
 
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             InterviewReportResponse expectedResponse = new InterviewReportResponse(
                     UUID.randomUUID(), sessionId, 4.0, InterviewReport.OfferProbability.MEDIUM,
-                    OVERALL_FEEDBACK, null, null, List.of());
+                    OVERALL_FEEDBACK, null, null, null, List.of());
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
 
@@ -560,7 +560,7 @@ class InterviewWriterTest {
 
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4)),
-                    "Средняя", OVERALL_FEEDBACK, null);
+                    "Средняя", OVERALL_FEEDBACK, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -581,7 +581,7 @@ class InterviewWriterTest {
                     .id(sessionId).questions(new ArrayList<>(List.of(unanswered))).build();
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", OVERALL_FEEDBACK, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", OVERALL_FEEDBACK, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -601,7 +601,7 @@ class InterviewWriterTest {
                     .id(sessionId).questions(new ArrayList<>()).build();
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", overallFeedback, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), "Средняя", overallFeedback, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -621,7 +621,7 @@ class InterviewWriterTest {
                     .id(sessionId).questions(new ArrayList<>()).build();
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), offerProbability, OVERALL_FEEDBACK, null);
+            LlmInterviewReport llmReport = new LlmInterviewReport(List.of(), offerProbability, OVERALL_FEEDBACK, null, null);
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
@@ -642,12 +642,12 @@ class InterviewWriterTest {
 
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4)),
-                    "Средняя", OVERALL_FEEDBACK, "   ");
+                    "Средняя", OVERALL_FEEDBACK, "   ", null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 4.0, InterviewReport.OfferProbability.MEDIUM,
-                            OVERALL_FEEDBACK, null, null, List.of()));
+                            OVERALL_FEEDBACK, null, null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -668,12 +668,12 @@ class InterviewWriterTest {
 
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хорошо", 4)),
-                    "Средняя", OVERALL_FEEDBACK, "Подтянуть SQL");
+                    "Средняя", OVERALL_FEEDBACK, "Подтянуть SQL", null);
 
             when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
                     .thenReturn(new InterviewReportResponse(
                             UUID.randomUUID(), sessionId, 4.0, InterviewReport.OfferProbability.MEDIUM,
-                            OVERALL_FEEDBACK, "Подтянуть SQL", null, List.of()));
+                            OVERALL_FEEDBACK, "Подтянуть SQL", null, null, List.of()));
 
             // when
             interviewWriter.completeReport(sessionId, llmReport);
@@ -691,7 +691,7 @@ class InterviewWriterTest {
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(
-                    sessionId, new LlmInterviewReport(List.of(), "Средняя", "фидбэк", null)))
+                    sessionId, new LlmInterviewReport(List.of(), "Средняя", "фидбэк", null, null)))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
         }
@@ -707,7 +707,7 @@ class InterviewWriterTest {
 
             // when / then
             assertThatThrownBy(() -> interviewWriter.completeReport(
-                    sessionId, new LlmInterviewReport(List.of(), "Средняя", OVERALL_FEEDBACK, null)))
+                    sessionId, new LlmInterviewReport(List.of(), "Средняя", OVERALL_FEEDBACK, null, null)))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
         }

@@ -1,6 +1,6 @@
 import type { FormEvent, KeyboardEvent } from 'react'
 import { useId, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +21,10 @@ import { trainingErrorMessage } from '@/features/training/errors'
 import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
 import { usePageTitle } from '@/lib/usePageTitle'
+
+const LEVEL_CODES = ['JUNIOR', 'MIDDLE', 'SENIOR']
+
+const fromQuery = (value: string | null) => (value ?? '').slice(0, 100)
 
 const pillClass = (selected: boolean) =>
   cn(
@@ -268,10 +272,16 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
   const navigate = useNavigate()
   const create = useCreateSession()
   const normalize = useNormalizeInput()
+  const [searchParams] = useSearchParams()
 
-  const [profession, setProfession] = useState('')
-  const [topic, setTopic] = useState('')
-  const [level, setLevel] = useState<string | null>(null)
+  const [profession, setProfession] = useState(
+    fromQuery(searchParams.get('profession')),
+  )
+  const [topic, setTopic] = useState(fromQuery(searchParams.get('skill')))
+  const [level, setLevel] = useState<string | null>(
+    options.levels[LEVEL_CODES.indexOf(searchParams.get('level') ?? '')] ??
+      null,
+  )
   const [checked, setChecked] = useState<NormalizeInputResponse | null>(null)
 
   const professionQuery = useDebounced(profession.trim())

@@ -6,16 +6,10 @@ import {
 } from './api'
 
 const keys = {
-  sessions: ['interview', 'sessions'] as const,
   session: (id: string) => ['interview', 'session', id] as const,
   report: (id: string) => ['interview', 'report', id] as const,
-}
-
-export function useInterviewSessions() {
-  return useQuery({
-    queryKey: keys.sessions,
-    queryFn: interviewApi.listSessions,
-  })
+  vacancies: ['interview', 'vacancies'] as const,
+  vacancy: (id: string) => ['interview', 'vacancy', id] as const,
 }
 
 export function useInterviewSession(sessionId: string) {
@@ -33,12 +27,30 @@ export function useInterviewReport(sessionId: string, enabled = true) {
   })
 }
 
+export function useInterviewVacancies() {
+  return useQuery({
+    queryKey: keys.vacancies,
+    queryFn: interviewApi.listVacancies,
+  })
+}
+
+export function useInterviewVacancy(vacancyId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.vacancy(vacancyId),
+    queryFn: () => interviewApi.getVacancy(vacancyId),
+    enabled,
+  })
+}
+
 export function useCreateInterview() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateInterviewRequest) =>
       interviewApi.createSession(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.vacancies })
+      qc.invalidateQueries({ queryKey: ['interview', 'vacancy'] })
+    },
   })
 }
 
@@ -54,16 +66,20 @@ export function useFinishInterview() {
     mutationFn: (sessionId: string) => interviewApi.finishSession(sessionId),
     onSuccess: (report, sessionId) => {
       qc.setQueryData(keys.report(sessionId), report)
-      qc.invalidateQueries({ queryKey: keys.sessions })
       qc.invalidateQueries({ queryKey: keys.session(sessionId) })
+      qc.invalidateQueries({ queryKey: keys.vacancies })
+      qc.invalidateQueries({ queryKey: ['interview', 'vacancy'] })
     },
   })
 }
 
-export function useDeleteInterview() {
+export function useDeleteInterviewVacancy() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (sessionId: string) => interviewApi.deleteSession(sessionId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
+    mutationFn: (vacancyId: string) => interviewApi.deleteVacancy(vacancyId),
+    onSuccess: (_, vacancyId) => {
+      qc.removeQueries({ queryKey: keys.vacancy(vacancyId) })
+      qc.invalidateQueries({ queryKey: keys.vacancies })
+    },
   })
 }

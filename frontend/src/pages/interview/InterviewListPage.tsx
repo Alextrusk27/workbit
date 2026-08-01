@@ -1,44 +1,44 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
-import { StatusTag } from '@/components/app/StatusTag'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import type { InterviewSession, SessionStatus } from '@/features/interview/api'
+import type { InterviewVacancy } from '@/features/interview/api'
 import {
-  sessionHeadline,
-  sessionSubtitle,
+  OFFER_TONE,
   STATUS_LABELS,
+  timesWord,
+  VACANCY_STATUS_LABELS,
 } from '@/features/interview/labels'
-import {
-  useDeleteInterview,
-  useInterviewReport,
-  useInterviewSessions,
-} from '@/features/interview/useInterview'
-import type { VacancyStatus } from '@/features/vacancy/api'
+import { useInterviewVacancies } from '@/features/interview/useInterview'
 import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { usePageTitle } from '@/lib/usePageTitle'
 
-type StatusFilter = 'ALL' | SessionStatus
+type StatusFilter = 'ALL' | 'PENDING' | 'COMPLETED'
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'ALL', label: 'Все' },
-  { key: 'CREATED', label: STATUS_LABELS.CREATED },
-  { key: 'IN_PROGRESS', label: STATUS_LABELS.IN_PROGRESS },
+  { key: 'PENDING', label: STATUS_LABELS.IN_PROGRESS },
   { key: 'COMPLETED', label: STATUS_LABELS.COMPLETED },
 ]
 
-const VACANCY_STATUS_LABELS: Record<VacancyStatus, string> = {
-  ACTIVE: 'активна',
-  ARCHIVED: 'в архиве',
-  NOT_FOUND: 'удалена',
+function matches(vacancy: InterviewVacancy, filter: StatusFilter): boolean {
+  if (filter === 'ALL') return true
+  const completed = vacancy.status === 'COMPLETED'
+  return filter === 'COMPLETED' ? completed : !completed
 }
+
+const OFFER_INLINE_CLASS = {
+  low: 'text-ink',
+  mid: 'text-indigo',
+  high: 'text-ok',
+} as const
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -48,9 +48,13 @@ function formatDate(iso: string): string {
   })
 }
 
+function formatScore(score: number): string {
+  return score.toFixed(1).replace('.', ',')
+}
+
 export function InterviewListPage() {
   usePageTitle('Интервью')
-  const { data: sessions, isLoading, isError, error } = useInterviewSessions()
+  const { data: vacancies, isLoading, isError, error } = useInterviewVacancies()
 
   return (
     <Container>
@@ -66,24 +70,23 @@ export function InterviewListPage() {
       />
 
       <div className="mt-8">
-        {isLoading && <SessionListSkeleton />}
+        {isLoading && <VacancyListSkeleton />}
 
         {isError && <Alert>{getErrorMessage(error)}</Alert>}
 
-        {sessions && sessions.length === 0 && <EmptyState />}
+        {vacancies && vacancies.length === 0 && <EmptyState />}
 
-        {sessions && sessions.length > 0 && (
-          <SessionBrowser sessions={sessions} />
+        {vacancies && vacancies.length > 0 && (
+          <VacancyBrowser vacancies={vacancies} />
         )}
       </div>
     </Container>
   )
 }
 
-function SessionBrowser({ sessions }: { sessions: InterviewSession[] }) {
+function VacancyBrowser({ vacancies }: { vacancies: InterviewVacancy[] }) {
   const [status, setStatus] = useState<StatusFilter>('ALL')
-  const shown =
-    status === 'ALL' ? sessions : sessions.filter((s) => s.status === status)
+  const shown = vacancies.filter((v) => matches(v, status))
 
   return (
     <div>
@@ -93,11 +96,7 @@ function SessionBrowser({ sessions }: { sessions: InterviewSession[] }) {
             key={f.key}
             selected={f.key === status}
             onClick={() => setStatus(f.key)}
-            count={
-              f.key === 'ALL'
-                ? sessions.length
-                : sessions.filter((s) => s.status === f.key).length
-            }
+            count={vacancies.filter((v) => matches(v, f.key)).length}
           >
             {f.label}
           </Chip>
@@ -111,8 +110,8 @@ function SessionBrowser({ sessions }: { sessions: InterviewSession[] }) {
           </p>
         ) : (
           <ul key={status} className="flex flex-col gap-4">
-            {shown.map((s) => (
-              <SessionCard key={s.id} session={s} />
+            {shown.map((v) => (
+              <VacancyCard key={v.vacancyId} vacancy={v} />
             ))}
           </ul>
         )}
@@ -121,7 +120,7 @@ function SessionBrowser({ sessions }: { sessions: InterviewSession[] }) {
   )
 }
 
-function SessionListSkeleton() {
+function VacancyListSkeleton() {
   return (
     <div role="status" className="flex flex-col gap-4">
       <span className="sr-only">Загрузка списка интервью…</span>
@@ -154,104 +153,94 @@ function EmptyState() {
   )
 }
 
-function VacancyLine({ session }: { session: InterviewSession }) {
-  const { data } = useVacancyStatus(session.vacancyUrl)
-  if (!session.vacancyUrl) return null
+function VacancyLine({ vacancy }: { vacancy: InterviewVacancy }) {
+  const { data } = useVacancyStatus(vacancy.vacancyUrl)
+  if (!vacancy.vacancyUrl) return null
   return (
     <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px]">
       <a
-        href={session.vacancyUrl}
+        href={vacancy.vacancyUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="text-indigo hover:text-violet transition-colors"
       >
         Вакансия на hh.ru ↗
       </a>
-      {data && <span>{VACANCY_STATUS_LABELS[data.status]}</span>}
-      {session.experience && <span>Опыт: {session.experience}</span>}
-    </div>
-  )
-}
-
-function CardResult({ sessionId }: { sessionId: string }) {
-  const { data, isLoading } = useInterviewReport(sessionId)
-  if (isLoading) return <Skeleton className="mt-2 h-4 w-40" />
-  if (!data) return null
-  return (
-    <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]">
-      {data.avgScore != null && (
-        <span className="flex items-center gap-2">
-          <Stars value={Math.round(data.avgScore * 2) / 2} />
-          <span className="tabular-nums">
-            {data.avgScore.toFixed(1).replace('.', ',')} из 5
-          </span>
+      {data && (
+        <span
+          className={cn(
+            'font-semibold',
+            data.status === 'ACTIVE' ? 'text-ok' : 'text-danger',
+          )}
+        >
+          {VACANCY_STATUS_LABELS[data.status]}
         </span>
       )}
-      <span>
-        Оффер: <span className="text-ink">{data.offerProbability}</span>
-      </span>
+      {vacancy.experience && <span>Опыт: {vacancy.experience}</span>}
     </div>
   )
 }
 
-function SessionCard({ session }: { session: InterviewSession }) {
-  const del = useDeleteInterview()
-  const completed = session.status === 'COMPLETED'
-  const openHref = completed
-    ? `/app/interview/${session.id}/report`
-    : `/app/interview/${session.id}`
-
-  const onDelete = () => {
-    if (!window.confirm('Удалить это интервью? Действие необратимо.')) return
-    del.mutate(session.id)
-  }
+function VacancyCard({ vacancy }: { vacancy: InterviewVacancy }) {
+  const navigate = useNavigate()
+  const to = `/app/interview/vacancy/${vacancy.vacancyId}`
 
   return (
-    <li className="border-line bg-card hover:border-line-hover flex flex-wrap justify-between gap-5 rounded-xl border px-6 py-5.5 transition-colors">
+    <li
+      className="border-line bg-card hover:border-line-hover cursor-pointer rounded-xl border px-6 py-5.5 transition-colors"
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('a, button')) navigate(to)
+      }}
+    >
       <div className="min-w-0">
         <h2 className="text-ink text-[17px] font-semibold tracking-[-0.01em] break-words">
           <Link
-            to={openHref}
+            to={to}
             className="hover:text-indigo focus-visible:outline-indigo rounded-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            {sessionHeadline(session)}
+            {vacancy.vacancyName}
           </Link>
         </h2>
         <p className="text-muted mt-1 text-[13.5px] break-words">
-          {sessionSubtitle(session)}
+          {vacancy.employer || 'Работодатель не указан'}
         </p>
         <div className="text-dim mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[12.5px]">
-          <StatusTag label={STATUS_LABELS[session.status]} done={completed} />
-          <span className="tabular-nums">
-            {session.answeredCount} / {session.totalQuestions} вопросов отвечено
-          </span>
-          <span>{formatDate(session.created)}</span>
+          {vacancy.bestScore != null && (
+            <span className="flex items-center gap-2">
+              Лучший результат:{' '}
+              <Stars value={Math.round(vacancy.bestScore * 2) / 2} />
+              <span className="text-ink font-semibold tabular-nums">
+                {formatScore(vacancy.bestScore)}
+              </span>
+            </span>
+          )}
+          {vacancy.bestOffer && (
+            <span>
+              Оффер:{' '}
+              <span
+                className={cn(
+                  'font-semibold',
+                  OFFER_INLINE_CLASS[OFFER_TONE[vacancy.bestOffer]],
+                )}
+              >
+                {vacancy.bestOffer}
+              </span>
+            </span>
+          )}
+          {vacancy.completedCount > 0 && (
+            <span>
+              Пройдено: {vacancy.completedCount}{' '}
+              {timesWord(vacancy.completedCount)}
+            </span>
+          )}
+          <span>{formatDate(vacancy.lastActivity)}</span>
         </div>
-        <VacancyLine session={session} />
-        {completed ? (
-          <CardResult sessionId={session.id} />
-        ) : (
+        <VacancyLine vacancy={vacancy} />
+        {vacancy.bestScore == null && (
           <p className="text-dim mt-2 text-[12.5px] italic">
             Завершите интервью и узнайте оценку и шансы на оффер
           </p>
         )}
-      </div>
-
-      <div className="flex flex-col items-center justify-center gap-2.5">
-        <Link
-          to={openHref}
-          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-        >
-          {completed ? 'Разбор' : 'Продолжить'}
-        </Link>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={del.isPending}
-          className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
-        >
-          Удалить
-        </button>
       </div>
     </li>
   )

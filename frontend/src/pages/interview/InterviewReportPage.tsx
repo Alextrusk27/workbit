@@ -8,7 +8,7 @@ import {
   useInterviewReport,
   useInterviewSession,
 } from '@/features/interview/useInterview'
-import { sessionSubtitle } from '@/features/interview/labels'
+import { sessionSubtitle, trainingLevelCode } from '@/features/interview/labels'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { CaseEntry, ReportSummary } from './reportParts'
@@ -54,10 +54,20 @@ export function InterviewReportPage() {
     .filter(Boolean)
     .join(' · ')
 
+  const backTo = session
+    ? `/app/interview/vacancy/${session.vacancyId}`
+    : '/app/interview'
+
+  const trainingParams = new URLSearchParams({
+    skill: report.weakestSkill ?? '',
+    level: trainingLevelCode(session?.experience ?? null),
+  })
+  if (session) trainingParams.set('profession', session.vacancyName)
+
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app/interview', label: 'Интервью' }}
+        back={{ to: backTo, label: session ? 'Вакансия' : 'Мои интервью' }}
         eyebrow="Разбор интервью"
         title={session?.vacancyName ?? 'Интервью по вакансии'}
       >
@@ -70,6 +80,8 @@ export function InterviewReportPage() {
           offerProbability={report.offerProbability}
           overallFeedback={report.overallFeedback}
           recommendations={report.recommendations}
+          weakestSkill={report.weakestSkill}
+          trainingTo={`/app/training/new?${trainingParams}`}
           answeredCount={report.questions.length}
         />
       </div>
@@ -91,11 +103,8 @@ export function InterviewReportPage() {
       </div>
 
       <div className="mt-12 flex flex-wrap gap-3.5">
-        <Link
-          to="/app/interview"
-          className={buttonClasses({ variant: 'secondary' })}
-        >
-          К списку интервью
+        <Link to={backTo} className={buttonClasses({ variant: 'secondary' })}>
+          {session ? 'К вакансии' : 'К списку интервью'}
         </Link>
         <Link to="/app/interview/new" className={buttonClasses()}>
           Новое интервью

@@ -8,6 +8,7 @@ export interface CreateInterviewRequest {
 
 export interface InterviewSession {
   id: string
+  vacancyId: string
   vacancyName: string
   employer: string
   vacancyUrl: string | null
@@ -40,6 +41,7 @@ export interface InterviewReport {
   offerProbability: OfferProbability
   overallFeedback: string
   recommendations: string | null
+  weakestSkill: string | null
   generatedAt: string
   questions: InterviewQuestion[]
 }
@@ -48,6 +50,48 @@ export interface SubmitAnswerVars {
   sessionId: string
   questionId: string
   answerText: string
+}
+
+export interface InterviewVacancy {
+  vacancyId: string
+  vacancyName: string
+  employer: string
+  vacancyUrl: string | null
+  experience: string | null
+  status: SessionStatus
+  completedCount: number
+  bestScore: number | null
+  bestOffer: OfferProbability | null
+  lastActivity: string
+}
+
+export interface InterviewAttempt {
+  sessionId: string
+  status: SessionStatus
+  created: string
+  completedAt: string | null
+  avgScore: number | null
+  offerProbability: OfferProbability | null
+}
+
+export interface RecommendedTraining {
+  skill: string
+  interviewScore: number | null
+  trainingSessionId: string | null
+  trainingStatus: SessionStatus | null
+  trainingScore: number | null
+  answeredCount: number | null
+  totalQuestions: number | null
+}
+
+export interface InterviewVacancyDetail {
+  vacancyId: string
+  vacancyName: string
+  employer: string
+  vacancyUrl: string | null
+  experience: string | null
+  interviews: InterviewAttempt[]
+  recommendedTrainings: RecommendedTraining[]
 }
 
 const BASE = '/interview'
@@ -86,4 +130,12 @@ export const interviewApi = {
 
   deleteSession: (sessionId: string) =>
     apiFetch<void>(`${BASE}/sessions/${sessionId}`, { method: 'DELETE' }),
+
+  listVacancies: () => apiFetch<InterviewVacancy[]>(`${BASE}/vacancies`),
+
+  getVacancy: (vacancyId: string) =>
+    apiFetch<InterviewVacancyDetail>(`${BASE}/vacancies/${vacancyId}`),
+
+  deleteVacancy: (vacancyId: string) =>
+    apiFetch<void>(`${BASE}/vacancies/${vacancyId}`, { method: 'DELETE' }),
 }

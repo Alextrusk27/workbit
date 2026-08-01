@@ -6,6 +6,7 @@ public record LlmInterviewReport(
         List<LlmInterviewAnswerReview> answers,
         String offerProbability,
         String overallFeedback,
-        String recommendations
+        String recommendations,
+        String weakestSkill
 ) {
 }

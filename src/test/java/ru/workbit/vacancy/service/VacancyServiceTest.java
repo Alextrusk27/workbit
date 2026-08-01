@@ -74,7 +74,7 @@ class VacancyServiceTest {
             when(vacancySnapshotRepository.findById(id)).thenReturn(Optional.of(snapshot));
 
             VacancySnapshotView expectedView = new VacancySnapshotView(
-                    "Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет");
+                    "123", "Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет");
             when(vacancyMapper.toSnapshotView(snapshot)).thenReturn(expectedView);
 
             // when
@@ -115,8 +115,8 @@ class VacancyServiceTest {
             when(vacancySnapshotRepository.findAllById(List.of(id1, id2)))
                     .thenReturn(List.of(snapshot1, snapshot2));
 
-            VacancySnapshotView view1 = new VacancySnapshotView("Java-разработчик", "ООО Ромашка", "url1", "level1");
-            VacancySnapshotView view2 = new VacancySnapshotView("Python-разработчик", "ООО Лютик", "url2", "level2");
+            VacancySnapshotView view1 = new VacancySnapshotView("1", "Java-разработчик", "ООО Ромашка", "url1", "level1");
+            VacancySnapshotView view2 = new VacancySnapshotView("2", "Python-разработчик", "ООО Лютик", "url2", "level2");
             when(vacancyMapper.toSnapshotView(snapshot1)).thenReturn(view1);
             when(vacancyMapper.toSnapshotView(snapshot2)).thenReturn(view2);
 

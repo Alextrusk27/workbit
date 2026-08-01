@@ -37,6 +37,7 @@ import ru.workbit.training.dto.TrainingOptionsResponse;
 import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.dto.TrainingTopicMatch;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
@@ -47,6 +48,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingFollowUp;
 import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
 import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
@@ -71,6 +73,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -987,6 +990,99 @@ class TrainingServiceTest {
     }
 
     @Nested
+    @DisplayName("FindLatestByTopics")
+    class FindLatestByTopics {
+
+        private final UUID userId = UUID.randomUUID();
+
+        private TrainingSession sessionWithTopic(UUID id, String topic, TrainingReport report) {
+            return TrainingSession.builder()
+                    .id(id)
+                    .userId(userId)
+                    .profession(PROFESSION)
+                    .topic(topic)
+                    .level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.COMPLETED)
+                    .report(report)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("По каждой теме возвращает метрики последней сессии")
+        void returnsMatchForEachTopicWithCounts() {
+            // given
+            UUID springSessionId = UUID.randomUUID();
+            UUID javaSessionId = UUID.randomUUID();
+            TrainingReport report = TrainingReport.builder().avgScore(4.5).build();
+            TrainingSession springSession = sessionWithTopic(springSessionId, "Spring Boot", report);
+            TrainingSession javaSession = sessionWithTopic(javaSessionId, "Java Core", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot", "java core")))
+                    .thenReturn(List.of(springSession, javaSession));
+
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(springSessionId))
+                    .thenReturn(7L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(springSessionId))
+                    .thenReturn(10L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(javaSessionId))
+                    .thenReturn(0L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(javaSessionId))
+                    .thenReturn(10L);
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot", "java core"));
+
+            // then
+            assertThat(result).containsExactlyInAnyOrder(
+                    new TrainingTopicMatch(springSessionId, "Spring Boot", TrainingSession.Status.COMPLETED, 4.5, 7, 10),
+                    new TrainingTopicMatch(javaSessionId, "Java Core", TrainingSession.Status.COMPLETED, null, 0, 10));
+        }
+
+        @Test
+        @DisplayName("Несколько сессий с одинаковой темой в разном регистре - берётся первая (последняя по времени), для второй счётчики не считаются")
+        void deduplicatesByLoweredTopicKeepingFirstOccurrence() {
+            // given
+            UUID latestSessionId = UUID.randomUUID();
+            UUID olderSessionId = UUID.randomUUID();
+            TrainingReport latestReport = TrainingReport.builder().avgScore(5.0).build();
+            TrainingSession latestSession = sessionWithTopic(latestSessionId, "SPRING BOOT", latestReport);
+            TrainingSession olderSession = sessionWithTopic(olderSessionId, "spring boot", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot")))
+                    .thenReturn(List.of(latestSession, olderSession));
+
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(latestSessionId))
+                    .thenReturn(4L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(latestSessionId))
+                    .thenReturn(10L);
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot"));
+
+            // then
+            assertThat(result).containsExactly(
+                    new TrainingTopicMatch(latestSessionId, "SPRING BOOT", TrainingSession.Status.COMPLETED, 5.0, 4, 10));
+            verify(trainingQuestionRepository, never())
+                    .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(olderSessionId);
+            verify(trainingQuestionRepository, never())
+                    .countByTrainingSessionIdAndFollowUpFalse(olderSessionId);
+        }
+
+        @Test
+        @DisplayName("Нет сессий по темам - пустой список, счётчики не запрашиваются")
+        void returnsEmptyListWhenNoSessionsMatch() {
+            // given
+            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("несуществующая тема")))
+                    .thenReturn(List.of());
+
+            // when
+            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("несуществующая тема"));
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(trainingQuestionRepository);
+        }
+    }
+
+    @Nested
     @DisplayName("GetOptions")
     class GetOptions {
 
@@ -1598,6 +1694,18 @@ class TrainingServiceTest {
     @DisplayName("CreateReport")
     class CreateReport {
 
+        private LlmTrainingReport usableReport(int casesCount) {
+            return new LlmTrainingReport(
+                    IntStream.rangeClosed(1, casesCount)
+                            .mapToObj(i -> new LlmTrainingCaseReview(i, "Хороший ответ по кейсу " + i, 4))
+                            .toList(),
+                    "Итоговый фидбэк по тренировке");
+        }
+
+        private LlmTrainingReport degenerateReport(String overallFeedback) {
+            return new LlmTrainingReport(List.of(), overallFeedback);
+        }
+
         @Test
         @DisplayName("Передаёт profession сессии как есть в LlmTrainingReportRequest")
         void passesSessionProfessionAsIsToLlmRequest() {
@@ -1608,7 +1716,7 @@ class TrainingServiceTest {
             session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmTrainingReport llmReport = new LlmTrainingReport(List.of(), "Общий фидбэк по тренировке");
+            LlmTrainingReport llmReport = usableReport(3);
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
@@ -1686,7 +1794,7 @@ class TrainingServiceTest {
             session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            LlmTrainingReport llmReport = new LlmTrainingReport(List.of(), "Общий фидбэк по тренировке");
+            LlmTrainingReport llmReport = usableReport(3);
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
             when(trainingWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("session already completed concurrently"));
@@ -1695,6 +1803,84 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM - вырожденный шаблон-заглушка - ретрай возвращает пригодный отчёт, LLM вызван дважды с одинаковым request")
+        void retriesReportWhenFirstResponseIsDegenerateTemplate() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport degenerateReport = degenerateReport("string");
+            LlmTrainingReport usableReport = usableReport(3);
+            when(llmService.createTrainingReport(any())).thenReturn(degenerateReport, usableReport);
+
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            ArgumentCaptor<LlmTrainingReportRequest> captor = ArgumentCaptor.forClass(LlmTrainingReportRequest.class);
+            verify(llmService, times(2)).createTrainingReport(captor.capture());
+            assertThat(captor.getAllValues()).hasSize(2);
+            assertThat(captor.getAllValues().get(0)).isEqualTo(captor.getAllValues().get(1));
+            verify(trainingWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Первый ответ LLM пригодный - ретрай не требуется, ровно один вызов")
+        void doesNotRetryWhenFirstResponseIsUsable() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport usableReport = usableReport(3);
+            when(llmService.createTrainingReport(any())).thenReturn(usableReport);
+
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(1)).createTrainingReport(any());
+            verify(trainingWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Оба ответа LLM вырожденные - вызван дважды (не больше), writer-у уходит второй ответ")
+        void delegatesSecondDegenerateResponseWhenBothAttemptsAreDegenerate() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            LlmTrainingReport firstDegenerate = degenerateReport("string");
+            LlmTrainingReport secondDegenerate = degenerateReport("string2");
+            when(llmService.createTrainingReport(any())).thenReturn(firstDegenerate, secondDegenerate);
+            when(trainingWriter.completeReport(sessionId, secondDegenerate))
+                    .thenThrow(new LlmException("Training report has no usable overall feedback"));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(LlmException.class);
+            verify(llmService, times(2)).createTrainingReport(any());
+            verify(trainingWriter).completeReport(sessionId, secondDegenerate);
         }
     }
 

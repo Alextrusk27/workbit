@@ -9,6 +9,8 @@ export function interviewCreateErrorMessage(error: unknown): string {
       return 'Вакансия не найдена или снята с публикации. Проверьте ссылку.'
     if (error.status === 400)
       return 'Ссылка не похожа на вакансию hh.ru. Проверьте адрес.'
+    if (error.status === 409)
+      return 'По этой вакансии уже есть незавершённое интервью. Завершите его, прежде чем начинать новое.'
     if (error.status === 503)
       return 'Сервис временно недоступен — попробуйте ещё раз чуть позже.'
   }

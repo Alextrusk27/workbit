@@ -17,6 +17,7 @@ import ru.workbit.vacancy.repository.VacancySnapshotRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,6 +73,14 @@ public class VacancyService {
     public Map<UUID, VacancySnapshotView> getSnapshotViews(Collection<UUID> ids) {
         return vacancySnapshotRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(VacancySnapshot::getId, vacancyMapper::toSnapshotView));
+    }
+
+    public List<UUID> getSnapshotIds(String sourceId) {
+        return vacancySnapshotRepository.findIdsBySourceId(sourceId);
+    }
+
+    public void deleteSnapshots(Collection<UUID> ids) {
+        vacancySnapshotRepository.deleteAllByIdInBatch(ids);
     }
 
     private HhVacancyResponse getActiveVacancy(String vacancyId) {

@@ -176,10 +176,10 @@ function SessionRun({ session }: { session: InterviewSession }) {
   return (
     <Container>
       <Link
-        to="/app/interview"
+        to={`/app/interview/vacancy/${session.vacancyId}`}
         className="text-indigo hover:text-violet mb-7 inline-block text-sm transition-colors"
       >
-        ← Интервью
+        ← Вакансия
       </Link>
 
       <div className="flex items-baseline justify-between gap-4">

@@ -38,9 +38,9 @@ class LlmServiceTest {
     private static Stream<Arguments> experienceGrades() {
         return Stream.of(
                 Arguments.of("Нет опыта", "noexp"),
-                Arguments.of("От 3 до 6 лет", "middle"),
+                Arguments.of("От 1 года до 3 лет", "middle"),
+                Arguments.of("От 3 до 6 лет", "senior"),
                 Arguments.of("Более 6 лет", "senior"),
-                Arguments.of("От 1 года до 3 лет", "junior"),
                 Arguments.of("", "junior"),
                 Arguments.of(null, "junior"),
                 Arguments.of("Неизвестная категория опыта", "junior")
@@ -173,7 +173,7 @@ class LlmServiceTest {
         void routesByExperienceGradeAndWrapsRequestAsJsonString(String experience, String expectedSuffix) {
             // given
             var request = new LlmInterviewReportRequest("Java-разработчик", experience, List.of());
-            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы");
+            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы", null);
             when(llm.call(anyString(), any(), eq(LlmInterviewReport.class))).thenReturn(expected);
 
             // when

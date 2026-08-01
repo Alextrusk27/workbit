@@ -21,11 +21,14 @@ import ru.workbit.interview.dto.CreateInterviewSessionRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
+import ru.workbit.interview.dto.InterviewVacancyDetailResponse;
+import ru.workbit.interview.dto.InterviewVacancyResponse;
 import ru.workbit.interview.dto.SubmitAnswerBody;
 import ru.workbit.interview.dto.SubmitAnswerRequest;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.interview.service.InterviewService;
+import ru.workbit.interview.service.InterviewVacancyService;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
@@ -68,6 +71,9 @@ class InterviewControllerTest {
     @MockitoBean
     InterviewService interviewService;
 
+    @MockitoBean
+    InterviewVacancyService interviewVacancyService;
+
     // JWTAuthFilter-зависимости: нужны, чтобы SecurityConfig мог создать фильтр
     @MockitoBean
     JWTService jwtService;
@@ -81,7 +87,7 @@ class InterviewControllerTest {
 
     private InterviewSessionResponse sessionResponse(UUID sessionId) {
         return new InterviewSessionResponse(
-                sessionId, "Java-разработчик", "ООО Ромашка", VACANCY_URL, "От 1 года до 3 лет",
+                sessionId, "123456", "Java-разработчик", "ООО Ромашка", VACANCY_URL, "От 1 года до 3 лет",
                 InterviewSession.Status.IN_PROGRESS, 3, 10, Instant.now(), null);
     }
 
@@ -93,7 +99,19 @@ class InterviewControllerTest {
     private InterviewReportResponse reportResponse(UUID sessionId, String recommendations) {
         return new InterviewReportResponse(
                 UUID.randomUUID(), sessionId, 3.8, InterviewReport.OfferProbability.MEDIUM,
-                "Хороший кандидат, есть пробелы в индексах", recommendations, Instant.now(), List.of());
+                "Хороший кандидат, есть пробелы в индексах", recommendations, null, Instant.now(), List.of());
+    }
+
+    private InterviewVacancyResponse vacancyResponse(String vacancyId) {
+        return new InterviewVacancyResponse(
+                vacancyId, "Java-разработчик", "ООО Ромашка", VACANCY_URL, "От 1 года до 3 лет",
+                InterviewSession.Status.COMPLETED, 2, 4.0, InterviewReport.OfferProbability.HIGH, Instant.now());
+    }
+
+    private InterviewVacancyDetailResponse vacancyDetailResponse(String vacancyId) {
+        return new InterviewVacancyDetailResponse(
+                vacancyId, "Java-разработчик", "ООО Ромашка", VACANCY_URL, "От 1 года до 3 лет",
+                List.of(), List.of());
     }
 
     // -------------------------------------------------------------------------
@@ -690,6 +708,136 @@ class InterviewControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(interviewService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /vacancies
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetAllVacancies")
+    class GetAllVacancies {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком вакансий пользователя")
+        void returns200WithVacancies() throws Exception {
+            // given
+            when(interviewVacancyService.getAll(USER_ID)).thenReturn(List.of(vacancyResponse("123456")));
+
+            // when / then
+            mvc.perform(get(BASE + "/vacancies")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$[0].vacancyId").value("123456"))
+                    .andExpect(jsonPath("$[0].bestOffer").value("Высокая"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/vacancies"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(interviewVacancyService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /vacancies/{vacancyId}
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetVacancy")
+    class GetVacancy {
+
+        @Test
+        @DisplayName("Возвращает 200 с деталями вакансии")
+        void returns200WithVacancy() throws Exception {
+            // given
+            var vacancyId = "123456";
+            when(interviewVacancyService.get(vacancyId, USER_ID)).thenReturn(vacancyDetailResponse(vacancyId));
+
+            // when / then
+            mvc.perform(get(BASE + "/vacancies/" + vacancyId)
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.vacancyId").value(vacancyId))
+                    .andExpect(jsonPath("$.vacancyName").value("Java-разработчик"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда у пользователя нет интервью по вакансии")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var vacancyId = "123456";
+            when(interviewVacancyService.get(vacancyId, USER_ID)).thenThrow(new NotFoundException("Vacancy not found"));
+
+            // when / then
+            mvc.perform(get(BASE + "/vacancies/" + vacancyId)
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Vacancy not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/vacancies/123456"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(interviewVacancyService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DELETE /vacancies/{vacancyId}
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("DeleteVacancy")
+    class DeleteVacancy {
+
+        @Test
+        @DisplayName("Возвращает 204 и передаёт в сервис vacancyId и userId")
+        void returns204AndDeletesVacancy() throws Exception {
+            // given
+            var vacancyId = "123456";
+
+            // when / then
+            mvc.perform(delete(BASE + "/vacancies/" + vacancyId)
+                            .with(user(principal())))
+                    .andExpect(status().isNoContent());
+
+            verify(interviewVacancyService).delete(vacancyId, USER_ID);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда у пользователя нет интервью по вакансии")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var vacancyId = "123456";
+            doThrow(new NotFoundException("Vacancy not found"))
+                    .when(interviewVacancyService).delete(vacancyId, USER_ID);
+
+            // when / then
+            mvc.perform(delete(BASE + "/vacancies/" + vacancyId)
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Vacancy not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then
+            mvc.perform(delete(BASE + "/vacancies/123456"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(interviewVacancyService);
         }
     }
 }

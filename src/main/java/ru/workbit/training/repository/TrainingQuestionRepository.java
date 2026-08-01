@@ -19,6 +19,8 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
 
     long countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(UUID trainingSessionId);
 
+    long countByTrainingSessionIdAndFollowUpFalse(UUID trainingSessionId);
+
     long countByParentQuestionId(UUID parentQuestionId);
 
     @Query("""

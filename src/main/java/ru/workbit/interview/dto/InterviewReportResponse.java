@@ -26,6 +26,10 @@ public record InterviewReportResponse(
         @Schema(description = "Рекомендации, что проработать перед реальным собеседованием; может отсутствовать")
         String recommendations,
 
+        @Schema(description = "Самый слабый навык по итогам интервью — название темы для тренировки; может отсутствовать",
+                example = "Многопоточность")
+        String weakestSkill,
+
         @Schema(description = "Момент формирования отчёта")
         Instant generatedAt,
 

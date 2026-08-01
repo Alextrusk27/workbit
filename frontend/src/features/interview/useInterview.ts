@@ -34,10 +34,11 @@ export function useInterviewVacancies() {
   })
 }
 
-export function useInterviewVacancy(vacancyId: string) {
+export function useInterviewVacancy(vacancyId: string, enabled = true) {
   return useQuery({
     queryKey: keys.vacancy(vacancyId),
     queryFn: () => interviewApi.getVacancy(vacancyId),
+    enabled,
   })
 }
 

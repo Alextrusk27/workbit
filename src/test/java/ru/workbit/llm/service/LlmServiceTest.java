@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.dto.*;
+import ru.workbit.training.model.TrainingSession;
 
 import java.util.List;
 import java.util.Map;
@@ -51,42 +53,24 @@ class LlmServiceTest {
     @DisplayName("GenerateTrainingQuestions")
     class GenerateTrainingQuestions {
 
-        @Test
-        @DisplayName("Вызывает агента training-question-generator без грейда, с запросом как есть")
-        void callsTrainingQuestionGeneratorAgent() {
+        @ParameterizedTest(name = "уровень {0}")
+        @EnumSource(TrainingSession.Level.class)
+        @DisplayName("Роутит вызов на агента training-question-generator-{грейд} по уровню сессии")
+        void routesByLevelGrade(TrainingSession.Level level) {
             // given
-            var request = new LlmTrainingQuestionsRequest("Java-разработчик", null, "middle", 5, List.of());
+            var grade = level.getGrade();
+            var request = new LlmTrainingQuestionsRequest("Spring Boot", "Java-разработчик", 5, List.of());
             var expected = new LlmTrainingQuestions(List.of("Что такое JVM?"));
-            when(llm.call(eq("training-question-generator"), eq(request), eq(LlmTrainingQuestions.class)))
-                    .thenReturn(expected);
+            when(llm.call(anyString(), eq(request), eq(LlmTrainingQuestions.class))).thenReturn(expected);
 
             // when
-            var result = llmService.generateTrainingQuestions(request);
+            var result = llmService.generateTrainingQuestions(grade, request);
 
             // then
             assertThat(result).isEqualTo(expected);
-        }
-    }
-
-    @Nested
-    @DisplayName("DecideTrainingFollowUp")
-    class DecideTrainingFollowUp {
-
-        @Test
-        @DisplayName("Вызывает агента training-follow-up без грейда, с запросом как есть")
-        void callsTrainingFollowUpAgent() {
-            // given
-            var request = new LlmTrainingFollowUpRequest(
-                    "Java-разработчик", "middle", "Что такое JVM?", "Виртуальная машина", List.of());
-            var expected = new LlmTrainingFollowUpDecision(true, "А что такое сборка мусора?");
-            when(llm.call(eq("training-follow-up"), eq(request), eq(LlmTrainingFollowUpDecision.class)))
-                    .thenReturn(expected);
-
-            // when
-            var result = llmService.decideTrainingFollowUp(request);
-
-            // then
-            assertThat(result).isEqualTo(expected);
+            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmTrainingQuestions.class));
+            assertThat(agentKeyCaptor.getValue()).isEqualTo("training-question-generator-" + grade);
         }
     }
 
@@ -98,7 +82,7 @@ class LlmServiceTest {
         @DisplayName("Вызывает агента training-reviewer с запросом одной переменной JSON_STRING, а не полями DTO")
         void callsTrainingReviewerAgentWithJsonStringVariable() {
             // given
-            var request = new LlmTrainingReportRequest("Java-разработчик", "middle", List.of());
+            var request = new LlmTrainingReportRequest("Spring Boot", "Java-разработчик", List.of());
             var expected = new LlmTrainingReport(List.of(), "Хороший результат");
             when(llm.call(eq("training-reviewer"), any(), eq(LlmTrainingReport.class))).thenReturn(expected);
 
@@ -110,6 +94,27 @@ class LlmServiceTest {
             ArgumentCaptor<Object> requestCaptor = ArgumentCaptor.forClass(Object.class);
             verify(llm).call(eq("training-reviewer"), requestCaptor.capture(), eq(LlmTrainingReport.class));
             assertThat(requestCaptor.getValue()).isEqualTo(Map.of("JSON_STRING", request));
+        }
+    }
+
+    @Nested
+    @DisplayName("CreateReferenceAnswer")
+    class CreateReferenceAnswer {
+
+        @Test
+        @DisplayName("Вызывает агента training-reference-answer без грейда, с запросом как есть")
+        void callsTrainingReferenceAnswerAgent() {
+            // given
+            var request = new LlmTrainingReferenceAnswerRequest("Spring Boot", "Java-разработчик", "Что такое JVM?");
+            var expected = new LlmTrainingReferenceAnswer("JVM - виртуальная машина Java, которая выполняет байткод");
+            when(llm.call(eq("training-reference-answer"), eq(request), eq(LlmTrainingReferenceAnswer.class)))
+                    .thenReturn(expected);
+
+            // when
+            var result = llmService.createReferenceAnswer(request);
+
+            // then
+            assertThat(result).isEqualTo(expected);
         }
     }
 
@@ -197,8 +202,8 @@ class LlmServiceTest {
         @DisplayName("Вызывает агента input-normalizer без грейда, с запросом как есть")
         void callsInputNormalizerAgent() {
             // given
-            var request = new LlmInputNormalizationRequest("джавист", "многопоточность");
-            var expected = new LlmInputNormalization(false, List.of("Java-разработчик"), true, List.of(), true);
+            var request = new LlmInputNormalizationRequest("многопоточность", "джавист");
+            var expected = new LlmInputNormalization(true, List.of(), false, List.of("Java-разработчик"), true);
             when(llm.call(eq("input-normalizer"), eq(request), eq(LlmInputNormalization.class)))
                     .thenReturn(expected);
 

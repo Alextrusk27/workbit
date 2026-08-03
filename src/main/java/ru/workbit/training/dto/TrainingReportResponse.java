@@ -14,13 +14,13 @@ public record TrainingReportResponse(
         @Schema(description = "Идентификатор сессии, по которой сформирован отчёт")
         UUID sessionId,
 
-        @Schema(description = "Профессия, по которой проводилось собеседование", example = "Java-разработчик")
+        @Schema(description = "Навык, который тренировался", example = "Spring Boot")
+        String skill,
+
+        @Schema(description = "Профессия, в контексте которой тренировался навык", example = "Java-разработчик")
         String profession,
 
-        @Schema(description = "Тема тренировки, null если не задана", example = "Spring Boot")
-        String topic,
-
-        @Schema(description = "Целевой уровень кандидата", example = "Middle")
+        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
         TrainingSession.Level level,
 
         @Schema(description = "Средний балл по всем оценённым ответам (1.0-5.0)", example = "3.8")

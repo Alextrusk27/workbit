@@ -70,9 +70,12 @@ llm:
     api-key: ${YANDEX_API_KEY}
     log-level: ${LLM_LOG_LEVEL:info}
     agents:
-      training-question-generator: ${TRAINING_QUESTION_GENERATOR}
-      training-follow-up: ${TRAINING_FOLLOW_UP}
+      training-question-generator-noexp: ${TQG_NOEXP}
+      training-question-generator-junior: ${TQG_JUNIOR}
+      training-question-generator-middle: ${TQG_MIDDLE}
+      training-question-generator-senior: ${TQG_SENIOR}
       training-reviewer: ${TRAINING_REVIEWER}
+      training-reference-answer: ${TRAINING_REFERENCE_ANSWER}
       interview-question-generator-noexp: ${IQG_NOEXP}
       interview-question-generator-junior: ${IQG_JUNIOR}
       interview-question-generator-middle: ${IQG_MIDDLE}

@@ -7,16 +7,17 @@ import jakarta.validation.constraints.Size;
 import ru.workbit.training.model.TrainingSession;
 
 public record CreateSessionRequest(
-        @Schema(description = "Профессия, по которой проводится собеседование", example = "Java-разработчик")
+        @Schema(description = "Навык, который тренируется", example = "Spring Boot")
+        @NotBlank
+        @Size(max = 100)
+        String skill,
+
+        @Schema(description = "Профессия, в контексте которой тренируется навык", example = "Java-разработчик")
         @NotBlank
         @Size(max = 100)
         String profession,
 
-        @Schema(description = "Тема тренировки: технология или область знаний, null - общие вопросы по профессии", example = "Spring Boot")
-        @Size(max = 100)
-        String topic,
-
-        @Schema(description = "Целевой уровень кандидата", example = "Middle")
+        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
         @NotNull
         TrainingSession.Level level
 ) {

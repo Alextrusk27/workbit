@@ -8,13 +8,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "topic_dict", schema = "content")
+@Table(name = "skill_dict", schema = "content")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TopicDict {
+public class SkillDict {
     @Id
     @UuidGenerator
     private UUID id;

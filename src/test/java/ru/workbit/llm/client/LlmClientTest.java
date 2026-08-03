@@ -21,9 +21,8 @@ import ru.workbit.exception.LlmException;
 import ru.workbit.llm.config.YandexAiProperties;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
-import ru.workbit.llm.dto.LlmTrainingFollowUp;
-import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
-import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -44,8 +43,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("LlmClientTest")
 class LlmClientTest {
 
-    private static final String FOLLOW_UP_AGENT = "training-follow-up";
-    private static final String FOLLOW_UP_PROMPT_ID = "prompt-training-follow-up";
+    private static final String REFERENCE_ANSWER_AGENT = "training-reference-answer";
+    private static final String REFERENCE_ANSWER_PROMPT_ID = "prompt-training-reference-answer";
     private static final String NORMALIZER_AGENT = "input-normalizer";
     private static final String NORMALIZER_PROMPT_ID = "prompt-input-normalizer";
 
@@ -57,7 +56,7 @@ class LlmClientTest {
     private final YandexAiProperties props = new YandexAiProperties(
             "folder-id",
             "api-key",
-            Map.of(FOLLOW_UP_AGENT, FOLLOW_UP_PROMPT_ID, NORMALIZER_AGENT, NORMALIZER_PROMPT_ID),
+            Map.of(REFERENCE_ANSWER_AGENT, REFERENCE_ANSWER_PROMPT_ID, NORMALIZER_AGENT, NORMALIZER_PROMPT_ID),
             LogLevel.OFF);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -69,13 +68,9 @@ class LlmClientTest {
         when(client.responses()).thenReturn(responseService);
     }
 
-    private LlmTrainingFollowUpRequest followUpRequest() {
-        return new LlmTrainingFollowUpRequest(
-                "Java-разработчик",
-                "middle",
-                "Расскажите про изоляцию транзакций",
-                "Используется уровень READ COMMITTED",
-                List.of(new LlmTrainingFollowUp("Что такое дедлок?", "Взаимная блокировка ресурсов")));
+    private LlmTrainingReferenceAnswerRequest referenceAnswerRequest() {
+        return new LlmTrainingReferenceAnswerRequest(
+                "Транзакции", "Java-разработчик", "Расскажите про изоляцию транзакций");
     }
 
     private static <T> StructuredResponseCreateParams<T> anyParams() {
@@ -107,12 +102,12 @@ class LlmClientTest {
         @DisplayName("Возвращает ответ как есть, если в нём нет CJK-символов")
         void returnsResponseAsIs_whenNoCjk() {
             // given
-            var expected = new LlmTrainingFollowUpDecision(true, "используйте индекс для поиска");
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
             var response = structuredResponseOf(expected);
             doReturn(response).when(responseService).create(anyParams());
 
             // when
-            var result = llmClient.call(FOLLOW_UP_AGENT, followUpRequest(), LlmTrainingFollowUpDecision.class);
+            var result = llmClient.call(REFERENCE_ANSWER_AGENT, referenceAnswerRequest(), LlmTrainingReferenceAnswer.class);
 
             // then
             assertThat(result).isEqualTo(expected);
@@ -123,14 +118,14 @@ class LlmClientTest {
         @DisplayName("Делает один повтор и возвращает его, если первый ответ содержит CJK")
         void retriesOnceAndReturnsRetry_whenFirstResponseHasCjk() {
             // given
-            var dirty = new LlmTrainingFollowUpDecision(true, "нужен 索引 сейчас");
-            var clean = new LlmTrainingFollowUpDecision(true, "нужен индекс сейчас");
+            var dirty = new LlmTrainingReferenceAnswer("нужен 索引 сейчас");
+            var clean = new LlmTrainingReferenceAnswer("нужен индекс сейчас");
             var dirtyResponse = structuredResponseOf(dirty);
             var cleanResponse = structuredResponseOf(clean);
             doReturn(dirtyResponse, cleanResponse).when(responseService).create(anyParams());
 
             // when
-            var result = llmClient.call(FOLLOW_UP_AGENT, followUpRequest(), LlmTrainingFollowUpDecision.class);
+            var result = llmClient.call(REFERENCE_ANSWER_AGENT, referenceAnswerRequest(), LlmTrainingReferenceAnswer.class);
 
             // then
             assertThat(result).isEqualTo(clean);
@@ -141,17 +136,16 @@ class LlmClientTest {
         @DisplayName("Вырезает CJK и схлопывает двойные пробелы, если CJK остаётся после повтора")
         void stripsCjkAndCollapsesSpaces_whenRetryStillHasCjk() {
             // given
-            var dirty = new LlmTrainingFollowUpDecision(true, "используйте 索引 для поиска");
+            var dirty = new LlmTrainingReferenceAnswer("используйте 索引 для поиска");
             var firstResponse = structuredResponseOf(dirty);
             var secondResponse = structuredResponseOf(dirty);
             doReturn(firstResponse, secondResponse).when(responseService).create(anyParams());
 
             // when
-            var result = llmClient.call(FOLLOW_UP_AGENT, followUpRequest(), LlmTrainingFollowUpDecision.class);
+            var result = llmClient.call(REFERENCE_ANSWER_AGENT, referenceAnswerRequest(), LlmTrainingReferenceAnswer.class);
 
             // then
-            assertThat(result.askFollowUp()).isTrue();
-            assertThat(result.question()).isEqualTo("используйте для поиска");
+            assertThat(result.answer()).isEqualTo("используйте для поиска");
             verify(responseService, times(2)).create(anyParams());
         }
 
@@ -159,14 +153,14 @@ class LlmClientTest {
         @DisplayName("Обнаруживает CJK в любом строковом поле DTO, включая элементы вложенного списка")
         void detectsCjk_inAnyStringField() {
             // given
-            var request = new LlmInputNormalizationRequest("java-разработчик", "транзакции");
+            var request = new LlmInputNormalizationRequest("транзакции", "java-разработчик");
             var dirty = new LlmInputNormalization(
-                    true, List.of("бэкенд-разработчик"),
                     false, List.of("транзакции基础", "изоляция"),
+                    true, List.of("бэкенд-разработчик"),
                     true);
             var clean = new LlmInputNormalization(
-                    true, List.of("бэкенд-разработчик"),
                     false, List.of("транзакции", "изоляция"),
+                    true, List.of("бэкенд-разработчик"),
                     true);
             var dirtyResponse = structuredResponseOf(dirty);
             var cleanResponse = structuredResponseOf(clean);
@@ -190,7 +184,7 @@ class LlmClientTest {
             doThrow(serviceException).when(responseService).create(anyParams());
 
             // when / then
-            assertThatThrownBy(() -> llmClient.call(FOLLOW_UP_AGENT, followUpRequest(), LlmTrainingFollowUpDecision.class))
+            assertThatThrownBy(() -> llmClient.call(REFERENCE_ANSWER_AGENT, referenceAnswerRequest(), LlmTrainingReferenceAnswer.class))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM call failed with status 400")
                     .hasCause(serviceException);
@@ -205,7 +199,7 @@ class LlmClientTest {
             doThrow(openAiException).when(responseService).create(anyParams());
 
             // when / then
-            assertThatThrownBy(() -> llmClient.call(FOLLOW_UP_AGENT, followUpRequest(), LlmTrainingFollowUpDecision.class))
+            assertThatThrownBy(() -> llmClient.call(REFERENCE_ANSWER_AGENT, referenceAnswerRequest(), LlmTrainingReferenceAnswer.class))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM call failed")
                     .hasCause(openAiException);

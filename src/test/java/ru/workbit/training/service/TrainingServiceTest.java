@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -20,10 +21,10 @@ import org.springframework.data.domain.Pageable;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.QuestionBankRepository;
-import ru.workbit.content.repository.TopicDictRepository;
+import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
@@ -32,12 +33,13 @@ import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.training.dto.CreateSessionRequest;
 import ru.workbit.training.dto.NormalizeInputRequest;
 import ru.workbit.training.dto.NormalizeInputResponse;
+import ru.workbit.training.dto.ReferenceAnswerResponse;
 import ru.workbit.training.dto.SubmitAnswerRequest;
 import ru.workbit.training.dto.TrainingOptionsResponse;
 import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
-import ru.workbit.training.dto.TrainingTopicMatch;
+import ru.workbit.training.dto.TrainingSkillMatch;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
@@ -49,11 +51,10 @@ import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
-import ru.workbit.llm.dto.LlmTrainingFollowUp;
-import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
-import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestions;
 import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
@@ -83,7 +84,7 @@ import static org.mockito.Mockito.when;
 class TrainingServiceTest {
 
     private static final String PROFESSION = "Java-разработчик";
-    private static final String TOPIC = "Spring Boot";
+    private static final String SKILL = "Spring Boot";
 
     @Mock
     TrainingSessionRepository trainingSessionRepository;
@@ -92,7 +93,7 @@ class TrainingServiceTest {
     @Mock
     ProfessionDictRepository professionDictRepository;
     @Mock
-    TopicDictRepository topicDictRepository;
+    SkillDictRepository skillDictRepository;
     @Mock
     QuestionBankRepository questionBankRepository;
     @Mock
@@ -113,6 +114,7 @@ class TrainingServiceTest {
         return TrainingSession.builder()
                 .id(sessionId)
                 .userId(userId)
+                .skill(SKILL)
                 .profession(profession)
                 .level(TrainingSession.Level.MIDDLE)
                 .status(TrainingSession.Status.CREATED)
@@ -125,7 +127,6 @@ class TrainingServiceTest {
                 .text("Вопрос " + orderIndex)
                 .answerText("Ответ " + orderIndex)
                 .orderIndex(orderIndex)
-                .followUp(false)
                 .answered(true)
                 .build();
     }
@@ -142,12 +143,12 @@ class TrainingServiceTest {
 
         private final UUID userId = UUID.randomUUID();
         private final UUID professionId = UUID.randomUUID();
-        private final UUID topicId = UUID.randomUUID();
+        private final UUID skillId = UUID.randomUUID();
 
-        private TrainingSession mappedEntity(String topic) {
+        private TrainingSession mappedEntity(String skill, String profession) {
             return TrainingSession.builder()
-                    .profession(PROFESSION)
-                    .topic(topic)
+                    .skill(skill)
+                    .profession(profession)
                     .level(TrainingSession.Level.MIDDLE)
                     .build();
         }
@@ -161,30 +162,30 @@ class TrainingServiceTest {
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
         }
 
-        private void stubProfessionAndTopicApproved() {
+        private void stubProfessionAndSkillApproved() {
             stubProfessionApproved();
-            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
                     .thenReturn(true);
         }
 
         @Test
-        @DisplayName("Банк выдал полные 10 вопросов - LLM не вызывается, в writer уходят 10 банковских и пустой список сгенерированных")
+        @DisplayName("Банк выдал полные QUESTION_CAP вопросов - LLM не вызывается, в writer уходят банковские и пустой список сгенерированных")
         void fullBankSkipsLlmGeneration() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -199,26 +200,26 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Банк выдал часть вопросов (7 из 10) - LLM вызывается с count=3 и текстами банковских вопросов")
+        @DisplayName("Банк выдал часть вопросов (7 из 10) - LLM вызывается с count=3, текстами банковских вопросов и грейдом сессии")
         void partialBankRequestsMissingFromLlm() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(7);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             List<String> generated = List.of("Сгенерированный 1", "Сгенерированный 2", "Сгенерированный 3");
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+            when(llmService.generateTrainingQuestions(eq("middle"), any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
 
             // when
@@ -228,15 +229,14 @@ class TrainingServiceTest {
             assertThat(result).isEqualTo(expectedResponse);
 
             verify(questionBankRepository).sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP);
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP);
 
             ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
                     ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
-            verify(llmService).generateTrainingQuestions(captor.capture());
+            verify(llmService).generateTrainingQuestions(eq("middle"), captor.capture());
             LlmTrainingQuestionsRequest llmRequest = captor.getValue();
+            assertThat(llmRequest.skill()).isEqualTo(SKILL);
             assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
-            assertThat(llmRequest.topic()).isEqualTo(TOPIC);
-            assertThat(llmRequest.level()).isEqualTo("Middle");
             assertThat(llmRequest.count()).isEqualTo(3);
             assertThat(llmRequest.existingQuestions())
                     .containsExactlyElementsOf(bank.stream().map(BankQuestion::getText).toList());
@@ -244,28 +244,52 @@ class TrainingServiceTest {
             verify(trainingWriter).createSession(mappedEntity, bank, generated);
         }
 
+        @ParameterizedTest
+        @EnumSource(TrainingSession.Level.class)
+        @DisplayName("Грейд, передаваемый в generateTrainingQuestions, - это getGrade() уровня сессии")
+        void passesSessionLevelGradeToLlm(TrainingSession.Level level) {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, level);
+            TrainingSession mappedEntity = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(level).build();
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            when(questionBankRepository.sampleUnseen(
+                    professionId, skillId, level.name(), userId, TrainingService.QUESTION_CAP))
+                    .thenReturn(List.of());
+            when(llmService.generateTrainingQuestions(anyString(), any()))
+                    .thenReturn(new LlmTrainingQuestions(List.of("Q1", "Q2", "Q3")));
+
+            // when
+            trainingService.create(request, userId);
+
+            // then
+            verify(llmService).generateTrainingQuestions(eq(level.getGrade()), any());
+        }
+
         @Test
-        @DisplayName("Банк пуст - LLM запрашивается на полный батч из 10 вопросов")
+        @DisplayName("Банк пуст - LLM запрашивается на полный батч из QUESTION_CAP вопросов")
         void emptyBankRequestsFullBatch() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(List.of());
 
-            List<String> generated = IntStream.rangeClosed(1, TrainingService.MAIN_QUESTION_CAP)
+            List<String> generated = IntStream.rangeClosed(1, TrainingService.QUESTION_CAP)
                     .mapToObj(i -> "Сгенерированный " + i)
                     .toList();
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, List.of(), generated)).thenReturn(expectedResponse);
 
             // when
@@ -276,8 +300,8 @@ class TrainingServiceTest {
 
             ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
                     ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
-            verify(llmService).generateTrainingQuestions(captor.capture());
-            assertThat(captor.getValue().count()).isEqualTo(TrainingService.MAIN_QUESTION_CAP);
+            verify(llmService).generateTrainingQuestions(eq("middle"), captor.capture());
+            assertThat(captor.getValue().count()).isEqualTo(TrainingService.QUESTION_CAP);
             assertThat(captor.getValue().existingQuestions()).isEmpty();
 
             verify(trainingWriter).createSession(mappedEntity, List.of(), generated);
@@ -287,24 +311,24 @@ class TrainingServiceTest {
         @DisplayName("Ответ LLM с null/blank и лишними строками - фильтруется и обрезается до missing")
         void filtersAndTrimsLlmResponse() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(8);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(
                     Arrays.asList(null, "   ", "Годный вопрос 1", "Годный вопрос 2", "Лишний вопрос 3")));
 
             List<String> expectedGenerated = List.of("Годный вопрос 1", "Годный вопрос 2");
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, expectedGenerated)).thenReturn(expectedResponse);
 
             // when
@@ -319,23 +343,23 @@ class TrainingServiceTest {
         @DisplayName("LLM вернул меньше вопросов, чем запрошено - сессия создаётся с тем, что есть, без исключения")
         void createsSessionWithFewerThanRequestedFromLlm() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(8);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             List<String> generated = List.of("Единственный сгенерированный");
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
 
             // when
@@ -350,17 +374,17 @@ class TrainingServiceTest {
         @DisplayName("Банк пуст и LLM вернул null-список - LlmException (недостаточно вопросов), сессия не создаётся")
         void throwsWhenBankEmptyAndLlmReturnsNullList() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(List.of());
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(null));
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(null));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
@@ -373,17 +397,17 @@ class TrainingServiceTest {
         @DisplayName("Банк пуст и LLM вернул только blank-строки - LlmException (недостаточно вопросов), сессия не создаётся")
         void throwsWhenBankEmptyAndLlmReturnsOnlyBlankStrings() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(List.of());
-            when(llmService.generateTrainingQuestions(any()))
+            when(llmService.generateTrainingQuestions(anyString(), any()))
                     .thenReturn(new LlmTrainingQuestions(Arrays.asList("", "   ", null)));
 
             // when / then
@@ -397,18 +421,18 @@ class TrainingServiceTest {
         @DisplayName("Суммарно 2 вопроса (2 из банка, LLM вернул 0) - LlmException, сессия не создаётся")
         void throwsWhenTotalQuestionsBelowThresholdFromBank() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(2);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(List.of()));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
@@ -421,18 +445,18 @@ class TrainingServiceTest {
         @DisplayName("Суммарно 2 вопроса (1 из банка, 1 от LLM) - LlmException, сессия не создаётся")
         void throwsWhenTotalQuestionsBelowThresholdMixedSources() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(1);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
-            when(llmService.generateTrainingQuestions(any()))
+            when(llmService.generateTrainingQuestions(anyString(), any()))
                     .thenReturn(new LlmTrainingQuestions(List.of("Единственный сгенерированный")));
 
             // when / then
@@ -446,21 +470,21 @@ class TrainingServiceTest {
         @DisplayName("Суммарно ровно 3 вопроса (порог не строгий) - сессия создаётся")
         void createsSessionWhenExactlyAtThreshold() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
             List<BankQuestion> bank = bankQuestions(3);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
+            when(llmService.generateTrainingQuestions(anyString(), any())).thenReturn(new LlmTrainingQuestions(List.of()));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -471,91 +495,24 @@ class TrainingServiceTest {
             verify(trainingWriter).createSession(mappedEntity, bank, List.of());
         }
 
-        @ParameterizedTest
-        @NullSource
-        @ValueSource(strings = {"   "})
-        @DisplayName("Тема null или из пробелов - в upsertDictionaries уходит null, в LLM-запрос (при генерации) - пустая строка")
-        void nullOrBlankTopicNormalizesForDictionariesAndLlm(String rawTopic) {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, rawTopic, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(rawTopic);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-
-            List<BankQuestion> bank = bankQuestions(9);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
-                    .thenReturn(bank);
-
-            List<String> generated = List.of("Доп. вопрос");
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
-
-            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
-
-            // when
-            trainingService.create(request, userId);
-
-            // then
-            assertThat(mappedEntity.getTopic()).isNull();
-            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
-
-            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
-                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
-            verify(llmService).generateTrainingQuestions(captor.capture());
-            assertThat(captor.getValue().topic()).isEmpty();
-        }
-
         @Test
-        @DisplayName("Словарный быстрый путь: профессия APPROVED, темы нет - LLM normalizeInput не вызывается")
-        void dictionaryFastPathWithoutTopicSkipsLlmNormalization() {
+        @DisplayName("Словарь подтвердил и навык, и профессию - LLM normalizeInput не вызывается")
+        void dictionaryFastPathSkipsLlmNormalization() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.create(request, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(llmService, never()).normalizeInput(any());
-            verifyNoInteractions(topicDictRepository);
-        }
-
-        @Test
-        @DisplayName("Профессия и тема APPROVED в словаре - LLM normalizeInput не вызывается")
-        void dictionaryFastPathWithTopicSkipsLlmNormalization() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndTopicApproved();
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
-
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
-                    .thenReturn(bank);
-
-            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -567,11 +524,11 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Профессия в словаре со статусом AUTO (не APPROVED) - LLM normalizeInput вызывается")
+        @DisplayName("Профессия в словаре со статусом AUTO (не APPROVED) - навык не проверяется в словаре (guard короткого замыкания), LLM normalizeInput вызывается")
         void autoStatusProfessionTriggersLlmNormalization() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
 
             ProfessionDict professionDict = ProfessionDict.builder()
@@ -580,15 +537,15 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any()))
                     .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -596,102 +553,73 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(llmService).normalizeInput(new LlmInputNormalizationRequest(PROFESSION, TOPIC));
+            verify(llmService).normalizeInput(new LlmInputNormalizationRequest(SKILL, PROFESSION));
+            verifyNoInteractions(skillDictRepository);
         }
 
         @Test
-        @DisplayName("Профессия не найдена в словаре, LLM не распознал профессию - UnprocessableEntityException, сессия не создаётся")
+        @DisplayName("Профессия не в словаре, LLM распознал навык, но не распознал профессию - UnprocessableEntityException, сессия не создаётся")
         void throwsWhenProfessionNotRecognizedByLlm() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(false, List.of("Java Developer"), true, List.of(), true));
+                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of("Java Developer"), true));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(UnprocessableEntityException.class)
                     .hasMessage("Profession not recognized");
-            verify(llmService, never()).generateTrainingQuestions(any());
-            verifyNoInteractions(trainingWriter, questionBankRepository, topicDictRepository);
+            verify(llmService, never()).generateTrainingQuestions(any(), any());
+            verifyNoInteractions(trainingWriter, questionBankRepository, skillDictRepository);
         }
 
         @Test
-        @DisplayName("Профессия распознана LLM, тема не распознана - UnprocessableEntityException, сессия не создаётся")
-        void throwsWhenTopicNotRecognizedByLlm() {
+        @DisplayName("Профессия не в словаре, LLM не распознал навык - UnprocessableEntityException (проверка навыка идёт первой), сессия не создаётся")
+        void throwsWhenSkillNotRecognizedByLlm() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of("Spring Framework"), false));
+                    .thenReturn(new LlmInputNormalization(false, List.of("Spring Framework"), true, List.of(), false));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(UnprocessableEntityException.class)
-                    .hasMessage("Topic not recognized");
-            verify(llmService, never()).generateTrainingQuestions(any());
+                    .hasMessage("Skill not recognized");
+            verify(llmService, never()).generateTrainingQuestions(any(), any());
             verifyNoInteractions(trainingWriter, questionBankRepository);
         }
 
         @Test
-        @DisplayName("Профессия APPROVED по словарю, тема мимо словаря, LLM отверг профессию, но признал тему - вердикт LLM по профессии игнорируется, создание проходит")
-        void createsSessionWhenDictionaryApprovesProfessionAndLlmRecognizesTopic() {
+        @DisplayName("Профессия APPROVED в словаре, навык мимо словаря, LLM отверг профессию, но признал навык - вердикт LLM по профессии игнорируется, создание проходит")
+        void createsSessionWhenDictionaryApprovesProfessionAndLlmRecognizesSkill() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
 
             ProfessionDict professionDict = ProfessionDict.builder()
                     .id(professionId).name(PROFESSION).status(DictStatus.APPROVED).build();
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
-            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
                     .thenReturn(false);
             when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(false, List.of(), true, List.of(), true));
+                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.create(request, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
-        }
-
-        @Test
-        @DisplayName("Профессия и тема мимо словаря, обе распознаны LLM - создание проходит")
-        void createsSessionWhenLlmRecognizesBothProfessionAndTopic() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
-            when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
-
-            when(trainingWriter.upsertDictionaries(PROFESSION, TOPIC))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
-                    .thenReturn(bank);
-
-            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -706,22 +634,22 @@ class TrainingServiceTest {
         @DisplayName("Профессия мимо словаря, LLM распознал и вернул подсказки - сессия создаётся с канонической профессией из первой подсказки, а не с вводом пользователя")
         void canonicalizesProfessionFromFirstSuggestionWhenNotInDictionary() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, List.of("Java-инженер", "Java Developer"), true, List.of(), true));
+                    true, List.of(), true, List.of("Java-инженер", "Java Developer"), true));
 
-            when(trainingWriter.upsertDictionaries("Java-инженер", null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, "Java-инженер"))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, "Java-инженер", null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, "Java-инженер", TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -730,31 +658,32 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo("Java-инженер");
-            verify(trainingWriter).upsertDictionaries("Java-инженер", null);
+            assertThat(mappedEntity.getSkill()).isEqualTo(SKILL);
+            verify(trainingWriter).upsertDictionaries(SKILL, "Java-инженер");
         }
 
         @Test
-        @DisplayName("Профессия APPROVED в словаре, тема мимо словаря, LLM распознал тему и вернул подсказки - канонизируется только тема, профессия остаётся как есть")
-        void canonicalizesTopicFromFirstSuggestionWhenNotApprovedKeepingProfessionUnchanged() {
+        @DisplayName("Профессия APPROVED в словаре, навык мимо словаря, LLM распознал навык и вернул подсказки - канонизируется только навык, профессия остаётся как есть")
+        void canonicalizesSkillFromFirstSuggestionWhenNotApprovedKeepingProfessionUnchanged() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, TOPIC, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(TOPIC);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionApproved();
-            when(topicDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, TOPIC, DictStatus.APPROVED))
+            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
                     .thenReturn(false);
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, List.of(), true, List.of("Spring Framework", "Spring MVC"), true));
+                    true, List.of("Spring Framework", "Spring MVC"), true, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries(PROFESSION, "Spring Framework"))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, topicId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries("Spring Framework", PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, topicId, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, "Spring Framework", TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, "Spring Framework", PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -763,8 +692,8 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
-            assertThat(mappedEntity.getTopic()).isEqualTo("Spring Framework");
-            verify(trainingWriter).upsertDictionaries(PROFESSION, "Spring Framework");
+            assertThat(mappedEntity.getSkill()).isEqualTo("Spring Framework");
+            verify(trainingWriter).upsertDictionaries("Spring Framework", PROFESSION);
         }
 
         @ParameterizedTest
@@ -772,22 +701,22 @@ class TrainingServiceTest {
         @DisplayName("LLM признал профессию распознанной, но подсказки не пригодны (null/пусто/только blank) - ввод пользователя сохраняется как есть, исключения нет")
         void keepsUserInputWhenSuggestionsUnusable(List<String> professionSuggestions) {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, professionSuggestions, true, List.of(), true));
+                    true, List.of(), true, professionSuggestions, true));
 
-            when(trainingWriter.upsertDictionaries(PROFESSION, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -796,7 +725,7 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
-            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
+            verify(trainingWriter).upsertDictionaries(SKILL, PROFESSION);
         }
 
         private static Stream<Arguments> unusableSuggestionSources() {
@@ -810,25 +739,25 @@ class TrainingServiceTest {
         @DisplayName("Первая подсказка длиннее MAX_INPUT_LENGTH - пропускается, берётся следующая пригодная (ровно MAX_INPUT_LENGTH символов - валидна)")
         void skipsSuggestionLongerThanMaxLength() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
 
             String tooLong = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
             String atLimit = "B".repeat(TrainingService.MAX_INPUT_LENGTH);
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, List.of(tooLong, atLimit), true, List.of(), true));
+                    true, List.of(), true, List.of(tooLong, atLimit), true));
 
-            when(trainingWriter.upsertDictionaries(atLimit, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, atLimit))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, atLimit, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, atLimit, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -837,32 +766,32 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo(atLimit);
-            verify(trainingWriter).upsertDictionaries(atLimit, null);
+            verify(trainingWriter).upsertDictionaries(SKILL, atLimit);
         }
 
         @Test
         @DisplayName("Все подсказки длиннее MAX_INPUT_LENGTH - пригодных нет, остаётся ввод пользователя")
         void keepsUserInputWhenAllSuggestionsExceedMaxLength() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
 
             String tooLong1 = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
             String tooLong2 = "B".repeat(TrainingService.MAX_INPUT_LENGTH + 5);
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, List.of(tooLong1, tooLong2), true, List.of(), true));
+                    true, List.of(), true, List.of(tooLong1, tooLong2), true));
 
-            when(trainingWriter.upsertDictionaries(PROFESSION, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, PROFESSION, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -871,32 +800,32 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
-            verify(trainingWriter).upsertDictionaries(PROFESSION, null);
+            verify(trainingWriter).upsertDictionaries(SKILL, PROFESSION);
         }
 
         @Test
         @DisplayName("Подсказка со слешем и пробелами по краям - применяется strip()")
         void stripsSuggestionWithSlashAndSurroundingWhitespace() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(PROFESSION, null, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(null);
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
 
             String rawSuggestion = "  Java / Kotlin разработчик  ";
             String strippedSuggestion = "Java / Kotlin разработчик";
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
-                    true, List.of(rawSuggestion), true, List.of(), true));
+                    true, List.of(), true, List.of(rawSuggestion), true));
 
-            when(trainingWriter.upsertDictionaries(strippedSuggestion, null))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, null));
-            List<BankQuestion> bank = bankQuestions(TrainingService.MAIN_QUESTION_CAP);
+            when(trainingWriter.upsertDictionaries(SKILL, strippedSuggestion))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
-                    professionId, null, "MIDDLE", userId, TrainingService.MAIN_QUESTION_CAP))
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, strippedSuggestion, null, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, SKILL, strippedSuggestion, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -905,7 +834,7 @@ class TrainingServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getProfession()).isEqualTo(strippedSuggestion);
-            verify(trainingWriter).upsertDictionaries(strippedSuggestion, null);
+            verify(trainingWriter).upsertDictionaries(SKILL, strippedSuggestion);
         }
     }
 
@@ -914,18 +843,17 @@ class TrainingServiceTest {
     class Get {
 
         @Test
-        @DisplayName("Сессия найдена - возвращает ответ с числом отвеченных основных вопросов")
-        void returnsResponseWithAnsweredMainCount() {
+        @DisplayName("Сессия найдена - возвращает ответ с числом отвеченных вопросов")
+        void returnsResponseWithAnsweredCount() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId))
-                    .thenReturn(3L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(sessionId)).thenReturn(3L);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    sessionId, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 3, null, null);
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 3, null, null);
             when(trainingSessionMapper.toResponse(session, 3)).thenReturn(expectedResponse);
 
             // when
@@ -975,9 +903,9 @@ class TrainingServiceTest {
                     .thenReturn(List.of(answeredCount));
 
             TrainingSessionResponse firstResponse = new TrainingSessionResponse(
-                    sessionWithAnswers, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 5, null, null);
+                    sessionWithAnswers, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 5, null, null);
             TrainingSessionResponse secondResponse = new TrainingSessionResponse(
-                    sessionWithoutAnswers, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    sessionWithoutAnswers, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingSessionMapper.toResponse(first, 5)).thenReturn(firstResponse);
             when(trainingSessionMapper.toResponse(second, 0)).thenReturn(secondResponse);
 
@@ -990,17 +918,17 @@ class TrainingServiceTest {
     }
 
     @Nested
-    @DisplayName("FindLatestByTopics")
-    class FindLatestByTopics {
+    @DisplayName("FindLatestBySkills")
+    class FindLatestBySkills {
 
         private final UUID userId = UUID.randomUUID();
 
-        private TrainingSession sessionWithTopic(UUID id, String topic, TrainingReport report) {
+        private TrainingSession sessionWithSkill(UUID id, String skill, TrainingReport report) {
             return TrainingSession.builder()
                     .id(id)
                     .userId(userId)
+                    .skill(skill)
                     .profession(PROFESSION)
-                    .topic(topic)
                     .level(TrainingSession.Level.MIDDLE)
                     .status(TrainingSession.Status.COMPLETED)
                     .report(report)
@@ -1008,73 +936,65 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("По каждой теме возвращает метрики последней сессии")
-        void returnsMatchForEachTopicWithCounts() {
+        @DisplayName("По каждому навыку возвращает метрики последней сессии")
+        void returnsMatchForEachSkillWithCounts() {
             // given
             UUID springSessionId = UUID.randomUUID();
             UUID javaSessionId = UUID.randomUUID();
             TrainingReport report = TrainingReport.builder().avgScore(4.5).build();
-            TrainingSession springSession = sessionWithTopic(springSessionId, "Spring Boot", report);
-            TrainingSession javaSession = sessionWithTopic(javaSessionId, "Java Core", null);
-            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot", "java core")))
+            TrainingSession springSession = sessionWithSkill(springSessionId, "Spring Boot", report);
+            TrainingSession javaSession = sessionWithSkill(javaSessionId, "Java Core", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredSkillIn(userId, List.of("spring boot", "java core")))
                     .thenReturn(List.of(springSession, javaSession));
 
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(springSessionId))
-                    .thenReturn(7L);
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(springSessionId))
-                    .thenReturn(10L);
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(javaSessionId))
-                    .thenReturn(0L);
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(javaSessionId))
-                    .thenReturn(10L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(springSessionId)).thenReturn(7L);
+            when(trainingQuestionRepository.countByTrainingSessionId(springSessionId)).thenReturn(10L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(javaSessionId)).thenReturn(0L);
+            when(trainingQuestionRepository.countByTrainingSessionId(javaSessionId)).thenReturn(10L);
 
             // when
-            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot", "java core"));
+            List<TrainingSkillMatch> result = trainingService.findLatestBySkills(userId, List.of("spring boot", "java core"));
 
             // then
             assertThat(result).containsExactlyInAnyOrder(
-                    new TrainingTopicMatch(springSessionId, "Spring Boot", TrainingSession.Status.COMPLETED, 4.5, 7, 10),
-                    new TrainingTopicMatch(javaSessionId, "Java Core", TrainingSession.Status.COMPLETED, null, 0, 10));
+                    new TrainingSkillMatch(springSessionId, "Spring Boot", TrainingSession.Status.COMPLETED, 4.5, 7, 10),
+                    new TrainingSkillMatch(javaSessionId, "Java Core", TrainingSession.Status.COMPLETED, null, 0, 10));
         }
 
         @Test
-        @DisplayName("Несколько сессий с одинаковой темой в разном регистре - берётся первая (последняя по времени), для второй счётчики не считаются")
-        void deduplicatesByLoweredTopicKeepingFirstOccurrence() {
+        @DisplayName("Несколько сессий с одинаковым навыком в разном регистре - берётся первая (последняя по времени), для второй счётчики не считаются")
+        void deduplicatesByLoweredSkillKeepingFirstOccurrence() {
             // given
             UUID latestSessionId = UUID.randomUUID();
             UUID olderSessionId = UUID.randomUUID();
             TrainingReport latestReport = TrainingReport.builder().avgScore(5.0).build();
-            TrainingSession latestSession = sessionWithTopic(latestSessionId, "SPRING BOOT", latestReport);
-            TrainingSession olderSession = sessionWithTopic(olderSessionId, "spring boot", null);
-            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("spring boot")))
+            TrainingSession latestSession = sessionWithSkill(latestSessionId, "SPRING BOOT", latestReport);
+            TrainingSession olderSession = sessionWithSkill(olderSessionId, "spring boot", null);
+            when(trainingSessionRepository.findAllByUserIdAndLoweredSkillIn(userId, List.of("spring boot")))
                     .thenReturn(List.of(latestSession, olderSession));
 
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(latestSessionId))
-                    .thenReturn(4L);
-            when(trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(latestSessionId))
-                    .thenReturn(10L);
+            when(trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(latestSessionId)).thenReturn(4L);
+            when(trainingQuestionRepository.countByTrainingSessionId(latestSessionId)).thenReturn(10L);
 
             // when
-            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("spring boot"));
+            List<TrainingSkillMatch> result = trainingService.findLatestBySkills(userId, List.of("spring boot"));
 
             // then
             assertThat(result).containsExactly(
-                    new TrainingTopicMatch(latestSessionId, "SPRING BOOT", TrainingSession.Status.COMPLETED, 5.0, 4, 10));
-            verify(trainingQuestionRepository, never())
-                    .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(olderSessionId);
-            verify(trainingQuestionRepository, never())
-                    .countByTrainingSessionIdAndFollowUpFalse(olderSessionId);
+                    new TrainingSkillMatch(latestSessionId, "SPRING BOOT", TrainingSession.Status.COMPLETED, 5.0, 4, 10));
+            verify(trainingQuestionRepository, never()).countByTrainingSessionIdAndAnsweredTrue(olderSessionId);
+            verify(trainingQuestionRepository, never()).countByTrainingSessionId(olderSessionId);
         }
 
         @Test
-        @DisplayName("Нет сессий по темам - пустой список, счётчики не запрашиваются")
+        @DisplayName("Нет сессий по навыкам - пустой список, счётчики не запрашиваются")
         void returnsEmptyListWhenNoSessionsMatch() {
             // given
-            when(trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, List.of("несуществующая тема")))
+            when(trainingSessionRepository.findAllByUserIdAndLoweredSkillIn(userId, List.of("несуществующий навык")))
                     .thenReturn(List.of());
 
             // when
-            List<TrainingTopicMatch> result = trainingService.findLatestByTopics(userId, List.of("несуществующая тема"));
+            List<TrainingSkillMatch> result = trainingService.findLatestBySkills(userId, List.of("несуществующий навык"));
 
             // then
             assertThat(result).isEmpty();
@@ -1083,90 +1003,8 @@ class TrainingServiceTest {
     }
 
     @Nested
-    @DisplayName("GetOptions")
-    class GetOptions {
-
-        @Test
-        @DisplayName("Профессии из словаря маппятся в имена с сохранением порядка, levels и капы как заданы")
-        void returnsProfessionNamesInOrderWithLevelsAndCaps() {
-            // given
-            ProfessionDict first = ProfessionDict.builder().id(UUID.randomUUID()).name("Java-разработчик").build();
-            ProfessionDict second = ProfessionDict.builder().id(UUID.randomUUID()).name("Python-разработчик").build();
-            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
-                    .thenReturn(List.of(first, second));
-
-            // when
-            TrainingOptionsResponse result = trainingService.getOptions();
-
-            // then
-            assertThat(result.professions()).containsExactly("Java-разработчик", "Python-разработчик");
-            assertThat(result.levels()).containsExactly(TrainingSession.Level.values());
-            assertThat(result.questionCap()).isEqualTo(TrainingService.MAIN_QUESTION_CAP);
-            assertThat(result.minAnswersToFinish()).isEqualTo(TrainingService.MIN_ANSWERED_TO_FINISH);
-        }
-
-        @Test
-        @DisplayName("Пустой словарь профессий - пустой список professions, а не ошибка")
-        void returnsEmptyProfessionsWhenDictionaryEmpty() {
-            // given
-            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
-                    .thenReturn(List.of());
-
-            // when
-            TrainingOptionsResponse result = trainingService.getOptions();
-
-            // then
-            assertThat(result.professions()).isEmpty();
-        }
-    }
-
-    @Nested
     @DisplayName("NextQuestion")
     class NextQuestion {
-
-        private TrainingQuestion answeredMain(UUID id, int orderIndex) {
-            return TrainingQuestion.builder()
-                    .id(id)
-                    .text("Вопрос " + orderIndex)
-                    .answerText("Ответ " + orderIndex)
-                    .orderIndex(orderIndex)
-                    .followUp(false)
-                    .answered(true)
-                    .build();
-        }
-
-        private TrainingQuestion unansweredMain(UUID id, int orderIndex) {
-            return TrainingQuestion.builder()
-                    .id(id)
-                    .text("Вопрос " + orderIndex)
-                    .orderIndex(orderIndex)
-                    .followUp(false)
-                    .answered(false)
-                    .build();
-        }
-
-        private TrainingQuestion answeredFollowUp(UUID id, UUID parentQuestionId, int orderIndex) {
-            return TrainingQuestion.builder()
-                    .id(id)
-                    .parentQuestionId(parentQuestionId)
-                    .text("Уточнение " + orderIndex)
-                    .answerText("Ответ на уточнение " + orderIndex)
-                    .orderIndex(orderIndex)
-                    .followUp(true)
-                    .answered(true)
-                    .build();
-        }
-
-        private TrainingQuestion unansweredFollowUp(UUID id, UUID parentQuestionId, int orderIndex) {
-            return TrainingQuestion.builder()
-                    .id(id)
-                    .parentQuestionId(parentQuestionId)
-                    .text("Уточнение " + orderIndex)
-                    .orderIndex(orderIndex)
-                    .followUp(true)
-                    .answered(false)
-                    .build();
-        }
 
         @Test
         @DisplayName("Сессия не найдена у пользователя - NotFoundException")
@@ -1180,7 +1018,7 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
-            verifyNoInteractions(trainingQuestionRepository, llmService, trainingWriter);
+            verifyNoInteractions(trainingQuestionRepository);
         }
 
         @Test
@@ -1197,296 +1035,25 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
-            verifyNoInteractions(trainingQuestionRepository, llmService, trainingWriter);
+            verifyNoInteractions(trainingQuestionRepository);
         }
 
         @Test
-        @DisplayName("Есть неотвеченный follow-up - возвращает его напрямую, LLM не вызывается")
-        void returnsPendingFollowUpWithoutCallingLlm() {
+        @DisplayName("Есть неотвеченный вопрос - маппит и возвращает его")
+        void returnsNextUnansweredQuestion() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
 
-            TrainingQuestion pendingFollowUp = unansweredFollowUp(UUID.randomUUID(), UUID.randomUUID(), 2);
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
-                    .thenReturn(Optional.of(pendingFollowUp));
+            TrainingQuestion nextQuestion = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).text("Вопрос 2").orderIndex(2).answered(false).build();
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(nextQuestion));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    pendingFollowUp.getId(), 2, pendingFollowUp.getText(), true, null, null, null);
-            when(trainingQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verifyNoInteractions(llmService, trainingWriter);
-            verify(trainingQuestionRepository, never()).findLastAnsweredWithoutFollowUpCheck(any());
-        }
-
-        @Test
-        @DisplayName("Нет неотвеченного follow-up и нет отвеченного-непроверенного вопроса - возвращает следующий основной, LLM не вызывается")
-        void returnsNextMainWhenNoLastAnsweredUnchecked() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 3);
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 3, nextMain.getText(), false, null, null, null);
-            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verifyNoInteractions(llmService, trainingWriter);
-        }
-
-        @Test
-        @DisplayName("В кейсе уже максимум уточнений - markFollowUpChecked, LLM не вызывается, возвращается следующий основной")
-        void marksFollowUpCheckedAndReturnsNextMainWhenLimitReached() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-
-            List<TrainingQuestion> maxFollowUps = IntStream.rangeClosed(1, TrainingService.MAX_FOLLOW_UPS_PER_QUESTION)
-                    .mapToObj(i -> answeredFollowUp(UUID.randomUUID(), answered.getId(), i + 1))
-                    .toList();
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(maxFollowUps);
-
-            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
-            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).markFollowUpChecked(answered.getId());
-            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
-            verifyNoInteractions(llmService);
-        }
-
-        @Test
-        @DisplayName("LLM решил не уточнять (askFollowUp=false) - markFollowUpChecked, возвращается следующий основной")
-        void marksFollowUpCheckedWhenLlmDecidesNotToAsk() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(List.of());
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(false, null));
-
-            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
-            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).markFollowUpChecked(answered.getId());
-            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
-        }
-
-        @ParameterizedTest
-        @NullSource
-        @ValueSource(strings = {"   "})
-        @DisplayName("LLM решил уточнить, но текст вопроса null/пустой - трактуется как отказ: markFollowUpChecked, возвращается следующий основной")
-        void treatsBlankOrNullQuestionAsRefusal(String question) {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(List.of());
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(true, question));
-
-            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
-            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).markFollowUpChecked(answered.getId());
-            verify(trainingWriter, never()).saveFollowUp(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("LLM решил уточнить - сохраняет follow-up через trainingWriter, в запросе - профессия/уровень сессии, текст/ответ основного вопроса и история уточнений")
-        void savesFollowUpWhenLlmDecidesToAskFollowUp() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-
-            TrainingQuestion previousFollowUp = answeredFollowUp(UUID.randomUUID(), answered.getId(), 2);
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(List.of(previousFollowUp));
-
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Новое уточнение"));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    UUID.randomUUID(), 3, "Новое уточнение", true, null, null, null);
-            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Новое уточнение"))
-                    .thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-
-            ArgumentCaptor<LlmTrainingFollowUpRequest> captor = ArgumentCaptor.forClass(LlmTrainingFollowUpRequest.class);
-            verify(llmService).decideTrainingFollowUp(captor.capture());
-            LlmTrainingFollowUpRequest llmRequest = captor.getValue();
-            assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
-            assertThat(llmRequest.level()).isEqualTo("Middle");
-            assertThat(llmRequest.question()).isEqualTo(answered.getText());
-            assertThat(llmRequest.answer()).isEqualTo(answered.getAnswerText());
-            assertThat(llmRequest.previousFollowUps()).containsExactly(
-                    new LlmTrainingFollowUp(previousFollowUp.getText(), previousFollowUp.getAnswerText()));
-
-            verify(trainingWriter, never()).markFollowUpChecked(any());
-        }
-
-        @Test
-        @DisplayName("Последний отвеченный вопрос сам - уточнение: caseMainId берётся из parentQuestionId, в промпт уходит текст/ответ основного вопроса")
-        void usesParentMainWhenLastAnsweredIsFollowUp() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            TrainingQuestion caseMain = answeredMain(UUID.randomUUID(), 1);
-            TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), caseMain.getId(), 2);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
-                    .thenReturn(Optional.of(lastAnsweredFollowUp));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(caseMain.getId()))
-                    .thenReturn(List.of(lastAnsweredFollowUp));
-            when(trainingQuestionRepository.findById(caseMain.getId())).thenReturn(Optional.of(caseMain));
-
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Ещё уточнение"));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    UUID.randomUUID(), 3, "Ещё уточнение", true, null, null, null);
-            when(trainingWriter.saveFollowUp(lastAnsweredFollowUp.getId(), caseMain.getId(), "Ещё уточнение"))
-                    .thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-
-            ArgumentCaptor<LlmTrainingFollowUpRequest> captor = ArgumentCaptor.forClass(LlmTrainingFollowUpRequest.class);
-            verify(llmService).decideTrainingFollowUp(captor.capture());
-            assertThat(captor.getValue().question()).isEqualTo(caseMain.getText());
-            assertThat(captor.getValue().answer()).isEqualTo(caseMain.getAnswerText());
-
-            verify(trainingWriter).saveFollowUp(lastAnsweredFollowUp.getId(), caseMain.getId(), "Ещё уточнение");
-        }
-
-        @Test
-        @DisplayName("Основной вопрос кейса не найден по parentQuestionId - NotFoundException")
-        void throwsNotFoundWhenCaseMainMissing() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            UUID missingMainId = UUID.randomUUID();
-            TrainingQuestion lastAnsweredFollowUp = answeredFollowUp(UUID.randomUUID(), missingMainId, 2);
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
-                    .thenReturn(Optional.of(lastAnsweredFollowUp));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(missingMainId))
-                    .thenReturn(List.of(lastAnsweredFollowUp));
-            when(trainingQuestionRepository.findById(missingMainId)).thenReturn(Optional.empty());
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Question not found");
-            verifyNoInteractions(llmService, trainingWriter);
-        }
-
-        @Test
-        @DisplayName("saveFollowUp бросает DataIntegrityViolationException, конкурентный follow-up уже создан - возвращает его")
-        void returnsConcurrentFollowUpWhenSaveFollowUpConflicts() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            TrainingQuestion concurrentFollowUp = unansweredFollowUp(UUID.randomUUID(), answered.getId(), 2);
-
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
-                    .thenReturn(Optional.empty(), Optional.of(concurrentFollowUp));
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(List.of());
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Уточнение"));
-            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Уточнение"))
-                    .thenThrow(new DataIntegrityViolationException("concurrent follow-up"));
-
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    concurrentFollowUp.getId(), 2, concurrentFollowUp.getText(), true, null, null, null);
-            when(trainingQuestionMapper.toDto(concurrentFollowUp)).thenReturn(expectedResponse);
+                    nextQuestion.getId(), 2, nextQuestion.getText(), null, null, null);
+            when(trainingQuestionMapper.toDto(nextQuestion)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.nextQuestion(sessionId, userId);
@@ -1496,55 +1063,19 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("saveFollowUp бросает DataIntegrityViolationException, конкурентного follow-up нет - падает дальше к следующему основному")
-        void fallsBackToNextMainWhenSaveFollowUpConflictsWithoutConcurrentFollowUp() {
+        @DisplayName("Неотвеченных вопросов нет - ConflictException")
+        void throwsConflictWhenNoQuestionsLeft() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-
-            TrainingQuestion answered = answeredMain(UUID.randomUUID(), 1);
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId))
-                    .thenReturn(Optional.empty(), Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
-            when(trainingQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId()))
-                    .thenReturn(List.of());
-            when(llmService.decideTrainingFollowUp(any()))
-                    .thenReturn(new LlmTrainingFollowUpDecision(true, "Уточнение"));
-            when(trainingWriter.saveFollowUp(answered.getId(), answered.getId(), "Уточнение"))
-                    .thenThrow(new DataIntegrityViolationException("concurrent follow-up"));
-
-            TrainingQuestion nextMain = unansweredMain(UUID.randomUUID(), 2);
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(nextMain));
-            TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextMain.getId(), 2, nextMain.getText(), false, null, null, null);
-            when(trainingQuestionMapper.toDto(nextMain)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.nextQuestion(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-        }
-
-        @Test
-        @DisplayName("Нет ни неотвеченного follow-up, ни основного вопроса - ConflictException")
-        void throwsConflictWhenNoFollowUpAndNoMainLeft() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
-            when(trainingQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.empty());
-            when(trainingQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.empty());
+            when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
 
             // when / then
             assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Question cap reached");
-            verifyNoInteractions(llmService, trainingWriter);
         }
     }
 
@@ -1691,6 +1222,135 @@ class TrainingServiceTest {
     }
 
     @Nested
+    @DisplayName("GetReferenceAnswer")
+    class GetReferenceAnswer {
+
+        private TrainingQuestion aQuestionWithSession(TrainingSession session, String referenceAnswer) {
+            return TrainingQuestion.builder()
+                    .id(UUID.randomUUID())
+                    .trainingSession(session)
+                    .text("Что такое JVM?")
+                    .orderIndex(1)
+                    .referenceAnswer(referenceAnswer)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Вопрос не найден - NotFoundException")
+        void throwsWhenQuestionNotFound() {
+            // given
+            UUID questionId = UUID.randomUUID();
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(UUID.randomUUID(), questionId, UUID.randomUUID()))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другому пользователю - ForbiddenException")
+        void throwsWhenQuestionOwnedByAnotherUser() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID ownerId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, ownerId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(sessionId, question.getId(), UUID.randomUUID()))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Access denied");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другой сессии, чем в запросе - ConflictException")
+        void throwsWhenQuestionBelongsToAnotherSession() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(UUID.randomUUID(), question.getId(), userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Invalid session");
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Эталонный ответ уже сохранён у вопроса - возвращает его без обращения к LLM")
+        void returnsCachedAnswerWithoutCallingLlm() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, "Кешированный эталонный ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when
+            ReferenceAnswerResponse result = trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
+
+            // then
+            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Кешированный эталонный ответ"));
+            verifyNoInteractions(llmService, trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Эталонного ответа ещё нет - запрашивает LLM по навыку/профессии/тексту вопроса, стрипает и сохраняет через writer")
+        void generatesAndSavesWhenNoCachedAnswer() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+            when(llmService.createReferenceAnswer(any()))
+                    .thenReturn(new LlmTrainingReferenceAnswer("  Сгенерированный эталонный ответ  "));
+
+            // when
+            ReferenceAnswerResponse result = trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
+
+            // then
+            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Сгенерированный эталонный ответ"));
+
+            ArgumentCaptor<LlmTrainingReferenceAnswerRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingReferenceAnswerRequest.class);
+            verify(llmService).createReferenceAnswer(captor.capture());
+            assertThat(captor.getValue().skill()).isEqualTo(SKILL);
+            assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+            assertThat(captor.getValue().question()).isEqualTo(question.getText());
+
+            verify(trainingWriter).saveReferenceAnswer(question.getId(), "Сгенерированный эталонный ответ");
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"   "})
+        @DisplayName("LLM вернул null/blank ответ - LlmException, сохранение не происходит")
+        void throwsLlmExceptionWhenGeneratedAnswerBlank(String answer) {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+            when(llmService.createReferenceAnswer(any())).thenReturn(new LlmTrainingReferenceAnswer(answer));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(sessionId, question.getId(), userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Reference answer is not available");
+            verifyNoInteractions(trainingWriter);
+        }
+    }
+
+    @Nested
     @DisplayName("CreateReport")
     class CreateReport {
 
@@ -1707,8 +1367,8 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Передаёт profession сессии как есть в LlmTrainingReportRequest")
-        void passesSessionProfessionAsIsToLlmRequest() {
+        @DisplayName("Передаёт skill и profession сессии как есть в LlmTrainingReportRequest")
+        void passesSessionSkillAndProfessionAsIsToLlmRequest() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
@@ -1720,7 +1380,7 @@ class TrainingServiceTest {
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
-                    UUID.randomUUID(), sessionId, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, 4.0,
+                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.0,
                     llmReport.overallFeedback(), null, List.of());
             when(trainingWriter.completeReport(sessionId, llmReport)).thenReturn(expectedResponse);
 
@@ -1732,6 +1392,7 @@ class TrainingServiceTest {
 
             ArgumentCaptor<LlmTrainingReportRequest> captor = ArgumentCaptor.forClass(LlmTrainingReportRequest.class);
             verify(llmService).createTrainingReport(captor.capture());
+            assertThat(captor.getValue().skill()).isEqualTo(SKILL);
             assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
         }
 
@@ -1768,7 +1429,7 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Отвечено меньше минимума основных вопросов - ConflictException")
+        @DisplayName("Отвечено меньше минимума вопросов - ConflictException")
         void throwsWhenNotEnoughAnsweredQuestions() {
             // given
             UUID sessionId = UUID.randomUUID();
@@ -1902,7 +1563,7 @@ class TrainingServiceTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
-                    report.getId(), sessionId, PROFESSION, TOPIC, TrainingSession.Level.MIDDLE, 4.0, "Фидбэк", null, List.of());
+                    report.getId(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.0, "Фидбэк", null, List.of());
             when(trainingReportMapper.toResponse(eq(report), eq(session), any())).thenReturn(expectedResponse);
 
             // when
@@ -1998,6 +1659,96 @@ class TrainingServiceTest {
     }
 
     @Nested
+    @DisplayName("GetOptions")
+    class GetOptions {
+
+        @Test
+        @DisplayName("Навыки и профессии из словарей маппятся с сохранением порядка, levels и капы как заданы")
+        void returnsSkillsAndProfessionsWithLevelsAndCaps() {
+            // given
+            ProfessionDict first = ProfessionDict.builder().id(UUID.randomUUID()).name("Java-разработчик").build();
+            ProfessionDict second = ProfessionDict.builder().id(UUID.randomUUID()).name("Python-разработчик").build();
+            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
+                    .thenReturn(List.of(first, second));
+            when(skillDictRepository.findTopNames(TrainingService.OPTIONS_LIMIT))
+                    .thenReturn(List.of("Spring Boot", "Docker"));
+
+            // when
+            TrainingOptionsResponse result = trainingService.getOptions();
+
+            // then
+            assertThat(result.skills()).containsExactly("Spring Boot", "Docker");
+            assertThat(result.professions()).containsExactly("Java-разработчик", "Python-разработчик");
+            assertThat(result.levels()).containsExactly(TrainingSession.Level.values());
+            assertThat(result.questionCap()).isEqualTo(TrainingService.QUESTION_CAP);
+            assertThat(result.minAnswersToFinish()).isEqualTo(TrainingService.MIN_ANSWERED_TO_FINISH);
+        }
+
+        @Test
+        @DisplayName("Пустые словари - пустые списки skills/professions, а не ошибка")
+        void returnsEmptyResultsWhenDictionariesEmpty() {
+            // given
+            when(professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED))
+                    .thenReturn(List.of());
+            when(skillDictRepository.findTopNames(TrainingService.OPTIONS_LIMIT)).thenReturn(List.of());
+
+            // when
+            TrainingOptionsResponse result = trainingService.getOptions();
+
+            // then
+            assertThat(result.professions()).isEmpty();
+            assertThat(result.skills()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("NormalizeInput")
+    class NormalizeInput {
+
+        @Test
+        @DisplayName("Стрипает поля в LLM-запросе, собирает ответ из полей LLM-ответа")
+        void stripsFieldsInLlmRequestAndMapsResponse() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest("  джава дев  ", " спринг ");
+            LlmInputNormalization llmResponse = new LlmInputNormalization(
+                    true, List.of("Spring"), true, List.of("Java-разработчик"), true);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().skill()).isEqualTo("джава дев");
+            assertThat(captor.getValue().profession()).isEqualTo("спринг");
+
+            assertThat(result.skillRecognized()).isTrue();
+            assertThat(result.skillSuggestions()).containsExactly("Spring");
+            assertThat(result.professionRecognized()).isTrue();
+            assertThat(result.professionSuggestions()).containsExactly("Java-разработчик");
+            assertThat(result.skillFitsProfession()).isTrue();
+        }
+
+        @Test
+        @DisplayName("LLM вернул null-списки подсказок - в ответе пустые списки, а не null")
+        void nullSuggestionListsFromLlmBecomeEmptyLists() {
+            // given
+            NormalizeInputRequest request = new NormalizeInputRequest(SKILL, PROFESSION);
+            LlmInputNormalization llmResponse = new LlmInputNormalization(false, null, false, null, false);
+            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+
+            // when
+            NormalizeInputResponse result = trainingService.normalizeInput(request);
+
+            // then
+            assertThat(result.skillSuggestions()).isNotNull().isEmpty();
+            assertThat(result.professionSuggestions()).isNotNull().isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("SuggestProfessions")
     class SuggestProfessions {
 
@@ -2059,132 +1810,53 @@ class TrainingServiceTest {
     }
 
     @Nested
-    @DisplayName("SuggestTopics")
-    class SuggestTopics {
+    @DisplayName("SuggestSkills")
+    class SuggestSkills {
 
         @ParameterizedTest
         @NullSource
-        @ValueSource(strings = {"  "})
-        @DisplayName("Профессия null или пробельная - пустой список без обращения к репозиторию")
-        void returnsEmptyListWhenProfessionBlank(String profession) {
+        @ValueSource(strings = {"j", " j "})
+        @DisplayName("Запрос короче 2 символов (null, 1 символ, 1 символ после strip) - пустой список без обращения к репозиторию")
+        void returnsEmptyListForTooShortQuery(String query) {
             // when
-            List<String> result = trainingService.suggestTopics(profession, "java");
+            List<String> result = trainingService.suggestSkills(PROFESSION, query);
 
             // then
             assertThat(result).isEmpty();
-            verifyNoInteractions(topicDictRepository);
+            verifyNoInteractions(skillDictRepository);
         }
 
         @Test
-        @DisplayName("Маппит найденные темы словаря в имена с сохранением порядка")
-        void mapsSuggestedTopicsToNamesPreservingOrder() {
+        @DisplayName("Профессия указана - ищет в её словаре, маппит найденные записи в имена, обрезает пробелы по краям профессии")
+        void mapsSuggestedSkillsToNamesPreservingOrderWithProfession() {
             // given
-            TopicDict first = TopicDict.builder().id(UUID.randomUUID()).professionId(UUID.randomUUID())
-                    .name("Spring Boot").build();
-            TopicDict second = TopicDict.builder().id(UUID.randomUUID()).professionId(UUID.randomUUID())
-                    .name("Spring Security").build();
-            when(topicDictRepository.suggest(PROFESSION, "sp", TrainingService.SUGGEST_LIMIT))
+            SkillDict first = SkillDict.builder().id(UUID.randomUUID()).name("Spring Boot").build();
+            SkillDict second = SkillDict.builder().id(UUID.randomUUID()).name("Spring Security").build();
+            when(skillDictRepository.suggest(PROFESSION, "sp", TrainingService.SUGGEST_LIMIT))
                     .thenReturn(List.of(first, second));
 
             // when
-            List<String> result = trainingService.suggestTopics(PROFESSION, "sp");
+            List<String> result = trainingService.suggestSkills("  " + PROFESSION + "  ", "sp");
 
             // then
             assertThat(result).containsExactly("Spring Boot", "Spring Security");
         }
-    }
 
-    @Nested
-    @DisplayName("NormalizeInput")
-    class NormalizeInput {
-
-        @Test
-        @DisplayName("Полный ввод с профессией и темой - стрипает поля в LLM-запросе, собирает ответ из полей LLM-ответа")
-        void fullInputStripsFieldsAndMapsLlmResponse() {
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"  "})
+        @DisplayName("Профессия null или пробельная - подсказки собираются по всему словарю (suggestAcrossProfessions), а не по одной профессии")
+        void returnsNamesAcrossProfessionsWhenProfessionBlankOrNull(String profession) {
             // given
-            NormalizeInputRequest request = new NormalizeInputRequest("  джава дев  ", " спринг ");
-            LlmInputNormalization llmResponse = new LlmInputNormalization(
-                    true, List.of("Java-разработчик"), true, List.of("Spring"), true);
-            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
+            when(skillDictRepository.suggestAcrossProfessions("sp", TrainingService.SUGGEST_LIMIT))
+                    .thenReturn(List.of("Spring Boot", "Spring Security"));
 
             // when
-            NormalizeInputResponse result = trainingService.normalizeInput(request);
+            List<String> result = trainingService.suggestSkills(profession, "sp");
 
             // then
-            ArgumentCaptor<LlmInputNormalizationRequest> captor =
-                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
-            verify(llmService).normalizeInput(captor.capture());
-            assertThat(captor.getValue().profession()).isEqualTo("джава дев");
-            assertThat(captor.getValue().topic()).isEqualTo("спринг");
-
-            assertThat(result.professionRecognized()).isTrue();
-            assertThat(result.professionSuggestions()).containsExactly("Java-разработчик");
-            assertThat(result.topicRecognized()).isTrue();
-            assertThat(result.topicSuggestions()).containsExactly("Spring");
-            assertThat(result.topicFitsProfession()).isTrue();
-        }
-
-        @Test
-        @DisplayName("Тема null - в LLM-запрос уходит пустая строка, поля темы в ответе - null")
-        void nullTopicSendsEmptyStringAndNullsTopicFields() {
-            // given
-            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, null);
-            LlmInputNormalization llmResponse = new LlmInputNormalization(
-                    true, List.of(PROFESSION), true, List.of("Spring"), true);
-            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
-
-            // when
-            NormalizeInputResponse result = trainingService.normalizeInput(request);
-
-            // then
-            ArgumentCaptor<LlmInputNormalizationRequest> captor =
-                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
-            verify(llmService).normalizeInput(captor.capture());
-            assertThat(captor.getValue().topic()).isEmpty();
-
-            assertThat(result.topicRecognized()).isNull();
-            assertThat(result.topicSuggestions()).isNull();
-            assertThat(result.topicFitsProfession()).isNull();
-        }
-
-        @Test
-        @DisplayName("Тема из пробелов - трактуется как отсутствующая: пустая строка в LLM-запрос, null-поля темы в ответе")
-        void blankTopicSendsEmptyStringAndNullsTopicFields() {
-            // given
-            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, "   ");
-            LlmInputNormalization llmResponse = new LlmInputNormalization(
-                    true, List.of(PROFESSION), true, List.of("Spring"), true);
-            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
-
-            // when
-            NormalizeInputResponse result = trainingService.normalizeInput(request);
-
-            // then
-            ArgumentCaptor<LlmInputNormalizationRequest> captor =
-                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
-            verify(llmService).normalizeInput(captor.capture());
-            assertThat(captor.getValue().topic()).isEmpty();
-
-            assertThat(result.topicRecognized()).isNull();
-            assertThat(result.topicSuggestions()).isNull();
-            assertThat(result.topicFitsProfession()).isNull();
-        }
-
-        @Test
-        @DisplayName("LLM вернул null-списки подсказок - в ответе пустые списки, а не null")
-        void nullSuggestionListsFromLlmBecomeEmptyLists() {
-            // given
-            NormalizeInputRequest request = new NormalizeInputRequest(PROFESSION, TOPIC);
-            LlmInputNormalization llmResponse = new LlmInputNormalization(
-                    false, null, false, null, false);
-            when(llmService.normalizeInput(any())).thenReturn(llmResponse);
-
-            // when
-            NormalizeInputResponse result = trainingService.normalizeInput(request);
-
-            // then
-            assertThat(result.professionSuggestions()).isNotNull().isEmpty();
-            assertThat(result.topicSuggestions()).isNotNull().isEmpty();
+            assertThat(result).containsExactly("Spring Boot", "Spring Security");
+            verify(skillDictRepository, never()).suggest(any(), any(), anyInt());
         }
     }
 }

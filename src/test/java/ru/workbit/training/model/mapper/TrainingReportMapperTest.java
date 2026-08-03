@@ -58,8 +58,8 @@ class TrainingReportMapperTest {
             var sessionQuestion = aQuestion("Вопрос из session.getQuestions() - не должен попасть в ответ", 1);
             var session = TrainingSession.builder()
                     .id(sessionId)
+                    .skill("Spring Boot")
                     .profession("Java-разработчик")
-                    .topic("Spring Boot")
                     .level(TrainingSession.Level.MIDDLE)
                     .questions(List.of(sessionQuestion))
                     .build();
@@ -74,8 +74,8 @@ class TrainingReportMapperTest {
             // then
             assertThat(dto.reportId()).isEqualTo(reportId);
             assertThat(dto.sessionId()).isEqualTo(sessionId);
+            assertThat(dto.skill()).isEqualTo("Spring Boot");
             assertThat(dto.profession()).isEqualTo("Java-разработчик");
-            assertThat(dto.topic()).isEqualTo("Spring Boot");
             assertThat(dto.level()).isEqualTo(TrainingSession.Level.MIDDLE);
             assertThat(dto.avgScore()).isEqualTo(4.2);
             assertThat(dto.overallFeedback()).isEqualTo("Итоговый фидбэк по тренировке");

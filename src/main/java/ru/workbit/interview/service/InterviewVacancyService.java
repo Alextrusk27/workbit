@@ -12,7 +12,7 @@ import ru.workbit.interview.dto.RecommendedTrainingResponse;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.interview.repository.InterviewSessionRepository;
-import ru.workbit.training.dto.TrainingTopicMatch;
+import ru.workbit.training.dto.TrainingSkillMatch;
 import ru.workbit.training.service.TrainingService;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
@@ -136,9 +136,9 @@ public class InterviewVacancyService {
             return List.of();
         }
 
-        Map<String, TrainingTopicMatch> matches = trainingService.findLatestByTopics(userId, bySkill.keySet())
+        Map<String, TrainingSkillMatch> matches = trainingService.findLatestBySkills(userId, bySkill.keySet())
                 .stream()
-                .collect(Collectors.toMap(m -> m.topic().toLowerCase(), Function.identity(), (a, b) -> a));
+                .collect(Collectors.toMap(m -> m.skill().toLowerCase(), Function.identity(), (a, b) -> a));
 
         return bySkill.values().stream()
                 .sorted(Comparator.comparingDouble(WeakSkill::score))
@@ -146,7 +146,7 @@ public class InterviewVacancyService {
                 .toList();
     }
 
-    private static RecommendedTrainingResponse toRecommendation(WeakSkill skill, TrainingTopicMatch match) {
+    private static RecommendedTrainingResponse toRecommendation(WeakSkill skill, TrainingSkillMatch match) {
         if (match == null) {
             return new RecommendedTrainingResponse(skill.name(), skill.score(), null, null, null, null, null);
         }

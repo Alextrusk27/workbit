@@ -17,16 +17,14 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
         long getCount();
     }
 
-    long countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(UUID trainingSessionId);
+    long countByTrainingSessionIdAndAnsweredTrue(UUID trainingSessionId);
 
-    long countByTrainingSessionIdAndFollowUpFalse(UUID trainingSessionId);
-
-    long countByParentQuestionId(UUID parentQuestionId);
+    long countByTrainingSessionId(UUID trainingSessionId);
 
     @Query("""
             SELECT q.trainingSession.id AS sessionId, COUNT(q) AS count
             FROM TrainingQuestion q
-            WHERE q.trainingSession.id IN :sessionIds AND q.answered = true AND q.followUp = false
+            WHERE q.trainingSession.id IN :sessionIds AND q.answered = true
             GROUP BY q.trainingSession.id
             """)
     List<AnsweredCount> countAnsweredBySessionIds(List<UUID> sessionIds);
@@ -40,27 +38,9 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
 
     @Query("""
             SELECT q FROM TrainingQuestion q
-            WHERE q.trainingSession.id = :sessionId AND q.answered = false AND q.followUp = true
+            WHERE q.trainingSession.id = :sessionId AND q.answered = false
             ORDER BY q.orderIndex
             LIMIT 1
             """)
-    Optional<TrainingQuestion> findNextUnansweredFollowUp(UUID sessionId);
-
-    @Query("""
-            SELECT q FROM TrainingQuestion q
-            WHERE q.trainingSession.id = :sessionId AND q.answered = false AND q.followUp = false
-            ORDER BY q.orderIndex
-            LIMIT 1
-            """)
-    Optional<TrainingQuestion> findNextUnansweredMain(UUID sessionId);
-
-    @Query("""
-            SELECT q FROM TrainingQuestion q
-            WHERE q.trainingSession.id = :sessionId AND q.answered = true AND q.followUpChecked = false
-            ORDER BY q.answeredAt DESC
-            LIMIT 1
-            """)
-    Optional<TrainingQuestion> findLastAnsweredWithoutFollowUpCheck(UUID sessionId);
-
-    List<TrainingQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
+    Optional<TrainingQuestion> findNextUnanswered(UUID sessionId);
 }

@@ -14,18 +14,18 @@ public class LlmService {
     private final LlmClient llm;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
-        return llm.call("training-question-generator", request, LlmTrainingQuestions.class);
-    }
-
-    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingFollowUpDecision decideTrainingFollowUp(LlmTrainingFollowUpRequest request) {
-        return llm.call("training-follow-up", request, LlmTrainingFollowUpDecision.class);
+    public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
+        return llm.call("training-question-generator-" + grade, request, LlmTrainingQuestions.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
         return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
+    }
+
+    @Loggable(level = "DEBUG", logArgs = true, logResult = true)
+    public LlmTrainingReferenceAnswer createReferenceAnswer(LlmTrainingReferenceAnswerRequest request) {
+        return llm.call("training-reference-answer", request, LlmTrainingReferenceAnswer.class);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

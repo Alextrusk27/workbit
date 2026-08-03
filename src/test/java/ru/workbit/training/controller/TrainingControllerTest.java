@@ -13,13 +13,17 @@ import ru.workbit.security.service.UserDetailsServiceImpl;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.mockito.ArgumentCaptor;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.training.dto.CreateSessionRequest;
 import ru.workbit.training.dto.NormalizeInputRequest;
 import ru.workbit.training.dto.NormalizeInputResponse;
+import ru.workbit.training.dto.ReferenceAnswerResponse;
 import ru.workbit.training.dto.TrainingOptionsResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingSession;
@@ -37,6 +41,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -80,9 +86,9 @@ class TrainingControllerTest {
         return new CustomUserDetails(USER_ID, "user@example.com", "hash", List.of());
     }
 
-    private TrainingSessionResponse sessionResponse(String profession, String topic) {
+    private TrainingSessionResponse sessionResponse(String skill, String profession) {
         return new TrainingSessionResponse(
-                UUID.randomUUID(), profession, topic, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
+                UUID.randomUUID(), skill, profession, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
                 0, Instant.now(), null);
     }
 
@@ -95,11 +101,11 @@ class TrainingControllerTest {
     class CreateSession {
 
         @Test
-        @DisplayName("Возвращает 201, Location и тело с profession/topic при валидном запросе")
+        @DisplayName("Возвращает 201, Location и тело с skill/profession при валидном запросе")
         void returns201OnHappyPath() throws Exception {
             // given
-            var request = new CreateSessionRequest("Java-разработчик", "Spring Boot", TrainingSession.Level.MIDDLE);
-            var response = sessionResponse("Java-разработчик", "Spring Boot");
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var response = sessionResponse("Spring Boot", "Java-разработчик");
             when(trainingService.create(any(), any())).thenReturn(response);
 
             // when / then
@@ -109,49 +115,47 @@ class TrainingControllerTest {
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isCreated())
                     .andExpect(header().exists("Location"))
-                    .andExpect(jsonPath("$.profession").value("Java-разработчик"))
-                    .andExpect(jsonPath("$.topic").value("Spring Boot"));
+                    .andExpect(jsonPath("$.skill").value("Spring Boot"))
+                    .andExpect(jsonPath("$.profession").value("Java-разработчик"));
         }
 
         @Test
-        @DisplayName("Возвращает 201, когда профессия — произвольная строка не из справочника")
-        void returns201WhenProfessionIsFreeformNotInDictionary() throws Exception {
+        @DisplayName("Возвращает 400, когда skill пустая строка")
+        void returns400WhenSkillBlank() throws Exception {
             // given
-            var request = new CreateSessionRequest("Астролог", null, TrainingSession.Level.JUNIOR);
-            var response = sessionResponse("Астролог", null);
-            when(trainingService.create(any(), any())).thenReturn(response);
+            var request = new CreateSessionRequest("", "Java-разработчик", TrainingSession.Level.MIDDLE);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.profession").value("Астролог"));
-        }
+                    .andExpect(status().isBadRequest());
 
-        @Test
-        @DisplayName("Возвращает 201, когда topic отсутствует")
-        void returns201WhenTopicMissing() throws Exception {
-            // given
-            var request = new CreateSessionRequest("Java-разработчик", null, TrainingSession.Level.SENIOR);
-            var response = sessionResponse("Java-разработчик", null);
-            when(trainingService.create(any(), any())).thenReturn(response);
-
-            // when / then
-            mvc.perform(post(BASE + "/sessions")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.topic").doesNotExist());
+            verifyNoInteractions(trainingService);
         }
 
         @Test
         @DisplayName("Возвращает 400, когда profession пустая строка")
         void returns400WhenProfessionBlank() throws Exception {
             // given
-            var request = new CreateSessionRequest("", "Spring Boot", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "", TrainingSession.Level.MIDDLE);
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда skill длиннее 100 символов")
+        void returns400WhenSkillTooLong() throws Exception {
+            // given
+            var request = new CreateSessionRequest("a".repeat(101), "Java-разработчик", TrainingSession.Level.MIDDLE);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -167,23 +171,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда profession длиннее 100 символов")
         void returns400WhenProfessionTooLong() throws Exception {
             // given
-            var request = new CreateSessionRequest("a".repeat(101), "Spring Boot", TrainingSession.Level.MIDDLE);
-
-            // when / then
-            mvc.perform(post(BASE + "/sessions")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(trainingService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда topic длиннее 100 символов")
-        void returns400WhenTopicTooLong() throws Exception {
-            // given
-            var request = new CreateSessionRequest("Java-разработчик", "b".repeat(101), TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "b".repeat(101), TrainingSession.Level.MIDDLE);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -200,7 +188,7 @@ class TrainingControllerTest {
         void returns400WhenLevelInvalid() throws Exception {
             // given — level со значением, отсутствующим в enum TrainingSession.Level
             var body = """
-                    {"profession":"Java-разработчик","topic":"Spring Boot","level":"NotALevel"}
+                    {"skill":"Spring Boot","profession":"Java-разработчик","level":"NotALevel"}
                     """;
 
             // when / then
@@ -217,7 +205,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 401, когда нет аутентификации")
         void returns401WithoutAuthentication() throws Exception {
             // given
-            var request = new CreateSessionRequest("Java-разработчик", "Spring Boot", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
 
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(post(BASE + "/sessions")
@@ -229,10 +217,29 @@ class TrainingControllerTest {
         }
 
         @Test
+        @DisplayName("Возвращает 422, когда сервис не распознал навык")
+        void returns422WhenSkillNotRecognized() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Ктулхурделла", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            when(trainingService.create(any(), any()))
+                    .thenThrow(new UnprocessableEntityException("Skill not recognized"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.status").value("UNPROCESSABLE_CONTENT"))
+                    .andExpect(jsonPath("$.message").value("Unprocessable content."))
+                    .andExpect(jsonPath("$.errors[0]").value("Skill not recognized"));
+        }
+
+        @Test
         @DisplayName("Возвращает 422, когда сервис не распознал профессию")
         void returns422WhenProfessionNotRecognized() throws Exception {
             // given
-            var request = new CreateSessionRequest("Астролог", "Гороскопы", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Астролог", TrainingSession.Level.MIDDLE);
             when(trainingService.create(any(), any()))
                     .thenThrow(new UnprocessableEntityException("Profession not recognized"));
 
@@ -257,10 +264,11 @@ class TrainingControllerTest {
     class GetOptions {
 
         @Test
-        @DisplayName("Возвращает 200 со списком профессий-строк, уровнями и капами")
+        @DisplayName("Возвращает 200 со списком навыков, профессий, уровнями и капами")
         void returns200WithOptions() throws Exception {
             // given
             var response = new TrainingOptionsResponse(
+                    List.of("Spring Boot", "Docker"),
                     List.of("Java-разработчик", "Frontend-разработчик"),
                     List.of(TrainingSession.Level.JUNIOR, TrainingSession.Level.MIDDLE, TrainingSession.Level.SENIOR),
                     10, 3);
@@ -270,6 +278,9 @@ class TrainingControllerTest {
             mvc.perform(get(BASE + "/options")
                             .with(user(principal())))
                     .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.skills").isArray())
+                    .andExpect(jsonPath("$.skills[0]").value("Spring Boot"))
+                    .andExpect(jsonPath("$.skills[1]").value("Docker"))
                     .andExpect(jsonPath("$.professions").isArray())
                     .andExpect(jsonPath("$.professions[0]").value("Java-разработчик"))
                     .andExpect(jsonPath("$.professions[1]").value("Frontend-разработчик"))
@@ -351,7 +362,7 @@ class TrainingControllerTest {
         }
 
         @Test
-        @DisplayName("Передаёт в rate limiter ключ с префиксом \"suggest:\"")
+        @DisplayName("Передаёт в rate limiter ключ с префиксом \"suggest-professions:\"")
         void passesKeyWithSuggestPrefixToRateLimiter() throws Exception {
             // given
             when(trainingService.suggestProfessions("ja")).thenReturn(List.of("Java-разработчик"));
@@ -365,40 +376,59 @@ class TrainingControllerTest {
 
             // then
             verify(rateLimiter).check(keyCaptor.capture(), any(RateLimitProperties.Bucket.class));
-            assertThat(keyCaptor.getValue()).startsWith("suggest:");
+            assertThat(keyCaptor.getValue()).startsWith("suggest-professions:");
         }
     }
 
     // -------------------------------------------------------------------------
-    // GET /suggest/topics
+    // GET /suggest/skills
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("SuggestTopics")
-    class SuggestTopics {
+    @DisplayName("SuggestSkills")
+    class SuggestSkills {
 
         @Test
-        @DisplayName("Возвращает 200 со списком подсказок из сервиса")
-        void returns200WithSuggestions() throws Exception {
+        @DisplayName("Возвращает 200 и передаёт профессию в сервис, когда она указана")
+        void returns200WhenProfessionProvided() throws Exception {
             // given
-            when(trainingService.suggestTopics("Java-разработчик", "spr")).thenReturn(List.of("Spring Boot"));
+            when(trainingService.suggestSkills("Java-разработчик", "spr")).thenReturn(List.of("Spring Boot"));
 
-            // when / then
-            mvc.perform(get(BASE + "/suggest/topics")
+            // when
+            mvc.perform(get(BASE + "/suggest/skills")
                             .with(user(principal()))
                             .param("profession", "Java-разработчик")
                             .param("query", "spr"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0]").value("Spring Boot"));
+
+            // then
+            verify(trainingService).suggestSkills("Java-разработчик", "spr");
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда profession отсутствует")
-        void returns400WhenProfessionMissing() throws Exception {
-            // when / then
-            mvc.perform(get(BASE + "/suggest/topics")
+        @DisplayName("Возвращает 200 и передаёт null вместо профессии в сервис, когда она не указана")
+        void returns200WhenProfessionMissing() throws Exception {
+            // given
+            when(trainingService.suggestSkills(isNull(), eq("spr"))).thenReturn(List.of("Spring Boot"));
+
+            // when
+            mvc.perform(get(BASE + "/suggest/skills")
                             .with(user(principal()))
                             .param("query", "spr"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0]").value("Spring Boot"));
+
+            // then
+            verify(trainingService).suggestSkills(isNull(), eq("spr"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда query отсутствует")
+        void returns400WhenQueryMissing() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/suggest/skills")
+                            .with(user(principal())))
                     .andExpect(status().isBadRequest());
 
             verifyNoInteractions(trainingService);
@@ -412,9 +442,8 @@ class TrainingControllerTest {
                     .when(rateLimiter).check(anyString(), any(RateLimitProperties.Bucket.class));
 
             // when / then
-            mvc.perform(get(BASE + "/suggest/topics")
+            mvc.perform(get(BASE + "/suggest/skills")
                             .with(user(principal()))
-                            .param("profession", "Java-разработчик")
                             .param("query", "spr"))
                     .andExpect(status().isTooManyRequests());
 
@@ -425,12 +454,29 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 401, когда нет аутентификации")
         void returns401WithoutAuthentication() throws Exception {
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
-            mvc.perform(get(BASE + "/suggest/topics")
-                            .param("profession", "Java-разработчик")
+            mvc.perform(get(BASE + "/suggest/skills")
                             .param("query", "spr"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Передаёт в rate limiter ключ с префиксом \"suggest-skills:\" — бакет отдельный от профессий")
+        void passesKeyWithSuggestPrefixToRateLimiter() throws Exception {
+            // given
+            when(trainingService.suggestSkills(isNull(), eq("spr"))).thenReturn(List.of("Spring Boot"));
+            var keyCaptor = ArgumentCaptor.forClass(String.class);
+
+            // when
+            mvc.perform(get(BASE + "/suggest/skills")
+                            .with(user(principal()))
+                            .param("query", "spr"))
+                    .andExpect(status().isOk());
+
+            // then
+            verify(rateLimiter).check(keyCaptor.capture(), any(RateLimitProperties.Bucket.class));
+            assertThat(keyCaptor.getValue()).startsWith("suggest-skills:");
         }
     }
 
@@ -446,9 +492,9 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 200 с телом из сервиса при валидном запросе")
         void returns200OnHappyPath() throws Exception {
             // given
-            var request = new NormalizeInputRequest("джава дев", "спринг");
+            var request = new NormalizeInputRequest("спринг", "джава дев");
             var response = new NormalizeInputResponse(
-                    true, List.of("Java-разработчик"), true, List.of("Spring"), true);
+                    true, List.of("Spring Boot"), true, List.of("Java-разработчик"), true);
             when(trainingService.normalizeInput(any())).thenReturn(response);
 
             // when / then
@@ -457,38 +503,50 @@ class TrainingControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.skillRecognized").value(true))
+                    .andExpect(jsonPath("$.skillSuggestions[0]").value("Spring Boot"))
                     .andExpect(jsonPath("$.professionRecognized").value(true))
                     .andExpect(jsonPath("$.professionSuggestions[0]").value("Java-разработчик"))
-                    .andExpect(jsonPath("$.topicFitsProfession").value(true));
+                    .andExpect(jsonPath("$.skillFitsProfession").value(true));
         }
 
         @Test
-        @DisplayName("Возвращает 200 и передаёт в сервис topic=null, когда topic отсутствует")
-        void returns200WhenTopicMissing() throws Exception {
+        @DisplayName("Возвращает 400, когда skill пустая строка")
+        void returns400WhenSkillBlank() throws Exception {
             // given
-            var request = new NormalizeInputRequest("джава дев", null);
-            var response = new NormalizeInputResponse(
-                    true, List.of("Java-разработчик"), null, null, null);
-            when(trainingService.normalizeInput(any())).thenReturn(response);
-            var requestCaptor = ArgumentCaptor.forClass(NormalizeInputRequest.class);
+            var request = new NormalizeInputRequest("", "джава дев");
 
-            // when
+            // when / then
             mvc.perform(post(BASE + "/normalize")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isBadRequest());
 
-            // then
-            verify(trainingService).normalizeInput(requestCaptor.capture());
-            assertThat(requestCaptor.getValue().topic()).isNull();
+            verifyNoInteractions(trainingService);
         }
 
         @Test
         @DisplayName("Возвращает 400, когда profession пустая строка")
         void returns400WhenProfessionBlank() throws Exception {
             // given
-            var request = new NormalizeInputRequest("", "спринг");
+            var request = new NormalizeInputRequest("спринг", "");
+
+            // when / then
+            mvc.perform(post(BASE + "/normalize")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда skill длиннее 100 символов")
+        void returns400WhenSkillTooLong() throws Exception {
+            // given
+            var request = new NormalizeInputRequest("a".repeat(101), "джава дев");
 
             // when / then
             mvc.perform(post(BASE + "/normalize")
@@ -504,23 +562,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда profession длиннее 100 символов")
         void returns400WhenProfessionTooLong() throws Exception {
             // given
-            var request = new NormalizeInputRequest("a".repeat(101), "спринг");
-
-            // when / then
-            mvc.perform(post(BASE + "/normalize")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(trainingService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда topic длиннее 100 символов")
-        void returns400WhenTopicTooLong() throws Exception {
-            // given
-            var request = new NormalizeInputRequest("джава дев", "b".repeat(101));
+            var request = new NormalizeInputRequest("спринг", "b".repeat(101));
 
             // when / then
             mvc.perform(post(BASE + "/normalize")
@@ -536,7 +578,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 429 и передаёт в rate limiter ключ с префиксом \"normalize:\", когда лимит превышен")
         void returns429WhenRateLimited() throws Exception {
             // given
-            var request = new NormalizeInputRequest("джава дев", "спринг");
+            var request = new NormalizeInputRequest("спринг", "джава дев");
             doThrow(new TooManyRequestsException("Too many requests"))
                     .when(rateLimiter).check(anyString(), any(RateLimitProperties.Bucket.class));
             var keyCaptor = ArgumentCaptor.forClass(String.class);
@@ -558,7 +600,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 503, когда сервис бросает LlmException")
         void returns503WhenLlmUnavailable() throws Exception {
             // given
-            var request = new NormalizeInputRequest("джава дев", "спринг");
+            var request = new NormalizeInputRequest("спринг", "джава дев");
             when(trainingService.normalizeInput(any())).thenThrow(new LlmException("LLM недоступен"));
 
             // when / then
@@ -573,12 +615,104 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 401, когда нет аутентификации")
         void returns401WithoutAuthentication() throws Exception {
             // given
-            var request = new NormalizeInputRequest("джава дев", "спринг");
+            var request = new NormalizeInputRequest("спринг", "джава дев");
 
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(post(BASE + "/normalize")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /sessions/{sessionId}/questions/{questionId}/reference-answer
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetReferenceAnswer")
+    class GetReferenceAnswer {
+
+        private final UUID sessionId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        private final UUID questionId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
+        private String uri() {
+            return BASE + "/sessions/" + sessionId + "/questions/" + questionId + "/reference-answer";
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 с эталонным ответом из сервиса")
+        void returns200OnHappyPath() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenReturn(new ReferenceAnswerResponse("Использую индексы и explain analyze"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.answer").value("Использую индексы и explain analyze"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 403, когда вопрос принадлежит другому пользователю")
+        void returns403WhenForbidden() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new ForbiddenException("Access denied"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда вопрос не найден")
+        void returns404WhenQuestionNotFound() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new NotFoundException("Question not found"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 409, когда вопрос не принадлежит указанной сессии")
+        void returns409WhenQuestionFromAnotherSession() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new ConflictException("Invalid session"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Возвращает 503, когда AI-сервис недоступен")
+        void returns503WhenLlmUnavailable() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new LlmException("Reference answer is not available"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isServiceUnavailable());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(get(uri()))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

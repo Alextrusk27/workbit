@@ -15,7 +15,7 @@ import ru.workbit.interview.dto.RecommendedTrainingResponse;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.interview.repository.InterviewSessionRepository;
-import ru.workbit.training.dto.TrainingTopicMatch;
+import ru.workbit.training.dto.TrainingSkillMatch;
 import ru.workbit.training.model.TrainingSession;
 import ru.workbit.training.service.TrainingService;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
@@ -254,9 +254,9 @@ class InterviewVacancyServiceTest {
             when(vacancyService.getSnapshotView(snap)).thenReturn(view);
 
             UUID trainingSessionId = UUID.randomUUID();
-            TrainingTopicMatch solidMatch = new TrainingTopicMatch(
+            TrainingSkillMatch solidMatch = new TrainingSkillMatch(
                     trainingSessionId, "Solid", TrainingSession.Status.IN_PROGRESS, null, 2, 10);
-            when(trainingService.findLatestByTopics(userId, Set.of("solid", "многопоточность")))
+            when(trainingService.findLatestBySkills(userId, Set.of("solid", "многопоточность")))
                     .thenReturn(List.of(solidMatch));
 
             // when
@@ -282,7 +282,7 @@ class InterviewVacancyServiceTest {
                     .thenReturn(List.of(olderSession, newerSession));
             VacancySnapshotView view = aView(vacancyId, "Java-разработчик");
             when(vacancyService.getSnapshotView(snap)).thenReturn(view);
-            when(trainingService.findLatestByTopics(userId, Set.of("многопоточность"))).thenReturn(List.of());
+            when(trainingService.findLatestBySkills(userId, Set.of("многопоточность"))).thenReturn(List.of());
 
             // when
             InterviewVacancyDetailResponse result = interviewVacancyService.get(vacancyId, userId);

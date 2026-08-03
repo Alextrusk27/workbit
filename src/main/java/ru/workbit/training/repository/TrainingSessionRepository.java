@@ -23,10 +23,10 @@ public interface TrainingSessionRepository extends JpaRepository<@NotNull Traini
 
     @Query("""
             SELECT ts FROM TrainingSession ts
-            WHERE ts.userId = :userId AND LOWER(ts.topic) IN :topics
+            WHERE ts.userId = :userId AND LOWER(ts.skill) IN :skills
             ORDER BY ts.created DESC
             """)
-    List<TrainingSession> findAllByUserIdAndLoweredTopicIn(@NotNull UUID userId, @NotNull Collection<String> topics);
+    List<TrainingSession> findAllByUserIdAndLoweredSkillIn(@NotNull UUID userId, @NotNull Collection<String> skills);
 
     @Query("""
             SELECT ts FROM TrainingSession ts

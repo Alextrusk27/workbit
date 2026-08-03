@@ -24,18 +24,18 @@ class TrainingSessionMapperTest {
     class ToEntity {
 
         @Test
-        @DisplayName("Переносит profession/topic/level и не трогает игнорируемые поля - status/created остаются дефолтными")
+        @DisplayName("Переносит skill/profession/level и не трогает игнорируемые поля - status/created остаются дефолтными")
         void mapsRequestFieldsAndKeepsIgnoredDefaults() {
             // given
             var before = Instant.now();
-            var request = new CreateSessionRequest("Java-разработчик", "Spring Boot", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
 
             // when
             TrainingSession entity = mapper.toEntity(request);
 
             // then
+            assertThat(entity.getSkill()).isEqualTo("Spring Boot");
             assertThat(entity.getProfession()).isEqualTo("Java-разработчик");
-            assertThat(entity.getTopic()).isEqualTo("Spring Boot");
             assertThat(entity.getLevel()).isEqualTo(TrainingSession.Level.MIDDLE);
 
             assertThat(entity.getId()).isNull();
@@ -61,8 +61,8 @@ class TrainingSessionMapperTest {
             var completedAt = Instant.now();
             var session = TrainingSession.builder()
                     .id(sessionId)
+                    .skill("Spring Boot")
                     .profession("Java-разработчик")
-                    .topic("Spring Boot")
                     .level(TrainingSession.Level.SENIOR)
                     .status(TrainingSession.Status.COMPLETED)
                     .created(created)
@@ -74,8 +74,8 @@ class TrainingSessionMapperTest {
 
             // then
             assertThat(dto.id()).isEqualTo(sessionId);
+            assertThat(dto.skill()).isEqualTo("Spring Boot");
             assertThat(dto.profession()).isEqualTo("Java-разработчик");
-            assertThat(dto.topic()).isEqualTo("Spring Boot");
             assertThat(dto.level()).isEqualTo(TrainingSession.Level.SENIOR);
             assertThat(dto.status()).isEqualTo(TrainingSession.Status.COMPLETED);
             assertThat(dto.answeredCount()).isEqualTo(3);

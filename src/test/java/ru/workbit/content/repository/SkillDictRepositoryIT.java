@@ -10,7 +10,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
 
 import java.util.UUID;
 
@@ -19,11 +19,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@DisplayName("TopicDictRepositoryIT")
-class TopicDictRepositoryIT extends AbstractPostgresIT {
+@DisplayName("SkillDictRepositoryIT")
+class SkillDictRepositoryIT extends AbstractPostgresIT {
 
     @Autowired
-    private TopicDictRepository repository;
+    private SkillDictRepository repository;
 
     @Autowired
     private TestEntityManager em;
@@ -36,31 +36,23 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
-    private TopicDict aTopic(UUID professionId, String name) {
-        return TopicDict.builder()
+    private SkillDict aSkill(UUID professionId, String name) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
                 .build(); // status=AUTO, usageCount=0 — @Builder.Default
     }
 
-    private TopicDict aTopic(UUID professionId, String name, int usageCount) {
-        return TopicDict.builder()
-                .professionId(professionId)
-                .name(name)
-                .usageCount(usageCount)
-                .build();
-    }
-
-    private TopicDict anApprovedTopic(UUID professionId, String name) {
-        return TopicDict.builder()
+    private SkillDict anApprovedSkill(UUID professionId, String name) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
                 .status(DictStatus.APPROVED)
                 .build();
     }
 
-    private TopicDict anApprovedTopic(UUID professionId, String name, int usageCount) {
-        return TopicDict.builder()
+    private SkillDict anApprovedSkill(UUID professionId, String name, int usageCount) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
                 .usageCount(usageCount)
@@ -75,32 +67,32 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
     class UniqueNamePerProfession {
 
         @Test
-        @DisplayName("Дубль имени темы в другом регистре у той же профессии нарушает уникальность при flush")
+        @DisplayName("Дубль имени навыка в другом регистре у той же профессии нарушает уникальность при flush")
         void throwsOnDuplicateNameSameProfessionDifferentCase() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
-            em.persistAndFlush(aTopic(profession.getId(), "Spring Core"));
+            em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
 
             // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(aTopic(profession.getId(), "spring core")))
+            assertThatThrownBy(() -> em.persistAndFlush(aSkill(profession.getId(), "spring core")))
                     .isInstanceOf(Exception.class);
         }
 
         @Test
-        @DisplayName("Одинаковое имя темы у разных профессий допустимо")
+        @DisplayName("Одинаковое имя навыка у разных профессий допустимо")
         void allowsSameNameForDifferentProfessions() {
             // given
             var professionA = em.persistAndFlush(aProfession("Java Developer"));
             var professionB = em.persistAndFlush(aProfession("Python Developer"));
 
             // when
-            var topicA = em.persistAndFlush(aTopic(professionA.getId(), "Databases"));
-            var topicB = em.persistAndFlush(aTopic(professionB.getId(), "Databases"));
+            var skillA = em.persistAndFlush(aSkill(professionA.getId(), "Databases"));
+            var skillB = em.persistAndFlush(aSkill(professionB.getId(), "Databases"));
 
             // then
-            assertThat(topicA.getId()).isNotEqualTo(topicB.getId());
-            assertThat(repository.findById(topicA.getId())).isPresent();
-            assertThat(repository.findById(topicB.getId())).isPresent();
+            assertThat(skillA.getId()).isNotEqualTo(skillB.getId());
+            assertThat(repository.findById(skillA.getId())).isPresent();
+            assertThat(repository.findById(skillB.getId())).isPresent();
         }
     }
 
@@ -119,8 +111,8 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
             // when / then — Java-энум DictStatus не позволяет собрать невалидное значение,
             // поэтому CHECK проверяем нативной вставкой в обход маппинга
             assertThatThrownBy(() -> em.getEntityManager()
-                    .createNativeQuery("INSERT INTO content.topic_dict (id, profession_id, name, status) "
-                            + "VALUES (gen_random_uuid(), :professionId, 'Bad Status Topic', 'BOGUS')")
+                    .createNativeQuery("INSERT INTO content.skill_dict (id, profession_id, name, status) "
+                            + "VALUES (gen_random_uuid(), :professionId, 'Bad Status Skill', 'BOGUS')")
                     .setParameter("professionId", profession.getId())
                     .executeUpdate())
                     .isInstanceOf(Exception.class);
@@ -138,11 +130,11 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void uuidIsGeneratedOnSave() {
             // given
             var profession = em.persistAndFlush(aProfession("Uuid Gen Profession"));
-            var topic = aTopic(profession.getId(), "Uuid Gen Topic");
-            assertThat(topic.getId()).isNull();
+            var skill = aSkill(profession.getId(), "Uuid Gen Skill");
+            assertThat(skill.getId()).isNull();
 
             // when
-            var saved = em.persistFlushFind(topic);
+            var saved = em.persistFlushFind(skill);
 
             // then
             assertThat(saved.getId()).isNotNull();
@@ -155,7 +147,7 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
             var profession = em.persistAndFlush(aProfession("Defaults Profession"));
 
             // when
-            var saved = em.persistFlushFind(aTopic(profession.getId(), "Defaults Topic"));
+            var saved = em.persistFlushFind(aSkill(profession.getId(), "Defaults Skill"));
 
             // then
             assertThat(saved.getStatus()).isEqualTo(DictStatus.AUTO);
@@ -171,19 +163,19 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
     class Suggest {
 
         @Test
-        @DisplayName("Возвращаются только темы указанной профессии")
-        void returnsOnlyTopicsOfGivenProfession() {
+        @DisplayName("Возвращаются только навыки указанной профессии")
+        void returnsOnlySkillsOfGivenProfession() {
             // given
             var professionA = em.persistAndFlush(aProfession("Zzz Backend Developer"));
             var professionB = em.persistAndFlush(aProfession("Zzz Frontend Developer"));
-            var topicA = em.persistAndFlush(anApprovedTopic(professionA.getId(), "Databases Basics"));
-            em.persistAndFlush(anApprovedTopic(professionB.getId(), "Databases Basics"));
+            var skillA = em.persistAndFlush(anApprovedSkill(professionA.getId(), "Databases Basics"));
+            em.persistAndFlush(anApprovedSkill(professionB.getId(), "Databases Basics"));
 
             // when
             var result = repository.suggest(professionA.getName(), "databases", 10);
 
             // then
-            assertThat(result).extracting(TopicDict::getId).containsExactly(topicA.getId());
+            assertThat(result).extracting(SkillDict::getId).containsExactly(skillA.getId());
         }
 
         @Test
@@ -191,13 +183,13 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void resolvesProfessionCaseInsensitively() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Backend Developer"));
-            var topic = em.persistAndFlush(anApprovedTopic(profession.getId(), "Rest Api Basics"));
+            var skill = em.persistAndFlush(anApprovedSkill(profession.getId(), "Rest Api Basics"));
 
             // when
             var result = repository.suggest("zzz BACKEND developer", "rest", 10);
 
             // then
-            assertThat(result).extracting(TopicDict::getId).containsExactly(topic.getId());
+            assertThat(result).extracting(SkillDict::getId).containsExactly(skill.getId());
         }
 
         @Test
@@ -211,11 +203,11 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("AUTO-тема не попадает в выдачу, даже если имя матчится")
-        void autoStatusTopicIsExcluded() {
+        @DisplayName("AUTO-навык не попадает в выдачу, даже если имя матчится")
+        void autoStatusSkillIsExcluded() {
             // given
-            var profession = em.persistAndFlush(aProfession("Zzz Auto Topic Profession"));
-            em.persistAndFlush(aTopic(profession.getId(), "Auto Only Topic"));
+            var profession = em.persistAndFlush(aProfession("Zzz Auto Skill Profession"));
+            em.persistAndFlush(aSkill(profession.getId(), "Auto Only Skill"));
 
             // when
             var result = repository.suggest(profession.getName(), "auto only", 10);
@@ -229,14 +221,14 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void prefixMatchesRankBeforeSubstringMatches() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Ranking Profession"));
-            em.persistAndFlush(anApprovedTopic(profession.getId(), "Backend Dev Guru", 100));
-            em.persistAndFlush(anApprovedTopic(profession.getId(), "Dev Ninja", 1));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Backend Dev Guru", 100));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Dev Ninja", 1));
 
             // when
             var result = repository.suggest(profession.getName(), "dev", 10);
 
             // then
-            assertThat(result).extracting(TopicDict::getName)
+            assertThat(result).extracting(SkillDict::getName)
                     .containsExactly("Dev Ninja", "Backend Dev Guru");
         }
 
@@ -245,15 +237,154 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         void sameMatchTypeOrderedByUsageCountDesc() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Usage Profession"));
-            em.persistAndFlush(anApprovedTopic(profession.getId(), "Qwe One", 1));
-            em.persistAndFlush(anApprovedTopic(profession.getId(), "Qwe Two", 5));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Qwe One", 1));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Qwe Two", 5));
 
             // when
             var result = repository.suggest(profession.getName(), "qwe", 10);
 
             // then
-            assertThat(result).extracting(TopicDict::getName)
+            assertThat(result).extracting(SkillDict::getName)
                     .containsExactly("Qwe Two", "Qwe One");
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("SuggestAcrossProfessions")
+    class SuggestAcrossProfessions {
+
+        @Test
+        @DisplayName("Схлопывает одноимённые навыки разных профессий в одну запись")
+        void collapsesSameNameSkillsAcrossProfessions() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Cross Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Cross Profession B"));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Cross Skill", 2));
+            em.persistAndFlush(anApprovedSkill(professionB.getId(), "Zzz Cross Skill", 3));
+
+            // when
+            var result = repository.suggestAcrossProfessions("zzz cross", 10);
+
+            // then
+            assertThat(result).containsExactly("Zzz Cross Skill");
+        }
+
+        @Test
+        @DisplayName("Сортирует схлопнутые группы по суммарному usage_count по всем профессиям DESC")
+        void ordersCollapsedGroupsBySummedUsageCountDesc() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Sum Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Sum Profession B"));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Sum Alpha", 1));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Sum Beta", 2));
+            em.persistAndFlush(anApprovedSkill(professionB.getId(), "Zzz Sum Beta", 5));
+
+            // when
+            var result = repository.suggestAcrossProfessions("zzz sum", 10);
+
+            // then — Beta: 2+5=7, Alpha: 1
+            assertThat(result).containsExactly("Zzz Sum Beta", "Zzz Sum Alpha");
+        }
+
+        @Test
+        @DisplayName("AUTO-навык не попадает в выдачу, даже если имя матчится")
+        void autoStatusSkillIsExcluded() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Cross Auto Profession"));
+            em.persistAndFlush(aSkill(profession.getId(), "Zzz Auto Cross Skill"));
+
+            // when
+            var result = repository.suggestAcrossProfessions("zzz auto cross", 10);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Prefix-совпадения идут раньше substring-совпадений независимо от usage_count")
+        void prefixMatchesRankBeforeSubstringMatches() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Cross Ranking Profession"));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Backend Dev Guru Cross", 100));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Dev Ninja Cross", 1));
+
+            // when
+            var result = repository.suggestAcrossProfessions("dev", 10);
+
+            // then
+            assertThat(result).containsExactly("Dev Ninja Cross", "Backend Dev Guru Cross");
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindTopNames")
+    class FindTopNames {
+
+        @Test
+        @DisplayName("Схлопывает одноимённые навыки разных профессий и суммирует usage_count")
+        void collapsesSameNameSkillsAcrossProfessions() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Top Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Top Profession B"));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Top Cross", 2));
+            em.persistAndFlush(anApprovedSkill(professionB.getId(), "Zzz Top Cross", 3));
+
+            // when
+            var result = repository.findTopNames(50);
+
+            // then
+            assertThat(result).containsExactly("Zzz Top Cross");
+        }
+
+        @Test
+        @DisplayName("Сортирует по суммарному usage_count DESC, затем по имени")
+        void ordersBySummedUsageCountDesc() {
+            // given
+            var professionA = em.persistAndFlush(aProfession("Zzz Rank Profession A"));
+            var professionB = em.persistAndFlush(aProfession("Zzz Rank Profession B"));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Rank Low", 1));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Zzz Rank High", 2));
+            em.persistAndFlush(anApprovedSkill(professionB.getId(), "Zzz Rank High", 5));
+
+            // when
+            var result = repository.findTopNames(50);
+
+            // then — High: 2+5=7, Low: 1
+            assertThat(result).containsExactly("Zzz Rank High", "Zzz Rank Low");
+        }
+
+        @Test
+        @DisplayName("AUTO-навыки исключены из топа")
+        void autoStatusSkillsAreExcluded() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Top Auto Profession"));
+            em.persistAndFlush(aSkill(profession.getId(), "Zzz Auto Top Skill"));
+
+            // when
+            var result = repository.findTopNames(50);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Limit обрезает количество результатов")
+        void limitCutsResults() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Zzz Lim Profession"));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Lim One", 1));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Lim Two", 2));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Lim Three", 3));
+
+            // when
+            var result = repository.findTopNames(2);
+
+            // then
+            assertThat(result).containsExactly("Lim Three", "Lim Two");
         }
     }
 
@@ -264,11 +395,11 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
     class ExistsByProfessionIdAndNameIgnoreCaseAndStatus {
 
         @Test
-        @DisplayName("True для APPROVED-темы своей профессии при другом регистре имени")
-        void trueForApprovedTopicDifferentCase() {
+        @DisplayName("True для APPROVED-навыка своей профессии при другом регистре имени")
+        void trueForApprovedSkillDifferentCase() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Exists Profession"));
-            em.persistAndFlush(anApprovedTopic(profession.getId(), "Rest Api Basics"));
+            em.persistAndFlush(anApprovedSkill(profession.getId(), "Rest Api Basics"));
 
             // when
             var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
@@ -279,27 +410,27 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("False, если тема есть, но статус AUTO")
-        void falseWhenTopicIsAutoStatus() {
+        @DisplayName("False, если навык есть, но статус AUTO")
+        void falseWhenSkillIsAutoStatus() {
             // given
             var profession = em.persistAndFlush(aProfession("Zzz Exists Auto Profession"));
-            em.persistAndFlush(aTopic(profession.getId(), "Auto Only Topic"));
+            em.persistAndFlush(aSkill(profession.getId(), "Auto Only Skill"));
 
             // when
             var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
-                    profession.getId(), "auto only topic", DictStatus.APPROVED);
+                    profession.getId(), "auto only skill", DictStatus.APPROVED);
 
             // then
             assertThat(result).isFalse();
         }
 
         @Test
-        @DisplayName("False для той же темы, но другого professionId")
-        void falseForSameTopicDifferentProfessionId() {
+        @DisplayName("False для того же навыка, но другого professionId")
+        void falseForSameSkillDifferentProfessionId() {
             // given
             var professionA = em.persistAndFlush(aProfession("Zzz Exists Profession A"));
             var professionB = em.persistAndFlush(aProfession("Zzz Exists Profession B"));
-            em.persistAndFlush(anApprovedTopic(professionA.getId(), "Databases Basics"));
+            em.persistAndFlush(anApprovedSkill(professionA.getId(), "Databases Basics"));
 
             // when
             var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
@@ -317,7 +448,7 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
 
             // when
             var result = repository.existsByProfessionIdAndNameIgnoreCaseAndStatus(
-                    profession.getId(), "Zzz Nonexistent Topic Name", DictStatus.APPROVED);
+                    profession.getId(), "Zzz Nonexistent Skill Name", DictStatus.APPROVED);
 
             // then
             assertThat(result).isFalse();
@@ -331,8 +462,8 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
     class UpsertAndIncrementUsage {
 
         @Test
-        @DisplayName("Новая тема создаётся со status AUTO, usage_count 1 и привязкой к профессии")
-        void newTopicCreatesRowWithDefaults() {
+        @DisplayName("Новый навык создаётся со status AUTO, usage_count 1 и привязкой к профессии")
+        void newSkillCreatesRowWithDefaults() {
             // given
             var profession = em.persistAndFlush(aProfession("Kotlin Engineer"));
 
@@ -365,8 +496,8 @@ class TopicDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Одинаковое имя темы у разных профессий создаёт две независимые строки")
-        void sameTopicNameDifferentProfessionsCreatesIndependentRows() {
+        @DisplayName("Одинаковое имя навыка у разных профессий создаёт две независимые строки")
+        void sameSkillNameDifferentProfessionsCreatesIndependentRows() {
             // given
             var professionA = em.persistAndFlush(aProfession("Zzz Upsert Profession A"));
             var professionB = em.persistAndFlush(aProfession("Zzz Upsert Profession B"));

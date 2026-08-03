@@ -21,7 +21,6 @@ class TrainingQuestionMapperTest {
                 .id(UUID.randomUUID())
                 .text("Что такое JVM?")
                 .orderIndex(2)
-                .followUp(true)
                 .answerText("JVM - виртуальная машина Java");
     }
 
@@ -46,7 +45,6 @@ class TrainingQuestionMapperTest {
             assertThat(dto.questionId()).isEqualTo(question.getId());
             assertThat(dto.questionText()).isEqualTo("Что такое JVM?");
             assertThat(dto.orderIndex()).isEqualTo(2);
-            assertThat(dto.followUp()).isTrue();
             assertThat(dto.answerText()).isEqualTo("JVM - виртуальная машина Java");
             assertThat(dto.score()).isEqualTo(4);
             assertThat(dto.feedback()).isEqualTo("Хороший ответ, но не хватило деталей");
@@ -67,7 +65,6 @@ class TrainingQuestionMapperTest {
             assertThat(dto.questionId()).isEqualTo(question.getId());
             assertThat(dto.questionText()).isEqualTo("Что такое JVM?");
             assertThat(dto.orderIndex()).isEqualTo(2);
-            assertThat(dto.followUp()).isTrue();
             assertThat(dto.answerText()).isEqualTo("JVM - виртуальная машина Java");
         }
     }

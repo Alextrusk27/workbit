@@ -11,7 +11,7 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
 
 import java.util.List;
 import java.util.UUID;
@@ -53,17 +53,17 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
-    private TopicDict aTopic(UUID professionId, String name) {
-        return TopicDict.builder()
+    private SkillDict aSkill(UUID professionId, String name) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
                 .build();
     }
 
-    private BankQuestion aBankQuestion(UUID professionId, UUID topicId) {
+    private BankQuestion aBankQuestion(UUID professionId, UUID skillId) {
         return BankQuestion.builder()
                 .professionId(professionId)
-                .topicId(topicId)
+                .skillId(skillId)
                 .levels(List.of("JUNIOR"))
                 .text("Что такое SOLID?")
                 .build();
@@ -157,13 +157,12 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     class CascadeDelete {
 
         @Test
-        @DisplayName("Удаление профессии каскадно удаляет её темы и вопросы банка")
-        void cascadeDeleteRemovesTopicsAndBankQuestions() {
+        @DisplayName("Удаление профессии каскадно удаляет её навыки и вопросы банка")
+        void cascadeDeleteRemovesSkillsAndBankQuestions() {
             // given
             var profession = em.persistAndFlush(aProfession("Cascade Profession"));
-            var topic = em.persistAndFlush(aTopic(profession.getId(), "Cascade Topic"));
-            var topicalQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), topic.getId()));
-            var generalQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), null));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Cascade Skill"));
+            var question = em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId()));
 
             // when — физическое удаление профессии нативным SQL, чтобы проверить реальный
             // ON DELETE CASCADE в БД, минуя JPA-кеш
@@ -176,9 +175,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(repository.findById(profession.getId())).isEmpty();
-            assertThat(em.find(TopicDict.class, topic.getId())).isNull();
-            assertThat(em.find(BankQuestion.class, topicalQuestion.getId())).isNull();
-            assertThat(em.find(BankQuestion.class, generalQuestion.getId())).isNull();
+            assertThat(em.find(SkillDict.class, skill.getId())).isNull();
+            assertThat(em.find(BankQuestion.class, question.getId())).isNull();
         }
     }
 

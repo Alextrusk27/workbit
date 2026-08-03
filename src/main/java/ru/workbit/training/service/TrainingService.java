@@ -39,6 +39,7 @@ import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.util.DictText;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -80,8 +81,8 @@ public class TrainingService {
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
-        session.setSkill(session.getSkill().strip());
-        session.setProfession(session.getProfession().strip());
+        session.setSkill(DictText.normalize(session.getSkill()));
+        session.setProfession(DictText.normalize(session.getProfession()));
 
         canonicalizeInput(session);
 
@@ -250,14 +251,14 @@ public class TrainingService {
 
     public NormalizeInputResponse normalizeInput(NormalizeInputRequest request) {
         LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
-                request.skill().strip(),
-                request.profession().strip()));
+                DictText.normalize(request.skill()),
+                DictText.normalize(request.profession())));
 
         return new NormalizeInputResponse(
                 normalized.skillRecognized(),
-                normalized.skillSuggestions() != null ? normalized.skillSuggestions() : List.of(),
+                cleanSuggestions(normalized.skillSuggestions()),
                 normalized.professionRecognized(),
-                normalized.professionSuggestions() != null ? normalized.professionSuggestions() : List.of(),
+                cleanSuggestions(normalized.professionSuggestions()),
                 normalized.skillFitsProfession());
     }
 
@@ -265,7 +266,7 @@ public class TrainingService {
         if (isTooShortQuery(query)) {
             return List.of();
         }
-        return professionDictRepository.suggest(escapeLike(query.strip()), SUGGEST_LIMIT).stream()
+        return professionDictRepository.suggest(escapeLike(DictText.normalize(query)), SUGGEST_LIMIT).stream()
                 .map(ProfessionDict::getName)
                 .toList();
     }
@@ -278,11 +279,11 @@ public class TrainingService {
         if (isTooShortQuery(query)) {
             return List.of();
         }
-        String escaped = escapeLike(query.strip());
+        String escaped = escapeLike(DictText.normalize(query));
         if (profession == null || profession.isBlank()) {
             return skillDictRepository.suggestAcrossProfessions(escaped, SUGGEST_LIMIT);
         }
-        return skillDictRepository.suggest(profession.strip(), escaped, SUGGEST_LIMIT).stream()
+        return skillDictRepository.suggest(DictText.normalize(profession), escaped, SUGGEST_LIMIT).stream()
                 .map(SkillDict::getName)
                 .toList();
     }
@@ -329,10 +330,20 @@ public class TrainingService {
         }
     }
 
+    private static List<String> cleanSuggestions(List<String> suggestions) {
+        if (suggestions == null) {
+            return List.of();
+        }
+        return suggestions.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(DictText::normalize)
+                .toList();
+    }
+
     private static String canonical(String input, List<String> suggestions) {
         String canonical = suggestions == null ? null : suggestions.stream()
                 .filter(s -> s != null && !s.isBlank())
-                .map(String::strip)
+                .map(DictText::normalize)
                 .filter(s -> s.length() <= MAX_INPUT_LENGTH)
                 .findFirst()
                 .orElse(null);

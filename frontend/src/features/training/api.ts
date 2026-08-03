@@ -6,6 +6,7 @@ export type Level = string
 export type SessionStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED'
 
 export interface TrainingOptions {
+  skills: string[]
   professions: Profession[]
   levels: Level[]
   questionCap: number
@@ -13,28 +14,28 @@ export interface TrainingOptions {
 }
 
 export interface CreateTrainingRequest {
+  skill: string
   profession: Profession
-  topic: string | null
   level: Level
 }
 
 export interface NormalizeInputRequest {
+  skill: string
   profession: string
-  topic: string | null
 }
 
 export interface NormalizeInputResponse {
+  skillRecognized: boolean
+  skillSuggestions: string[]
   professionRecognized: boolean
   professionSuggestions: string[]
-  topicRecognized: boolean | null
-  topicSuggestions: string[] | null
-  topicFitsProfession: boolean | null
+  skillFitsProfession: boolean
 }
 
 export interface TrainingSession {
   id: string
+  skill: string
   profession: Profession
-  topic: string | null
   level: Level
   status: SessionStatus
   answeredCount: number
@@ -46,7 +47,6 @@ export interface TrainingQuestion {
   questionId: string
   orderIndex: number
   questionText: string
-  followUp: boolean
   answerText: string | null
   score: number | null
   feedback: string | null
@@ -55,13 +55,17 @@ export interface TrainingQuestion {
 export interface TrainingReport {
   reportId: string
   sessionId: string
+  skill: string
   profession: Profession
-  topic: string | null
   level: Level
   avgScore: number | null
   overallFeedback: string
   generatedAt: string
   questions: TrainingQuestion[]
+}
+
+export interface ReferenceAnswer {
+  answer: string
 }
 
 /** Обёртка Spring PagedModel: нужен только content, метаданные страницы игнорируем. */
@@ -85,9 +89,10 @@ export const trainingApi = {
       `${BASE}/suggest/professions?query=${encodeURIComponent(query)}`,
     ),
 
-  suggestTopics: (profession: string, query: string) =>
+  suggestSkills: (profession: string, query: string) =>
     apiFetch<string[]>(
-      `${BASE}/suggest/topics?profession=${encodeURIComponent(profession)}&query=${encodeURIComponent(query)}`,
+      `${BASE}/suggest/skills?query=${encodeURIComponent(query)}` +
+        (profession ? `&profession=${encodeURIComponent(profession)}` : ''),
     ),
 
   normalizeInput: (data: NormalizeInputRequest) =>
@@ -112,6 +117,11 @@ export const trainingApi = {
     apiFetch<TrainingQuestion>(`${BASE}/sessions/${sessionId}/questions/next`, {
       method: 'POST',
     }),
+
+  referenceAnswer: (sessionId: string, questionId: string) =>
+    apiFetch<ReferenceAnswer>(
+      `${BASE}/sessions/${sessionId}/questions/${questionId}/reference-answer`,
+    ),
 
   submitAnswer: ({ sessionId, questionId, answerText }: SubmitAnswerVars) =>
     apiFetch<void>(`${BASE}/sessions/${sessionId}/questions/${questionId}`, {

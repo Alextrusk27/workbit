@@ -134,7 +134,7 @@ function EmptyState() {
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
       <h2 className="text-ink text-xl font-bold">Пока нет тренировок</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Запустите первую тренировку — рецензент подберёт вопросы под профессию и
+        Запустите первую тренировку — рецензент подберёт вопросы под навык и
         уровень, а в конце разберёт ваши ответы.
       </p>
       <Link

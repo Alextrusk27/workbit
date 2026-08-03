@@ -6,17 +6,17 @@ export const STATUS_LABELS: Record<SessionStatus, string> = {
   COMPLETED: 'Завершено',
 }
 
-/** Заголовок тренировки — профессия. */
+/** Заголовок тренировки — навык: тренируется он, профессия только уточняет. */
 export function sessionHeadline(session: {
-  profession: TrainingSession['profession']
+  skill: TrainingSession['skill']
 }): string {
-  return session.profession
+  return session.skill
 }
 
-/** Подпись под заголовком — уровень и тема, если она задана. */
+/** Подпись под заголовком — уровень и профессия. */
 export function sessionSubtitle(session: {
   level: TrainingSession['level']
-  topic: TrainingSession['topic']
+  profession: TrainingSession['profession']
 }): string {
-  return session.topic ? `${session.level} · ${session.topic}` : session.level
+  return `${session.level} · ${session.profession}`
 }

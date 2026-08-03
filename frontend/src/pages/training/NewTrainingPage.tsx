@@ -14,7 +14,7 @@ import {
   useCreateSession,
   useNormalizeInput,
   useProfessionSuggest,
-  useTopicSuggest,
+  useSkillSuggest,
   useTrainingOptions,
 } from '@/features/training/useTraining'
 import { trainingErrorMessage } from '@/features/training/errors'
@@ -22,7 +22,7 @@ import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
 import { usePageTitle } from '@/lib/usePageTitle'
 
-const LEVEL_CODES = ['JUNIOR', 'MIDDLE', 'SENIOR']
+const LEVEL_CODES = ['NOEXP', 'JUNIOR', 'MIDDLE', 'SENIOR']
 
 const fromQuery = (value: string | null) => (value ?? '').slice(0, 100)
 
@@ -195,18 +195,27 @@ function SuggestField({
 
 function ConfirmPanel({
   result,
+  skill,
   profession,
-  topic,
+  onPickSkill,
   onPickProfession,
-  onPickTopic,
 }: {
   result: NormalizeInputResponse
+  skill: string
   profession: string
-  topic: string
+  onPickSkill: (v: string) => void
   onPickProfession: (v: string) => void
-  onPickTopic: (v: string) => void
 }) {
   const rows = [
+    {
+      key: 'skill',
+      label: 'Навык',
+      value: skill,
+      recognized: result.skillRecognized,
+      suggestions: result.skillSuggestions,
+      onPick: onPickSkill,
+      unknown: `Не удалось распознать навык «${skill}». С таким навыком тренировка не запустится — уточните формулировку или выберите вариант.`,
+    },
     {
       key: 'profession',
       label: 'Профессия',
@@ -215,15 +224,6 @@ function ConfirmPanel({
       suggestions: result.professionSuggestions,
       onPick: onPickProfession,
       unknown: `Не удалось распознать профессию «${profession}». С такой профессией тренировка не запустится — уточните формулировку или выберите вариант.`,
-    },
-    {
-      key: 'topic',
-      label: 'Тема',
-      value: topic,
-      recognized: result.topicRecognized ?? true,
-      suggestions: result.topicSuggestions ?? [],
-      onPick: onPickTopic,
-      unknown: `Не удалось распознать тему «${topic}». Уточните формулировку, выберите вариант или уберите тему — без неё вопросы будут общими по профессии.`,
     },
   ].filter((row) => row.value.trim() !== '')
 
@@ -258,9 +258,9 @@ function ConfirmPanel({
         ))}
       </div>
 
-      {result.topicFitsProfession === false && (
+      {!result.skillFitsProfession && (
         <p className="text-dim mt-5 text-xs">
-          Тема «{topic}» не выглядит темой для профессии «{profession}» —
+          Навык «{skill}» не выглядит навыком профессии «{profession}» —
           продолжить можно, но вопросы могут получиться неожиданными.
         </p>
       )}
@@ -274,50 +274,49 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
   const normalize = useNormalizeInput()
   const [searchParams] = useSearchParams()
 
+  const [skill, setSkill] = useState(fromQuery(searchParams.get('skill')))
   const [profession, setProfession] = useState(
     fromQuery(searchParams.get('profession')),
   )
-  const [topic, setTopic] = useState(fromQuery(searchParams.get('skill')))
   const [level, setLevel] = useState<string | null>(
     options.levels[LEVEL_CODES.indexOf(searchParams.get('level') ?? '')] ??
       null,
   )
   const [checked, setChecked] = useState<NormalizeInputResponse | null>(null)
 
+  const skillQuery = useDebounced(skill.trim())
   const professionQuery = useDebounced(profession.trim())
-  const topicQuery = useDebounced(topic.trim())
+  const skillSuggest = useSkillSuggest(profession.trim(), skillQuery)
   const professionSuggest = useProfessionSuggest(professionQuery)
-  const topicSuggest = useTopicSuggest(profession.trim(), topicQuery)
 
+  const skillOptions =
+    skillQuery.length >= 2 ? (skillSuggest.data ?? []) : options.skills
   const professionOptions =
     professionQuery.length >= 2
       ? (professionSuggest.data ?? [])
       : options.professions
-  const topicOptions = topicSuggest.data ?? []
 
   const inList = (value: string, list: string[]) =>
     list.some((s) => s.toLowerCase() === value.trim().toLowerCase())
 
   const fromDict =
-    inList(profession, professionOptions) &&
-    (topic.trim() === '' || inList(topic, topicOptions))
+    inList(skill, skillOptions) && inList(profession, professionOptions)
 
-  const ready = profession.trim() !== '' && level !== null
+  const ready =
+    skill.trim() !== '' && profession.trim() !== '' && level !== null
 
   const blocked =
     checked !== null &&
-    ((!checked.professionRecognized &&
-      !inList(profession, checked.professionSuggestions)) ||
-      (topic.trim() !== '' &&
-        checked.topicRecognized === false &&
-        !inList(topic, checked.topicSuggestions ?? [])))
+    ((!checked.skillRecognized && !inList(skill, checked.skillSuggestions)) ||
+      (!checked.professionRecognized &&
+        !inList(profession, checked.professionSuggestions)))
 
   const start = () => {
     if (level === null) return
     create.mutate(
       {
+        skill: skill.trim(),
         profession: profession.trim(),
-        topic: topic.trim() === '' ? null : topic.trim(),
         level,
       },
       {
@@ -336,8 +335,8 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
     }
     normalize.mutate(
       {
+        skill: skill.trim(),
         profession: profession.trim(),
-        topic: topic.trim() === '' ? null : topic.trim(),
       },
       {
         onSuccess: setChecked,
@@ -346,13 +345,13 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
     )
   }
 
-  const editProfession = (v: string) => {
-    setProfession(v)
+  const editSkill = (v: string) => {
+    setSkill(v)
     setChecked(null)
   }
 
-  const editTopic = (v: string) => {
-    setTopic(v)
+  const editProfession = (v: string) => {
+    setProfession(v)
     setChecked(null)
   }
 
@@ -363,25 +362,25 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
       {create.isError && <Alert>{trainingErrorMessage(create.error)}</Alert>}
 
       <SuggestField
+        label="Навык"
+        hint="Технология, область знаний или умение — по нему и будут вопросы"
+        placeholder="Spring Boot"
+        value={skill}
+        suggestions={skillOptions}
+        required
+        onChange={editSkill}
+        onPick={editSkill}
+      />
+
+      <SuggestField
         label="Профессия"
-        hint="Начните вводить — подскажем из справочника; можно вписать свою"
+        hint="Уточняет, под каким углом смотреть на навык"
         placeholder="Java-разработчик"
         value={profession}
         suggestions={professionOptions}
         required
         onChange={editProfession}
         onPick={editProfession}
-      />
-
-      <SuggestField
-        label="Навык (необязательно)"
-        hint="Технология или область знаний — без навыка вопросы будут общими по профессии"
-        placeholder="Spring Boot"
-        value={topic}
-        suggestions={topicOptions}
-        disabled={profession.trim() === ''}
-        onChange={editTopic}
-        onPick={editTopic}
       />
 
       <ChipGroup
@@ -394,10 +393,10 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
       {checked && (
         <ConfirmPanel
           result={checked}
+          skill={skill}
           profession={profession}
-          topic={topic}
+          onPickSkill={setSkill}
           onPickProfession={setProfession}
-          onPickTopic={setTopic}
         />
       )}
 
@@ -423,9 +422,9 @@ export function NewTrainingPage() {
         eyebrow="Новая тренировка навыка"
         title="Соберём тренировку под вас"
       >
-        Тренировка — это прокачка одного навыка. Укажите профессию, при желании
-        — навык, и выберите уровень. Вопросы подберёт рецензент, а разбор придёт
-        в конце.
+        Тренировка — это прокачка одного навыка. Укажите навык, профессию, в
+        контексте которой он нужен, и выберите уровень сложности. Вопросы
+        подберёт рецензент, а разбор придёт в конце.
       </AppPageHeader>
 
       {isLoading && <p className="text-muted mt-10 text-sm">Загрузка…</p>}

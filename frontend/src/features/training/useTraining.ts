@@ -15,8 +15,10 @@ const keys = {
   report: (id: string) => ['training', 'report', id] as const,
   professionSuggest: (query: string) =>
     ['training', 'suggest', 'professions', query] as const,
-  topicSuggest: (profession: string, query: string) =>
-    ['training', 'suggest', 'topics', profession, query] as const,
+  skillSuggest: (profession: string, query: string) =>
+    ['training', 'suggest', 'skills', profession, query] as const,
+  referenceAnswer: (sessionId: string, questionId: string) =>
+    ['training', 'reference-answer', sessionId, questionId] as const,
 }
 
 export function useTrainingOptions() {
@@ -58,13 +60,26 @@ export function useProfessionSuggest(query: string) {
   })
 }
 
-export function useTopicSuggest(profession: string, query: string) {
+export function useSkillSuggest(profession: string, query: string) {
   return useQuery({
-    queryKey: keys.topicSuggest(profession, query),
-    queryFn: () => trainingApi.suggestTopics(profession, query),
-    enabled:
-      profession.trim().length > 0 && query.trim().length >= MIN_SUGGEST_QUERY,
+    queryKey: keys.skillSuggest(profession, query),
+    queryFn: () => trainingApi.suggestSkills(profession, query),
+    enabled: query.trim().length >= MIN_SUGGEST_QUERY,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Эталонный ответ грузится только по кнопке: enabled поднимает вызывающий. */
+export function useReferenceAnswer(
+  sessionId: string,
+  questionId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: keys.referenceAnswer(sessionId, questionId),
+    queryFn: () => trainingApi.referenceAnswer(sessionId, questionId),
+    enabled,
+    staleTime: Infinity,
   })
 }
 

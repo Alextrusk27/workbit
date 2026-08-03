@@ -50,7 +50,7 @@ export function TrainingReportPage() {
       <AppPageHeader
         back={{ to: '/app/training', label: 'Тренажёр' }}
         eyebrow="Разбор тренировки"
-        title={report.profession}
+        title={report.skill}
       >
         {subtitle}
       </AppPageHeader>
@@ -72,7 +72,7 @@ export function TrainingReportPage() {
               key={q.questionId}
               className="border-divider mt-8 border-t pt-8 first:mt-0 first:border-0 first:pt-0"
             >
-              <CaseEntry question={q} />
+              <CaseEntry question={q} sessionId={report.sessionId} />
             </li>
           ))}
         </ol>

@@ -21,7 +21,7 @@ import {
 } from '@/features/training/useTraining'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { QuestionEntry } from './reportParts'
+import { QuestionEntry, ReferenceAnswer } from './reportParts'
 
 export function TrainingSessionPage() {
   usePageTitle('Тренировка')
@@ -144,7 +144,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
                 : it,
             ),
           )
-          if (!item.q.followUp) setAnsweredMain((c) => c + 1)
+          setAnsweredMain((c) => c + 1)
           loadNext()
         },
       },
@@ -164,7 +164,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
   return (
     <Container>
       <div className="flex items-baseline justify-between gap-4">
-        <Eyebrow>{session.profession}</Eyebrow>
+        <Eyebrow>{session.skill}</Eyebrow>
         <p
           aria-live="polite"
           className="text-dim text-[13px] whitespace-nowrap tabular-nums"
@@ -194,12 +194,17 @@ function SessionRun({ session }: { session: TrainingSession }) {
                 onSubmit={(text) => onAnswer(item, text)}
               />
             ) : (
-              <QuestionEntry
-                orderIndex={item.q.orderIndex}
-                followUp={item.q.followUp}
-                questionText={item.q.questionText}
-                answerText={item.answer}
-              />
+              <>
+                <QuestionEntry
+                  orderIndex={item.q.orderIndex}
+                  questionText={item.q.questionText}
+                  answerText={item.answer}
+                />
+                <ReferenceAnswer
+                  sessionId={session.id}
+                  questionId={item.q.questionId}
+                />
+              </>
             )}
           </li>
         ))}
@@ -262,15 +267,9 @@ function CurrentQuestion({
 
   return (
     <div>
-      {question.followUp ? (
-        <span className="bg-indigo/12 text-indigo rounded-sm px-2.5 py-[3px] text-xs font-semibold">
-          Уточняющий вопрос
-        </span>
-      ) : (
-        <Eyebrow className="tracking-[0.08em]">
-          Вопрос {question.orderIndex}
-        </Eyebrow>
-      )}
+      <Eyebrow className="tracking-[0.08em]">
+        Вопрос {question.orderIndex}
+      </Eyebrow>
       <h1 className="text-ink mt-2 text-[21px] leading-snug font-bold break-words">
         {question.questionText}
       </h1>

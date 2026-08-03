@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -65,6 +66,7 @@ public class TrainingService {
     public static final int OPTIONS_LIMIT = 20;
     public static final int MIN_SUGGEST_QUERY_LENGTH = 2;
     public static final int MAX_INPUT_LENGTH = 100;
+    public static final int CANDIDATE_LIMIT = 10;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
@@ -250,9 +252,9 @@ public class TrainingService {
     }
 
     public NormalizeInputResponse normalizeInput(NormalizeInputRequest request) {
-        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
+        LlmInputNormalization normalized = normalize(
                 DictText.normalize(request.skill()),
-                DictText.normalize(request.profession())));
+                DictText.normalize(request.profession()));
 
         return new NormalizeInputResponse(
                 normalized.skillRecognized(),
@@ -273,7 +275,8 @@ public class TrainingService {
 
     /**
      * Профессия необязательна: навык — первое поле мастера, и до выбора профессии подсказки собираются
-     * по всему словарю (одноимённые навыки разных профессий схлопываются).
+     * по всему словарю (одноимённые навыки разных профессий схлопываются). Профессия резолвится по
+     * ключу сравнения, поэтому подсказки находятся и по своему написанию названия.
      */
     public List<String> suggestSkills(String profession, String query) {
         if (isTooShortQuery(query)) {
@@ -283,7 +286,7 @@ public class TrainingService {
         if (profession == null || profession.isBlank()) {
             return skillDictRepository.suggestAcrossProfessions(escaped, SUGGEST_LIMIT);
         }
-        return skillDictRepository.suggest(DictText.normalize(profession), escaped, SUGGEST_LIMIT).stream()
+        return skillDictRepository.suggest(DictText.matchKey(profession), escaped, SUGGEST_LIMIT).stream()
                 .map(SkillDict::getName)
                 .toList();
     }
@@ -296,38 +299,62 @@ public class TrainingService {
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
+    /**
+     * Приводит ввод к тому названию, под которым навык и профессия уже живут в словаре: сначала по
+     * ключу сравнения, потом по подсказкам нормализатора, среди которых предпочитается известная
+     * словарю. Известное словарю название проверки не требует — в словарь попадает только
+     * распознанный ввод, а повторный вызов нормализатора на том же вводе плодил бы синонимы.
+     */
     private void canonicalizeInput(TrainingSession session) {
-        Optional<ProfessionDict> profession = professionDictRepository.findByNameIgnoreCase(session.getProfession());
-        boolean professionApproved = profession
-                .filter(p -> p.getStatus() == DictStatus.APPROVED)
-                .isPresent();
-        boolean skillApproved = professionApproved && skillDictRepository
-                .existsByProfessionIdAndNameIgnoreCaseAndStatus(
-                        profession.get().getId(), session.getSkill(), DictStatus.APPROVED);
-        if (professionApproved && skillApproved) {
+        Optional<ProfessionDict> knownProfession = professionDictRepository
+                .findByMatchKey(DictText.matchKey(session.getProfession()));
+        Optional<SkillDict> knownSkill = knownProfession.flatMap(profession -> skillDictRepository
+                .findByProfessionIdAndMatchKey(profession.getId(), DictText.matchKey(session.getSkill())));
+        knownProfession.ifPresent(profession -> session.setProfession(profession.getName()));
+        knownSkill.ifPresent(skill -> session.setSkill(skill.getName()));
+        if (knownProfession.isPresent() && knownSkill.isPresent()) {
             return;
         }
 
-        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
-                session.getSkill(),
-                session.getProfession()));
-        if (!skillApproved && !normalized.skillRecognized()) {
+        LlmInputNormalization normalized = normalize(session.getSkill(), session.getProfession());
+        if (knownSkill.isEmpty() && !normalized.skillRecognized()) {
             log.warn("Rejecting training session: skill not recognized [skill={}, profession={}]",
                     session.getSkill(), session.getProfession());
             throw new UnprocessableEntityException("Skill not recognized");
         }
-        if (!professionApproved && !normalized.professionRecognized()) {
+        if (knownProfession.isEmpty() && !normalized.professionRecognized()) {
             log.warn("Rejecting training session: profession not recognized [profession={}]",
                     session.getProfession());
             throw new UnprocessableEntityException("Profession not recognized");
         }
 
-        if (!skillApproved) {
-            session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions()));
+        if (knownSkill.isEmpty()) {
+            session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
+                    skillDictRepository::findNameByMatchKey));
         }
-        if (!professionApproved) {
-            session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions()));
+        if (knownProfession.isEmpty()) {
+            session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions(),
+                    key -> professionDictRepository.findByMatchKey(key).map(ProfessionDict::getName)));
         }
+    }
+
+    /**
+     * Нормализатор получает похожие названия из словаря (общее значащее слово с вводом), чтобы
+     * предложить уже принятое название вместо синонима-двойника.
+     */
+    private LlmInputNormalization normalize(String skill, String profession) {
+        List<String> skillTokens = DictText.matchTokens(skill);
+        List<String> professionTokens = DictText.matchTokens(profession);
+
+        return llmService.normalizeInput(new LlmInputNormalizationRequest(
+                skill,
+                profession,
+                skillTokens.isEmpty()
+                        ? List.of()
+                        : skillDictRepository.findCandidateNames(skillTokens, CANDIDATE_LIMIT),
+                professionTokens.isEmpty()
+                        ? List.of()
+                        : professionDictRepository.findCandidateNames(professionTokens, CANDIDATE_LIMIT)));
     }
 
     private static List<String> cleanSuggestions(List<String> suggestions) {
@@ -340,20 +367,32 @@ public class TrainingService {
                 .toList();
     }
 
-    private static String canonical(String input, List<String> suggestions) {
-        String canonical = suggestions == null ? null : suggestions.stream()
+    /**
+     * Первая подсказка, которая уже есть в словаре, — под её названием ввод и продолжит жить;
+     * если ни одна не известна, берётся первая пригодная, как раньше.
+     */
+    private static String canonical(String input, List<String> suggestions,
+                                    Function<String, Optional<String>> dictionaryLookup) {
+        List<String> usable = suggestions == null ? List.<String>of() : suggestions.stream()
                 .filter(s -> s != null && !s.isBlank())
                 .map(DictText::normalize)
                 .filter(s -> s.length() <= MAX_INPUT_LENGTH)
-                .findFirst()
-                .orElse(null);
+                .toList();
 
-        if (canonical == null) {
+        Optional<String> known = usable.stream()
+                .map(s -> dictionaryLookup.apply(DictText.matchKey(s)))
+                .flatMap(Optional::stream)
+                .findFirst();
+        if (known.isPresent()) {
+            return known.get();
+        }
+
+        if (usable.isEmpty()) {
             log.warn("LLM recognized input but returned no usable canonical name, keeping input as is [input={}]",
                     input);
             return input;
         }
-        return canonical;
+        return usable.getFirst();
     }
 
     private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {

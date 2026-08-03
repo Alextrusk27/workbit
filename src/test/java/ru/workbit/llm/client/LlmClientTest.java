@@ -153,7 +153,7 @@ class LlmClientTest {
         @DisplayName("Обнаруживает CJK в любом строковом поле DTO, включая элементы вложенного списка")
         void detectsCjk_inAnyStringField() {
             // given
-            var request = new LlmInputNormalizationRequest("транзакции", "java-разработчик");
+            var request = new LlmInputNormalizationRequest("транзакции", "java-разработчик", List.of(), List.of());
             var dirty = new LlmInputNormalization(
                     false, List.of("транзакции基础", "изоляция"),
                     true, List.of("бэкенд-разработчик"),

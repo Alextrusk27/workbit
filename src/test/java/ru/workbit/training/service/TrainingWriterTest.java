@@ -29,6 +29,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.util.DictText;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,13 +74,15 @@ class TrainingWriterTest {
     class UpsertDictionaries {
 
         @Test
-        @DisplayName("Апсертит и профессию, и навык, возвращает оба id")
+        @DisplayName("Апсертит и профессию, и навык с посчитанным ключом сравнения, возвращает оба id")
         void upsertsBothProfessionAndSkill() {
             // given
             UUID professionId = UUID.randomUUID();
             UUID skillId = UUID.randomUUID();
-            when(professionDictRepository.upsertAndIncrementUsage(PROFESSION)).thenReturn(professionId);
-            when(skillDictRepository.upsertAndIncrementUsage(professionId, SKILL)).thenReturn(skillId);
+            when(professionDictRepository.upsertAndIncrementUsage(PROFESSION, DictText.matchKey(PROFESSION)))
+                    .thenReturn(professionId);
+            when(skillDictRepository.upsertAndIncrementUsage(professionId, SKILL, DictText.matchKey(SKILL)))
+                    .thenReturn(skillId);
 
             // when
             TrainingWriter.DictionaryRefs result = trainingWriter.upsertDictionaries(SKILL, PROFESSION);
@@ -87,7 +90,7 @@ class TrainingWriterTest {
             // then
             assertThat(result.professionId()).isEqualTo(professionId);
             assertThat(result.skillId()).isEqualTo(skillId);
-            verify(skillDictRepository).upsertAndIncrementUsage(professionId, SKILL);
+            verify(skillDictRepository).upsertAndIncrementUsage(professionId, SKILL, DictText.matchKey(SKILL));
         }
     }
 

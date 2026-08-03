@@ -202,7 +202,7 @@ class LlmServiceTest {
         @DisplayName("Вызывает агента input-normalizer без грейда, с запросом как есть")
         void callsInputNormalizerAgent() {
             // given
-            var request = new LlmInputNormalizationRequest("многопоточность", "джавист");
+            var request = new LlmInputNormalizationRequest("многопоточность", "джавист", List.of(), List.of());
             var expected = new LlmInputNormalization(true, List.of(), false, List.of("Java-разработчик"), true);
             when(llm.call(eq("input-normalizer"), eq(request), eq(LlmInputNormalization.class)))
                     .thenReturn(expected);

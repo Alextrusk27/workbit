@@ -14,6 +14,7 @@ import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.SkillDict;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.util.DictText;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
     private ProfessionDict aProfession(String name) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 
@@ -44,6 +46,7 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 

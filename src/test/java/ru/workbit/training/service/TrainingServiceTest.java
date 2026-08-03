@@ -58,6 +58,7 @@ import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.util.DictText;
 
 import java.util.Arrays;
 import java.util.List;
@@ -159,13 +160,18 @@ class TrainingServiceTest {
                     .name(PROFESSION)
                     .status(DictStatus.APPROVED)
                     .build();
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.of(professionDict));
         }
 
         private void stubProfessionAndSkillApproved() {
             stubProfessionApproved();
-            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
-                    .thenReturn(true);
+            SkillDict skillDict = SkillDict.builder()
+                    .id(skillId)
+                    .name(SKILL)
+                    .status(DictStatus.APPROVED)
+                    .build();
+            when(skillDictRepository.findByProfessionIdAndMatchKey(professionId, DictText.matchKey(SKILL)))
+                    .thenReturn(Optional.of(skillDict));
         }
 
         @Test
@@ -524,20 +530,25 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Профессия в словаре со статусом AUTO (не APPROVED) - навык не проверяется в словаре (guard короткого замыкания), LLM normalizeInput вызывается")
-        void autoStatusProfessionTriggersLlmNormalization() {
+        @DisplayName("Ввод отличается от словарного по формулировке, но совпадает по matchKey - подменяется словарным названием, LLM не вызывается")
+        void replacesInputWithDictionaryNameWhenMatchKeyMatches() {
             // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            String skillInput = "Spring Boot Jpa";
+            String professionInput = "Разработчик на Java";
+            CreateSessionRequest request = new CreateSessionRequest(skillInput, professionInput, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(skillInput, professionInput);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
 
             ProfessionDict professionDict = ProfessionDict.builder()
-                    .id(professionId).name(PROFESSION).status(DictStatus.AUTO).build();
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
-            when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
+                    .id(professionId).name(PROFESSION).status(DictStatus.APPROVED).build();
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(professionInput)))
+                    .thenReturn(Optional.of(professionDict));
+            SkillDict skillDict = SkillDict.builder()
+                    .id(skillId).name("Spring JPA").status(DictStatus.APPROVED).build();
+            when(skillDictRepository.findByProfessionIdAndMatchKey(professionId, DictText.matchKey(skillInput)))
+                    .thenReturn(Optional.of(skillDict));
 
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+            when(trainingWriter.upsertDictionaries("Spring JPA", PROFESSION))
                     .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
             List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
             when(questionBankRepository.sampleUnseen(
@@ -545,7 +556,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+                    null, "Spring JPA", PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -553,61 +564,21 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(llmService).normalizeInput(new LlmInputNormalizationRequest(SKILL, PROFESSION));
-            verifyNoInteractions(skillDictRepository);
+            assertThat(mappedEntity.getSkill()).isEqualTo("Spring JPA");
+            assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
+            verifyNoInteractions(llmService);
+            verify(trainingWriter).upsertDictionaries("Spring JPA", PROFESSION);
         }
 
         @Test
-        @DisplayName("Профессия не в словаре, LLM распознал навык, но не распознал профессию - UnprocessableEntityException, сессия не создаётся")
-        void throwsWhenProfessionNotRecognizedByLlm() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
-            when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of("Java Developer"), true));
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.create(request, userId))
-                    .isInstanceOf(UnprocessableEntityException.class)
-                    .hasMessage("Profession not recognized");
-            verify(llmService, never()).generateTrainingQuestions(any(), any());
-            verifyNoInteractions(trainingWriter, questionBankRepository, skillDictRepository);
-        }
-
-        @Test
-        @DisplayName("Профессия не в словаре, LLM не распознал навык - UnprocessableEntityException (проверка навыка идёт первой), сессия не создаётся")
-        void throwsWhenSkillNotRecognizedByLlm() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
-            when(llmService.normalizeInput(any()))
-                    .thenReturn(new LlmInputNormalization(false, List.of("Spring Framework"), true, List.of(), false));
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.create(request, userId))
-                    .isInstanceOf(UnprocessableEntityException.class)
-                    .hasMessage("Skill not recognized");
-            verify(llmService, never()).generateTrainingQuestions(any(), any());
-            verifyNoInteractions(trainingWriter, questionBankRepository);
-        }
-
-        @Test
-        @DisplayName("Профессия APPROVED в словаре, навык мимо словаря, LLM отверг профессию, но признал навык - вердикт LLM по профессии игнорируется, создание проходит")
-        void createsSessionWhenDictionaryApprovesProfessionAndLlmRecognizesSkill() {
+        @DisplayName("Профессия найдена в словаре по ключу, навык не найден в её скоупе, LLM отверг профессию но признал навык - вердикт LLM по профессии игнорируется, LLM normalizeInput вызывается")
+        void professionKnownSkillUnknownTriggersLlmNormalizationForSkillOnly() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
 
-            ProfessionDict professionDict = ProfessionDict.builder()
-                    .id(professionId).name(PROFESSION).status(DictStatus.APPROVED).build();
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.of(professionDict));
-            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
-                    .thenReturn(false);
+            stubProfessionApproved();
             when(llmService.normalizeInput(any()))
                     .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of(), true));
 
@@ -627,7 +598,178 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
+            assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
+            verify(llmService).normalizeInput(any());
+            verify(skillDictRepository).findByProfessionIdAndMatchKey(professionId, DictText.matchKey(SKILL));
+        }
+
+        @Test
+        @DisplayName("Профессия и навык не в словаре - в запрос нормализатора уходят кандидаты, найденные по значащим словам обоих словарей")
+        void sendsCandidatesFromBothDictionariesToNormalizer() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
+
+            List<String> skillCandidates = List.of("Spring Framework");
+            List<String> professionCandidates = List.of("Java Developer");
+            when(skillDictRepository.findCandidateNames(DictText.matchTokens(SKILL), TrainingService.CANDIDATE_LIMIT))
+                    .thenReturn(skillCandidates);
+            when(professionDictRepository.findCandidateNames(DictText.matchTokens(PROFESSION), TrainingService.CANDIDATE_LIMIT))
+                    .thenReturn(professionCandidates);
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
+
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
+                    .thenReturn(bank);
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            trainingService.create(request, userId);
+
+            // then
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().skill()).isEqualTo(SKILL);
+            assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+            assertThat(captor.getValue().knownSkills()).isEqualTo(skillCandidates);
+            assertThat(captor.getValue().knownProfessions()).isEqualTo(professionCandidates);
+        }
+
+        @Test
+        @DisplayName("Навык без значащих токенов (только пунктуация) - кандидаты по навыку не запрашиваются, в запрос уходит пустой список")
+        void doesNotQueryCandidatesWhenSkillHasNoSignificantTokens() {
+            // given
+            String punctuationSkill = "!!!";
+            CreateSessionRequest request = new CreateSessionRequest(punctuationSkill, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(punctuationSkill, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(false, List.of(), true, List.of(), true));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Skill not recognized");
+
+            verify(skillDictRepository, never()).findCandidateNames(any(), anyInt());
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().knownSkills()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Профессия без значащих токенов (только пунктуация) - кандидаты по профессии не запрашиваются, в запрос уходит пустой список")
+        void doesNotQueryCandidatesWhenProfessionHasNoSignificantTokens() {
+            // given
+            String punctuationProfession = "!!!";
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, punctuationProfession, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, punctuationProfession);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(punctuationProfession))).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of(), true));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Profession not recognized");
+
+            verify(professionDictRepository, never()).findCandidateNames(any(), anyInt());
+            ArgumentCaptor<LlmInputNormalizationRequest> captor =
+                    ArgumentCaptor.forClass(LlmInputNormalizationRequest.class);
+            verify(llmService).normalizeInput(captor.capture());
+            assertThat(captor.getValue().knownProfessions()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Профессия не в словаре, среди подсказок LLM известна не первая, а вторая - выбирается она, в сессию идёт словарное название, а не текст подсказки")
+        void picksKnownSuggestionEvenWhenNotFirstAndUsesDictionaryName() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
+
+            String firstSuggestion = "Джавист";
+            String secondSuggestion = "Java Developer";
+            String dictionaryName = "Java-инженер";
+            when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
+                    true, List.of(), true, List.of(firstSuggestion, secondSuggestion), true));
+
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(firstSuggestion))).thenReturn(Optional.empty());
+            ProfessionDict known = ProfessionDict.builder()
+                    .id(professionId).name(dictionaryName).status(DictStatus.APPROVED).build();
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(secondSuggestion)))
+                    .thenReturn(Optional.of(known));
+
+            when(trainingWriter.upsertDictionaries(SKILL, dictionaryName))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
+                    .thenReturn(bank);
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    null, SKILL, dictionaryName, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
+            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+
+            // when
+            var result = trainingService.create(request, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(mappedEntity.getProfession()).isEqualTo(dictionaryName);
+            verify(trainingWriter).upsertDictionaries(SKILL, dictionaryName);
+        }
+
+        @Test
+        @DisplayName("Профессия не в словаре, LLM распознал навык, но не распознал профессию - UnprocessableEntityException, сессия не создаётся")
+        void throwsWhenProfessionNotRecognizedByLlm() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of("Java Developer"), true));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Profession not recognized");
+            verify(llmService, never()).generateTrainingQuestions(any(), any());
+            verify(skillDictRepository, never()).findByProfessionIdAndMatchKey(any(), any());
+            verifyNoInteractions(trainingWriter, questionBankRepository);
+        }
+
+        @Test
+        @DisplayName("Профессия не в словаре, LLM не распознал навык - UnprocessableEntityException (проверка навыка идёт первой), сессия не создаётся")
+        void throwsWhenSkillNotRecognizedByLlm() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
+            when(llmService.normalizeInput(any()))
+                    .thenReturn(new LlmInputNormalization(false, List.of("Spring Framework"), true, List.of(), false));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(UnprocessableEntityException.class)
+                    .hasMessage("Skill not recognized");
+            verify(llmService, never()).generateTrainingQuestions(any(), any());
+            verifyNoInteractions(trainingWriter, questionBankRepository);
         }
 
         @Test
@@ -637,7 +779,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, List.of("Java-инженер", "Java Developer"), true));
 
@@ -670,8 +812,6 @@ class TrainingServiceTest {
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionApproved();
-            when(skillDictRepository.existsByProfessionIdAndNameIgnoreCaseAndStatus(professionId, SKILL, DictStatus.APPROVED))
-                    .thenReturn(false);
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of("Spring Framework", "Spring MVC"), true, List.of(), true));
 
@@ -704,7 +844,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, professionSuggestions, true));
 
@@ -742,7 +882,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
 
             String tooLong = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
             String atLimit = "B".repeat(TrainingService.MAX_INPUT_LENGTH);
@@ -776,7 +916,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
 
             String tooLong1 = "A".repeat(TrainingService.MAX_INPUT_LENGTH + 1);
             String tooLong2 = "B".repeat(TrainingService.MAX_INPUT_LENGTH + 5);
@@ -810,7 +950,7 @@ class TrainingServiceTest {
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            when(professionDictRepository.findByNameIgnoreCase(PROFESSION)).thenReturn(Optional.empty());
+            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
 
             String rawSuggestion = "  Java / Kotlin разработчик  ";
             String strippedSuggestion = "Java / Kotlin разработчик";
@@ -1832,7 +1972,7 @@ class TrainingServiceTest {
             // given
             SkillDict first = SkillDict.builder().id(UUID.randomUUID()).name("Spring Boot").build();
             SkillDict second = SkillDict.builder().id(UUID.randomUUID()).name("Spring Security").build();
-            when(skillDictRepository.suggest(PROFESSION, "sp", TrainingService.SUGGEST_LIMIT))
+            when(skillDictRepository.suggest(DictText.matchKey(PROFESSION), "sp", TrainingService.SUGGEST_LIMIT))
                     .thenReturn(List.of(first, second));
 
             // when
@@ -1840,6 +1980,21 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).containsExactly("Spring Boot", "Spring Security");
+        }
+
+        @Test
+        @DisplayName("Профессия введена другими словами и в другом регистре - в репозиторий уходит её ключ сравнения, а не введённый текст")
+        void queriesByProfessionMatchKeyRegardlessOfInputWording() {
+            // given
+            when(skillDictRepository.suggest("java разработчик", "sp", TrainingService.SUGGEST_LIMIT))
+                    .thenReturn(List.of());
+
+            // when
+            List<String> result = trainingService.suggestSkills("разработчик на JAVA", "sp");
+
+            // then
+            assertThat(result).isEmpty();
+            verify(skillDictRepository).suggest("java разработчик", "sp", TrainingService.SUGGEST_LIMIT);
         }
 
         @ParameterizedTest

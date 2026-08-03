@@ -25,6 +25,9 @@ public class SkillDict {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "match_key", nullable = false)
+    private String matchKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

@@ -21,6 +21,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.util.DictText;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -52,8 +53,10 @@ class TrainingWriter {
 
     @Transactional
     public DictionaryRefs upsertDictionaries(String skill, String profession) {
-        UUID professionId = professionDictRepository.upsertAndIncrementUsage(profession);
-        UUID skillId = skillDictRepository.upsertAndIncrementUsage(professionId, skill);
+        UUID professionId = professionDictRepository.upsertAndIncrementUsage(
+                profession, DictText.matchKey(profession));
+        UUID skillId = skillDictRepository.upsertAndIncrementUsage(
+                professionId, skill, DictText.matchKey(skill));
         return new DictionaryRefs(professionId, skillId);
     }
 

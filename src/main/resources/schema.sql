@@ -70,6 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_snapshot_source_id
 CREATE TABLE IF NOT EXISTS content.profession_dict (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(100) NOT NULL,
+    match_key   VARCHAR(100) NOT NULL,
     status      VARCHAR(16) NOT NULL DEFAULT 'AUTO',
     usage_count INT NOT NULL DEFAULT 0,
     created     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -78,13 +79,14 @@ CREATE TABLE IF NOT EXISTS content.profession_dict (
         CHECK (status IN ('AUTO', 'APPROVED'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_profession_dict_name
-    ON content.profession_dict (lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_profession_dict_match_key
+    ON content.profession_dict (match_key);
 
 CREATE TABLE IF NOT EXISTS content.skill_dict (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     profession_id UUID NOT NULL REFERENCES content.profession_dict(id) ON DELETE CASCADE,
     name          VARCHAR(100) NOT NULL,
+    match_key     VARCHAR(100) NOT NULL,
     status        VARCHAR(16) NOT NULL DEFAULT 'AUTO',
     usage_count   INT NOT NULL DEFAULT 0,
     created       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -93,8 +95,11 @@ CREATE TABLE IF NOT EXISTS content.skill_dict (
         CHECK (status IN ('AUTO', 'APPROVED'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_dict_profession_name
-    ON content.skill_dict (profession_id, lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_dict_profession_match_key
+    ON content.skill_dict (profession_id, match_key);
+
+CREATE INDEX IF NOT EXISTS idx_skill_dict_match_key
+    ON content.skill_dict (match_key);
 
 CREATE TABLE IF NOT EXISTS content.question_bank (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -253,8 +258,8 @@ CREATE TABLE IF NOT EXISTS interview.report (
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
 
-INSERT INTO content.profession_dict (name, status) VALUES
-    ('Java-разработчик', 'APPROVED'),
-    ('Python-разработчик', 'APPROVED'),
-    ('Инженер по тестированию', 'APPROVED')
+INSERT INTO content.profession_dict (name, match_key, status) VALUES
+    ('Java-разработчик', 'java разработчик', 'APPROVED'),
+    ('Python-разработчик', 'python разработчик', 'APPROVED'),
+    ('Инженер по тестированию', 'инженер тестированию', 'APPROVED')
 ON CONFLICT DO NOTHING;

@@ -9,6 +9,7 @@ import type {
 } from '@/features/interview/api'
 import { OFFER_TONE, type OfferTone } from '@/features/interview/labels'
 import { cn } from '@/lib/cn'
+import { answersWord } from '@/lib/plural'
 
 /** Отвеченный вопрос в режиме чтения: текст вопроса и ответ пользователя. */
 export function QuestionEntry({
@@ -128,12 +129,7 @@ export function ReportSummary({
           <OfferBadge value={offerProbability} />
         </p>
         <p className="text-dim mt-1.5 text-[13px]">
-          По итогам {answeredCount}{' '}
-          {answeredCount === 1
-            ? 'ответа'
-            : answeredCount < 5
-              ? 'ответов'
-              : 'ответов'}
+          По итогам {answeredCount} {answersWord(answeredCount)}
         </p>
       </div>
 

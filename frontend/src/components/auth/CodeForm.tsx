@@ -9,7 +9,8 @@ import { useRequestCode, useVerifyCode } from '@/features/auth/useAuth'
 const COOLDOWN_SECONDS = 60
 
 /** Ввод шестизначного кода из письма и повторная отправка кода с кулдауном.
- *  Кулдаун стартует сразу: код только что ушёл на почту. */
+ *  Кулдаун стартует сразу (код только что ушёл на почту) и перезапускается
+ *  даже на отказ — иначе кнопка долбит лимит бэка. */
 export function CodeForm({
   email,
   onSuccess,
@@ -44,6 +45,7 @@ export function CodeForm({
         setCooldown(COOLDOWN_SECONDS)
         setCode('')
       },
+      onError: () => setCooldown(COOLDOWN_SECONDS),
     })
   }
 

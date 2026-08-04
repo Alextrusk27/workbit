@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { vacancyApi } from './api'
 
-/** Ссылка на конкретную вакансию hh.ru — гейт для запроса предпросмотра. */
-export const HH_VACANCY_URL = /^https?:\/\/(www\.)?hh\.ru\/vacancy\/(?<id>\d+)/
+/** Ссылка на конкретную вакансию hh.ru — гейт для запроса предпросмотра.
+ *  Поддомены разрешены (`spb.hh.ru`, `www.hh.ru`): бэк ищет в ссылке то же
+ *  `hh.ru/vacancy/<id>` и региональные адреса принимает. */
+export const HH_VACANCY_URL =
+  /^https?:\/\/([a-z0-9-]+\.)*hh\.ru\/vacancy\/(?<id>\d+)/i
 
 export function isHhVacancyUrl(url: string): boolean {
   return HH_VACANCY_URL.test(url.trim())

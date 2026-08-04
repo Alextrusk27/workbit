@@ -68,17 +68,9 @@ export function Header() {
             {isAuthenticated ? (
               <UserMenu />
             ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="text-muted hover:text-ink hidden text-[14.5px] font-medium transition-colors sm:block"
-                >
-                  Войти
-                </Link>
-                <Link to="/login" className={buttonClasses({ size: 'sm' })}>
-                  Начать бесплатно
-                </Link>
-              </>
+              <Link to="/login" className={buttonClasses({ size: 'sm' })}>
+                Войти
+              </Link>
             )}
             <button
               type="button"

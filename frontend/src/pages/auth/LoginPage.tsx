@@ -77,15 +77,15 @@ export function LoginPage() {
             className="text-muted hover:text-ink underline underline-offset-2"
           >
             Пользовательское соглашение
-          </Link>{' '}
-          и даёте согласие на обработку персональных данных в соответствии с{' '}
+          </Link>
+          . Обработка данных описана в{' '}
           <Link
             to="/privacy"
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted hover:text-ink underline underline-offset-2"
           >
-            Политикой конфиденциальности
+            Политике конфиденциальности
           </Link>
           .
         </p>

@@ -1,11 +1,14 @@
-import { Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { sessionSubtitle } from '@/features/training/labels'
-import { useReport } from '@/features/training/useTraining'
+import { useReport, useRestartSession } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { CaseEntry, ReportSummary } from './reportParts'
@@ -13,7 +16,23 @@ import { CaseEntry, ReportSummary } from './reportParts'
 export function TrainingReportPage() {
   usePageTitle('Разбор тренировки')
   const { sessionId = '' } = useParams()
-  const { data: report, isLoading, isError, error } = useReport(sessionId)
+  const navigate = useNavigate()
+  const restart = useRestartSession()
+  const {
+    data: report,
+    isLoading,
+    isError,
+    error,
+  } = useReport(sessionId, !restart.isSuccess)
+  const [confirming, setConfirming] = useState(false)
+
+  const onRestart = () => {
+    setConfirming(false)
+    restart.mutate(sessionId, {
+      onSuccess: () =>
+        navigate(`/app/training/${sessionId}`, { replace: true }),
+    })
+  }
 
   if (isLoading) {
     return (
@@ -78,7 +97,20 @@ export function TrainingReportPage() {
         </ol>
       </div>
 
+      {restart.isError && (
+        <div className="mt-8">
+          <Alert>{getErrorMessage(restart.error)}</Alert>
+        </div>
+      )}
+
       <div className="mt-12 flex flex-wrap gap-3.5">
+        <Button
+          variant="secondary"
+          onClick={() => setConfirming(true)}
+          disabled={restart.isPending}
+        >
+          {restart.isPending ? 'Готовим тренировку…' : 'Пройти заново'}
+        </Button>
         <Link
           to="/app/training"
           className={buttonClasses({ variant: 'secondary' })}
@@ -89,6 +121,15 @@ export function TrainingReportPage() {
           Новая тренировка
         </Link>
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Пройти заново?"
+        text="Вопросы останутся те же, а ваши ответы и этот разбор будут стёрты. Действие необратимо."
+        confirmLabel="Пройти заново"
+        onConfirm={onRestart}
+        onClose={() => setConfirming(false)}
+      />
     </Container>
   )
 }

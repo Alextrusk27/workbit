@@ -10,6 +10,7 @@ export interface TrainingOptions {
   professions: Profession[]
   levels: Level[]
   questionCap: number
+  maxQuestions: number
   minAnswersToFinish: number
 }
 
@@ -39,6 +40,7 @@ export interface TrainingSession {
   level: Level
   status: SessionStatus
   answeredCount: number
+  totalQuestions: number
   created: string
   completedAt: string | null
 }
@@ -115,6 +117,16 @@ export const trainingApi = {
 
   nextQuestion: (sessionId: string) =>
     apiFetch<TrainingQuestion>(`${BASE}/sessions/${sessionId}/questions/next`, {
+      method: 'POST',
+    }),
+
+  addQuestions: (sessionId: string) =>
+    apiFetch<TrainingSession>(`${BASE}/sessions/${sessionId}/questions/more`, {
+      method: 'POST',
+    }),
+
+  restartSession: (sessionId: string) =>
+    apiFetch<TrainingSession>(`${BASE}/sessions/${sessionId}/restart`, {
       method: 'POST',
     }),
 

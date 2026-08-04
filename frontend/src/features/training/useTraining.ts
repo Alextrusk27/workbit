@@ -105,6 +105,30 @@ export function useSubmitAnswer() {
   })
 }
 
+export function useAddQuestions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => trainingApi.addQuestions(sessionId),
+    onSuccess: (session) => {
+      qc.setQueryData(keys.session(session.id), session)
+      qc.invalidateQueries({ queryKey: keys.sessions })
+    },
+  })
+}
+
+/** Перезапуск стирает разбор — отчёт выкидываем из кэша, иначе страница покажет старый. */
+export function useRestartSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => trainingApi.restartSession(sessionId),
+    onSuccess: (session) => {
+      qc.setQueryData(keys.session(session.id), session)
+      qc.removeQueries({ queryKey: keys.report(session.id) })
+      qc.invalidateQueries({ queryKey: keys.sessions })
+    },
+  })
+}
+
 export function useFinishSession() {
   const qc = useQueryClient()
   return useMutation({

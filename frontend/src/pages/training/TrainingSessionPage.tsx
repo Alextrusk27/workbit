@@ -12,8 +12,10 @@ import { Textarea } from '@/components/ui/Textarea'
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { trainingApi } from '@/features/training/api'
 import type { TrainingQuestion, TrainingSession } from '@/features/training/api'
+import { trainingErrorMessage } from '@/features/training/errors'
 import { sessionSubtitle } from '@/features/training/labels'
 import {
+  useAddQuestions,
   useFinishSession,
   useSession,
   useSubmitAnswer,
@@ -68,11 +70,13 @@ interface LiveItem {
 function SessionRun({ session }: { session: TrainingSession }) {
   const navigate = useNavigate()
   const options = useTrainingOptions()
-  const cap = options.data?.questionCap ?? 10
+  const batch = options.data?.questionCap ?? 10
+  const maxQuestions = options.data?.maxQuestions ?? 50
   const min = options.data?.minAnswersToFinish ?? 3
 
   const [items, setItems] = useState<LiveItem[]>([])
   const [answeredMain, setAnsweredMain] = useState(session.answeredCount)
+  const [total, setTotal] = useState(session.totalQuestions)
   const [loadState, setLoadState] = useState<
     'loading' | 'idle' | 'cap' | 'error'
   >('loading')
@@ -81,6 +85,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
 
   const submit = useSubmitAnswer()
   const finish = useFinishSession()
+  const more = useAddQuestions()
 
   const startedRef = useRef(false)
   const inFlight = useRef(false)
@@ -158,6 +163,15 @@ function SessionRun({ session }: { session: TrainingSession }) {
     })
   }
 
+  const onAddQuestions = () => {
+    more.mutate(session.id, {
+      onSuccess: (updated) => {
+        setTotal(updated.totalQuestions)
+        loadNext()
+      },
+    })
+  }
+
   const canFinish = answeredMain >= min && !finish.isPending
   const remaining = Math.max(0, min - answeredMain)
 
@@ -169,7 +183,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
           aria-live="polite"
           className="text-dim text-[13px] whitespace-nowrap tabular-nums"
         >
-          {Math.min(answeredMain, cap)} / {cap}
+          {Math.min(answeredMain, total)} / {total}
         </p>
       </div>
       <p className="text-muted mt-1.5 text-sm">{sessionSubtitle(session)}</p>
@@ -234,6 +248,10 @@ function SessionRun({ session }: { session: TrainingSession }) {
         pending={finish.isPending}
         error={finish.isError ? getErrorMessage(finish.error) : null}
         onFinish={onFinish}
+        batch={Math.min(batch, maxQuestions - total)}
+        addPending={more.isPending}
+        addError={more.isError ? trainingErrorMessage(more.error) : null}
+        onAddQuestions={onAddQuestions}
       />
 
       <div ref={bottomRef} />
@@ -309,6 +327,11 @@ function CurrentQuestion({
   )
 }
 
+function questionsWord(count: number): string {
+  if (count === 1) return 'вопрос'
+  return count < 5 ? 'вопроса' : 'вопросов'
+}
+
 function FinishBar({
   capReached,
   canFinish,
@@ -316,6 +339,10 @@ function FinishBar({
   pending,
   error,
   onFinish,
+  batch,
+  addPending,
+  addError,
+  onAddQuestions,
 }: {
   capReached: boolean
   canFinish: boolean
@@ -323,6 +350,10 @@ function FinishBar({
   pending: boolean
   error: string | null
   onFinish: () => void
+  batch: number
+  addPending: boolean
+  addError: string | null
+  onAddQuestions: () => void
 }) {
   if (pending) {
     return (
@@ -343,7 +374,9 @@ function FinishBar({
     <div className="border-divider mt-12 border-t pt-9">
       {capReached && (
         <p className="text-muted mb-4 text-sm">
-          Достигнут лимит вопросов — тренировку можно завершить.
+          {batch > 0
+            ? `Вопросы закончились — возьмите ещё ${batch} ${questionsWord(batch)} или завершите тренировку и получите разбор.`
+            : 'Достигнут потолок вопросов в одной тренировке — её можно завершить.'}
         </p>
       )}
       {error && (
@@ -351,17 +384,39 @@ function FinishBar({
           <Alert>{error}</Alert>
         </div>
       )}
-      {canFinish ? (
-        <Button variant="secondary" onClick={onFinish}>
-          Завершить и получить разбор
-        </Button>
-      ) : (
-        <p className="text-muted text-sm">
-          Ответьте ещё на {remaining}{' '}
-          {remaining === 1 ? 'вопрос' : remaining < 5 ? 'вопроса' : 'вопросов'},
-          чтобы завершить тренировку.
-        </p>
+      {addError && (
+        <div className="mb-4">
+          <Alert>{addError}</Alert>
+        </div>
       )}
+      <div className="flex flex-wrap items-center gap-3.5">
+        {capReached && batch > 0 && (
+          <Button
+            variant="secondary"
+            onClick={onAddQuestions}
+            disabled={addPending}
+          >
+            {addPending ? (
+              <>
+                <Spinner className="mr-2" />
+                Подбираем вопросы…
+              </>
+            ) : (
+              `Ещё ${batch} ${questionsWord(batch)}`
+            )}
+          </Button>
+        )}
+        {canFinish ? (
+          <Button variant="secondary" onClick={onFinish}>
+            Завершить и получить разбор
+          </Button>
+        ) : (
+          <p className="text-muted text-sm">
+            Ответьте ещё на {remaining} {questionsWord(remaining)}, чтобы
+            завершить тренировку.
+          </p>
+        )}
+      </div>
     </div>
   )
 }

@@ -12,7 +12,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export function PricingPage() {
   usePageTitle('Тарифы')
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app' : '/register'
+  const startTo = isAuthenticated ? '/app' : '/login'
 
   return (
     <>

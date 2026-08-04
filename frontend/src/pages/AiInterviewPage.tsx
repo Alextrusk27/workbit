@@ -58,7 +58,7 @@ const advantages = [
 export function AiInterviewPage() {
   usePageTitle('AI-интервью')
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app/interview/new' : '/register'
+  const startTo = isAuthenticated ? '/app/interview/new' : '/login'
 
   return (
     <>

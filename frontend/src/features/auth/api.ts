@@ -6,45 +6,19 @@ export interface UserResponse {
   created: string
 }
 
-export interface Credentials {
-  email: string
-  password: string
-}
-
 export const authApi = {
-  register: (data: Credentials) =>
-    apiFetch<void>('/auth/register', { method: 'POST', body: data }),
+  requestCode: (email: string) =>
+    apiFetch<void>('/auth/request-code', { method: 'POST', body: { email } }),
 
-  verifyEmail: (token: string) =>
-    apiFetch<void>('/auth/verify-email', { method: 'POST', body: { token } }),
-
-  resendVerification: (email: string) =>
-    apiFetch<void>('/auth/resend-verification', {
+  verifyCode: (email: string, code: string) =>
+    apiFetch<void>('/auth/verify-code', {
       method: 'POST',
-      body: { email },
+      body: { email, code },
     }),
-
-  login: (data: Credentials) =>
-    apiFetch<void>('/auth/login', { method: 'POST', body: data }),
 
   me: () => apiFetch<UserResponse>('/auth/me'),
 
   logout: () => apiFetch<void>('/auth/logout', { method: 'POST' }),
-
-  forgotPassword: (email: string) =>
-    apiFetch<void>('/auth/forgot-password', {
-      method: 'POST',
-      body: { email },
-    }),
-
-  resetPassword: (token: string, newPassword: string) =>
-    apiFetch<void>('/auth/reset-password', {
-      method: 'POST',
-      body: { token, newPassword },
-    }),
-
-  changePassword: (data: { oldPassword: string; newPassword: string }) =>
-    apiFetch<void>('/auth/change-password', { method: 'PATCH', body: data }),
 
   deleteAccount: () => apiFetch<void>('/auth/delete', { method: 'DELETE' }),
 }

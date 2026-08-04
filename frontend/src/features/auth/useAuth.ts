@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError } from '@/lib/api'
-import { authApi, type Credentials, type UserResponse } from './api'
+import { authApi, type UserResponse } from './api'
 
 const ME_KEY = ['me'] as const
 
@@ -35,30 +35,17 @@ export function useAuth() {
   }
 }
 
-export function useLogin() {
+export function useRequestCode() {
+  return useMutation({
+    mutationFn: (email: string) => authApi.requestCode(email),
+  })
+}
+
+export function useVerifyCode() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: Credentials) => authApi.login(data),
-    onSuccess: () => refreshMe(qc),
-  })
-}
-
-export function useRegister() {
-  return useMutation({
-    mutationFn: (data: Credentials) => authApi.register(data),
-  })
-}
-
-export function useResendVerification() {
-  return useMutation({
-    mutationFn: (email: string) => authApi.resendVerification(email),
-  })
-}
-
-export function useVerifyEmail() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (token: string) => authApi.verifyEmail(token),
+    mutationFn: (vars: { email: string; code: string }) =>
+      authApi.verifyCode(vars.email, vars.code),
     onSuccess: () => refreshMe(qc),
   })
 }
@@ -68,26 +55,6 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authApi.logout(),
     onSettled: () => qc.setQueryData(ME_KEY, null),
-  })
-}
-
-export function useForgotPassword() {
-  return useMutation({
-    mutationFn: (email: string) => authApi.forgotPassword(email),
-  })
-}
-
-export function useResetPassword() {
-  return useMutation({
-    mutationFn: (vars: { token: string; newPassword: string }) =>
-      authApi.resetPassword(vars.token, vars.newPassword),
-  })
-}
-
-export function useChangePassword() {
-  return useMutation({
-    mutationFn: (vars: { oldPassword: string; newPassword: string }) =>
-      authApi.changePassword(vars),
   })
 }
 

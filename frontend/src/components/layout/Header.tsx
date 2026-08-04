@@ -75,7 +75,7 @@ export function Header() {
                 >
                   Войти
                 </Link>
-                <Link to="/register" className={buttonClasses({ size: 'sm' })}>
+                <Link to="/login" className={buttonClasses({ size: 'sm' })}>
                   Начать бесплатно
                 </Link>
               </>

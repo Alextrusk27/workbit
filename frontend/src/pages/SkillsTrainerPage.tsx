@@ -66,7 +66,7 @@ const audience = [
 export function SkillsTrainerPage() {
   usePageTitle('Тренажёр навыков')
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app/training/new' : '/register'
+  const startTo = isAuthenticated ? '/app/training/new' : '/login'
 
   return (
     <>

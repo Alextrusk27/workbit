@@ -82,7 +82,7 @@ class InterviewControllerTest {
     UserDetailsServiceImpl userDetailsService;
 
     private CustomUserDetails principal() {
-        return new CustomUserDetails(USER_ID, "user@example.com", "hash", List.of());
+        return new CustomUserDetails(USER_ID, "user@example.com", List.of());
     }
 
     private InterviewSessionResponse sessionResponse(UUID sessionId) {

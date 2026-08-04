@@ -5,6 +5,9 @@ app:
     rate-limit:
       limit: ${RATE_LIMIT_LIMIT:5}
       window: ${RATE_LIMIT_WINDOW:15m}
+      verify-code:
+        limit: ${VERIFY_CODE_RATE_LIMIT_LIMIT:10}
+        window: ${VERIFY_CODE_RATE_LIMIT_WINDOW:15m}
       suggest:
         limit: ${SUGGEST_RATE_LIMIT_LIMIT:60}
         window: ${SUGGEST_RATE_LIMIT_WINDOW:1m}
@@ -20,7 +23,6 @@ app:
     from-name: Workbit
     from-mail: noreply@workbit.ru
     base-url: https://workbit.ru
-    reset-ttl-minutes: 15
 
 spring:
   application:

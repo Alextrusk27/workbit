@@ -36,7 +36,6 @@ class InterviewSessionRepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build();
     }
 

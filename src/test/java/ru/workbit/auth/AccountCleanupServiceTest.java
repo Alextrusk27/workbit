@@ -44,7 +44,6 @@ class AccountCleanupServiceTest {
         return User.builder()
                 .id(UUID.randomUUID())
                 .email(email)
-                .password("$argon2id$encoded")
                 .emailVerified(true)
                 .build();
     }

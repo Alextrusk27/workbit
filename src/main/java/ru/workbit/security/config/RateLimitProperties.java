@@ -8,6 +8,7 @@ import java.time.Duration;
 public record RateLimitProperties(
         int limit,
         Duration window,
+        Bucket verifyCode,
         Bucket suggest,
         Bucket normalize,
         Bucket stt

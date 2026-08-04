@@ -36,7 +36,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new CustomUserDetails(
                 user.getId(),
                 user.getEmail(),
-                user.getPassword(),
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
     }

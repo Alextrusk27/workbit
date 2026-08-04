@@ -7,7 +7,6 @@ CREATE SCHEMA IF NOT EXISTS interview;
 CREATE TABLE IF NOT EXISTS auth.users (
     id                  UUID PRIMARY KEY,
     email               VARCHAR(254) NOT NULL UNIQUE,
-    pwd_hash            VARCHAR(255) NOT NULL,
     email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
     created             TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen           TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -28,23 +27,18 @@ CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id
 CREATE INDEX IF NOT EXISTS idx_refresh_token_token_hash
     ON auth.refresh_token(token_hash);
 
-CREATE TABLE IF NOT EXISTS auth.verification_token (
+CREATE TABLE IF NOT EXISTS auth.login_code (
     id          UUID PRIMARY KEY,
     user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    token_hash  VARCHAR(255) NOT NULL UNIQUE,
-    type        VARCHAR(32) NOT NULL,
+    code_hash   VARCHAR(255) NOT NULL,
     expires_at  TIMESTAMPTZ NOT NULL,
+    attempts    INT NOT NULL DEFAULT 0,
     used_at     TIMESTAMPTZ,
-    created     TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    CONSTRAINT chk_type
-        CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION'))
+    created     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_verification_token_user_id
-    ON auth.verification_token(user_id);
-CREATE INDEX IF NOT EXISTS idx_verification_token_token_hash
-    ON auth.verification_token(token_hash);
+CREATE INDEX IF NOT EXISTS idx_login_code_user_id
+    ON auth.login_code(user_id);
 
 CREATE TABLE IF NOT EXISTS vacancy.snapshot (
     id            UUID PRIMARY KEY,

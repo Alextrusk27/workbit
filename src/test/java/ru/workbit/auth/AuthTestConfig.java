@@ -5,8 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.event.EventListener;
 import org.springframework.mail.javamail.JavaMailSender;
-import ru.workbit.email.ResetPasswordEmailEvent;
-import ru.workbit.email.VerificationEmailEvent;
+import ru.workbit.email.LoginCodeEmailEvent;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,15 +13,15 @@ import static org.mockito.Mockito.mock;
 
 /**
  * Тест-конфигурация для e2e-тестов auth-домена:
- * - перехват токенов из ApplicationEvent без реального SMTP
+ * - перехват кода входа из ApplicationEvent без реального SMTP
  * - mock-заглушка JavaMailSender
  */
 @TestConfiguration
 public class AuthTestConfig {
 
     @Bean
-    public TokenCaptor tokenCaptor() {
-        return new TokenCaptor();
+    public CodeCaptor codeCaptor() {
+        return new CodeCaptor();
     }
 
     /**
@@ -36,31 +35,21 @@ public class AuthTestConfig {
     }
 
     /**
-     * Перехватывает токены из ApplicationEvent без отправки реальных писем.
+     * Перехватывает код входа из ApplicationEvent без отправки реальных писем.
      * Использует синхронный @EventListener (не @TransactionalEventListener),
      * поэтому вызывается в момент публикации события — внутри транзакции AuthService.
-     * К моменту возврата HTTP-ответа токен уже доступен.
+     * К моменту возврата HTTP-ответа код уже доступен.
      */
-    public static class TokenCaptor {
-        private final ConcurrentHashMap<String, String> verificationTokens = new ConcurrentHashMap<>();
-        private final ConcurrentHashMap<String, String> resetTokens = new ConcurrentHashMap<>();
+    public static class CodeCaptor {
+        private final ConcurrentHashMap<String, String> codes = new ConcurrentHashMap<>();
 
         @EventListener
-        public void onVerification(VerificationEmailEvent event) {
-            verificationTokens.put(event.email(), event.token());
+        public void onLoginCode(LoginCodeEmailEvent event) {
+            codes.put(event.email(), event.code());
         }
 
-        @EventListener
-        public void onReset(ResetPasswordEmailEvent event) {
-            resetTokens.put(event.email(), event.token());
-        }
-
-        public String getVerificationToken(String email) {
-            return verificationTokens.get(email);
-        }
-
-        public String getResetToken(String email) {
-            return resetTokens.get(email);
+        public String getCode(String email) {
+            return codes.get(email);
         }
     }
 }

@@ -26,10 +26,6 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "pwd_hash", nullable = false)
-    @ToString.Exclude
-    private String password;
-
     @Column(nullable = false)
     @Builder.Default
     private boolean emailVerified = false;

@@ -5,7 +5,7 @@ import { PlanCard } from '@/components/ui/PlanCard'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import { plans } from '@/content/plans'
+import { packs, plans } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -24,7 +24,7 @@ export function PricingPage() {
         }
       >
         Начните бесплатно, чтобы понять формат. Переходите на Про, когда
-        готовитесь всерьёз и нужен глубокий разбор.
+        готовитесь всерьёз — под реальные вакансии и голосом.
       </PageHero>
 
       <section className="py-22">
@@ -36,6 +36,34 @@ export function PricingPage() {
               </Reveal>
             ))}
           </div>
+
+          <Reveal>
+            <div className="border-line bg-card mt-6 flex flex-col items-center justify-between gap-5 rounded-2xl border p-7 sm:flex-row sm:px-8">
+              <div className="text-center sm:text-left">
+                <p className="text-ink text-[15px] font-semibold">
+                  Не хватило пакета на месяц?
+                </p>
+                <p className="text-muted mt-1 text-sm">
+                  Докупайте поверх любого тарифа — купленное не сгорает.
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                {packs.map((p) => (
+                  <div
+                    key={p.title}
+                    className="border-line flex items-baseline gap-2.5 rounded-xl border px-4.5 py-3"
+                  >
+                    <span className="text-ink text-[14.5px] font-semibold">
+                      {p.title}
+                    </span>
+                    <span className="text-muted text-sm tabular-nums">
+                      {p.price}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
 
           <p className="text-dim mt-7 text-center text-[13.5px]">
             Цены указаны для примера и могут измениться до запуска. Условия

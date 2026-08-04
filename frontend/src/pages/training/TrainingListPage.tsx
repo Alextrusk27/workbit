@@ -23,6 +23,7 @@ import {
 } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 type StatusFilter = 'ALL' | SessionStatus
@@ -203,7 +204,8 @@ function SessionCard({ session }: { session: TrainingSession }) {
         <div className="text-dim mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[12.5px]">
           <StatusTag label={STATUS_LABELS[session.status]} done={completed} />
           <span className="tabular-nums">
-            {session.answeredCount} вопросов отвечено
+            Отвечено: {session.answeredCount}{' '}
+            {questionsWord(session.answeredCount)}
           </span>
           <span>{formatDate(session.created)}</span>
         </div>

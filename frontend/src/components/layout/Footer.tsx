@@ -57,7 +57,7 @@ export function Footer() {
         </div>
 
         <div className="border-divider text-dim mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4.5 text-[13px]">
-          <span>© {new Date().getFullYear()} workbit. Все права защищены.</span>
+          <span>© {new Date().getFullYear()} Workbit. Все права защищены.</span>
           {import.meta.env.DEV && (
             <Link
               to="/brand"

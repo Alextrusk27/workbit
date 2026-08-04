@@ -44,7 +44,7 @@ export function Header() {
     >
       <Container>
         <div className="relative flex h-17 items-center gap-8">
-          <Link to="/" className="rounded-sm" aria-label="workbit — на главную">
+          <Link to="/" className="rounded-sm" aria-label="Workbit — на главную">
             <Logo />
           </Link>
 

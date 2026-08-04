@@ -278,7 +278,7 @@ function HintTip({ text }: { text: string }) {
       className="group border-line text-dim relative inline-flex size-[15px] cursor-help items-center justify-center rounded-full border text-[10px] font-normal"
     >
       ?
-      <span className="bg-pop border-line text-ink shadow-pop pointer-events-none invisible absolute bottom-[calc(100%+8px)] left-1/2 z-5 -translate-x-1/2 rounded-lg border px-[11px] py-[7px] text-xs font-normal whitespace-nowrap opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100">
+      <span className="bg-pop border-line text-ink shadow-pop pointer-events-none invisible absolute bottom-[calc(100%+8px)] left-1/2 z-5 w-max max-w-60 -translate-x-1/2 rounded-lg border px-[11px] py-[7px] text-center text-xs leading-snug font-normal opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100">
         {text}
       </span>
     </span>
@@ -319,7 +319,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
         <div>
           <h2 className="text-ink m-0 flex items-center gap-[7px] text-[15px] font-semibold">
             Прогресс по вакансии
-            <HintTip text="Прогресс рассчитывается за 5 последних интервью" />
+            <HintTip text="На графике — 5 последних интервью, лучшая оценка и оффер — по всем" />
           </h2>
           <p className="text-muted mt-1 text-[13.5px]">Оценка за попытку</p>
         </div>
@@ -483,7 +483,6 @@ function RecommendationsSection({
 
   const trainingNewTo = (skill: string) => {
     const params = new URLSearchParams({
-      profession: detail.vacancyName,
       skill,
       level: trainingLevelCode(detail.experience),
     })

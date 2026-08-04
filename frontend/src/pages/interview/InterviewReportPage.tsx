@@ -10,6 +10,7 @@ import {
 } from '@/features/interview/useInterview'
 import { sessionSubtitle, trainingLevelCode } from '@/features/interview/labels'
 import { getErrorMessage } from '@/lib/api'
+import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { CaseEntry, ReportSummary } from './reportParts'
 
@@ -49,7 +50,7 @@ export function InterviewReportPage() {
 
   const subtitle = [
     session ? sessionSubtitle(session) : null,
-    `${report.questions.length} вопросов`,
+    `${report.questions.length} ${questionsWord(report.questions.length)}`,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -62,7 +63,6 @@ export function InterviewReportPage() {
     skill: report.weakestSkill ?? '',
     level: trainingLevelCode(session?.experience ?? null),
   })
-  if (session) trainingParams.set('profession', session.vacancyName)
 
   return (
     <Container>

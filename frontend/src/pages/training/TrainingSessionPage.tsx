@@ -22,6 +22,7 @@ import {
   useTrainingOptions,
 } from '@/features/training/useTraining'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
+import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { QuestionEntry, ReferenceAnswer } from './reportParts'
 
@@ -325,11 +326,6 @@ function CurrentQuestion({
       </div>
     </div>
   )
-}
-
-function questionsWord(count: number): string {
-  if (count === 1) return 'вопрос'
-  return count < 5 ? 'вопроса' : 'вопросов'
 }
 
 function FinishBar({

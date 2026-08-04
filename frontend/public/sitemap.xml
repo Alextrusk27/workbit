@@ -2,7 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://workbit.ru/</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-04</lastmod>
+  </url>
+  <url>
+    <loc>https://workbit.ru/ai-interview</loc>
+    <lastmod>2026-08-04</lastmod>
+  </url>
+  <url>
+    <loc>https://workbit.ru/skills-trainer</loc>
+    <lastmod>2026-08-04</lastmod>
   </url>
   <url>
     <loc>https://workbit.ru/pricing</loc>
@@ -10,14 +18,18 @@
   </url>
   <url>
     <loc>https://workbit.ru/faq</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-04</lastmod>
   </url>
   <url>
     <loc>https://workbit.ru/privacy</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-04</lastmod>
   </url>
   <url>
-    <loc>https://workbit.ru/terms</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://workbit.ru/user-agreement</loc>
+    <lastmod>2026-08-04</lastmod>
+  </url>
+  <url>
+    <loc>https://workbit.ru/offer</loc>
+    <lastmod>2026-08-04</lastmod>
   </url>
 </urlset>

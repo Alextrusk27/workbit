@@ -10,6 +10,7 @@ import { buttonClasses } from '@/components/ui/buttonStyles'
 import { sessionSubtitle } from '@/features/training/labels'
 import { useReport, useRestartSession } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
+import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { CaseEntry, ReportSummary } from './reportParts'
 
@@ -59,7 +60,7 @@ export function TrainingReportPage() {
 
   const subtitle = [
     sessionSubtitle(report),
-    `${report.questions.length} вопросов`,
+    `${report.questions.length} ${questionsWord(report.questions.length)}`,
   ]
     .filter(Boolean)
     .join(' · ')

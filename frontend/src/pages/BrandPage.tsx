@@ -271,13 +271,13 @@ export function BrandPage() {
             defaultValue=""
           />
           <Field
-            label="Пароль"
-            type="password"
-            hint="Минимум 8 символов"
+            label="Код из письма"
+            inputMode="numeric"
+            hint="Шесть цифр, код действует 15 минут"
             defaultValue=""
           />
-          <Alert>Не удалось войти. Проверьте email и пароль.</Alert>
-          <Alert tone="success">Пароль обновлён.</Alert>
+          <Alert>Неверный код. Проверьте письмо и повторите ввод.</Alert>
+          <Alert tone="success">Новый код отправлен. Проверьте почту.</Alert>
         </div>
       </Section>
 

@@ -148,7 +148,7 @@ export function HeroChatDemo() {
   return (
     <div
       role="img"
-      aria-label="Пример интервью: вопрос про HashMap, голосовой ответ кандидата и разбор рецензента с оценкой 4 из 5"
+      aria-label="Пример интервью: вопрос про HashMap, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой 4 из 5"
     >
       <div aria-hidden>
         <ChatShell
@@ -210,7 +210,7 @@ export function HeroChatDemo() {
           )}
 
           {reached(phase, 'reviewing') && (
-            <ChatBubble role="bot" who="Разбор">
+            <ChatBubble role="bot" who="Разбор в отчёте">
               {phase === 'reviewing' ? (
                 <TypingDots />
               ) : (

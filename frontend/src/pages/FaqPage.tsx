@@ -1,17 +1,27 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { faq } from '@/content/faq'
-import { useAuth } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
+
+const SUPPORT_EMAIL = 'support@workbit.ru'
 
 export function FaqPage() {
   usePageTitle('Частые вопросы')
-  const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app' : '/login'
+  const [copied, setCopied] = useState(false)
+
+  const copySupportEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_EMAIL)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.location.href = `mailto:${SUPPORT_EMAIL}`
+    }
+  }
 
   return (
     <>
@@ -54,23 +64,25 @@ export function FaqPage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Готовы попробовать?"
+              title="Остались вопросы?"
               actions={
-                <>
-                  <Link to={startTo} className={buttonClasses()}>
-                    Начать интервью
-                  </Link>
-                  <Link
-                    to="/pricing"
-                    className={buttonClasses({ variant: 'secondary' })}
-                  >
-                    Смотреть тарифы
-                  </Link>
-                </>
+                <button
+                  type="button"
+                  onClick={copySupportEmail}
+                  className={buttonClasses({ variant: 'secondary' })}
+                >
+                  {copied ? 'Адрес скопирован' : 'Скопировать адрес'}
+                </button>
               }
             >
-              Проведите пробное интервью сегодня и приходите на настоящее
-              подготовленным.
+              Не нашли ответ? Напишите нам на{' '}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
+              >
+                {SUPPORT_EMAIL}
+              </a>{' '}
+              — поможем разобраться.
             </CtaPanel>
           </Reveal>
         </Container>

@@ -50,8 +50,8 @@ function DeleteAccountSection() {
     <section>
       <h2 className="text-ink text-[21px] font-bold">Удаление аккаунта</h2>
       <p className="text-muted mt-2 max-w-[48ch] text-sm">
-        Аккаунт и вся история интервью удаляются безвозвратно. Восстановить их
-        будет нельзя.
+        Аккаунт и вся история интервью и тренировок удаляются безвозвратно.
+        Восстановить их будет нельзя.
       </p>
 
       {del.isError && (
@@ -72,7 +72,7 @@ function DeleteAccountSection() {
       <ConfirmDialog
         open={confirming}
         title="Удалить аккаунт?"
-        text="Все интервью и отчёты будут потеряны. Действие необратимо."
+        text="Все интервью, тренировки и отчёты будут потеряны. Действие необратимо."
         onConfirm={onDelete}
         onClose={() => setConfirming(false)}
       />

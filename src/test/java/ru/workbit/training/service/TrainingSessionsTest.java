@@ -107,4 +107,33 @@ class TrainingSessionsTest {
             assertThatCode(() -> TrainingSessions.checkSessionNotCompleted(session)).doesNotThrowAnyException();
         }
     }
+
+    @Nested
+    @DisplayName("CheckSessionCompleted")
+    class CheckSessionCompleted {
+
+        @ParameterizedTest
+        @EnumSource(value = TrainingSession.Status.class, names = {"CREATED", "IN_PROGRESS"})
+        @DisplayName("Сессия не завершена (CREATED/IN_PROGRESS) - ConflictException")
+        void throwsWhenSessionNotCompleted(TrainingSession.Status status) {
+            // given
+            TrainingSession session = TrainingSession.builder().id(UUID.randomUUID()).status(status).build();
+
+            // when / then
+            assertThatThrownBy(() -> TrainingSessions.checkSessionCompleted(session))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session is not finished");
+        }
+
+        @Test
+        @DisplayName("Сессия завершена (COMPLETED) - исключения нет")
+        void doesNotThrowForCompletedStatus() {
+            // given
+            TrainingSession session = TrainingSession.builder()
+                    .id(UUID.randomUUID()).status(TrainingSession.Status.COMPLETED).build();
+
+            // when / then
+            assertThatCode(() -> TrainingSessions.checkSessionCompleted(session)).doesNotThrowAnyException();
+        }
+    }
 }

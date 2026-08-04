@@ -83,13 +83,13 @@ class TrainingControllerTest {
     RateLimiterService rateLimiter;
 
     private CustomUserDetails principal() {
-        return new CustomUserDetails(USER_ID, "user@example.com", "hash", List.of());
+        return new CustomUserDetails(USER_ID, "user@example.com", List.of());
     }
 
     private TrainingSessionResponse sessionResponse(String skill, String profession) {
         return new TrainingSessionResponse(
                 UUID.randomUUID(), skill, profession, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
-                0, Instant.now(), null);
+                0, 10, Instant.now(), null);
     }
 
     // -------------------------------------------------------------------------
@@ -116,7 +116,8 @@ class TrainingControllerTest {
                     .andExpect(status().isCreated())
                     .andExpect(header().exists("Location"))
                     .andExpect(jsonPath("$.skill").value("Spring Boot"))
-                    .andExpect(jsonPath("$.profession").value("Java-разработчик"));
+                    .andExpect(jsonPath("$.profession").value("Java-разработчик"))
+                    .andExpect(jsonPath("$.totalQuestions").value(10));
         }
 
         @Test
@@ -271,7 +272,7 @@ class TrainingControllerTest {
                     List.of("Spring Boot", "Docker"),
                     List.of("Java-разработчик", "Frontend-разработчик"),
                     List.of(TrainingSession.Level.JUNIOR, TrainingSession.Level.MIDDLE, TrainingSession.Level.SENIOR),
-                    10, 3);
+                    10, 50, 3);
             when(trainingService.getOptions()).thenReturn(response);
 
             // when / then
@@ -287,6 +288,7 @@ class TrainingControllerTest {
                     .andExpect(jsonPath("$.levels").isArray())
                     .andExpect(jsonPath("$.levels[0]").value("Начинающий"))
                     .andExpect(jsonPath("$.questionCap").value(10))
+                    .andExpect(jsonPath("$.maxQuestions").value(50))
                     .andExpect(jsonPath("$.minAnswersToFinish").value(3));
         }
 
@@ -713,6 +715,188 @@ class TrainingControllerTest {
         void returns401WithoutAuthentication() throws Exception {
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(get(uri()))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions/{sessionId}/questions/more
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("AddQuestions")
+    class AddQuestions {
+
+        private final UUID sessionId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+        private String uri() {
+            return BASE + "/sessions/" + sessionId + "/questions/more";
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 с обновлённой сессией из сервиса")
+        void returns200OnHappyPath() throws Exception {
+            // given
+            var response = new TrainingSessionResponse(
+                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE,
+                    TrainingSession.Status.IN_PROGRESS, 10, 20, Instant.now(), null);
+            when(trainingService.addQuestions(sessionId, USER_ID)).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(sessionId.toString()))
+                    .andExpect(jsonPath("$.answeredCount").value(10))
+                    .andExpect(jsonPath("$.totalQuestions").value(20));
+        }
+
+        @Test
+        @DisplayName("Передаёт sessionId и userId в сервис")
+        void passesSessionIdAndUserIdToService() throws Exception {
+            // given
+            when(trainingService.addQuestions(sessionId, USER_ID))
+                    .thenReturn(sessionResponse("Spring Boot", "Java-разработчик"));
+
+            // when
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isOk());
+
+            // then
+            verify(trainingService).addQuestions(sessionId, USER_ID);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда сессия не найдена")
+        void returns404WhenSessionNotFound() throws Exception {
+            // given
+            when(trainingService.addQuestions(sessionId, USER_ID))
+                    .thenThrow(new NotFoundException("Session not found"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 409, когда достигнут потолок вопросов или новых вопросов больше нет")
+        void returns409WhenLimitReachedOrNoNewQuestions() throws Exception {
+            // given
+            when(trainingService.addQuestions(sessionId, USER_ID))
+                    .thenThrow(new ConflictException("No new questions available"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Возвращает 503, когда AI-сервис недоступен")
+        void returns503WhenLlmUnavailable() throws Exception {
+            // given
+            when(trainingService.addQuestions(sessionId, USER_ID))
+                    .thenThrow(new LlmException("LLM недоступен"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isServiceUnavailable());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(uri()))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions/{sessionId}/restart
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("RestartSession")
+    class RestartSession {
+
+        private final UUID sessionId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+
+        private String uri() {
+            return BASE + "/sessions/" + sessionId + "/restart";
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 с сессией в исходном состоянии")
+        void returns200OnHappyPath() throws Exception {
+            // given
+            var response = new TrainingSessionResponse(
+                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE,
+                    TrainingSession.Status.CREATED, 0, 10, Instant.now(), null);
+            when(trainingService.restart(sessionId, USER_ID)).thenReturn(response);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CREATED"))
+                    .andExpect(jsonPath("$.answeredCount").value(0));
+        }
+
+        @Test
+        @DisplayName("Передаёт sessionId и userId в сервис")
+        void passesSessionIdAndUserIdToService() throws Exception {
+            // given
+            when(trainingService.restart(sessionId, USER_ID))
+                    .thenReturn(sessionResponse("Spring Boot", "Java-разработчик"));
+
+            // when
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isOk());
+
+            // then
+            verify(trainingService).restart(sessionId, USER_ID);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда сессия не найдена")
+        void returns404WhenSessionNotFound() throws Exception {
+            // given
+            when(trainingService.restart(sessionId, USER_ID))
+                    .thenThrow(new NotFoundException("Session not found"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 409, когда тренировка ещё не завершена")
+        void returns409WhenNotCompleted() throws Exception {
+            // given
+            when(trainingService.restart(sessionId, USER_ID))
+                    .thenThrow(new ConflictException("Session not completed"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(uri()))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

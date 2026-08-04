@@ -168,6 +168,23 @@ public class TrainingController {
         return ResponseEntity.ok(trainingService.nextQuestion(sessionId, userDetails.getId()));
     }
 
+    @PostMapping("/sessions/{sessionId}/questions/more")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Добавить ещё пачку вопросов", description = "Добавляет в незавершённую сессию следующие 10 вопросов - альтернатива разбору, когда все вопросы уже отвечены. Вопросы новые: банк отдаёт только не виденное пользователем, недостающее генерирует LLM с оглядкой на уже заданные. Всего в тренировке не больше 50 вопросов.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Вопросы добавлены"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Сессия завершена, остались неотвеченные вопросы, достигнут потолок в 50 вопросов или новых вопросов этого уровня больше нет", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull TrainingSessionResponse> addQuestions(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.addQuestions(sessionId, userDetails.getId()));
+    }
+
     @GetMapping("/sessions/{sessionId}/questions/{questionId}/reference-answer")
     @Loggable(logArgs = true)
     @Operation(summary = "Посмотреть эталонный ответ", description = "Возвращает эталонный ответ на вопрос: у вопроса из банка он подготовлен заранее, у сгенерированного - создаётся через LLM при первом запросе и далее отдаётся из кеша.")
@@ -242,6 +259,22 @@ public class TrainingController {
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(trainingService.getReport(sessionId, userDetails.getId()));
+    }
+
+    @PostMapping("/sessions/{sessionId}/restart")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Пройти тренировку заново", description = "Возвращает завершённую тренировку в исходное состояние: вопросы и эталонные ответы остаются те же, ответы, фидбэк и отчёт стираются безвозвратно.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Тренировка перезапущена"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Тренировка ещё не завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull TrainingSessionResponse> restartSession(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.restart(sessionId, userDetails.getId()));
     }
 
     @DeleteMapping("/sessions/{sessionId}")

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -19,6 +20,7 @@ import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.model.TrainingFeedback;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
@@ -31,6 +33,7 @@ import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.util.DictText;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -113,8 +117,8 @@ class TrainingWriterTest {
             List<String> generated = List.of("Сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
-            when(trainingSessionMapper.toResponse(session, 0)).thenReturn(expectedResponse);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 3, null, null);
+            when(trainingSessionMapper.toResponse(session, 0, 3)).thenReturn(expectedResponse);
 
             // when
             TrainingSessionResponse result = trainingWriter.createSession(session, List.of(bank1, bank2), generated);
@@ -152,8 +156,8 @@ class TrainingWriterTest {
             // given
             TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE).build();
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, null, null);
-            when(trainingSessionMapper.toResponse(session, 0)).thenReturn(expectedResponse);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 0, null, null);
+            when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(expectedResponse);
 
             // when
             TrainingSessionResponse result = trainingWriter.createSession(session, List.of(), List.of());
@@ -162,6 +166,181 @@ class TrainingWriterTest {
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(session.getQuestions()).isEmpty();
             verify(trainingSessionRepository).save(session);
+        }
+    }
+
+    @Nested
+    @DisplayName("AppendQuestions")
+    class AppendQuestions {
+
+        @Test
+        @DisplayName("Продолжает нумерацию с max(orderIndex)+1 - сначала банковские с bankQuestionId/referenceAnswer, "
+                + "затем сгенерированные без них; answered/total считаются по итоговому списку")
+        void continuesOrderIndexNumberingAppendingBankThenGenerated() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingQuestion existingAnswered = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).text("Существующий вопрос 1").orderIndex(1).answered(true).build();
+            TrainingQuestion existingUnanswered = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).text("Существующий вопрос 2").orderIndex(2).answered(false).build();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.IN_PROGRESS)
+                    .questions(new ArrayList<>(List.of(existingAnswered, existingUnanswered)))
+                    .build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            UUID bankId = UUID.randomUUID();
+            BankQuestion bankQuestion = BankQuestion.builder()
+                    .id(bankId).text("Банковский вопрос").referenceAnswer("Эталон").build();
+            List<String> generated = List.of("Сгенерированный вопрос");
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
+                    1, 4, null, null);
+            when(trainingSessionMapper.toResponse(session, 1, 4)).thenReturn(expectedResponse);
+
+            // when
+            TrainingSessionResponse result = trainingWriter.appendQuestions(sessionId, List.of(bankQuestion), generated);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+
+            List<TrainingQuestion> questions = session.getQuestions();
+            assertThat(questions).hasSize(4);
+
+            TrainingQuestion appendedBank = questions.get(2);
+            assertThat(appendedBank.getBankQuestionId()).isEqualTo(bankId);
+            assertThat(appendedBank.getOrderIndex()).isEqualTo(3);
+            assertThat(appendedBank.getReferenceAnswer()).isEqualTo("Эталон");
+
+            TrainingQuestion appendedGenerated = questions.get(3);
+            assertThat(appendedGenerated.getBankQuestionId()).isNull();
+            assertThat(appendedGenerated.getOrderIndex()).isEqualTo(4);
+            assertThat(appendedGenerated.getText()).isEqualTo("Сгенерированный вопрос");
+            assertThat(appendedGenerated.getReferenceAnswer()).isNull();
+
+            verify(trainingSessionRepository).save(session);
+            verify(trainingSessionMapper).toResponse(session, 1, 4);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of(), List.of()))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verify(trainingSessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Сессия уже завершена - ConflictException")
+        void throwsWhenSessionCompleted() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.COMPLETED)
+                    .questions(new ArrayList<>())
+                    .build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of(), List.of()))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session already finished");
+            verify(trainingSessionRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("RestartSession")
+    class RestartSession {
+
+        @Test
+        @DisplayName("Сбрасывает feedback/answered/answerText/answeredAt у каждого вопроса, отчёт и статус сессии; "
+                + "вопросы и эталонные ответы остаются на месте")
+        void resetsAnswersFeedbackAndReport() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingFeedback feedback = TrainingFeedback.builder().score(4).text("Фидбэк").build();
+            TrainingQuestion question = TrainingQuestion.builder()
+                    .id(UUID.randomUUID())
+                    .text("Вопрос")
+                    .referenceAnswer("Эталонный ответ")
+                    .orderIndex(1)
+                    .answered(true)
+                    .answerText("Ответ пользователя")
+                    .answeredAt(Instant.now())
+                    .feedback(feedback)
+                    .build();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.COMPLETED)
+                    .completedAt(Instant.now())
+                    .report(TrainingReport.builder().avgScore(4.0).overallFeedback("Фидбэк").build())
+                    .questions(new ArrayList<>(List.of(question)))
+                    .build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 1, null, null);
+            when(trainingSessionMapper.toResponse(session, 0, 1)).thenReturn(expectedResponse);
+
+            // when
+            TrainingSessionResponse result = trainingWriter.restartSession(sessionId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(question.getFeedback()).isNull();
+            assertThat(question.isAnswered()).isFalse();
+            assertThat(question.getAnswerText()).isNull();
+            assertThat(question.getAnsweredAt()).isNull();
+            assertThat(question.getText()).isEqualTo("Вопрос");
+            assertThat(question.getReferenceAnswer()).isEqualTo("Эталонный ответ");
+            assertThat(session.getReport()).isNull();
+            assertThat(session.getStatus()).isEqualTo(TrainingSession.Status.CREATED);
+            assertThat(session.getCompletedAt()).isNull();
+            verify(trainingSessionRepository).save(session);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.restartSession(sessionId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verify(trainingSessionRepository, never()).save(any());
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = TrainingSession.Status.class, names = {"CREATED", "IN_PROGRESS"})
+        @DisplayName("Сессия ещё не завершена - ConflictException, сброс не происходит")
+        void throwsWhenSessionNotCompleted(TrainingSession.Status status) {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .status(status)
+                    .questions(new ArrayList<>())
+                    .build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.restartSession(sessionId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Session is not finished");
+            verify(trainingSessionRepository, never()).save(any());
         }
     }
 

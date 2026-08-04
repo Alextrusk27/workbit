@@ -26,7 +26,7 @@ public class TrainingQuestion {
     @Column(name = "bank_question_id", updatable = false)
     private UUID bankQuestionId;
 
-    @OneToOne(mappedBy = "question", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "question", orphanRemoval = true, cascade = CascadeType.ALL)
     private TrainingFeedback feedback;
 
     @Column(nullable = false, updatable = false)

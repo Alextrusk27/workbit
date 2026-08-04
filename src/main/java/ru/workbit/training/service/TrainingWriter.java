@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import static ru.workbit.training.service.TrainingSessions.answeredSorted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionCompleted;
 import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
 
 @Component
@@ -75,7 +76,55 @@ class TrainingWriter {
         session.setQuestions(questions);
         trainingSessionRepository.save(session);
 
-        return trainingSessionMapper.toResponse(session, 0);
+        return trainingSessionMapper.toResponse(session, 0, questions.size());
+    }
+
+    @Transactional
+    public TrainingSessionResponse appendQuestions(UUID sessionId, List<BankQuestion> bankQuestions,
+                                                   List<String> generatedQuestions) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionNotCompleted(session);
+
+        List<TrainingQuestion> questions = session.getQuestions();
+        int orderIndex = questions.stream().mapToInt(TrainingQuestion::getOrderIndex).max().orElse(0);
+        for (BankQuestion bankQuestion : bankQuestions) {
+            questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
+                    bankQuestion.getReferenceAnswer(), ++orderIndex));
+        }
+        for (String text : generatedQuestions) {
+            questions.add(buildQuestion(session, text, null, null, ++orderIndex));
+        }
+
+        trainingSessionRepository.save(session);
+
+        int answered = (int) questions.stream().filter(TrainingQuestion::isAnswered).count();
+        return trainingSessionMapper.toResponse(session, answered, questions.size());
+    }
+
+    /**
+     * Перезапуск: вопросы и эталонные ответы остаются на месте, ответы, фидбэк и отчёт стираются,
+     * сессия возвращается в исходное состояние.
+     */
+    @Transactional
+    public TrainingSessionResponse restartSession(UUID sessionId) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionCompleted(session);
+
+        for (TrainingQuestion question : session.getQuestions()) {
+            question.setFeedback(null);
+            question.setAnswered(false);
+            question.setAnswerText(null);
+            question.setAnsweredAt(null);
+        }
+        session.setReport(null);
+        session.setStatus(TrainingSession.Status.CREATED);
+        session.setCompletedAt(null);
+
+        trainingSessionRepository.save(session);
+
+        return trainingSessionMapper.toResponse(session, 0, session.getQuestions().size());
     }
 
     private static TrainingQuestion buildQuestion(TrainingSession session, String text, UUID bankQuestionId,

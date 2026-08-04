@@ -51,6 +51,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static ru.workbit.training.service.TrainingSessions.answeredSorted;
 import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
@@ -61,6 +62,7 @@ import static ru.workbit.training.service.TrainingSessions.checkSessionNotComple
 public class TrainingService {
 
     public static final int QUESTION_CAP = 10;
+    public static final int MAX_QUESTIONS = 50;
     public static final int MIN_ANSWERED_TO_FINISH = 3;
     public static final int SUGGEST_LIMIT = 7;
     public static final int OPTIONS_LIMIT = 20;
@@ -94,7 +96,8 @@ public class TrainingService {
                 refs.professionId(), refs.skillId(), session.getLevel().name(), userId, QUESTION_CAP);
 
         List<String> generatedQuestions = bankQuestions.size() < QUESTION_CAP
-                ? generateMissingQuestions(session, bankQuestions)
+                ? generateQuestions(session, QUESTION_CAP - bankQuestions.size(),
+                        bankQuestions.stream().map(BankQuestion::getText).toList())
                 : List.of();
         checkEnoughQuestions(session, bankQuestions, generatedQuestions);
 
@@ -103,24 +106,30 @@ public class TrainingService {
 
     public TrainingSessionResponse get(UUID sessionId, UUID userId) {
         return trainingSessionRepository.findByIdAndUserId(sessionId, userId)
-                .map(session -> trainingSessionMapper.toResponse(session, (int) trainingQuestionRepository
-                        .countByTrainingSessionIdAndAnsweredTrue(sessionId)))
+                .map(session -> trainingSessionMapper.toResponse(
+                        session,
+                        (int) trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(sessionId),
+                        (int) trainingQuestionRepository.countByTrainingSessionId(sessionId)))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
     }
 
     public Page<@NotNull TrainingSessionResponse> getAll(UUID userId, Pageable pageable) {
         Page<@NotNull TrainingSession> sessions = trainingSessionRepository.findAllByUserId(userId, pageable);
 
-        Map<UUID, Long> answered = trainingQuestionRepository
-                .countAnsweredBySessionIds(sessions.stream().map(TrainingSession::getId).toList())
+        Map<UUID, TrainingQuestionRepository.QuestionCounts> counts = trainingQuestionRepository
+                .countBySessionIds(sessions.stream().map(TrainingSession::getId).toList())
                 .stream()
                 .collect(Collectors.toMap(
-                        TrainingQuestionRepository.AnsweredCount::getSessionId,
-                        TrainingQuestionRepository.AnsweredCount::getCount));
+                        TrainingQuestionRepository.QuestionCounts::getSessionId,
+                        Function.identity()));
 
-        return sessions.map(session -> trainingSessionMapper.toResponse(
-                session,
-                answered.getOrDefault(session.getId(), 0L).intValue()));
+        return sessions.map(session -> {
+            TrainingQuestionRepository.QuestionCounts sessionCounts = counts.get(session.getId());
+            return trainingSessionMapper.toResponse(
+                    session,
+                    sessionCounts == null ? 0 : (int) sessionCounts.getAnswered(),
+                    sessionCounts == null ? 0 : (int) sessionCounts.getTotal());
+        });
     }
 
     public List<TrainingSkillMatch> findLatestBySkills(UUID userId, Collection<String> skills) {
@@ -151,6 +160,35 @@ public class TrainingService {
                     log.warn("Session {} has no questions left to ask", sessionId);
                     return new ConflictException("Question cap reached");
                 });
+    }
+
+    /**
+     * Следующая пачка вопросов в ту же сессию — альтернатива разбору, когда вопросы кончились.
+     * Банк отдаёт только не виденное пользователем, недостающее пишет LLM с оглядкой на уже
+     * заданные вопросы. Ни одного нового вопроса — 409: предлагать по этому навыку и уровню нечего.
+     */
+    public TrainingSessionResponse addQuestions(UUID sessionId, UUID userId) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .filter(s -> s.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionNotCompleted(session);
+
+        List<TrainingQuestion> questions = session.getQuestions();
+        checkRoomForMoreQuestions(sessionId, questions);
+        checkAllQuestionsAnswered(sessionId, questions);
+
+        int missing = Math.min(QUESTION_CAP, MAX_QUESTIONS - questions.size());
+        List<BankQuestion> bankQuestions = sampleBank(session, userId, missing);
+        List<String> generatedQuestions = bankQuestions.size() < missing
+                ? generateQuestions(session, missing - bankQuestions.size(),
+                        Stream.concat(
+                                        questions.stream().map(TrainingQuestion::getText),
+                                        bankQuestions.stream().map(BankQuestion::getText))
+                                .toList())
+                : List.of();
+        checkAnyNewQuestion(session, bankQuestions, generatedQuestions);
+
+        return trainingWriter.appendQuestions(sessionId, bankQuestions, generatedQuestions);
     }
 
     @Transactional
@@ -234,6 +272,15 @@ public class TrainingService {
         return trainingReportMapper.toResponse(report, session, answeredSorted(session));
     }
 
+    /**
+     * Пройти ту же тренировку заново: вопросы и эталонные ответы остаются, ответы, фидбэк
+     * и отчёт стираются.
+     */
+    public TrainingSessionResponse restart(UUID sessionId, UUID userId) {
+        checkUserSession(sessionId, userId);
+        return trainingWriter.restartSession(sessionId);
+    }
+
     @Transactional
     public void delete(UUID sessionId, UUID userId) {
         checkUserSession(sessionId, userId);
@@ -248,6 +295,7 @@ public class TrainingService {
                         .toList(),
                 List.of(TrainingSession.Level.values()),
                 QUESTION_CAP,
+                MAX_QUESTIONS,
                 MIN_ANSWERED_TO_FINISH);
     }
 
@@ -395,15 +443,27 @@ public class TrainingService {
         return usable.getFirst();
     }
 
-    private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {
-        int missing = QUESTION_CAP - bankQuestions.size();
+    /**
+     * Банк адресуется id словарных записей, а в сессии от них остались только строки-снапшоты,
+     * поэтому пара ищется по ключу сравнения; нет записи в словаре — вопросы даст только LLM.
+     */
+    private List<BankQuestion> sampleBank(TrainingSession session, UUID userId, int limit) {
+        return professionDictRepository.findByMatchKey(DictText.matchKey(session.getProfession()))
+                .flatMap(profession -> skillDictRepository
+                        .findByProfessionIdAndMatchKey(profession.getId(), DictText.matchKey(session.getSkill()))
+                        .map(skill -> questionBankRepository.sampleUnseen(
+                                profession.getId(), skill.getId(), session.getLevel().name(), userId, limit)))
+                .orElseGet(List::of);
+    }
+
+    private List<String> generateQuestions(TrainingSession session, int missing, List<String> existingQuestions) {
         LlmTrainingQuestions generated = llmService.generateTrainingQuestions(
                 session.getLevel().getGrade(),
                 new LlmTrainingQuestionsRequest(
                         session.getSkill(),
                         session.getProfession(),
                         missing,
-                        bankQuestions.stream().map(BankQuestion::getText).toList()));
+                        existingQuestions));
 
         List<String> questions = generated.questions() == null ? List.of() : generated.questions().stream()
                 .filter(q -> q != null && !q.isBlank())
@@ -414,6 +474,30 @@ public class TrainingService {
                     questions.size(), missing, session.getSkill(), session.getProfession(), session.getLevel());
         }
         return questions;
+    }
+
+    private void checkRoomForMoreQuestions(UUID sessionId, List<TrainingQuestion> questions) {
+        if (questions.size() >= MAX_QUESTIONS) {
+            log.warn("Session {} already has {} questions, limit is {}",
+                    sessionId, questions.size(), MAX_QUESTIONS);
+            throw new ConflictException("Question limit reached");
+        }
+    }
+
+    private void checkAllQuestionsAnswered(UUID sessionId, List<TrainingQuestion> questions) {
+        if (questions.stream().anyMatch(question -> !question.isAnswered())) {
+            log.warn("Session {} still has unanswered questions", sessionId);
+            throw new ConflictException("Unanswered questions left");
+        }
+    }
+
+    private void checkAnyNewQuestion(TrainingSession session, List<BankQuestion> bankQuestions,
+                                     List<String> generatedQuestions) {
+        if (bankQuestions.isEmpty() && generatedQuestions.isEmpty()) {
+            log.warn("No new questions left [skill={}, profession={}, level={}]",
+                    session.getSkill(), session.getProfession(), session.getLevel());
+            throw new ConflictException("No new questions available");
+        }
     }
 
     private void checkEnoughQuestions(TrainingSession session, List<BankQuestion> bankQuestions,

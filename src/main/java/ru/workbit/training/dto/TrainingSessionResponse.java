@@ -25,6 +25,9 @@ public record TrainingSessionResponse(
         @Schema(description = "Количество вопросов, на которые уже дан ответ", example = "3")
         int answeredCount,
 
+        @Schema(description = "Всего вопросов в сессии", example = "10")
+        int totalQuestions,
+
         @Schema(description = "Момент создания сессии")
         Instant created,
 

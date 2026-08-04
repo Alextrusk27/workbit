@@ -53,8 +53,8 @@ class TrainingSessionMapperTest {
     class ToResponse {
 
         @Test
-        @DisplayName("Переносит все поля сессии и answeredCount")
-        void mapsAllSessionFieldsAndAnsweredCount() {
+        @DisplayName("Переносит все поля сессии, answeredCount и totalQuestions")
+        void mapsAllSessionFieldsAnsweredCountAndTotalQuestions() {
             // given
             var sessionId = UUID.randomUUID();
             var created = Instant.now().minusSeconds(60);
@@ -70,7 +70,7 @@ class TrainingSessionMapperTest {
                     .build();
 
             // when
-            TrainingSessionResponse dto = mapper.toResponse(session, 3);
+            TrainingSessionResponse dto = mapper.toResponse(session, 3, 10);
 
             // then
             assertThat(dto.id()).isEqualTo(sessionId);
@@ -79,6 +79,7 @@ class TrainingSessionMapperTest {
             assertThat(dto.level()).isEqualTo(TrainingSession.Level.SENIOR);
             assertThat(dto.status()).isEqualTo(TrainingSession.Status.COMPLETED);
             assertThat(dto.answeredCount()).isEqualTo(3);
+            assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isEqualTo(completedAt);
         }

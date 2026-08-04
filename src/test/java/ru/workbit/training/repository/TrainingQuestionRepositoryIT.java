@@ -41,7 +41,6 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build();
     }
 
@@ -346,6 +345,130 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             // then
             assertThat(result).isPresent();
             assertThat(result.get().getId()).isEqualTo(questionA.getId());
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("CountBySessionIds")
+    class CountBySessionIds {
+
+        @Test
+        @DisplayName("Считает total и answered раздельно по каждой сессии, не путая значения между ними")
+        void countsTotalAndAnsweredPerSessionSeparately() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-multi@example.com"));
+            var sessionA = em.persistAndFlush(aSession(user.getId()));
+            var sessionB = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(answered(aQuestion(sessionA, 1), Instant.now()));
+            em.persistAndFlush(aQuestion(sessionA, 2));
+            em.persistAndFlush(aQuestion(sessionA, 3));
+            em.persistAndFlush(answered(aQuestion(sessionB, 1), Instant.now()));
+            em.persistAndFlush(answered(aQuestion(sessionB, 2), Instant.now()));
+
+            // when
+            var result = repository.countBySessionIds(List.of(sessionA.getId(), sessionB.getId()));
+
+            // then
+            assertThat(result).hasSize(2);
+            var countsA = result.stream()
+                    .filter(c -> c.getSessionId().equals(sessionA.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            var countsB = result.stream()
+                    .filter(c -> c.getSessionId().equals(sessionB.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(countsA.getTotal()).isEqualTo(3);
+            assertThat(countsA.getAnswered()).isEqualTo(1);
+            assertThat(countsB.getTotal()).isEqualTo(2);
+            assertThat(countsB.getAnswered()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Сессия, где отвечены все вопросы — answered равен total")
+        void allAnsweredSessionHasAnsweredEqualToTotal() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-all-answered@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(answered(aQuestion(session, 1), Instant.now()));
+            em.persistAndFlush(answered(aQuestion(session, 2), Instant.now()));
+
+            // when
+            var result = repository.countBySessionIds(List.of(session.getId()));
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getTotal()).isEqualTo(2);
+            assertThat(result.get(0).getAnswered()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Сессия без единого отвеченного вопроса — answered равен 0, не null")
+        void noneAnsweredSessionHasAnsweredZero() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-none-answered@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(aQuestion(session, 1));
+            em.persistAndFlush(aQuestion(session, 2));
+
+            // when
+            var result = repository.countBySessionIds(List.of(session.getId()));
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getTotal()).isEqualTo(2);
+            assertThat(result.get(0).getAnswered()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("Сессия без единого вопроса не попадает в результат")
+        void sessionWithoutQuestionsIsAbsentFromResult() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-no-questions@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+
+            // when
+            var result = repository.countBySessionIds(List.of(session.getId()));
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Id чужой сессии в списке не подмешивает лишних строк")
+        void doesNotMixInRowsForSessionNotRequested() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-foreign@example.com"));
+            var requestedSession = em.persistAndFlush(aSession(user.getId()));
+            var foreignSession = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(aQuestion(requestedSession, 1));
+            em.persistAndFlush(aQuestion(foreignSession, 1));
+            em.persistAndFlush(aQuestion(foreignSession, 2));
+
+            // when
+            var result = repository.countBySessionIds(List.of(requestedSession.getId()));
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getSessionId()).isEqualTo(requestedSession.getId());
+            assertThat(result.get(0).getTotal()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Пустой список id — фактическое поведение: пустой результат без ошибки")
+        void emptySessionIdsListReturnsEmptyResult() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-empty-list@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(aQuestion(session, 1));
+
+            // when
+            var result = repository.countBySessionIds(List.of());
+
+            // then
+            assertThat(result).isEmpty();
         }
     }
 }

@@ -11,10 +11,12 @@ import java.util.UUID;
 
 public interface TrainingQuestionRepository extends JpaRepository<@NotNull TrainingQuestion, @NotNull UUID> {
 
-    interface AnsweredCount {
+    interface QuestionCounts {
         UUID getSessionId();
 
-        long getCount();
+        long getTotal();
+
+        long getAnswered();
     }
 
     long countByTrainingSessionIdAndAnsweredTrue(UUID trainingSessionId);
@@ -22,12 +24,14 @@ public interface TrainingQuestionRepository extends JpaRepository<@NotNull Train
     long countByTrainingSessionId(UUID trainingSessionId);
 
     @Query("""
-            SELECT q.trainingSession.id AS sessionId, COUNT(q) AS count
+            SELECT q.trainingSession.id AS sessionId,
+                   COUNT(q) AS total,
+                   SUM(CASE WHEN q.answered = true THEN 1 ELSE 0 END) AS answered
             FROM TrainingQuestion q
-            WHERE q.trainingSession.id IN :sessionIds AND q.answered = true
+            WHERE q.trainingSession.id IN :sessionIds
             GROUP BY q.trainingSession.id
             """)
-    List<AnsweredCount> countAnsweredBySessionIds(List<UUID> sessionIds);
+    List<QuestionCounts> countBySessionIds(List<UUID> sessionIds);
 
     @Query("""
             SELECT q FROM TrainingQuestion q

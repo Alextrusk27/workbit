@@ -27,4 +27,11 @@ final class TrainingSessions {
             throw new ConflictException("Session already finished");
         }
     }
+
+    static void checkSessionCompleted(TrainingSession session) {
+        if (session.getStatus() != TrainingSession.Status.COMPLETED) {
+            log.warn("Session {} is not finished yet", session.getId());
+            throw new ConflictException("Session is not finished");
+        }
+    }
 }

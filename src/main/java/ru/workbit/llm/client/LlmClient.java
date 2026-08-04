@@ -3,6 +3,7 @@ package ru.workbit.llm.client;
 import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.errors.OpenAIException;
+import com.openai.errors.OpenAIInvalidDataException;
 import com.openai.errors.OpenAIServiceException;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponsePrompt;
@@ -24,11 +25,16 @@ import java.util.regex.Pattern;
  * подстановка переменных в промпт и извлечение типизированного ответа модели.
  * Ответы с CJK-вкраплениями (иероглифы, кана, хангыль — редкий дефект моделей)
  * перезапрашиваются один раз, при повторном срабатывании символы вырезаются.
+ * Неразбираемый ответ (модель отдала не JSON) тоже перезапрашивается один раз;
+ * если и повтор не разобрался, в лог идёт ERROR с маркером {@value #MODEL_DEGRADED} —
+ * признак того, что модель агента в Studio перестала держать формат.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LlmClient {
+    public static final String MODEL_DEGRADED = "LLM_MODEL_DEGRADED";
+
     private static final Pattern CJK =
             Pattern.compile("[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]");
 
@@ -37,17 +43,32 @@ public class LlmClient {
     private final ObjectMapper objectMapper;
 
     public <T> T call(String agentKey, Object request, Class<T> responseType) {
-        T result = callOnce(agentKey, request, responseType);
+        T result = callParseable(agentKey, request, responseType);
         if (!containsCjk(result)) {
             return result;
         }
         log.warn("LLM response contains CJK characters [agent={}], retrying once", agentKey);
-        T retried = callOnce(agentKey, request, responseType);
+        T retried = callParseable(agentKey, request, responseType);
         if (!containsCjk(retried)) {
             return retried;
         }
         log.warn("LLM response contains CJK characters after retry [agent={}], stripping them", agentKey);
         return stripCjk(retried, responseType);
+    }
+
+    private <T> T callParseable(String agentKey, Object request, Class<T> responseType) {
+        try {
+            return callOnce(agentKey, request, responseType);
+        } catch (OpenAIInvalidDataException first) {
+            log.warn("LLM response is not parseable [agent={}], retrying once: {}", agentKey, first.getMessage());
+            try {
+                return callOnce(agentKey, request, responseType);
+            } catch (OpenAIInvalidDataException second) {
+                log.error("{}: LLM response is not parseable after retry [agent={}, promptId={}] — check the agent model in Studio",
+                        MODEL_DEGRADED, agentKey, props.agents().get(agentKey), second);
+                throw new LlmException("LLM response is not parseable", second);
+            }
+        }
     }
 
     private <T> T callOnce(String agentKey, Object request, Class<T> responseType) {
@@ -60,6 +81,8 @@ public class LlmClient {
                     .flatMap(content -> content.outputText().stream())
                     .findFirst()
                     .orElseThrow(() -> new LlmException("Model not response"));
+        } catch (OpenAIInvalidDataException e) {
+            throw e;
         } catch (OpenAIServiceException e) {
             log.error("LLM call failed [agent={}, promptId={}]: status={}, code={}, type={}, param={}, body={}",
                     agentKey, props.agents().get(agentKey), e.statusCode(),

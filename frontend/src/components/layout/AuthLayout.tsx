@@ -17,7 +17,7 @@ export function AuthLayout() {
             <Link
               to="/"
               className="rounded-sm"
-              aria-label="workbit — на главную"
+              aria-label="Workbit — на главную"
             >
               <Logo />
             </Link>

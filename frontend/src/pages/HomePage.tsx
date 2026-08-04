@@ -102,7 +102,7 @@ export function HomePage() {
               </Link>
             </div>
             <p className="text-dim mt-4.5 text-[13.5px]">
-              Без карты · 3 интервью в месяц бесплатно
+              3 интервью в месяц бесплатно
             </p>
           </div>
 
@@ -177,7 +177,7 @@ export function HomePage() {
               >
                 <ChatBubble
                   role="bot"
-                  who="workbit-интервьюер · вопрос 5 / 10"
+                  who="Workbit-интервьюер · вопрос 5 / 10"
                   className="max-w-full"
                 >
                   Расскажите о случае, когда вы не уложились в срок. Что пошло
@@ -265,7 +265,6 @@ export function HomePage() {
           <Reveal>
             <CtaPanel
               title="Следующее собеседование — уже не первое"
-              note="Без карты · бесплатный тариф навсегда"
               actions={
                 <>
                   <Link to={startTo} className={buttonClasses()}>

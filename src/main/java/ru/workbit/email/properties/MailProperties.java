@@ -6,7 +6,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record MailProperties(
         String fromName,
         String fromMail,
-        String baseUrl,
-        int resetTtlMinutes
+        String baseUrl
 ) {
 }

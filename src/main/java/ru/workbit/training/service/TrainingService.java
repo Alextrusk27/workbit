@@ -17,10 +17,10 @@ import ru.workbit.training.dto.*;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.QuestionBankRepository;
-import ru.workbit.content.repository.TopicDictRepository;
+import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
@@ -32,14 +32,14 @@ import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCase;
-import ru.workbit.llm.dto.LlmTrainingFollowUp;
-import ru.workbit.llm.dto.LlmTrainingFollowUpDecision;
-import ru.workbit.llm.dto.LlmTrainingFollowUpRequest;
 import ru.workbit.llm.dto.LlmTrainingQuestions;
 import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.util.DictText;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -48,29 +48,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-import static ru.workbit.training.service.TrainingCases.answeredSorted;
-import static ru.workbit.training.service.TrainingCases.checkSessionNotCompleted;
-import static ru.workbit.training.service.TrainingCases.groupCases;
+import static ru.workbit.training.service.TrainingSessions.answeredSorted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TrainingService {
 
-    public static final int MAIN_QUESTION_CAP = 10;
+    public static final int QUESTION_CAP = 10;
+    public static final int MAX_QUESTIONS = 50;
     public static final int MIN_ANSWERED_TO_FINISH = 3;
-    public static final int MAX_FOLLOW_UPS_PER_QUESTION = 4;
     public static final int SUGGEST_LIMIT = 7;
+    public static final int OPTIONS_LIMIT = 20;
     public static final int MIN_SUGGEST_QUERY_LENGTH = 2;
     public static final int MAX_INPUT_LENGTH = 100;
+    public static final int CANDIDATE_LIMIT = 10;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
-    private final TopicDictRepository topicDictRepository;
+    private final SkillDictRepository skillDictRepository;
     private final QuestionBankRepository questionBankRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
@@ -82,61 +85,67 @@ public class TrainingService {
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
-        session.setProfession(session.getProfession().strip());
-        String topic = session.getTopic();
-        session.setTopic(topic == null || topic.isBlank() ? null : topic.strip());
+        session.setSkill(DictText.normalize(session.getSkill()));
+        session.setProfession(DictText.normalize(session.getProfession()));
 
         canonicalizeInput(session);
 
         TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
-                session.getProfession(), session.getTopic());
+                session.getSkill(), session.getProfession());
         List<BankQuestion> bankQuestions = questionBankRepository.sampleUnseen(
-                refs.professionId(), refs.topicId(), session.getLevel().name(), userId, MAIN_QUESTION_CAP);
+                refs.professionId(), refs.skillId(), session.getLevel().name(), userId, QUESTION_CAP);
 
-        List<String> generatedQuestions = bankQuestions.size() < MAIN_QUESTION_CAP
-                ? generateMissingQuestions(session, bankQuestions)
+        List<String> generatedQuestions = bankQuestions.size() < QUESTION_CAP
+                ? generateQuestions(session, QUESTION_CAP - bankQuestions.size(),
+                        bankQuestions.stream().map(BankQuestion::getText).toList())
                 : List.of();
-        checkEnoughMainQuestions(session, bankQuestions, generatedQuestions);
+        checkEnoughQuestions(session, bankQuestions, generatedQuestions);
 
         return trainingWriter.createSession(session, bankQuestions, generatedQuestions);
     }
 
     public TrainingSessionResponse get(UUID sessionId, UUID userId) {
         return trainingSessionRepository.findByIdAndUserId(sessionId, userId)
-                .map(session -> trainingSessionMapper.toResponse(session, (int) trainingQuestionRepository
-                        .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)))
+                .map(session -> trainingSessionMapper.toResponse(
+                        session,
+                        (int) trainingQuestionRepository.countByTrainingSessionIdAndAnsweredTrue(sessionId),
+                        (int) trainingQuestionRepository.countByTrainingSessionId(sessionId)))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
     }
 
     public Page<@NotNull TrainingSessionResponse> getAll(UUID userId, Pageable pageable) {
         Page<@NotNull TrainingSession> sessions = trainingSessionRepository.findAllByUserId(userId, pageable);
 
-        Map<UUID, Long> answered = trainingQuestionRepository
-                .countAnsweredBySessionIds(sessions.stream().map(TrainingSession::getId).toList())
+        Map<UUID, TrainingQuestionRepository.QuestionCounts> counts = trainingQuestionRepository
+                .countBySessionIds(sessions.stream().map(TrainingSession::getId).toList())
                 .stream()
                 .collect(Collectors.toMap(
-                        TrainingQuestionRepository.AnsweredCount::getSessionId,
-                        TrainingQuestionRepository.AnsweredCount::getCount));
+                        TrainingQuestionRepository.QuestionCounts::getSessionId,
+                        Function.identity()));
 
-        return sessions.map(session -> trainingSessionMapper.toResponse(
-                session,
-                answered.getOrDefault(session.getId(), 0L).intValue()));
+        return sessions.map(session -> {
+            TrainingQuestionRepository.QuestionCounts sessionCounts = counts.get(session.getId());
+            return trainingSessionMapper.toResponse(
+                    session,
+                    sessionCounts == null ? 0 : (int) sessionCounts.getAnswered(),
+                    sessionCounts == null ? 0 : (int) sessionCounts.getTotal());
+        });
     }
 
-    public List<TrainingTopicMatch> findLatestByTopics(UUID userId, Collection<String> topics) {
-        Map<String, TrainingSession> latestByTopic = new HashMap<>();
-        for (TrainingSession session : trainingSessionRepository.findAllByUserIdAndLoweredTopicIn(userId, topics)) {
-            latestByTopic.putIfAbsent(session.getTopic().toLowerCase(), session);
+    public List<TrainingSkillMatch> findLatestBySkills(UUID userId, Collection<String> skills) {
+        Map<String, TrainingSession> latestBySkill = new HashMap<>();
+        for (TrainingSession session : trainingSessionRepository.findAllByUserIdAndLoweredSkillIn(userId, skills)) {
+            latestBySkill.putIfAbsent(session.getSkill().toLowerCase(), session);
         }
-        return latestByTopic.values().stream()
-                .map(session -> new TrainingTopicMatch(
+        return latestBySkill.values().stream()
+                .map(session -> new TrainingSkillMatch(
                         session.getId(),
-                        session.getTopic(),
+                        session.getSkill(),
                         session.getStatus(),
                         session.getReport() == null ? null : session.getReport().getAvgScore(),
                         (int) trainingQuestionRepository
-                                .countByTrainingSessionIdAndFollowUpFalseAndAnsweredTrue(session.getId()),
-                        (int) trainingQuestionRepository.countByTrainingSessionIdAndFollowUpFalse(session.getId())))
+                                .countByTrainingSessionIdAndAnsweredTrue(session.getId()),
+                        (int) trainingQuestionRepository.countByTrainingSessionId(session.getId())))
                 .toList();
     }
 
@@ -145,64 +154,41 @@ public class TrainingService {
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
 
-        Optional<TrainingQuestion> pendingFollowUp = trainingQuestionRepository
-                .findNextUnansweredFollowUp(sessionId);
-        if (pendingFollowUp.isPresent()) {
-            return trainingQuestionMapper.toDto(pendingFollowUp.get());
-        }
-
-        return askFollowUp(session)
-                .or(() -> trainingQuestionRepository.findNextUnansweredMain(sessionId)
-                        .map(trainingQuestionMapper::toDto))
+        return trainingQuestionRepository.findNextUnanswered(sessionId)
+                .map(trainingQuestionMapper::toDto)
                 .orElseThrow(() -> {
                     log.warn("Session {} has no questions left to ask", sessionId);
                     return new ConflictException("Question cap reached");
                 });
     }
 
-    private Optional<TrainingQuestionResponse> askFollowUp(TrainingSession session) {
-        Optional<TrainingQuestion> lastAnswered = trainingQuestionRepository
-                .findLastAnsweredWithoutFollowUpCheck(session.getId());
-        if (lastAnswered.isEmpty()) {
-            return Optional.empty();
-        }
+    /**
+     * Следующая пачка вопросов в ту же сессию — альтернатива разбору, когда вопросы кончились.
+     * Банк отдаёт только не виденное пользователем, недостающее пишет LLM с оглядкой на уже
+     * заданные вопросы. Ни одного нового вопроса — 409: предлагать по этому навыку и уровню нечего.
+     */
+    public TrainingSessionResponse addQuestions(UUID sessionId, UUID userId) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .filter(s -> s.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionNotCompleted(session);
 
-        TrainingQuestion answered = lastAnswered.get();
-        UUID caseMainId = answered.isFollowUp() ? answered.getParentQuestionId() : answered.getId();
-        List<TrainingQuestion> caseFollowUps = trainingQuestionRepository
-                .findAllByParentQuestionIdOrderByOrderIndex(caseMainId);
+        List<TrainingQuestion> questions = session.getQuestions();
+        checkRoomForMoreQuestions(sessionId, questions);
+        checkAllQuestionsAnswered(sessionId, questions);
 
-        if (caseFollowUps.size() >= MAX_FOLLOW_UPS_PER_QUESTION) {
-            trainingWriter.markFollowUpChecked(answered.getId());
-            return Optional.empty();
-        }
+        int missing = Math.min(QUESTION_CAP, MAX_QUESTIONS - questions.size());
+        List<BankQuestion> bankQuestions = sampleBank(session, userId, missing);
+        List<String> generatedQuestions = bankQuestions.size() < missing
+                ? generateQuestions(session, missing - bankQuestions.size(),
+                        Stream.concat(
+                                        questions.stream().map(TrainingQuestion::getText),
+                                        bankQuestions.stream().map(BankQuestion::getText))
+                                .toList())
+                : List.of();
+        checkAnyNewQuestion(session, bankQuestions, generatedQuestions);
 
-        TrainingQuestion caseMain = answered.isFollowUp()
-                ? trainingQuestionRepository.findById(caseMainId)
-                        .orElseThrow(() -> new NotFoundException("Question not found"))
-                : answered;
-
-        LlmTrainingFollowUpDecision decision = llmService.decideTrainingFollowUp(new LlmTrainingFollowUpRequest(
-                session.getProfession(),
-                session.getLevel().getGrade(),
-                caseMain.getText(),
-                caseMain.getAnswerText(),
-                caseFollowUps.stream()
-                        .map(q -> new LlmTrainingFollowUp(q.getText(), q.getAnswerText()))
-                        .toList()));
-
-        if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
-            trainingWriter.markFollowUpChecked(answered.getId());
-            return Optional.empty();
-        }
-
-        try {
-            return Optional.of(trainingWriter.saveFollowUp(answered.getId(), caseMainId, decision.question()));
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Concurrent request already created a follow-up for session {}", session.getId());
-            return trainingQuestionRepository.findNextUnansweredFollowUp(session.getId())
-                    .map(trainingQuestionMapper::toDto);
-        }
+        return trainingWriter.appendQuestions(sessionId, bankQuestions, generatedQuestions);
     }
 
     @Transactional
@@ -225,6 +211,35 @@ public class TrainingService {
         }
     }
 
+    /**
+     * Эталонный ответ на вопрос: у вопроса из банка он скопирован при создании сессии, у сгенерированного
+     * живьём — генерируется по первому запросу и кешируется, чтобы повторный показ не стоил вызова LLM.
+     */
+    public ReferenceAnswerResponse getReferenceAnswer(UUID sessionId, UUID questionId, UUID userId) {
+        TrainingQuestion question = trainingQuestionRepository.findWithSessionById(questionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+
+        checkQuestionOwnership(question, userId);
+        checkQuestionSession(question, sessionId);
+
+        if (question.getReferenceAnswer() != null) {
+            return new ReferenceAnswerResponse(question.getReferenceAnswer());
+        }
+
+        TrainingSession session = question.getTrainingSession();
+        LlmTrainingReferenceAnswer generated = llmService.createReferenceAnswer(
+                new LlmTrainingReferenceAnswerRequest(
+                        session.getSkill(), session.getProfession(), question.getText()));
+        if (generated.answer() == null || generated.answer().isBlank()) {
+            log.error("LLM returned no usable reference answer for question {}", questionId);
+            throw new LlmException("Reference answer is not available");
+        }
+
+        String answer = generated.answer().strip();
+        trainingWriter.saveReferenceAnswer(questionId, answer);
+        return new ReferenceAnswerResponse(answer);
+    }
+
     public TrainingReportResponse createReport(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
@@ -234,8 +249,7 @@ public class TrainingService {
         List<TrainingQuestion> answered = answeredSorted(session);
         checkEnoughAnsweredToFinish(sessionId, answered);
 
-        List<List<TrainingQuestion>> cases = groupCases(answered);
-        LlmTrainingReport llmReport = requestReport(sessionId, session, cases);
+        LlmTrainingReport llmReport = requestReport(sessionId, session, answered);
 
         try {
             return trainingWriter.completeReport(sessionId, llmReport);
@@ -258,6 +272,15 @@ public class TrainingService {
         return trainingReportMapper.toResponse(report, session, answeredSorted(session));
     }
 
+    /**
+     * Пройти ту же тренировку заново: вопросы и эталонные ответы остаются, ответы, фидбэк
+     * и отчёт стираются.
+     */
+    public TrainingSessionResponse restart(UUID sessionId, UUID userId) {
+        checkUserSession(sessionId, userId);
+        return trainingWriter.restartSession(sessionId);
+    }
+
     @Transactional
     public void delete(UUID sessionId, UUID userId) {
         checkUserSession(sessionId, userId);
@@ -266,43 +289,53 @@ public class TrainingService {
 
     public TrainingOptionsResponse getOptions() {
         return new TrainingOptionsResponse(
+                skillDictRepository.findTopNames(OPTIONS_LIMIT),
                 professionDictRepository.findTop20ByStatusOrderByUsageCountDesc(DictStatus.APPROVED).stream()
                         .map(ProfessionDict::getName)
                         .toList(),
                 List.of(TrainingSession.Level.values()),
-                MAIN_QUESTION_CAP,
+                QUESTION_CAP,
+                MAX_QUESTIONS,
                 MIN_ANSWERED_TO_FINISH);
     }
 
     public NormalizeInputResponse normalizeInput(NormalizeInputRequest request) {
-        boolean hasTopic = request.topic() != null && !request.topic().isBlank();
-        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
-                request.profession().strip(),
-                hasTopic ? request.topic().strip() : ""));
+        LlmInputNormalization normalized = normalize(
+                DictText.normalize(request.skill()),
+                DictText.normalize(request.profession()));
 
         return new NormalizeInputResponse(
+                normalized.skillRecognized(),
+                cleanSuggestions(normalized.skillSuggestions()),
                 normalized.professionRecognized(),
-                normalized.professionSuggestions() != null ? normalized.professionSuggestions() : List.of(),
-                hasTopic ? normalized.topicRecognized() : null,
-                hasTopic ? (normalized.topicSuggestions() != null ? normalized.topicSuggestions() : List.of()) : null,
-                hasTopic ? normalized.topicFitsProfession() : null);
+                cleanSuggestions(normalized.professionSuggestions()),
+                normalized.skillFitsProfession());
     }
 
     public List<String> suggestProfessions(String query) {
         if (isTooShortQuery(query)) {
             return List.of();
         }
-        return professionDictRepository.suggest(escapeLike(query.strip()), SUGGEST_LIMIT).stream()
+        return professionDictRepository.suggest(escapeLike(DictText.normalize(query)), SUGGEST_LIMIT).stream()
                 .map(ProfessionDict::getName)
                 .toList();
     }
 
-    public List<String> suggestTopics(String profession, String query) {
-        if (profession == null || profession.isBlank() || isTooShortQuery(query)) {
+    /**
+     * Профессия необязательна: навык — первое поле мастера, и до выбора профессии подсказки собираются
+     * по всему словарю (одноимённые навыки разных профессий схлопываются). Профессия резолвится по
+     * ключу сравнения, поэтому подсказки находятся и по своему написанию названия.
+     */
+    public List<String> suggestSkills(String profession, String query) {
+        if (isTooShortQuery(query)) {
             return List.of();
         }
-        return topicDictRepository.suggest(profession.strip(), escapeLike(query.strip()), SUGGEST_LIMIT).stream()
-                .map(TopicDict::getName)
+        String escaped = escapeLike(DictText.normalize(query));
+        if (profession == null || profession.isBlank()) {
+            return skillDictRepository.suggestAcrossProfessions(escaped, SUGGEST_LIMIT);
+        }
+        return skillDictRepository.suggest(DictText.matchKey(profession), escaped, SUGGEST_LIMIT).stream()
+                .map(SkillDict::getName)
                 .toList();
     }
 
@@ -314,83 +347,166 @@ public class TrainingService {
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
+    /**
+     * Приводит ввод к тому названию, под которым навык и профессия уже живут в словаре: сначала по
+     * ключу сравнения, потом по подсказкам нормализатора, среди которых предпочитается известная
+     * словарю. Известное словарю название проверки не требует — в словарь попадает только
+     * распознанный ввод, а повторный вызов нормализатора на том же вводе плодил бы синонимы.
+     */
     private void canonicalizeInput(TrainingSession session) {
-        Optional<ProfessionDict> profession = professionDictRepository.findByNameIgnoreCase(session.getProfession());
-        boolean professionApproved = profession
-                .filter(p -> p.getStatus() == DictStatus.APPROVED)
-                .isPresent();
-        boolean topicApproved = session.getTopic() == null || (professionApproved && topicDictRepository
-                .existsByProfessionIdAndNameIgnoreCaseAndStatus(
-                        profession.get().getId(), session.getTopic(), DictStatus.APPROVED));
-        if (professionApproved && topicApproved) {
+        Optional<ProfessionDict> knownProfession = professionDictRepository
+                .findByMatchKey(DictText.matchKey(session.getProfession()));
+        Optional<SkillDict> knownSkill = knownProfession.flatMap(profession -> skillDictRepository
+                .findByProfessionIdAndMatchKey(profession.getId(), DictText.matchKey(session.getSkill())));
+        knownProfession.ifPresent(profession -> session.setProfession(profession.getName()));
+        knownSkill.ifPresent(skill -> session.setSkill(skill.getName()));
+        if (knownProfession.isPresent() && knownSkill.isPresent()) {
             return;
         }
 
-        LlmInputNormalization normalized = llmService.normalizeInput(new LlmInputNormalizationRequest(
-                session.getProfession(),
-                session.getTopic() != null ? session.getTopic() : ""));
-        if (!professionApproved && !normalized.professionRecognized()) {
+        LlmInputNormalization normalized = normalize(session.getSkill(), session.getProfession());
+        if (knownSkill.isEmpty() && !normalized.skillRecognized()) {
+            log.warn("Rejecting training session: skill not recognized [skill={}, profession={}]",
+                    session.getSkill(), session.getProfession());
+            throw new UnprocessableEntityException("Skill not recognized");
+        }
+        if (knownProfession.isEmpty() && !normalized.professionRecognized()) {
             log.warn("Rejecting training session: profession not recognized [profession={}]",
                     session.getProfession());
             throw new UnprocessableEntityException("Profession not recognized");
         }
-        if (!topicApproved && !normalized.topicRecognized()) {
-            log.warn("Rejecting training session: topic not recognized [profession={}, topic={}]",
-                    session.getProfession(), session.getTopic());
-            throw new UnprocessableEntityException("Topic not recognized");
-        }
 
-        if (!professionApproved) {
-            session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions()));
+        if (knownSkill.isEmpty()) {
+            session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
+                    skillDictRepository::findNameByMatchKey));
         }
-        if (!topicApproved) {
-            session.setTopic(canonical(session.getTopic(), normalized.topicSuggestions()));
+        if (knownProfession.isEmpty()) {
+            session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions(),
+                    key -> professionDictRepository.findByMatchKey(key).map(ProfessionDict::getName)));
         }
     }
 
-    private static String canonical(String input, List<String> suggestions) {
-        String canonical = suggestions == null ? null : suggestions.stream()
-                .filter(s -> s != null && !s.isBlank())
-                .map(String::strip)
-                .filter(s -> s.length() <= MAX_INPUT_LENGTH)
-                .findFirst()
-                .orElse(null);
+    /**
+     * Нормализатор получает похожие названия из словаря (общее значащее слово с вводом), чтобы
+     * предложить уже принятое название вместо синонима-двойника.
+     */
+    private LlmInputNormalization normalize(String skill, String profession) {
+        List<String> skillTokens = DictText.matchTokens(skill);
+        List<String> professionTokens = DictText.matchTokens(profession);
 
-        if (canonical == null) {
+        return llmService.normalizeInput(new LlmInputNormalizationRequest(
+                skill,
+                profession,
+                skillTokens.isEmpty()
+                        ? List.of()
+                        : skillDictRepository.findCandidateNames(skillTokens, CANDIDATE_LIMIT),
+                professionTokens.isEmpty()
+                        ? List.of()
+                        : professionDictRepository.findCandidateNames(professionTokens, CANDIDATE_LIMIT)));
+    }
+
+    private static List<String> cleanSuggestions(List<String> suggestions) {
+        if (suggestions == null) {
+            return List.of();
+        }
+        return suggestions.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(DictText::normalize)
+                .toList();
+    }
+
+    /**
+     * Первая подсказка, которая уже есть в словаре, — под её названием ввод и продолжит жить;
+     * если ни одна не известна, берётся первая пригодная, как раньше.
+     */
+    private static String canonical(String input, List<String> suggestions,
+                                    Function<String, Optional<String>> dictionaryLookup) {
+        List<String> usable = suggestions == null ? List.<String>of() : suggestions.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(DictText::normalize)
+                .filter(s -> s.length() <= MAX_INPUT_LENGTH)
+                .toList();
+
+        Optional<String> known = usable.stream()
+                .map(s -> dictionaryLookup.apply(DictText.matchKey(s)))
+                .flatMap(Optional::stream)
+                .findFirst();
+        if (known.isPresent()) {
+            return known.get();
+        }
+
+        if (usable.isEmpty()) {
             log.warn("LLM recognized input but returned no usable canonical name, keeping input as is [input={}]",
                     input);
             return input;
         }
-        return canonical;
+        return usable.getFirst();
     }
 
-    private List<String> generateMissingQuestions(TrainingSession session, List<BankQuestion> bankQuestions) {
-        int missing = MAIN_QUESTION_CAP - bankQuestions.size();
-        LlmTrainingQuestions generated = llmService.generateTrainingQuestions(new LlmTrainingQuestionsRequest(
-                session.getProfession(),
-                session.getTopic() != null ? session.getTopic() : "",
+    /**
+     * Банк адресуется id словарных записей, а в сессии от них остались только строки-снапшоты,
+     * поэтому пара ищется по ключу сравнения; нет записи в словаре — вопросы даст только LLM.
+     */
+    private List<BankQuestion> sampleBank(TrainingSession session, UUID userId, int limit) {
+        return professionDictRepository.findByMatchKey(DictText.matchKey(session.getProfession()))
+                .flatMap(profession -> skillDictRepository
+                        .findByProfessionIdAndMatchKey(profession.getId(), DictText.matchKey(session.getSkill()))
+                        .map(skill -> questionBankRepository.sampleUnseen(
+                                profession.getId(), skill.getId(), session.getLevel().name(), userId, limit)))
+                .orElseGet(List::of);
+    }
+
+    private List<String> generateQuestions(TrainingSession session, int missing, List<String> existingQuestions) {
+        LlmTrainingQuestions generated = llmService.generateTrainingQuestions(
                 session.getLevel().getGrade(),
-                missing,
-                bankQuestions.stream().map(BankQuestion::getText).toList()));
+                new LlmTrainingQuestionsRequest(
+                        session.getSkill(),
+                        session.getProfession(),
+                        missing,
+                        existingQuestions));
 
         List<String> questions = generated.questions() == null ? List.of() : generated.questions().stream()
                 .filter(q -> q != null && !q.isBlank())
                 .limit(missing)
                 .toList();
         if (questions.size() < missing) {
-            log.warn("LLM returned {} usable questions of {} requested [profession={}, topic={}, level={}]",
-                    questions.size(), missing, session.getProfession(), session.getTopic(), session.getLevel());
+            log.warn("LLM returned {} usable questions of {} requested [skill={}, profession={}, level={}]",
+                    questions.size(), missing, session.getSkill(), session.getProfession(), session.getLevel());
         }
         return questions;
     }
 
-    private void checkEnoughMainQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
-                                          List<String> generatedQuestions) {
+    private void checkRoomForMoreQuestions(UUID sessionId, List<TrainingQuestion> questions) {
+        if (questions.size() >= MAX_QUESTIONS) {
+            log.warn("Session {} already has {} questions, limit is {}",
+                    sessionId, questions.size(), MAX_QUESTIONS);
+            throw new ConflictException("Question limit reached");
+        }
+    }
+
+    private void checkAllQuestionsAnswered(UUID sessionId, List<TrainingQuestion> questions) {
+        if (questions.stream().anyMatch(question -> !question.isAnswered())) {
+            log.warn("Session {} still has unanswered questions", sessionId);
+            throw new ConflictException("Unanswered questions left");
+        }
+    }
+
+    private void checkAnyNewQuestion(TrainingSession session, List<BankQuestion> bankQuestions,
+                                     List<String> generatedQuestions) {
+        if (bankQuestions.isEmpty() && generatedQuestions.isEmpty()) {
+            log.warn("No new questions left [skill={}, profession={}, level={}]",
+                    session.getSkill(), session.getProfession(), session.getLevel());
+            throw new ConflictException("No new questions available");
+        }
+    }
+
+    private void checkEnoughQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
+                                      List<String> generatedQuestions) {
         int questions = bankQuestions.size() + generatedQuestions.size();
         if (questions < MIN_ANSWERED_TO_FINISH) {
-            log.error("Only {} main questions for new training session, {} required "
-                            + "[profession={}, topic={}, level={}]",
-                    questions, MIN_ANSWERED_TO_FINISH, session.getProfession(), session.getTopic(),
+            log.error("Only {} questions for new training session, {} required "
+                            + "[skill={}, profession={}, level={}]",
+                    questions, MIN_ANSWERED_TO_FINISH, session.getSkill(), session.getProfession(),
                     session.getLevel());
             throw new LlmException("Not enough questions for a training session");
         }
@@ -402,45 +518,34 @@ public class TrainingService {
      * интервью-ревьюера и генераторов вопросов. Итоговую валидацию делает completeReport.
      */
     private LlmTrainingReport requestReport(UUID sessionId, TrainingSession session,
-                                            List<List<TrainingQuestion>> cases) {
+                                            List<TrainingQuestion> answered) {
         LlmTrainingReportRequest request = new LlmTrainingReportRequest(
+                session.getSkill(),
                 session.getProfession(),
-                session.getLevel().getGrade(),
-                IntStream.range(0, cases.size())
-                        .mapToObj(i -> toLlmCase(i + 1, cases.get(i)))
+                IntStream.range(0, answered.size())
+                        .mapToObj(i -> new LlmTrainingCase(
+                                i + 1, answered.get(i).getText(), answered.get(i).getAnswerText()))
                         .toList());
         LlmTrainingReport report = llmService.createTrainingReport(request);
-        if (isUsableReport(report, cases.size())) {
+        if (isUsableReport(report, answered.size())) {
             return report;
         }
         log.warn("LLM returned degenerate training report for session {}, retrying once", sessionId);
         return llmService.createTrainingReport(request);
     }
 
-    private static boolean isUsableReport(LlmTrainingReport report, int casesCount) {
+    private static boolean isUsableReport(LlmTrainingReport report, int questionsCount) {
         return report.overallFeedback() != null
                 && !report.overallFeedback().isBlank()
                 && report.overallFeedback().length() >= TrainingWriter.MIN_OVERALL_FEEDBACK_LENGTH
                 && report.cases() != null
-                && report.cases().size() >= casesCount * TrainingWriter.MIN_REVIEWED_CASES_RATIO;
-    }
-
-    private static LlmTrainingCase toLlmCase(int index, List<TrainingQuestion> trainingCase) {
-        return new LlmTrainingCase(
-                index,
-                trainingCase.getFirst().getText(),
-                trainingCase.getFirst().getAnswerText(),
-                trainingCase.stream()
-                        .skip(1)
-                        .map(q -> new LlmTrainingFollowUp(q.getText(), q.getAnswerText()))
-                        .toList());
+                && report.cases().size() >= questionsCount * TrainingWriter.MIN_REVIEWED_QUESTIONS_RATIO;
     }
 
     private void checkEnoughAnsweredToFinish(UUID sessionId, List<TrainingQuestion> answered) {
-        long answeredMain = answered.stream().filter(q -> !q.isFollowUp()).count();
-        if (answeredMain < MIN_ANSWERED_TO_FINISH) {
-            log.warn("Session {} has only {} answered main questions, {} required to finish",
-                    sessionId, answeredMain, MIN_ANSWERED_TO_FINISH);
+        if (answered.size() < MIN_ANSWERED_TO_FINISH) {
+            log.warn("Session {} has only {} answered questions, {} required to finish",
+                    sessionId, answered.size(), MIN_ANSWERED_TO_FINISH);
             throw new ConflictException("Not enough answered questions to finish");
         }
     }

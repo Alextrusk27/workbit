@@ -4,9 +4,9 @@ import ru.workbit.training.model.TrainingSession;
 
 import java.util.UUID;
 
-public record TrainingTopicMatch(
+public record TrainingSkillMatch(
         UUID sessionId,
-        String topic,
+        String skill,
         TrainingSession.Status status,
         Double avgScore,
         int answeredCount,

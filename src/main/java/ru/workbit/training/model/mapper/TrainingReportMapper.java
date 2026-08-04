@@ -14,8 +14,8 @@ public interface TrainingReportMapper {
 
     @Mapping(target = "reportId", source = "report.id")
     @Mapping(target = "sessionId", source = "session.id")
+    @Mapping(target = "skill", source = "session.skill")
     @Mapping(target = "profession", source = "session.profession")
-    @Mapping(target = "topic", source = "session.topic")
     @Mapping(target = "level", source = "session.level")
     @Mapping(target = "avgScore", source = "report.avgScore")
     @Mapping(target = "overallFeedback", source = "report.overallFeedback")

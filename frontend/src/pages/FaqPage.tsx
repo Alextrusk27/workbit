@@ -11,7 +11,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export function FaqPage() {
   usePageTitle('Частые вопросы')
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app' : '/register'
+  const startTo = isAuthenticated ? '/app' : '/login'
 
   return (
     <>

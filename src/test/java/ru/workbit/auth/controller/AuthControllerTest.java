@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +20,7 @@ import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.controller.ExceptionController;
+import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.JWTService;
@@ -31,7 +33,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -41,13 +42,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, ExceptionController.class, AuthCookieService.class})
+@EnableConfigurationProperties(RateLimitProperties.class)
 @DisplayName("AuthControllerTest")
 class AuthControllerTest {
 
     private static final String BASE = "/api/v1/auth";
     private static final String EMAIL = "user@example.com";
-    private static final String PASSWORD = "P@ssw0rd123";
-    private static final String TOKEN = "some-token-value";
+    private static final String CODE = "123456";
     private static final String ACCESS_TOKEN = "jwt-access-token";
     private static final String REFRESH_TOKEN = "raw-refresh-token";
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -73,7 +74,7 @@ class AuthControllerTest {
 
     // Вспомогательный метод для создания CustomUserDetails в тестах авторизации
     private CustomUserDetails principal() {
-        return new CustomUserDetails(USER_ID, EMAIL, PASSWORD, List.of());
+        return new CustomUserDetails(USER_ID, EMAIL, List.of());
     }
 
     private TokenResponse tokenResponse() {
@@ -81,91 +82,53 @@ class AuthControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // POST /register
+    // POST /request-code
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Register")
-    class Register {
+    @DisplayName("RequestCode")
+    class RequestCode {
 
         @Test
-        @DisplayName("Возвращает 200 при успешной регистрации")
+        @DisplayName("Возвращает 200 при успешном запросе кода")
         void returnsOkOnSuccess() throws Exception {
             // given
-            var request = new RegistrationRequest(EMAIL, PASSWORD);
-            doNothing().when(authService).register(any());
+            var request = new RequestCodeRequest(EMAIL);
+            doNothing().when(authService).requestCode(any());
 
             // when / then
-            mvc.perform(post(BASE + "/register")
+            mvc.perform(post(BASE + "/request-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(authService).register(any());
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда email уже используется")
-        void returns401WhenEmailAlreadyInUse() throws Exception {
-            // given
-            var request = new RegistrationRequest(EMAIL, PASSWORD);
-            doThrow(new BadCredentialsException("Email already in use")).when(authService).register(any());
-
-            // when / then
-            mvc.perform(post(BASE + "/register")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.message").value("Bad credentials"));
+            verify(authService).requestCode(any());
         }
 
         @Test
         @DisplayName("Возвращает 400, когда email невалиден")
         void returns400WhenEmailInvalid() throws Exception {
             // given
-            var request = new RegistrationRequest("not-an-email", PASSWORD);
+            var request = new RequestCodeRequest("not-an-email");
 
             // when / then
-            mvc.perform(post(BASE + "/register")
+            mvc.perform(post(BASE + "/request-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
             verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда пароль короче 8 символов")
-        void returns400WhenPasswordTooShort() throws Exception {
-            // given
-            var request = new RegistrationRequest(EMAIL, "short");
-
-            // when / then
-            mvc.perform(post(BASE + "/register")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда тело запроса отсутствует")
-        void returns400WhenBodyMissing() throws Exception {
-            mvc.perform(post(BASE + "/register")
-                            .contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isBadRequest());
         }
 
         @Test
         @DisplayName("Возвращает 429, когда превышен лимит запросов")
         void returns429WhenRateLimitExceeded() throws Exception {
             // given
-            var request = new RegistrationRequest(EMAIL, PASSWORD);
+            var request = new RequestCodeRequest(EMAIL);
             doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
 
             // when / then
-            mvc.perform(post(BASE + "/register")
+            mvc.perform(post(BASE + "/request-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isTooManyRequests())
@@ -178,22 +141,22 @@ class AuthControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // POST /verify-email
+    // POST /verify-code
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("VerifyEmail")
-    class VerifyEmail {
+    @DisplayName("VerifyCode")
+    class VerifyCode {
 
         @Test
-        @DisplayName("Возвращает 200 и токены в cookie при успешном подтверждении")
+        @DisplayName("Возвращает 200 и токены в cookie при верном коде")
         void returnsTokensOnSuccess() throws Exception {
             // given
-            var request = new VerifyEmailRequest(TOKEN);
-            when(authService.verifyEmail(TOKEN)).thenReturn(tokenResponse());
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            when(authService.verifyCode(request)).thenReturn(tokenResponse());
 
             // when
-            var result = mvc.perform(post(BASE + "/verify-email")
+            var result = mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
@@ -214,67 +177,103 @@ class AuthControllerTest {
         }
 
         @Test
-        @DisplayName("Возвращает 401, когда токен недействителен")
-        void returns401WhenTokenInvalid() throws Exception {
+        @DisplayName("Возвращает 401, когда код неверен")
+        void returns401WhenInvalidCode() throws Exception {
             // given
-            var request = new VerifyEmailRequest(TOKEN);
-            when(authService.verifyEmail(TOKEN)).thenThrow(new BadCredentialsException("Invalid token"));
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            when(authService.verifyCode(request)).thenThrow(new BadCredentialsException("Invalid code"));
 
             // when / then
-            mvc.perform(post(BASE + "/verify-email")
+            mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errors[0]").value("Invalid code"));
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда token пустой")
-        void returns400WhenTokenBlank() throws Exception {
+        @DisplayName("Возвращает 401, когда код истёк")
+        void returns401WhenCodeExpired() throws Exception {
             // given
-            var request = new VerifyEmailRequest("");
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            when(authService.verifyCode(request)).thenThrow(new BadCredentialsException("Code has expired"));
 
             // when / then
-            mvc.perform(post(BASE + "/verify-email")
+            mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errors[0]").value("Code has expired"));
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // POST /resend-verification
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ResendVerification")
-    class ResendVerification {
 
         @Test
-        @DisplayName("Возвращает 200 всегда (даже если email не найден)")
-        void alwaysReturns200() throws Exception {
+        @DisplayName("Возвращает 401, когда исчерпаны попытки ввода кода")
+        void returns401WhenTooManyAttempts() throws Exception {
             // given
-            var request = new ResendVerificationRequest(EMAIL);
-            doNothing().when(authService).resendVerification(any());
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            when(authService.verifyCode(request)).thenThrow(new BadCredentialsException("Too many attempts"));
 
             // when / then
-            mvc.perform(post(BASE + "/resend-verification")
+            mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
-
-            verify(authService).resendVerification(any());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errors[0]").value("Too many attempts"));
         }
 
         @Test
         @DisplayName("Возвращает 400, когда email невалиден")
         void returns400WhenEmailInvalid() throws Exception {
             // given
-            var request = new ResendVerificationRequest("bad-email");
+            var request = new VerifyCodeRequest("not-an-email", CODE);
 
             // when / then
-            mvc.perform(post(BASE + "/resend-verification")
+            mvc.perform(post(BASE + "/verify-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда код короче 6 цифр")
+        void returns400WhenCodeTooShort() throws Exception {
+            // given
+            var request = new VerifyCodeRequest(EMAIL, "12345");
+
+            // when / then
+            mvc.perform(post(BASE + "/verify-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда код содержит нецифровые символы")
+        void returns400WhenCodeNotNumeric() throws Exception {
+            // given
+            var request = new VerifyCodeRequest(EMAIL, "12a456");
+
+            // when / then
+            mvc.perform(post(BASE + "/verify-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда код пустой")
+        void returns400WhenCodeBlank() throws Exception {
+            // given
+            var request = new VerifyCodeRequest(EMAIL, "");
+
+            // when / then
+            mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -286,90 +285,18 @@ class AuthControllerTest {
         @DisplayName("Возвращает 429, когда превышен лимит запросов")
         void returns429WhenRateLimitExceeded() throws Exception {
             // given
-            var request = new ResendVerificationRequest(EMAIL);
-            doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            doThrow(new TooManyRequestsException("Too many requests"))
+                    .when(rateLimiterService).check(anyString(), any(RateLimitProperties.Bucket.class));
 
             // when / then
-            mvc.perform(post(BASE + "/resend-verification")
+            mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
                     .andExpect(jsonPath("$.message").value("Too many requests."))
                     .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
-
-            verifyNoInteractions(authService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // POST /login
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("Login")
-    class Login {
-
-        @Test
-        @DisplayName("Возвращает 200 и токены в cookie при успешном входе")
-        void returnsTokensOnSuccess() throws Exception {
-            // given
-            var request = new LoginRequest(EMAIL, PASSWORD);
-            when(authService.login(any())).thenReturn(tokenResponse());
-
-            // when / then
-            mvc.perform(post(BASE + "/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").doesNotExist())
-                    .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
-                    .andExpect(cookie().path(AuthCookieService.ACCESS_COOKIE_NAME, "/"))
-                    .andExpect(cookie().value(AuthCookieService.REFRESH_COOKIE_NAME, REFRESH_TOKEN))
-                    .andExpect(cookie().path(AuthCookieService.REFRESH_COOKIE_NAME, BASE));
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда учётные данные неверны")
-        void returns401WhenBadCredentials() throws Exception {
-            // given
-            var request = new LoginRequest(EMAIL, PASSWORD);
-            when(authService.login(any())).thenThrow(new BadCredentialsException("Invalid credentials"));
-
-            // when / then
-            mvc.perform(post(BASE + "/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.message").value("Bad credentials"));
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда email отсутствует")
-        void returns400WhenEmailMissing() throws Exception {
-            // given — email=null
-            var request = new LoginRequest(null, PASSWORD);
-
-            // when / then
-            mvc.perform(post(BASE + "/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда пароль короче 8 символов")
-        void returns400WhenPasswordTooShort() throws Exception {
-            // given
-            var request = new LoginRequest(EMAIL, "short");
-
-            // when / then
-            mvc.perform(post(BASE + "/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
 
             verifyNoInteractions(authService);
         }
@@ -459,208 +386,6 @@ class AuthControllerTest {
                     .andExpect(status().isNoContent())
                     .andExpect(cookie().maxAge(AuthCookieService.ACCESS_COOKIE_NAME, 0))
                     .andExpect(cookie().maxAge(AuthCookieService.REFRESH_COOKIE_NAME, 0));
-
-            verifyNoInteractions(authService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // PATCH /change-password  (требует аутентификации)
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ChangePassword")
-    class ChangePassword {
-
-        @Test
-        @DisplayName("Возвращает 200, когда передан валидный принципал")
-        void returnsOkWithPrincipal() throws Exception {
-            // given
-            var request = new ChangePasswordRequest("OldP@ss123", "NewP@ss123");
-            doNothing().when(authService).changePassword(any(), eq(USER_ID));
-
-            // when / then
-            mvc.perform(patch(BASE + "/change-password")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
-
-            verify(authService).changePassword(any(), eq(USER_ID));
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда старый пароль неверен")
-        void returns401WhenOldPasswordWrong() throws Exception {
-            // given
-            var request = new ChangePasswordRequest("WrongOld1", "NewP@ss123");
-            doThrow(new BadCredentialsException("Invalid credentials"))
-                    .when(authService).changePassword(any(), any());
-
-            // when / then
-            mvc.perform(patch(BASE + "/change-password")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда нет токена (нет аутентификации)")
-        void returns401WithoutAuthentication() throws Exception {
-            // given
-            var request = new ChangePasswordRequest("OldP@ss123", "NewP@ss123");
-
-            // when / then — эндпоинт защищён (.authenticated()), без токена -> 401
-            mvc.perform(patch(BASE + "/change-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized());
-
-            verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда newPassword короче 8 символов")
-        void returns400WhenNewPasswordTooShort() throws Exception {
-            // given
-            var request = new ChangePasswordRequest("OldP@ss123", "short");
-
-            // when / then
-            mvc.perform(patch(BASE + "/change-password")
-                            .with(user(principal()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // POST /forgot-password
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ForgotPassword")
-    class ForgotPassword {
-
-        @Test
-        @DisplayName("Возвращает 200 всегда (не раскрывает наличие email)")
-        void alwaysReturns200() throws Exception {
-            // given
-            var request = new ForgotPasswordRequest(EMAIL);
-            doNothing().when(authService).remindPassword(any());
-
-            // when / then
-            mvc.perform(post(BASE + "/forgot-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
-
-            verify(authService).remindPassword(any());
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда email невалиден")
-        void returns400WhenEmailInvalid() throws Exception {
-            // given
-            var request = new ForgotPasswordRequest("not-email");
-
-            // when / then
-            mvc.perform(post(BASE + "/forgot-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 429, когда превышен лимит запросов")
-        void returns429WhenRateLimitExceeded() throws Exception {
-            // given
-            var request = new ForgotPasswordRequest(EMAIL);
-            doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
-
-            // when / then
-            mvc.perform(post(BASE + "/forgot-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isTooManyRequests())
-                    .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
-                    .andExpect(jsonPath("$.message").value("Too many requests."))
-                    .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
-
-            verifyNoInteractions(authService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // POST /reset-password
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ResetPassword")
-    class ResetPassword {
-
-        @Test
-        @DisplayName("Возвращает 200 при успешном сбросе пароля")
-        void returnsOkOnSuccess() throws Exception {
-            // given
-            var request = new ResetPasswordRequest(TOKEN, "NewP@ss123");
-            doNothing().when(authService).resetPassword(TOKEN, "NewP@ss123");
-
-            // when / then
-            mvc.perform(post(BASE + "/reset-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isOk());
-
-            verify(authService).resetPassword(TOKEN, "NewP@ss123");
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда токен недействителен")
-        void returns401WhenTokenInvalid() throws Exception {
-            // given
-            var request = new ResetPasswordRequest(TOKEN, "NewP@ss123");
-            doThrow(new BadCredentialsException("Invalid token"))
-                    .when(authService).resetPassword(any(), any());
-
-            // when / then
-            mvc.perform(post(BASE + "/reset-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда newPassword короче 8 символов")
-        void returns400WhenPasswordTooShort() throws Exception {
-            // given
-            var request = new ResetPasswordRequest(TOKEN, "short");
-
-            // when / then
-            mvc.perform(post(BASE + "/reset-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(authService);
-        }
-
-        @Test
-        @DisplayName("Возвращает 400, когда token пустой")
-        void returns400WhenTokenBlank() throws Exception {
-            // given
-            var request = new ResetPasswordRequest("", "NewP@ss123");
-
-            // when / then
-            mvc.perform(post(BASE + "/reset-password")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
 
             verifyNoInteractions(authService);
         }

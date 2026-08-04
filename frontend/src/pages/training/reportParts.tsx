@@ -1,29 +1,26 @@
+import { useState } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { MarginNote } from '@/components/ui/MarginNote'
+import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
 import type { TrainingQuestion } from '@/features/training/api'
+import { useReferenceAnswer } from '@/features/training/useTraining'
+import { getErrorMessage } from '@/lib/api'
 
 /** Отвеченный вопрос в режиме чтения: текст вопроса и ответ пользователя. */
 export function QuestionEntry({
   orderIndex,
-  followUp,
   questionText,
   answerText,
 }: {
   orderIndex: number
-  followUp: boolean
   questionText: string
   answerText: string | null
 }) {
   return (
     <div>
-      {followUp ? (
-        <span className="bg-indigo/12 text-indigo rounded-sm px-2.5 py-[3px] text-xs font-semibold">
-          Уточняющий вопрос
-        </span>
-      ) : (
-        <Eyebrow className="tracking-[0.08em]">Вопрос {orderIndex}</Eyebrow>
-      )}
+      <Eyebrow className="tracking-[0.08em]">Вопрос {orderIndex}</Eyebrow>
       <h3 className="text-ink mt-2 text-lg leading-snug font-bold break-words">
         {questionText}
       </h3>
@@ -34,14 +31,69 @@ export function QuestionEntry({
   )
 }
 
-/** Кейс в отчёте: основной вопрос с ответом и пометка рецензента с оценкой
- *  за весь кейс (уточнения в отчёт не попадают — их удаляют при завершении). */
-export function CaseEntry({ question }: { question: TrainingQuestion }) {
+/** Эталонный ответ по кнопке: до первого клика запрос не уходит, дальше
+ *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM. */
+export function ReferenceAnswer({
+  sessionId,
+  questionId,
+}: {
+  sessionId: string
+  questionId: string
+}) {
+  const [open, setOpen] = useState(false)
+  const { data, isFetching, isError, error } = useReferenceAnswer(
+    sessionId,
+    questionId,
+    open,
+  )
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-dim hover:text-ink focus-visible:outline-indigo mt-4 rounded-sm text-[13px] underline underline-offset-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        Посмотреть эталонный ответ
+      </button>
+    )
+  }
+
+  return (
+    <div className="border-line bg-glass mt-4 rounded-xl border p-5">
+      <Eyebrow>Эталонный ответ</Eyebrow>
+      {isFetching && (
+        <p role="status" className="text-muted mt-3 text-sm">
+          <Spinner className="mr-2.5" />
+          Готовим эталонный ответ…
+        </p>
+      )}
+      {isError && (
+        <div className="mt-3">
+          <Alert>{getErrorMessage(error)}</Alert>
+        </div>
+      )}
+      {data && (
+        <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">
+          {data.answer}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Кейс в отчёте: вопрос с ответом, пометка рецензента с оценкой и эталон по кнопке. */
+export function CaseEntry({
+  question,
+  sessionId,
+}: {
+  question: TrainingQuestion
+  sessionId: string
+}) {
   return (
     <div>
       <QuestionEntry
         orderIndex={question.orderIndex}
-        followUp={question.followUp}
         questionText={question.questionText}
         answerText={question.answerText}
       />
@@ -50,6 +102,7 @@ export function CaseEntry({ question }: { question: TrainingQuestion }) {
           {question.feedback}
         </MarginNote>
       )}
+      <ReferenceAnswer sessionId={sessionId} questionId={question.questionId} />
     </div>
   )
 }

@@ -34,7 +34,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build(); // emailVerified=false, created=now() — @Builder.Default
     }
 
@@ -115,7 +114,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             var now = Instant.now();
             var user = User.builder()
                     .email("roundtrip@example.com")
-                    .password("hashed_roundtrip")
                     .emailVerified(true)
                     .created(now)
                     .build();
@@ -125,7 +123,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(saved.getEmail()).isEqualTo("roundtrip@example.com");
-            assertThat(saved.getPassword()).isEqualTo("hashed_roundtrip");
             assertThat(saved.isEmailVerified()).isTrue();
             assertThat(saved.getCreated()).isNotNull();
         }
@@ -177,7 +174,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var inactive = User.builder()
                     .email("inactive@example.com")
-                    .password("hashed_password")
                     .lastSeen(threshold.minus(1, ChronoUnit.DAYS))
                     .build();
             em.persistAndFlush(inactive);
@@ -196,7 +192,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var active = User.builder()
                     .email("active@example.com")
-                    .password("hashed_password")
                     .lastSeen(Instant.now())
                     .build();
             em.persistAndFlush(active);
@@ -214,7 +209,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var warned = User.builder()
                     .email("warned@example.com")
-                    .password("hashed_password")
                     .lastSeen(threshold.minus(10, ChronoUnit.DAYS))
                     .deletionWarnedAt(Instant.now().minus(5, ChronoUnit.DAYS))
                     .build();
@@ -242,12 +236,10 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var old1 = User.builder()
                     .email("old-warned-1@example.com")
-                    .password("hashed_password")
                     .deletionWarnedAt(threshold.minus(1, ChronoUnit.DAYS))
                     .build();
             var old2 = User.builder()
                     .email("old-warned-2@example.com")
-                    .password("hashed_password")
                     .deletionWarnedAt(threshold.minus(2, ChronoUnit.DAYS))
                     .build();
             em.persistAndFlush(old1);
@@ -270,7 +262,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var noWarning = User.builder()
                     .email("no-warning@example.com")
-                    .password("hashed_password")
                     .build();
             em.persistAndFlush(noWarning);
 
@@ -290,7 +281,6 @@ class UserJPARepositoryIT extends AbstractPostgresIT {
             // given
             var freshWarning = User.builder()
                     .email("fresh-warning@example.com")
-                    .password("hashed_password")
                     .deletionWarnedAt(Instant.now())
                     .build();
             em.persistAndFlush(freshWarning);

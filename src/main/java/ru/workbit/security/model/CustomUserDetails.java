@@ -14,11 +14,15 @@ import java.util.UUID;
 public class CustomUserDetails implements UserDetails {
     private final UUID id;
     private final String email;
-    private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
 
     @Override
     public @NotNull String getUsername() {
         return email;
+    }
+
+    @Override
+    public String getPassword() {
+        return null;
     }
 }

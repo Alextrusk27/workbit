@@ -44,7 +44,7 @@ public class TrainingController {
 
     @GetMapping("/options")
     @Loggable(logResult = true)
-    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает популярные профессии из словаря (подсказки для быстрого выбора, свободный ввод тоже допустим), допустимые уровни, а также лимит основных вопросов и минимум ответов для завершения тренировки.")
+    @Operation(summary = "Справочник значений для создания тренировки", description = "Возвращает популярные навыки и профессии из словаря (подсказки для быстрого выбора, свободный ввод тоже допустим), уровни сложности, а также лимит вопросов и минимум ответов для завершения тренировки.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Справочник значений")
@@ -65,30 +65,30 @@ public class TrainingController {
             @RequestParam String query,
             HttpServletRequest httpRequest
     ) {
-        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
+        rateLimiter.check("suggest-professions:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
         return ResponseEntity.ok(trainingService.suggestProfessions(query));
     }
 
-    @GetMapping("/suggest/topics")
+    @GetMapping("/suggest/skills")
     @Loggable(logArgs = true)
-    @Operation(summary = "Подсказки тем", description = "Возвращает до 7 тем словаря для указанной профессии по подстроке: сначала совпадения по началу названия, затем по популярности. Неизвестная профессия или запрос короче 2 символов дают пустой список.")
+    @Operation(summary = "Подсказки навыков", description = "Возвращает до 7 навыков словаря по подстроке: сначала совпадения по началу названия, затем по популярности. Если передана профессия, подсказки ограничены её навыками, иначе собираются по всему словарю. Запрос короче 2 символов даёт пустой список.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Список подсказок, возможно пустой"),
             @ApiResponse(responseCode = "429", description = "Превышен лимит запросов", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull List<String>> suggestTopics(
-            @RequestParam String profession,
+    public ResponseEntity<@NotNull List<String>> suggestSkills(
+            @RequestParam(required = false) String profession,
             @RequestParam String query,
             HttpServletRequest httpRequest
     ) {
-        rateLimiter.check("suggest:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
-        return ResponseEntity.ok(trainingService.suggestTopics(profession, query));
+        rateLimiter.check("suggest-skills:" + ClientIp.from(httpRequest), rateLimitProperties.suggest());
+        return ResponseEntity.ok(trainingService.suggestSkills(profession, query));
     }
 
     @PostMapping("/normalize")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Распознавание введённых профессии и темы", description = "Проверяет свободный ввод через LLM: распознаваема ли профессия/тема, подходит ли тема профессии, и возвращает канонические варианты для подтверждения. Предназначен для случая, когда ввод не выбран из подсказок словаря; выбор предложенного варианта необязателен.")
+    @Operation(summary = "Распознавание введённых навыка и профессии", description = "Проверяет свободный ввод через LLM: распознаваемы ли навык и профессия, подходит ли навык профессии, и возвращает канонические варианты для подтверждения. Предназначен для случая, когда ввод не выбран из подсказок словаря; выбор предложенного варианта необязателен.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Результат распознавания"),
@@ -106,12 +106,12 @@ public class TrainingController {
 
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по указанной профессии (свободный ввод), необязательной теме и уровню. Вопросы заранее не генерируются: первый вопрос запрашивается отдельным вызовом.")
+    @Operation(summary = "Создать тренировочную сессию", description = "Создаёт новую тренировочную сессию по указанному навыку и профессии (свободный ввод) и уровню сложности. Вопросы отбираются из банка и при нехватке добираются через LLM сразу при создании.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "422", description = "Профессия или тема не распознаны", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "422", description = "Навык или профессия не распознаны", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull TrainingSessionResponse> createSession(
             @RequestBody @Valid CreateSessionRequest request,
@@ -154,19 +154,54 @@ public class TrainingController {
 
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Получить следующий вопрос", description = "Возвращает текущий неотвеченный вопрос сессии, а если его нет - генерирует следующий вопрос через LLM с учётом истории диалога. LLM может задать уточняющий вопрос к последнему ответу (followUp=true); такие вопросы не входят в счётчик основных. Вызов идемпотентен: повторный запрос возвращает тот же неотвеченный вопрос.")
+    @Operation(summary = "Получить следующий вопрос", description = "Возвращает первый неотвеченный вопрос сессии. Вызов идемпотентен: повторный запрос возвращает тот же вопрос, пока на него не ответили.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопрос возвращён"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Достигнут лимит основных вопросов или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "409", description = "Все вопросы сессии отвечены или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull TrainingQuestionResponse> nextQuestion(
             @PathVariable UUID sessionId,
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(trainingService.nextQuestion(sessionId, userDetails.getId()));
+    }
+
+    @PostMapping("/sessions/{sessionId}/questions/more")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Добавить ещё пачку вопросов", description = "Добавляет в незавершённую сессию следующие 10 вопросов - альтернатива разбору, когда все вопросы уже отвечены. Вопросы новые: банк отдаёт только не виденное пользователем, недостающее генерирует LLM с оглядкой на уже заданные. Всего в тренировке не больше 50 вопросов.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Вопросы добавлены"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Сессия завершена, остались неотвеченные вопросы, достигнут потолок в 50 вопросов или новых вопросов этого уровня больше нет", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull TrainingSessionResponse> addQuestions(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.addQuestions(sessionId, userDetails.getId()));
+    }
+
+    @GetMapping("/sessions/{sessionId}/questions/{questionId}/reference-answer")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Посмотреть эталонный ответ", description = "Возвращает эталонный ответ на вопрос: у вопроса из банка он подготовлен заранее, у сгенерированного - создаётся через LLM при первом запросе и далее отдаётся из кеша.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Эталонный ответ"),
+            @ApiResponse(responseCode = "403", description = "Вопрос принадлежит другому пользователю", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Вопрос не найден", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Вопрос не принадлежит указанной сессии", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull ReferenceAnswerResponse> getReferenceAnswer(
+            @PathVariable UUID sessionId,
+            @PathVariable UUID questionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.getReferenceAnswer(sessionId, questionId, userDetails.getId()));
     }
 
     @PostMapping("/sessions/{sessionId}/questions/{questionId}")
@@ -193,12 +228,12 @@ public class TrainingController {
 
     @PostMapping("/sessions/{sessionId}/finish")
     @Loggable(logArgs = true)
-    @Operation(summary = "Завершить тренировку", description = "Завершает тренировку, запрашивает у LLM поразборный фидбэк по каждому ответу и формирует итоговый отчёт. Доступно после ответа минимум на 3 основных вопроса.")
+    @Operation(summary = "Завершить тренировку", description = "Завершает тренировку, запрашивает у LLM поразборный фидбэк по каждому ответу и формирует итоговый отчёт. Доступно после ответа минимум на 3 вопроса.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Отчёт сформирован"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Отвечено меньше 3 основных вопросов или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Отвечено меньше 3 вопросов или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull TrainingReportResponse> finishSession(
@@ -224,6 +259,22 @@ public class TrainingController {
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(trainingService.getReport(sessionId, userDetails.getId()));
+    }
+
+    @PostMapping("/sessions/{sessionId}/restart")
+    @Loggable(logArgs = true, logResult = true)
+    @Operation(summary = "Пройти тренировку заново", description = "Возвращает завершённую тренировку в исходное состояние: вопросы и эталонные ответы остаются те же, ответы, фидбэк и отчёт стираются безвозвратно.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Тренировка перезапущена"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Тренировка ещё не завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull TrainingSessionResponse> restartSession(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.restart(sessionId, userDetails.getId()));
     }
 
     @DeleteMapping("/sessions/{sessionId}")

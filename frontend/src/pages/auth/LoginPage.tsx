@@ -4,53 +4,54 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Field } from '@/components/ui/Field'
-import { ResendVerification } from '@/components/auth/ResendVerification'
-import { authErrorMessage, isEmailNotVerified } from '@/features/auth/errors'
-import { useLogin } from '@/features/auth/useAuth'
+import { CodeForm } from '@/components/auth/CodeForm'
+import { authErrorMessage } from '@/features/auth/errors'
+import { useRequestCode } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function LoginPage() {
   usePageTitle('Вход')
-  const login = useLogin()
+  const requestCode = useRequestCode()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
 
   const from =
     (location.state as { from?: { pathname: string } } | null)?.from
       ?.pathname ?? '/app'
 
-  const onSubmit = async (e: FormEvent) => {
+  const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    try {
-      await login.mutateAsync({ email, password })
-      navigate(from, { replace: true })
-    } catch {
-      // ошибка показывается через login.isError
-    }
+    requestCode.mutate(email)
+  }
+
+  if (requestCode.isSuccess) {
+    return (
+      <>
+        <h1 className="text-ink text-[28px]">Введите код</h1>
+        <p className="text-muted mt-3 text-sm leading-relaxed">
+          Мы отправили код на <span className="text-ink">{email}</span>. Код
+          действует 15 минут.
+        </p>
+        <CodeForm
+          email={email}
+          onSuccess={() => navigate(from, { replace: true })}
+        />
+      </>
+    )
   }
 
   return (
     <>
       <h1 className="text-ink text-[28px]">Вход</h1>
       <p className="text-muted mt-2 text-sm">
-        Ещё нет аккаунта?{' '}
-        <Link to="/register" className="text-indigo hover:text-violet">
-          Зарегистрироваться
-        </Link>
+        Введите почту — пришлём код для входа. Отдельная регистрация не нужна.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
-        {login.isError &&
-          (isEmailNotVerified(login.error) ? (
-            <div>
-              <Alert>{authErrorMessage(login.error)}</Alert>
-              <ResendVerification email={email} />
-            </div>
-          ) : (
-            <Alert>{authErrorMessage(login.error)}</Alert>
-          ))}
+        {requestCode.isError && (
+          <Alert>{authErrorMessage(requestCode.error)}</Alert>
+        )}
         <Field
           label="Email"
           type="email"
@@ -59,32 +60,36 @@ export function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Field
-          label="Пароль"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
         <Button
           type="submit"
           size="lg"
           className="w-full"
-          disabled={login.isPending}
+          disabled={requestCode.isPending}
         >
-          {login.isPending ? 'Входим…' : 'Войти'}
+          {requestCode.isPending ? 'Отправляем код…' : 'Получить код'}
         </Button>
+        <p className="text-dim text-[12.5px] leading-relaxed">
+          Нажимая «Получить код», вы принимаете{' '}
+          <Link
+            to="/user-agreement"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted hover:text-ink underline underline-offset-2"
+          >
+            Пользовательское соглашение
+          </Link>
+          . Обработка данных описана в{' '}
+          <Link
+            to="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted hover:text-ink underline underline-offset-2"
+          >
+            Политике конфиденциальности
+          </Link>
+          .
+        </p>
       </form>
-
-      <p className="mt-6 text-sm">
-        <Link
-          to="/forgot-password"
-          className="text-muted hover:text-ink transition-colors"
-        >
-          Забыли пароль?
-        </Link>
-      </p>
     </>
   )
 }

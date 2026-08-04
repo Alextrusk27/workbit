@@ -11,7 +11,8 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
+import ru.workbit.util.DictText;
 
 import java.util.List;
 import java.util.UUID;
@@ -35,12 +36,14 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     private ProfessionDict aProfession(String name) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build(); // status=AUTO, usageCount=0 — @Builder.Default
     }
 
     private ProfessionDict aProfession(String name, int usageCount) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .usageCount(usageCount)
                 .build();
     }
@@ -48,22 +51,24 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     private ProfessionDict anApprovedProfession(String name, int usageCount) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .usageCount(usageCount)
                 .status(DictStatus.APPROVED)
                 .build();
     }
 
-    private TopicDict aTopic(UUID professionId, String name) {
-        return TopicDict.builder()
+    private SkillDict aSkill(UUID professionId, String name) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 
-    private BankQuestion aBankQuestion(UUID professionId, UUID topicId) {
+    private BankQuestion aBankQuestion(UUID professionId, UUID skillId) {
         return BankQuestion.builder()
                 .professionId(professionId)
-                .topicId(topicId)
+                .skillId(skillId)
                 .levels(List.of("JUNIOR"))
                 .text("Что такое SOLID?")
                 .build();
@@ -83,6 +88,17 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(aProfession("java developer")))
+                    .isInstanceOf(Exception.class);
+        }
+
+        @Test
+        @DisplayName("Разное написание одного смысла нарушает уникальность по match_key")
+        void throwsOnDuplicateMatchKeyDifferentWording() {
+            // given
+            em.persistAndFlush(aProfession("Rust-разработчик"));
+
+            // when / then
+            assertThatThrownBy(() -> em.persistAndFlush(aProfession("Разработчик на Rust")))
                     .isInstanceOf(Exception.class);
         }
 
@@ -110,8 +126,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
             // given / when / then — Java-энум DictStatus не позволяет собрать невалидное
             // значение, поэтому CHECK проверяем нативной вставкой в обход маппинга
             assertThatThrownBy(() -> em.getEntityManager()
-                    .createNativeQuery("INSERT INTO content.profession_dict (id, name, status) "
-                            + "VALUES (gen_random_uuid(), 'Bad Status Profession', 'BOGUS')")
+                    .createNativeQuery("INSERT INTO content.profession_dict (id, name, match_key, status) "
+                            + "VALUES (gen_random_uuid(), 'Bad Status Profession', 'bad status profession', 'BOGUS')")
                     .executeUpdate())
                     .isInstanceOf(Exception.class);
         }
@@ -157,13 +173,12 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     class CascadeDelete {
 
         @Test
-        @DisplayName("Удаление профессии каскадно удаляет её темы и вопросы банка")
-        void cascadeDeleteRemovesTopicsAndBankQuestions() {
+        @DisplayName("Удаление профессии каскадно удаляет её навыки и вопросы банка")
+        void cascadeDeleteRemovesSkillsAndBankQuestions() {
             // given
             var profession = em.persistAndFlush(aProfession("Cascade Profession"));
-            var topic = em.persistAndFlush(aTopic(profession.getId(), "Cascade Topic"));
-            var topicalQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), topic.getId()));
-            var generalQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), null));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Cascade Skill"));
+            var question = em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId()));
 
             // when — физическое удаление профессии нативным SQL, чтобы проверить реальный
             // ON DELETE CASCADE в БД, минуя JPA-кеш
@@ -176,9 +191,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(repository.findById(profession.getId())).isEmpty();
-            assertThat(em.find(TopicDict.class, topic.getId())).isNull();
-            assertThat(em.find(BankQuestion.class, topicalQuestion.getId())).isNull();
-            assertThat(em.find(BankQuestion.class, generalQuestion.getId())).isNull();
+            assertThat(em.find(SkillDict.class, skill.getId())).isNull();
+            assertThat(em.find(BankQuestion.class, question.getId())).isNull();
         }
     }
 
@@ -332,8 +346,8 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
-    @DisplayName("FindByNameIgnoreCase")
-    class FindByNameIgnoreCase {
+    @DisplayName("FindByMatchKey")
+    class FindByMatchKey {
 
         @Test
         @DisplayName("Находит запись при другом регистре запроса")
@@ -342,7 +356,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
             var saved = em.persistAndFlush(anApprovedProfession("Golang Developer", 0));
 
             // when
-            var result = repository.findByNameIgnoreCase("GOLANG developer");
+            var result = repository.findByMatchKey(DictText.matchKey("GOLANG developer"));
 
             // then
             assertThat(result).isPresent();
@@ -350,10 +364,97 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Возвращает empty для отсутствующего имени")
+        @DisplayName("Находит запись при другом порядке слов и предлоге")
+        void findsRecordWithDifferentWordOrder() {
+            // given
+            var saved = em.persistAndFlush(anApprovedProfession("Rust-разработчик", 0));
+
+            // when
+            var result = repository.findByMatchKey(DictText.matchKey("Разработчик на Rust"));
+
+            // then
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(saved.getId());
+        }
+
+        @Test
+        @DisplayName("Возвращает empty для отсутствующего ключа")
         void returnsEmptyForMissingName() {
             // when
-            var result = repository.findByNameIgnoreCase("Zzz Nonexistent Profession Name");
+            var result = repository.findByMatchKey(DictText.matchKey("Zzz Nonexistent Profession Name"));
+
+            // then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindCandidateNames")
+    class FindCandidateNames {
+
+        @Test
+        @DisplayName("Находит профессии по общему значащему слову")
+        void findsByCommonToken() {
+            // given
+            em.persistAndFlush(anApprovedProfession("Zzz Backend Candidate", 0));
+            em.persistAndFlush(anApprovedProfession("Zzz Frontend Other", 0));
+
+            // when
+            var result = repository.findCandidateNames(List.of("backend"), 10);
+
+            // then
+            assertThat(result).containsExactly("Zzz Backend Candidate");
+        }
+
+        @Test
+        @DisplayName("AUTO-запись тоже попадает в кандидаты")
+        void includesAutoStatusRecords() {
+            // given
+            em.persistAndFlush(aProfession("Zzz Auto Candidate"));
+
+            // when
+            var result = repository.findCandidateNames(List.of("candidate"), 10);
+
+            // then
+            assertThat(result).contains("Zzz Auto Candidate");
+        }
+
+        @Test
+        @DisplayName("Сортирует по usage_count DESC")
+        void ordersByUsageCountDesc() {
+            // given
+            em.persistAndFlush(anApprovedProfession("Zzz Candidate One", 1));
+            em.persistAndFlush(anApprovedProfession("Zzz Candidate Two", 5));
+
+            // when
+            var result = repository.findCandidateNames(List.of("candidate"), 10);
+
+            // then
+            assertThat(result).containsExactly("Zzz Candidate Two", "Zzz Candidate One");
+        }
+
+        @Test
+        @DisplayName("Limit обрезает количество результатов")
+        void limitCutsResults() {
+            // given
+            em.persistAndFlush(anApprovedProfession("Zzz Candidate Lim One", 1));
+            em.persistAndFlush(anApprovedProfession("Zzz Candidate Lim Two", 2));
+            em.persistAndFlush(anApprovedProfession("Zzz Candidate Lim Three", 3));
+
+            // when
+            var result = repository.findCandidateNames(List.of("candidate"), 2);
+
+            // then
+            assertThat(result).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("На токенах без совпадений отдаёт пустой список")
+        void returnsEmptyForUnmatchedTokens() {
+            // when
+            var result = repository.findCandidateNames(List.of("zzznonexistenttoken"), 10);
 
             // then
             assertThat(result).isEmpty();
@@ -370,7 +471,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Новое имя создаёт профессию со status AUTO и usage_count 1")
         void newNameCreatesRowWithDefaults() {
             // when
-            var returnedId = repository.upsertAndIncrementUsage("Golang Engineer");
+            var returnedId = repository.upsertAndIncrementUsage("Golang Engineer", DictText.matchKey("Golang Engineer"));
 
             // then
             var saved = repository.findById(returnedId).orElseThrow();
@@ -383,10 +484,10 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @DisplayName("Повторный вызов с тем же именем в другом регистре инкрементит usage_count и не меняет каноническое имя")
         void repeatedCallDifferentCaseIncrementsUsageKeepsCanonicalName() {
             // given
-            var firstId = repository.upsertAndIncrementUsage("Rust Engineer");
+            var firstId = repository.upsertAndIncrementUsage("Rust Engineer", DictText.matchKey("Rust Engineer"));
 
             // when
-            var secondId = repository.upsertAndIncrementUsage("rust engineer");
+            var secondId = repository.upsertAndIncrementUsage("rust engineer", DictText.matchKey("rust engineer"));
 
             // then
             assertThat(secondId).isEqualTo(firstId);
@@ -396,21 +497,58 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
+        @DisplayName("Повторный вызов с другим порядком слов и предлогом попадает в существующую строку и не меняет каноническое имя")
+        void repeatedCallDifferentWordOrderIncrementsUsageKeepsCanonicalName() {
+            // given
+            var firstId = repository.upsertAndIncrementUsage(
+                    "Kotlin-разработчик", DictText.matchKey("Kotlin-разработчик"));
+
+            // when
+            var secondId = repository.upsertAndIncrementUsage(
+                    "Разработчик на Kotlin", DictText.matchKey("Разработчик на Kotlin"));
+
+            // then
+            assertThat(secondId).isEqualTo(firstId);
+            var saved = repository.findById(firstId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Kotlin-разработчик");
+            assertThat(saved.getUsageCount()).isEqualTo(2);
+        }
+
+        @Test
         @DisplayName("Конфликт с сид-профессией инкрементит usage_count, не трогая status и каноническое имя")
         void conflictsWithSeededProfessionKeepsApprovedStatusAndCanonicalName() {
             // given — сид из schema.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
             var seedId = (UUID) em.getEntityManager()
-                    .createNativeQuery("SELECT id FROM content.profession_dict WHERE lower(name) = 'java-разработчик'")
+                    .createNativeQuery("SELECT id FROM content.profession_dict WHERE match_key = 'java разработчик'")
                     .getSingleResult();
 
             // when
-            var returnedId = repository.upsertAndIncrementUsage("java-разработчик");
+            var returnedId = repository.upsertAndIncrementUsage("java-разработчик", DictText.matchKey("java-разработчик"));
 
             // then
             assertThat(returnedId).isEqualTo(seedId);
             var saved = repository.findById(returnedId).orElseThrow();
             assertThat(saved.getName()).isEqualTo("Java-разработчик");
             assertThat(saved.getStatus()).isEqualTo(DictStatus.APPROVED);
+            assertThat(saved.getUsageCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Конфликт с сид-профессией при другом порядке слов и предлоге тоже находит существующую строку")
+        void conflictsWithSeededProfessionDifferentWordOrder() {
+            // given — сид из schema.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
+            var seedId = (UUID) em.getEntityManager()
+                    .createNativeQuery("SELECT id FROM content.profession_dict WHERE match_key = 'java разработчик'")
+                    .getSingleResult();
+
+            // when
+            var returnedId = repository.upsertAndIncrementUsage(
+                    "Разработчик на Java", DictText.matchKey("Разработчик на Java"));
+
+            // then
+            assertThat(returnedId).isEqualTo(seedId);
+            var saved = repository.findById(returnedId).orElseThrow();
+            assertThat(saved.getName()).isEqualTo("Java-разработчик");
             assertThat(saved.getUsageCount()).isEqualTo(1);
         }
     }

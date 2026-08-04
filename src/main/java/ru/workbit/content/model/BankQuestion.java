@@ -25,8 +25,8 @@ public class BankQuestion {
     @Column(name = "profession_id", nullable = false, updatable = false)
     private UUID professionId;
 
-    @Column(name = "topic_id", updatable = false)
-    private UUID topicId;
+    @Column(name = "skill_id", nullable = false, updatable = false)
+    private UUID skillId;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(nullable = false, columnDefinition = "varchar(32)[]")

@@ -9,20 +9,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import ru.workbit.auth.dto.*;
-import ru.workbit.auth.model.VerificationToken;
+import ru.workbit.auth.model.User;
+import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.auth.service.AuthService;
+import ru.workbit.auth.service.LoginCodeService;
 import ru.workbit.auth.service.RefreshTokenService;
-import ru.workbit.auth.service.VerificationTokenService;
-import ru.workbit.email.ResetPasswordEmailEvent;
-import ru.workbit.email.VerificationEmailEvent;
+import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
-import ru.workbit.auth.model.User;
-import ru.workbit.auth.repository.UserJPARepository;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -32,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,11 +37,9 @@ import static org.mockito.Mockito.*;
 class AuthServiceTest {
 
     private static final String EMAIL = "user@example.com";
-    private static final String RAW_PASSWORD = "P@ssw0rd123";
-    private static final String ENCODED_PASSWORD = "$argon2id$encoded";
+    private static final String RAW_CODE = "123456";
     private static final String ACCESS_TOKEN = "jwt-access-token";
     private static final String REFRESH_TOKEN = "raw-refresh-token";
-    private static final String VERIFY_TOKEN = "raw-verify-token";
     private static final UUID USER_ID = UUID.randomUUID();
 
     @Mock
@@ -52,13 +47,11 @@ class AuthServiceTest {
     @Mock
     RefreshTokenService refreshTokenService;
     @Mock
-    VerificationTokenService verificationTokenService;
+    LoginCodeService loginCodeService;
     @Mock
     JWTService jwtService;
     @Mock
     ApplicationEventPublisher eventPublisher;
-    @Mock
-    PasswordEncoder passwordEncoder;
 
     @InjectMocks
     AuthService authService;
@@ -67,7 +60,6 @@ class AuthServiceTest {
         return User.builder()
                 .id(USER_ID)
                 .email(EMAIL)
-                .password(ENCODED_PASSWORD)
                 .emailVerified(true)
                 .build();
     }
@@ -76,84 +68,8 @@ class AuthServiceTest {
         return User.builder()
                 .id(USER_ID)
                 .email(EMAIL)
-                .password(ENCODED_PASSWORD)
                 .emailVerified(false)
                 .build();
-    }
-
-    // -------------------------------------------------------------------------
-    // login
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("Login")
-    class Login {
-
-        @Test
-        @DisplayName("Возвращает токены для верифицированного пользователя")
-        void returnsTokensForVerifiedUser() {
-            // given
-            var user = verifiedUser();
-            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
-            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
-            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
-            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
-
-            // when
-            var result = authService.login(new LoginRequest(EMAIL, RAW_PASSWORD));
-
-            // then
-            assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
-            assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
-            assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
-            assertThat(user.getDeletionWarnedAt()).isNull();
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException, когда пользователь не найден")
-        void throwsWhenUserNotFound() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-
-            // when / then
-            assertThatThrownBy(() -> authService.login(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid credentials");
-
-            verifyNoInteractions(passwordEncoder, refreshTokenService, jwtService, eventPublisher);
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException, когда email не подтверждён")
-        void throwsWhenEmailNotVerified() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverifiedUser()));
-
-            // when / then
-            assertThatThrownBy(() -> authService.login(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Email not verified");
-
-            verifyNoInteractions(passwordEncoder, refreshTokenService, jwtService);
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException, когда пароль неверный")
-        void throwsWhenWrongPassword() {
-            // given
-            var user = verifiedUser();
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
-
-            // when / then
-            assertThatThrownBy(() -> authService.login(new LoginRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid credentials");
-
-            verifyNoInteractions(refreshTokenService, jwtService);
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -212,159 +128,118 @@ class AuthServiceTest {
     }
 
     // -------------------------------------------------------------------------
-    // register
+    // requestCode
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Register")
-    class Register {
+    @DisplayName("RequestCode")
+    class RequestCode {
 
         @Test
-        @DisplayName("Создаёт нового пользователя и публикует событие верификации")
-        void createsNewUserAndPublishesEvent() {
+        @DisplayName("Выпускает код существующему пользователю, не создавая нового")
+        void issuesCodeForExistingUserWithoutCreatingNew() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
+
+            // when
+            authService.requestCode(new RequestCodeRequest(EMAIL));
+
+            // then
+            verify(userRepository, never()).save(any());
+
+            var eventCaptor = ArgumentCaptor.forClass(LoginCodeEmailEvent.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
+            assertThat(eventCaptor.getValue().code()).isEqualTo(RAW_CODE);
+        }
+
+        @Test
+        @DisplayName("Создаёт пользователя и выпускает код, когда email неизвестен")
+        void createsUserAndIssuesCodeForUnknownEmail() {
             // given
             when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
             var savedUser = unverifiedUser();
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
-            when(passwordEncoder.encode(any())).thenReturn(ENCODED_PASSWORD);
-            when(verificationTokenService.issue(any(), eq(VerificationToken.Type.EMAIL_VERIFICATION)))
-                    .thenReturn(VERIFY_TOKEN);
+            when(loginCodeService.issue(savedUser)).thenReturn(RAW_CODE);
 
             // when
-            authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD));
+            authService.requestCode(new RequestCodeRequest(EMAIL));
 
             // then
             var userCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(userCaptor.capture());
             assertThat(userCaptor.getValue().getEmail()).isEqualTo(EMAIL);
 
-            var eventCaptor = ArgumentCaptor.forClass(VerificationEmailEvent.class);
+            var eventCaptor = ArgumentCaptor.forClass(LoginCodeEmailEvent.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
-            assertThat(eventCaptor.getValue().token()).isEqualTo(VERIFY_TOKEN);
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с уже занятым email")
-        void throwsWhenEmailAlreadyInUse() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(verifiedUser()));
-
-            // when / then
-            assertThatThrownBy(() -> authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Email already in use");
-
-            verifyNoInteractions(verificationTokenService, eventPublisher);
-        }
-
-        @Test
-        @DisplayName("Бросает BadCredentialsException при попытке зарегистрироваться с email, который уже зарегистрирован, но не подтверждён")
-        void throwsWhenEmailRegisteredButNotVerified() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverifiedUser()));
-
-            // when / then
-            assertThatThrownBy(() -> authService.register(new RegistrationRequest(EMAIL, RAW_PASSWORD)))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Email registered but not verified");
-
-            verifyNoInteractions(verificationTokenService, eventPublisher);
+            assertThat(eventCaptor.getValue().code()).isEqualTo(RAW_CODE);
         }
     }
 
     // -------------------------------------------------------------------------
-    // verifyEmail
+    // verifyCode
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("VerifyEmail")
-    class VerifyEmail {
+    @DisplayName("VerifyCode")
+    class VerifyCode {
 
         @Test
-        @DisplayName("Подтверждает email и возвращает токены")
+        @DisplayName("Подтверждает email и возвращает токены при верном коде")
         void verifiesEmailAndReturnsTokens() {
             // given
             var user = unverifiedUser();
-            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
-            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
-            when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.EMAIL_VERIFICATION))
-                    .thenReturn(user);
+            user.setLastSeen(Instant.now().minus(Duration.ofDays(400)));
+            user.setDeletionWarnedAt(Instant.now().minus(Duration.ofDays(10)));
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
             when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
             when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
 
             // when
-            var result = authService.verifyEmail(VERIFY_TOKEN);
+            var result = authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE));
 
             // then
+            verify(loginCodeService).consume(user, RAW_CODE);
             assertThat(user.isEmailVerified()).isTrue();
             assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
             assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
             assertThat(user.getDeletionWarnedAt()).isNull();
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // changePassword
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ChangePassword")
-    class ChangePassword {
-
-        private static final String NEW_PASSWORD = "N3wP@ssw0rd";
-        private static final String NEW_ENCODED = "$argon2id$new-encoded";
 
         @Test
-        @DisplayName("Меняет пароль и отзывает все сессии")
-        void changesPasswordAndRevokesAllSessions() {
-            // given
-            var user = verifiedUser();
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
-            when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(NEW_ENCODED);
-
-            // when
-            authService.changePassword(new ChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD), USER_ID);
-
-            // then
-            // dirty checking: проверяем состояние объекта, не verify(save)
-            assertThat(user.getPassword()).isEqualTo(NEW_ENCODED);
-            verify(refreshTokenService).revokeAll(user);
-            verify(userRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("Бросает NotFoundException, когда пользователь не найден")
+        @DisplayName("Бросает BadCredentialsException, когда пользователь не найден")
         void throwsWhenUserNotFound() {
             // given
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> authService.changePassword(
-                    new ChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD), USER_ID))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("User not found");
+            assertThatThrownBy(() -> authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE)))
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("Invalid code");
 
-            verifyNoInteractions(passwordEncoder, refreshTokenService);
+            verifyNoInteractions(loginCodeService, jwtService, refreshTokenService);
         }
 
         @Test
-        @DisplayName("Бросает BadCredentialsException при неверном старом пароле")
-        void throwsWhenOldPasswordWrong() {
+        @DisplayName("Прокидывает BadCredentialsException от LoginCodeService, не подтверждая email")
+        void propagatesExceptionFromLoginCodeService() {
             // given
-            var user = verifiedUser();
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
+            var user = unverifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            doThrow(new BadCredentialsException("Invalid code"))
+                    .when(loginCodeService).consume(user, RAW_CODE);
 
             // when / then
-            assertThatThrownBy(() -> authService.changePassword(
-                    new ChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD), USER_ID))
+            assertThatThrownBy(() -> authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE)))
                     .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid credentials");
+                    .hasMessage("Invalid code");
 
-            verify(refreshTokenService, never()).revokeAll(any());
+            assertThat(user.isEmailVerified()).isFalse();
+            verifyNoInteractions(jwtService, refreshTokenService);
         }
     }
 
@@ -381,8 +256,8 @@ class AuthServiceTest {
         void returnsNewTokensForValidRefreshToken() {
             // given
             var user = verifiedUser();
-            user.setLastSeen(Instant.now().minus(java.time.Duration.ofDays(400)));
-            user.setDeletionWarnedAt(Instant.now().minus(java.time.Duration.ofDays(10)));
+            user.setLastSeen(Instant.now().minus(Duration.ofDays(400)));
+            user.setDeletionWarnedAt(Instant.now().minus(Duration.ofDays(10)));
             when(refreshTokenService.consume(REFRESH_TOKEN)).thenReturn(user);
             when(jwtService.generateToken(user)).thenReturn(ACCESS_TOKEN);
             when(refreshTokenService.issue(user)).thenReturn("new-refresh-token");
@@ -422,146 +297,6 @@ class AuthServiceTest {
                     .hasMessage("Refresh token missing");
 
             verifyNoInteractions(refreshTokenService, jwtService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // remindPassword
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("RemindPassword")
-    class RemindPassword {
-
-        @Test
-        @DisplayName("Публикует событие сброса пароля для существующего пользователя")
-        void publishesResetEventForExistingUser() {
-            // given
-            var user = verifiedUser();
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-            when(verificationTokenService.issue(user, VerificationToken.Type.PASSWORD_RESET))
-                    .thenReturn(VERIFY_TOKEN);
-
-            // when
-            authService.remindPassword(new ForgotPasswordRequest(EMAIL));
-
-            // then
-            var eventCaptor = ArgumentCaptor.forClass(ResetPasswordEmailEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
-            assertThat(eventCaptor.getValue().token()).isEqualTo(VERIFY_TOKEN);
-        }
-
-        @Test
-        @DisplayName("Ничего не делает, когда пользователь не найден")
-        void doesNothingWhenUserNotFound() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-
-            // when
-            authService.remindPassword(new ForgotPasswordRequest(EMAIL));
-
-            // then
-            verifyNoInteractions(verificationTokenService, eventPublisher);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // resetPassword
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ResetPassword")
-    class ResetPassword {
-
-        private static final String NEW_PASSWORD = "N3wP@ssw0rd";
-        private static final String NEW_ENCODED = "$argon2id$new-encoded";
-
-        @Test
-        @DisplayName("Сбрасывает пароль и отзывает все сессии")
-        void resetsPasswordAndRevokesAllSessions() {
-            // given
-            var user = verifiedUser();
-            when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.PASSWORD_RESET))
-                    .thenReturn(user);
-            when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(NEW_ENCODED);
-
-            // when
-            authService.resetPassword(VERIFY_TOKEN, NEW_PASSWORD);
-
-            // then
-            // dirty checking: проверяем состояние объекта
-            assertThat(user.getPassword()).isEqualTo(NEW_ENCODED);
-            verify(refreshTokenService).revokeAll(user);
-        }
-
-        @Test
-        @DisplayName("Прокидывает BadCredentialsException от VerificationTokenService")
-        void propagatesExceptionFromVerificationTokenService() {
-            // given
-            when(verificationTokenService.consume(VERIFY_TOKEN, VerificationToken.Type.PASSWORD_RESET))
-                    .thenThrow(new BadCredentialsException("Invalid token"));
-
-            // when / then
-            assertThatThrownBy(() -> authService.resetPassword(VERIFY_TOKEN, NEW_PASSWORD))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("Invalid token");
-
-            verifyNoInteractions(passwordEncoder, refreshTokenService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // resendVerification
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("ResendVerification")
-    class ResendVerification {
-
-        @Test
-        @DisplayName("Повторно отправляет письмо верификации неверифицированному пользователю")
-        void resendsVerificationEmailToUnverifiedUser() {
-            // given
-            var user = unverifiedUser();
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-            when(verificationTokenService.issue(user, VerificationToken.Type.EMAIL_VERIFICATION))
-                    .thenReturn(VERIFY_TOKEN);
-
-            // when
-            authService.resendVerification(new ResendVerificationRequest(EMAIL));
-
-            // then
-            var eventCaptor = ArgumentCaptor.forClass(VerificationEmailEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
-            assertThat(eventCaptor.getValue().token()).isEqualTo(VERIFY_TOKEN);
-        }
-
-        @Test
-        @DisplayName("Ничего не делает, когда пользователь не найден")
-        void doesNothingWhenUserNotFound() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-
-            // when
-            authService.resendVerification(new ResendVerificationRequest(EMAIL));
-
-            // then
-            verifyNoInteractions(verificationTokenService, eventPublisher);
-        }
-
-        @Test
-        @DisplayName("Ничего не делает, когда email уже верифицирован")
-        void doesNothingWhenEmailAlreadyVerified() {
-            // given
-            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(verifiedUser()));
-
-            // when
-            authService.resendVerification(new ResendVerificationRequest(EMAIL));
-
-            // then
-            verifyNoInteractions(verificationTokenService, eventPublisher);
         }
     }
 

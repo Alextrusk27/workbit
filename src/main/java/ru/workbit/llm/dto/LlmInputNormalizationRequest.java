@@ -1,7 +1,11 @@
 package ru.workbit.llm.dto;
 
+import java.util.List;
+
 public record LlmInputNormalizationRequest(
+        String skill,
         String profession,
-        String topic
+        List<String> knownSkills,
+        List<String> knownProfessions
 ) {
 }

@@ -25,10 +25,10 @@ public class TrainingSession {
     private UUID userId;
 
     @Column(nullable = false, length = 100)
-    private String profession;
+    private String skill;
 
-    @Column(length = 100)
-    private String topic;
+    @Column(nullable = false, length = 100)
+    private String profession;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -58,9 +58,10 @@ public class TrainingSession {
 
     @Getter
     public enum Level {
-        JUNIOR("Junior", "Начинающий"),
-        MIDDLE("Middle", "Уверенный"),
-        SENIOR("Senior", "Продвинутый");
+        NOEXP("noexp", "Базовый"),
+        JUNIOR("junior", "Начинающий"),
+        MIDDLE("middle", "Уверенный"),
+        SENIOR("senior", "Продвинутый");
 
         private final String grade;
 

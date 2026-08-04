@@ -34,7 +34,6 @@ class RefreshTokenJPARepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build(); // active=true, deactivated=null по @Builder.Default
     }
 

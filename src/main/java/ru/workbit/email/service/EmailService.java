@@ -12,8 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import ru.workbit.email.AccountDeletionWarningEmailEvent;
-import ru.workbit.email.ResetPasswordEmailEvent;
-import ru.workbit.email.VerificationEmailEvent;
+import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.email.properties.MailProperties;
 import ru.workbit.exception.EmailSendException;
 
@@ -26,17 +25,9 @@ public class EmailService {
     private final TemplateEngine templateEngine;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onVerificationEmailRequested(VerificationEmailEvent event) {
+    public void onLoginCodeEmailRequested(LoginCodeEmailEvent event) {
         try {
-            sendVerificationMail(event.email(), event.token());
-        } catch (EmailSendException ignored) {
-        }
-    }
-
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onResetPasswordEmailRequested(ResetPasswordEmailEvent event) {
-        try {
-            sendResetPasswordMail(event.email(), event.token());
+            sendLoginCodeMail(event.email(), event.code());
         } catch (EmailSendException ignored) {
         }
     }
@@ -49,11 +40,11 @@ public class EmailService {
         }
     }
 
-    public void sendVerificationMail(String to, String token) {
+    public void sendLoginCodeMail(String to, String code) {
         Context context = new Context();
-        context.setVariable("verificationUrl", createVerificationLink(token));
+        context.setVariable("code", code);
 
-        String html = templateEngine.process("email/verification", context);
+        String html = templateEngine.process("email/login-code", context);
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
@@ -61,37 +52,14 @@ public class EmailService {
 
             helper.setFrom(mailProperties.fromMail());
             helper.setTo(to);
-            helper.setSubject("Подтверждение электронной почты");
+            helper.setSubject("Код для входа в Workbit");
             helper.setText(html, true);
 
             mailSender.send(mimeMessage);
-            log.info("Verification email sent");
+            log.info("Login code email sent");
         } catch (MessagingException e) {
-            log.error("Failed to send verification email", e);
-            throw new EmailSendException("Failed to send verification email", e);
-        }
-    }
-
-    public void sendResetPasswordMail(String to, String token) {
-        Context context = new Context();
-        context.setVariable("resetUrl", createResetPasswordLink(token));
-
-        String html = templateEngine.process("email/reset-password", context);
-
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-
-            helper.setFrom(mailProperties.fromMail());
-            helper.setTo(to);
-            helper.setSubject("Изменение пароля для аккаунта");
-            helper.setText(html, true);
-
-            mailSender.send(mimeMessage);
-            log.info("Reset password email sent");
-        } catch (MessagingException e) {
-            log.error("Failed to send reset password email", e);
-            throw new EmailSendException("Failed to send reset password email", e);
+            log.error("Failed to send login code email", e);
+            throw new EmailSendException("Failed to send login code email", e);
         }
     }
 
@@ -116,13 +84,5 @@ public class EmailService {
             log.error("Failed to send account deletion warning email", e);
             throw new EmailSendException("Failed to send account deletion warning email", e);
         }
-    }
-
-    private String createVerificationLink(String token) {
-        return mailProperties.baseUrl() + "/verify-email?token=" + token;
-    }
-
-    private String createResetPasswordLink(String token) {
-        return mailProperties.baseUrl() + "/reset-password?token=" + token;
     }
 }

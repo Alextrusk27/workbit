@@ -6,34 +6,32 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
-import ru.workbit.content.repository.TopicDictRepository;
+import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
-import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingFeedback;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
-import ru.workbit.training.model.mapper.TrainingQuestionMapper;
 import ru.workbit.training.model.mapper.TrainingReportMapper;
 import ru.workbit.training.model.mapper.TrainingSessionMapper;
 import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.util.DictText;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
-import static ru.workbit.training.service.TrainingCases.answeredSorted;
-import static ru.workbit.training.service.TrainingCases.checkSessionNotCompleted;
-import static ru.workbit.training.service.TrainingCases.groupCases;
+import static ru.workbit.training.service.TrainingSessions.answeredSorted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionCompleted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
 
 @Component
 @Slf4j
@@ -41,25 +39,26 @@ import static ru.workbit.training.service.TrainingCases.groupCases;
 class TrainingWriter {
 
     static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
-    static final double MIN_REVIEWED_CASES_RATIO = 0.5;
+    static final double MIN_REVIEWED_QUESTIONS_RATIO = 0.5;
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
-    private final TopicDictRepository topicDictRepository;
+    private final SkillDictRepository skillDictRepository;
 
     private final TrainingSessionMapper trainingSessionMapper;
-    private final TrainingQuestionMapper trainingQuestionMapper;
     private final TrainingReportMapper trainingReportMapper;
 
-    record DictionaryRefs(UUID professionId, UUID topicId) {
+    record DictionaryRefs(UUID professionId, UUID skillId) {
     }
 
     @Transactional
-    public DictionaryRefs upsertDictionaries(String profession, String topic) {
-        UUID professionId = professionDictRepository.upsertAndIncrementUsage(profession);
-        UUID topicId = topic != null ? topicDictRepository.upsertAndIncrementUsage(professionId, topic) : null;
-        return new DictionaryRefs(professionId, topicId);
+    public DictionaryRefs upsertDictionaries(String skill, String profession) {
+        UUID professionId = professionDictRepository.upsertAndIncrementUsage(
+                profession, DictText.matchKey(profession));
+        UUID skillId = skillDictRepository.upsertAndIncrementUsage(
+                professionId, skill, DictText.matchKey(skill));
+        return new DictionaryRefs(professionId, skillId);
     }
 
     @Transactional
@@ -67,59 +66,83 @@ class TrainingWriter {
                                                  List<String> generatedQuestions) {
         List<TrainingQuestion> questions = new ArrayList<>();
         for (BankQuestion bankQuestion : bankQuestions) {
-            questions.add(buildMainQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
-                    questions.size() + 1));
+            questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
+                    bankQuestion.getReferenceAnswer(), questions.size() + 1));
         }
         for (String text : generatedQuestions) {
-            questions.add(buildMainQuestion(session, text, null, questions.size() + 1));
+            questions.add(buildQuestion(session, text, null, null, questions.size() + 1));
         }
 
         session.setQuestions(questions);
         trainingSessionRepository.save(session);
 
-        return trainingSessionMapper.toResponse(session, 0);
+        return trainingSessionMapper.toResponse(session, 0, questions.size());
     }
 
-    private static TrainingQuestion buildMainQuestion(TrainingSession session, String text,
-                                                      UUID bankQuestionId, int orderIndex) {
+    @Transactional
+    public TrainingSessionResponse appendQuestions(UUID sessionId, List<BankQuestion> bankQuestions,
+                                                   List<String> generatedQuestions) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionNotCompleted(session);
+
+        List<TrainingQuestion> questions = session.getQuestions();
+        int orderIndex = questions.stream().mapToInt(TrainingQuestion::getOrderIndex).max().orElse(0);
+        for (BankQuestion bankQuestion : bankQuestions) {
+            questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
+                    bankQuestion.getReferenceAnswer(), ++orderIndex));
+        }
+        for (String text : generatedQuestions) {
+            questions.add(buildQuestion(session, text, null, null, ++orderIndex));
+        }
+
+        trainingSessionRepository.save(session);
+
+        int answered = (int) questions.stream().filter(TrainingQuestion::isAnswered).count();
+        return trainingSessionMapper.toResponse(session, answered, questions.size());
+    }
+
+    /**
+     * Перезапуск: вопросы и эталонные ответы остаются на месте, ответы, фидбэк и отчёт стираются,
+     * сессия возвращается в исходное состояние.
+     */
+    @Transactional
+    public TrainingSessionResponse restartSession(UUID sessionId) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        checkSessionCompleted(session);
+
+        for (TrainingQuestion question : session.getQuestions()) {
+            question.setFeedback(null);
+            question.setAnswered(false);
+            question.setAnswerText(null);
+            question.setAnsweredAt(null);
+        }
+        session.setReport(null);
+        session.setStatus(TrainingSession.Status.CREATED);
+        session.setCompletedAt(null);
+
+        trainingSessionRepository.save(session);
+
+        return trainingSessionMapper.toResponse(session, 0, session.getQuestions().size());
+    }
+
+    private static TrainingQuestion buildQuestion(TrainingSession session, String text, UUID bankQuestionId,
+                                                  String referenceAnswer, int orderIndex) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)
                 .text(text)
+                .referenceAnswer(referenceAnswer != null && !referenceAnswer.isBlank() ? referenceAnswer : null)
                 .orderIndex(orderIndex)
                 .build();
     }
 
     @Transactional
-    public void markFollowUpChecked(UUID questionId) {
+    public void saveReferenceAnswer(UUID questionId, String answer) {
         trainingQuestionRepository.findById(questionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"))
-                .setFollowUpChecked(true);
-    }
-
-    @Transactional
-    public TrainingQuestionResponse saveFollowUp(UUID answeredQuestionId, UUID caseMainId, String text) {
-        TrainingQuestion answered = trainingQuestionRepository.findWithSessionById(answeredQuestionId)
-                .orElseThrow(() -> new NotFoundException("Question not found"));
-        TrainingSession session = answered.getTrainingSession();
-        checkSessionNotCompleted(session);
-        answered.setFollowUpChecked(true);
-
-        Optional<TrainingQuestion> pending = trainingQuestionRepository.findNextUnansweredFollowUp(session.getId());
-        if (pending.isPresent()) {
-            log.warn("Session {} already has an unanswered follow-up, discarding the generated one", session.getId());
-            return trainingQuestionMapper.toDto(pending.get());
-        }
-
-        TrainingQuestion followUp = trainingQuestionRepository.save(TrainingQuestion.builder()
-                .trainingSession(session)
-                .parentQuestionId(caseMainId)
-                .text(text)
-                .orderIndex((int) trainingQuestionRepository.countByParentQuestionId(caseMainId) + 1)
-                .followUp(true)
-                .build());
-
-        return trainingQuestionMapper.toDto(followUp);
+                .setReferenceAnswer(answer);
     }
 
     @Transactional
@@ -129,14 +152,13 @@ class TrainingWriter {
         checkSessionNotCompleted(session);
         checkOverallFeedback(sessionId, llmReport.overallFeedback());
 
-        List<List<TrainingQuestion>> cases = groupCases(answeredSorted(session));
-        saveFeedbacks(cases, llmReport.cases() != null ? llmReport.cases() : List.of());
-        checkEnoughReviewedCases(sessionId, cases);
+        List<TrainingQuestion> answered = answeredSorted(session);
+        saveFeedbacks(answered, llmReport.cases() != null ? llmReport.cases() : List.of());
+        checkEnoughReviewedQuestions(sessionId, answered);
 
-        List<TrainingQuestion> mains = cases.stream().map(List::getFirst).toList();
-        double avgScore = calculateAvgScore(mains);
+        double avgScore = calculateAvgScore(answered);
 
-        session.getQuestions().removeIf(q -> !q.isAnswered() || q.isFollowUp());
+        session.getQuestions().removeIf(q -> !q.isAnswered());
         session.setReport(TrainingReport.builder()
                 .trainingSession(session)
                 .avgScore(avgScore)
@@ -147,24 +169,24 @@ class TrainingWriter {
 
         trainingSessionRepository.save(session);
 
-        return trainingReportMapper.toResponse(session.getReport(), session, mains);
+        return trainingReportMapper.toResponse(session.getReport(), session, answered);
     }
 
-    private void saveFeedbacks(List<List<TrainingQuestion>> cases, List<LlmTrainingCaseReview> reviews) {
+    private void saveFeedbacks(List<TrainingQuestion> answered, List<LlmTrainingCaseReview> reviews) {
         for (LlmTrainingCaseReview review : reviews) {
-            if (review.index() < 1 || review.index() > cases.size()) {
+            if (review.index() < 1 || review.index() > answered.size()) {
                 log.warn("LLM returned review with invalid index {}, skipping feedback", review.index());
                 continue;
             }
             if (!isPersistableFeedback(review.score(), review.evaluation())) {
-                log.warn("LLM returned invalid review for case {} (score={}), skipping feedback",
+                log.warn("LLM returned invalid review for question {} (score={}), skipping feedback",
                         review.index(), review.score());
                 continue;
             }
 
-            TrainingQuestion question = cases.get(review.index() - 1).getFirst();
+            TrainingQuestion question = answered.get(review.index() - 1);
             if (question.getFeedback() != null) {
-                log.warn("LLM returned duplicate review for case {}, skipping feedback", review.index());
+                log.warn("LLM returned duplicate review for question {}, skipping feedback", review.index());
                 continue;
             }
             question.setFeedback(TrainingFeedback.builder()
@@ -175,8 +197,8 @@ class TrainingWriter {
         }
     }
 
-    private double calculateAvgScore(List<TrainingQuestion> mains) {
-        double avg = mains.stream()
+    private double calculateAvgScore(List<TrainingQuestion> answered) {
+        double avg = answered.stream()
                 .map(TrainingQuestion::getFeedback)
                 .filter(Objects::nonNull)
                 .mapToInt(TrainingFeedback::getScore)
@@ -185,11 +207,12 @@ class TrainingWriter {
         return Math.round(avg * 10) / 10.0;
     }
 
-    private void checkEnoughReviewedCases(UUID sessionId, List<List<TrainingQuestion>> cases) {
-        long reviewed = cases.stream().filter(c -> c.getFirst().getFeedback() != null).count();
-        if (reviewed < cases.size() * MIN_REVIEWED_CASES_RATIO) {
-            log.error("Cannot finish session {}: LLM reviewed only {} of {} cases", sessionId, reviewed, cases.size());
-            throw new LlmException("Training report has too few reviewed cases");
+    private void checkEnoughReviewedQuestions(UUID sessionId, List<TrainingQuestion> answered) {
+        long reviewed = answered.stream().filter(q -> q.getFeedback() != null).count();
+        if (reviewed < answered.size() * MIN_REVIEWED_QUESTIONS_RATIO) {
+            log.error("Cannot finish session {}: LLM reviewed only {} of {} questions",
+                    sessionId, reviewed, answered.size());
+            throw new LlmException("Training report has too few reviewed questions");
         }
     }
 

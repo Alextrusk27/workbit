@@ -36,12 +36,13 @@ export function sessionSubtitle(session: {
 }
 
 /** Код уровня тренировки по требуемому опыту вакансии: строки hh.ru разложены
- *  как в грейдовом роутинге бэка, «нет опыта» и нераспознанное — начальный. */
-export type TrainingLevelCode = 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+ *  как в грейдовом роутинге бэка, нераспознанное — начальный. */
+export type TrainingLevelCode = 'NOEXP' | 'JUNIOR' | 'MIDDLE' | 'SENIOR'
 
 export function trainingLevelCode(
   experience: string | null,
 ): TrainingLevelCode {
+  if (experience === 'Нет опыта') return 'NOEXP'
   if (experience === 'От 1 года до 3 лет') return 'MIDDLE'
   if (experience === 'От 3 до 6 лет' || experience === 'Более 6 лет')
     return 'SENIOR'

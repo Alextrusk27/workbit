@@ -11,9 +11,10 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.TopicDict;
+import ru.workbit.content.model.SkillDict;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.util.DictText;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,20 +38,22 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
     private ProfessionDict aProfession(String name) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 
-    private TopicDict aTopic(UUID professionId, String name) {
-        return TopicDict.builder()
+    private SkillDict aSkill(UUID professionId, String name) {
+        return SkillDict.builder()
                 .professionId(professionId)
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 
-    private BankQuestion aBankQuestion(UUID professionId, UUID topicId, List<String> levels, String text) {
+    private BankQuestion aBankQuestion(UUID professionId, UUID skillId, List<String> levels, String text) {
         return BankQuestion.builder()
                 .professionId(professionId)
-                .topicId(topicId)
+                .skillId(skillId)
                 .levels(levels)
                 .text(text)
                 .build();
@@ -59,13 +62,13 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build();
     }
 
     private TrainingSession aSession(UUID userId) {
         return TrainingSession.builder()
                 .userId(userId)
+                .skill("Spring Core")
                 .profession("Java-разработчик")
                 .level(TrainingSession.Level.JUNIOR)
                 .build();
@@ -87,56 +90,56 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
     class SampleUnseen {
 
         @Test
-        @DisplayName("Возвращает вопросы только запрошенной профессии")
-        void filtersByProfession() {
+        @DisplayName("Возвращает вопросы только запрошенной профессии и навыка")
+        void returnsOnlyQuestionsOfGivenProfessionAndSkill() {
             // given
             var professionA = em.persistAndFlush(aProfession("Java Developer"));
             var professionB = em.persistAndFlush(aProfession("Python Developer"));
+            var skillA = em.persistAndFlush(aSkill(professionA.getId(), "Collections"));
+            var skillB = em.persistAndFlush(aSkill(professionB.getId(), "Generators"));
             var questionA = em.persistAndFlush(
-                    aBankQuestion(professionA.getId(), null, List.of("JUNIOR"), "Вопрос по Java"));
-            em.persistAndFlush(aBankQuestion(professionB.getId(), null, List.of("JUNIOR"), "Вопрос по Python"));
+                    aBankQuestion(professionA.getId(), skillA.getId(), List.of("JUNIOR"), "Вопрос по Java"));
+            em.persistAndFlush(aBankQuestion(professionB.getId(), skillB.getId(), List.of("JUNIOR"), "Вопрос по Python"));
 
             // when
-            var result = repository.sampleUnseen(professionA.getId(), null, "JUNIOR", UUID.randomUUID(), 10);
+            var result = repository.sampleUnseen(professionA.getId(), skillA.getId(), "JUNIOR", UUID.randomUUID(), 10);
 
             // then
             assertThat(result).extracting(BankQuestion::getId).containsExactly(questionA.getId());
         }
 
         @Test
-        @DisplayName("topicId=null возвращает только общие вопросы, не тематические")
-        void topicIdNullReturnsOnlyGeneralQuestions() {
+        @DisplayName("Не возвращает вопросы другого навыка той же профессии")
+        void doesNotReturnQuestionsOfAnotherSkillSameProfession() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
-            var topic = em.persistAndFlush(aTopic(profession.getId(), "Spring Core"));
-            var generalQuestion = em.persistAndFlush(
-                    aBankQuestion(profession.getId(), null, List.of("JUNIOR"), "Общий вопрос"));
-            em.persistAndFlush(aBankQuestion(profession.getId(), topic.getId(), List.of("JUNIOR"), "Тематический вопрос"));
+            var skillA = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var skillB = em.persistAndFlush(aSkill(profession.getId(), "Collections"));
+            var skillAQuestion = em.persistAndFlush(
+                    aBankQuestion(profession.getId(), skillA.getId(), List.of("JUNIOR"), "Вопрос по Spring"));
+            em.persistAndFlush(aBankQuestion(profession.getId(), skillB.getId(), List.of("JUNIOR"), "Вопрос по коллекциям"));
 
             // when
-            var result = repository.sampleUnseen(profession.getId(), null, "JUNIOR", UUID.randomUUID(), 10);
+            var result = repository.sampleUnseen(profession.getId(), skillA.getId(), "JUNIOR", UUID.randomUUID(), 10);
 
             // then
-            assertThat(result).extracting(BankQuestion::getId).containsExactly(generalQuestion.getId());
+            assertThat(result).extracting(BankQuestion::getId).containsExactly(skillAQuestion.getId());
         }
 
         @Test
-        @DisplayName("topicId задан — возвращает только вопросы этой темы")
-        void topicIdSetReturnsOnlyThatTopicQuestions() {
+        @DisplayName("Не возвращает вопрос, если professionId не соответствует профессии переданного skillId")
+        void returnsEmptyWhenProfessionDoesNotMatchSkillOwner() {
             // given
-            var profession = em.persistAndFlush(aProfession("Java Developer"));
-            var topicA = em.persistAndFlush(aTopic(profession.getId(), "Spring Core"));
-            var topicB = em.persistAndFlush(aTopic(profession.getId(), "Collections"));
-            var topicAQuestion = em.persistAndFlush(
-                    aBankQuestion(profession.getId(), topicA.getId(), List.of("JUNIOR"), "Вопрос по Spring"));
-            em.persistAndFlush(aBankQuestion(profession.getId(), topicB.getId(), List.of("JUNIOR"), "Вопрос по коллекциям"));
-            em.persistAndFlush(aBankQuestion(profession.getId(), null, List.of("JUNIOR"), "Общий вопрос"));
+            var professionA = em.persistAndFlush(aProfession("Java Developer"));
+            var professionB = em.persistAndFlush(aProfession("Python Developer"));
+            var skillA = em.persistAndFlush(aSkill(professionA.getId(), "Spring Core"));
+            em.persistAndFlush(aBankQuestion(professionA.getId(), skillA.getId(), List.of("JUNIOR"), "Вопрос по Spring"));
 
-            // when
-            var result = repository.sampleUnseen(profession.getId(), topicA.getId(), "JUNIOR", UUID.randomUUID(), 10);
+            // when — skillA принадлежит professionA, но передан professionB
+            var result = repository.sampleUnseen(professionB.getId(), skillA.getId(), "JUNIOR", UUID.randomUUID(), 10);
 
             // then
-            assertThat(result).extracting(BankQuestion::getId).containsExactly(topicAQuestion.getId());
+            assertThat(result).isEmpty();
         }
 
         @Test
@@ -144,13 +147,14 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void levelMatchesViaAnyArray() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
             var question = em.persistAndFlush(
-                    aBankQuestion(profession.getId(), null, List.of("JUNIOR", "MIDDLE"), "Многоуровневый вопрос"));
+                    aBankQuestion(profession.getId(), skill.getId(), List.of("JUNIOR", "MIDDLE"), "Многоуровневый вопрос"));
 
             // when
-            var forJunior = repository.sampleUnseen(profession.getId(), null, "JUNIOR", UUID.randomUUID(), 10);
-            var forMiddle = repository.sampleUnseen(profession.getId(), null, "MIDDLE", UUID.randomUUID(), 10);
-            var forSenior = repository.sampleUnseen(profession.getId(), null, "SENIOR", UUID.randomUUID(), 10);
+            var forJunior = repository.sampleUnseen(profession.getId(), skill.getId(), "JUNIOR", UUID.randomUUID(), 10);
+            var forMiddle = repository.sampleUnseen(profession.getId(), skill.getId(), "MIDDLE", UUID.randomUUID(), 10);
+            var forSenior = repository.sampleUnseen(profession.getId(), skill.getId(), "SENIOR", UUID.randomUUID(), 10);
 
             // then
             assertThat(forJunior).extracting(BankQuestion::getId).containsExactly(question.getId());
@@ -163,14 +167,15 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void excludesSeenQuestionsForSameUser() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
             var question = em.persistAndFlush(
-                    aBankQuestion(profession.getId(), null, List.of("JUNIOR"), "Уже виденный вопрос"));
+                    aBankQuestion(profession.getId(), skill.getId(), List.of("JUNIOR"), "Уже виденный вопрос"));
             var user = em.persistAndFlush(aUser("seen@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
             em.persistAndFlush(aQuestion(session, question.getId(), 1));
 
             // when
-            var result = repository.sampleUnseen(profession.getId(), null, "JUNIOR", user.getId(), 10);
+            var result = repository.sampleUnseen(profession.getId(), skill.getId(), "JUNIOR", user.getId(), 10);
 
             // then
             assertThat(result).isEmpty();
@@ -181,15 +186,16 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void includesSeenQuestionsForDifferentUser() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
             var question = em.persistAndFlush(
-                    aBankQuestion(profession.getId(), null, List.of("JUNIOR"), "Вопрос другого пользователя"));
+                    aBankQuestion(profession.getId(), skill.getId(), List.of("JUNIOR"), "Вопрос другого пользователя"));
             var owner = em.persistAndFlush(aUser("owner@example.com"));
             var otherUser = em.persistAndFlush(aUser("other@example.com"));
             var session = em.persistAndFlush(aSession(owner.getId()));
             em.persistAndFlush(aQuestion(session, question.getId(), 1));
 
             // when
-            var result = repository.sampleUnseen(profession.getId(), null, "JUNIOR", otherUser.getId(), 10);
+            var result = repository.sampleUnseen(profession.getId(), skill.getId(), "JUNIOR", otherUser.getId(), 10);
 
             // then
             assertThat(result).extracting(BankQuestion::getId).containsExactly(question.getId());
@@ -200,15 +206,39 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void respectsLimit() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
             for (int i = 0; i < 5; i++) {
-                em.persistAndFlush(aBankQuestion(profession.getId(), null, List.of("JUNIOR"), "Вопрос " + i));
+                em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId(), List.of("JUNIOR"), "Вопрос " + i));
             }
 
             // when
-            var result = repository.sampleUnseen(profession.getId(), null, "JUNIOR", UUID.randomUUID(), 2);
+            var result = repository.sampleUnseen(profession.getId(), skill.getId(), "JUNIOR", UUID.randomUUID(), 2);
 
             // then
             assertThat(result).hasSize(2);
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("SkillIdRequired")
+    class SkillIdRequired {
+
+        @Test
+        @DisplayName("Вставка вопроса банка с skill_id=NULL нарушает NOT NULL-констрейнт")
+        void throwsWhenSkillIdIsNull() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var bad = BankQuestion.builder()
+                    .professionId(profession.getId())
+                    .levels(List.of("JUNIOR"))
+                    .text("Вопрос без навыка")
+                    .build();
+
+            // when / then
+            assertThatThrownBy(() -> em.persistAndFlush(bad))
+                    .isInstanceOf(Exception.class);
         }
     }
 
@@ -223,7 +253,8 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void throwsWhenLevelsEmpty() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
-            var bad = aBankQuestion(profession.getId(), null, List.of(), "Вопрос без уровней");
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var bad = aBankQuestion(profession.getId(), skill.getId(), List.of(), "Вопрос без уровней");
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))
@@ -231,15 +262,60 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("Значение вне JUNIOR/MIDDLE/SENIOR нарушает CHECK-констрейнт chk_bank_levels")
+        @DisplayName("Значение вне NOEXP/JUNIOR/MIDDLE/SENIOR нарушает CHECK-констрейнт chk_bank_levels")
         void throwsWhenLevelValueInvalid() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
-            var bad = aBankQuestion(profession.getId(), null, List.of("EXPERT"), "Вопрос с невалидным уровнем");
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var bad = aBankQuestion(profession.getId(), skill.getId(), List.of("EXPERT"), "Вопрос с невалидным уровнем");
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))
                     .isInstanceOf(Exception.class);
+        }
+
+        @Test
+        @DisplayName("Уровень NOEXP проходит CHECK-констрейнт chk_bank_levels")
+        void allowsNoexpLevel() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var question = aBankQuestion(profession.getId(), skill.getId(), List.of("NOEXP"), "Вопрос для новичка без опыта");
+
+            // when
+            var saved = em.persistFlushFind(question);
+
+            // then
+            assertThat(saved.getLevels()).containsExactly("NOEXP");
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("CascadeDeleteSkill")
+    class CascadeDeleteSkill {
+
+        @Test
+        @DisplayName("Удаление навыка каскадно удаляет вопросы банка, привязанные к нему")
+        void deletingSkillCascadesBankQuestions() {
+            // given
+            var profession = em.persistAndFlush(aProfession("Java Developer"));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var question = em.persistAndFlush(
+                    aBankQuestion(profession.getId(), skill.getId(), List.of("JUNIOR"), "Вопрос по Spring"));
+
+            // when — физическое удаление навыка нативным SQL, чтобы проверить реальный
+            // ON DELETE CASCADE в БД, минуя JPA-кеш
+            em.getEntityManager()
+                    .createNativeQuery("DELETE FROM content.skill_dict WHERE id = :id")
+                    .setParameter("id", skill.getId())
+                    .executeUpdate();
+            em.flush();
+            em.clear();
+
+            // then
+            assertThat(repository.findById(question.getId())).isEmpty();
         }
     }
 
@@ -254,7 +330,8 @@ class QuestionBankRepositoryIT extends AbstractPostgresIT {
         void roundTripLevelsArray() {
             // given
             var profession = em.persistAndFlush(aProfession("Java Developer"));
-            var question = aBankQuestion(profession.getId(), null, List.of("MIDDLE", "SENIOR"), "Вопрос с массивом уровней");
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Spring Core"));
+            var question = aBankQuestion(profession.getId(), skill.getId(), List.of("MIDDLE", "SENIOR"), "Вопрос с массивом уровней");
 
             // when
             var saved = em.persistFlushFind(question);

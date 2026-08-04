@@ -15,13 +15,13 @@ import { usePageTitle } from '@/lib/usePageTitle'
 const steps = [
   {
     n: '1',
-    title: 'Профессия и навык',
-    body: 'Назовите профессию и навык: «Java-разработчик → Hibernate». Вопросы будут именно по нему, а не «в среднем по профессии».',
+    title: 'Навык и профессия',
+    body: 'Назовите навык и профессию, в контексте которой он нужен: «Hibernate → Java-разработчик». Вопросы будут именно по навыку, а не «в среднем по профессии».',
   },
   {
     n: '2',
     title: 'Уровень сложности',
-    body: 'Начинающий, средний или продвинутый — вопросы и строгость оценки подстраиваются под выбранную планку.',
+    body: 'Базовый, начинающий, уверенный или продвинутый — от выбранной планки зависит, насколько глубоко копают вопросы.',
   },
   {
     n: '3',
@@ -66,7 +66,7 @@ const audience = [
 export function SkillsTrainerPage() {
   usePageTitle('Тренажёр навыков')
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app/training/new' : '/register'
+  const startTo = isAuthenticated ? '/app/training/new' : '/login'
 
   return (
     <>
@@ -101,7 +101,7 @@ export function SkillsTrainerPage() {
         <Container>
           <Reveal>
             <SectionHead title="Тренировка за три клика">
-              Профессия, навык, уровень — и вопросы уже идут.
+              Навык, профессия, уровень — и вопросы уже идут.
             </SectionHead>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

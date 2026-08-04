@@ -7,7 +7,6 @@ CREATE SCHEMA IF NOT EXISTS interview;
 CREATE TABLE IF NOT EXISTS auth.users (
     id                  UUID PRIMARY KEY,
     email               VARCHAR(254) NOT NULL UNIQUE,
-    pwd_hash            VARCHAR(255) NOT NULL,
     email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
     created             TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen           TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -28,23 +27,18 @@ CREATE INDEX IF NOT EXISTS idx_refresh_token_user_id
 CREATE INDEX IF NOT EXISTS idx_refresh_token_token_hash
     ON auth.refresh_token(token_hash);
 
-CREATE TABLE IF NOT EXISTS auth.verification_token (
+CREATE TABLE IF NOT EXISTS auth.login_code (
     id          UUID PRIMARY KEY,
     user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    token_hash  VARCHAR(255) NOT NULL UNIQUE,
-    type        VARCHAR(32) NOT NULL,
+    code_hash   VARCHAR(255) NOT NULL,
     expires_at  TIMESTAMPTZ NOT NULL,
+    attempts    INT NOT NULL DEFAULT 0,
     used_at     TIMESTAMPTZ,
-    created     TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    CONSTRAINT chk_type
-        CHECK (type IN ('PASSWORD_RESET', 'EMAIL_VERIFICATION'))
+    created     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_verification_token_user_id
-    ON auth.verification_token(user_id);
-CREATE INDEX IF NOT EXISTS idx_verification_token_token_hash
-    ON auth.verification_token(token_hash);
+CREATE INDEX IF NOT EXISTS idx_login_code_user_id
+    ON auth.login_code(user_id);
 
 CREATE TABLE IF NOT EXISTS vacancy.snapshot (
     id            UUID PRIMARY KEY,
@@ -70,6 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_snapshot_source_id
 CREATE TABLE IF NOT EXISTS content.profession_dict (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(100) NOT NULL,
+    match_key   VARCHAR(100) NOT NULL,
     status      VARCHAR(16) NOT NULL DEFAULT 'AUTO',
     usage_count INT NOT NULL DEFAULT 0,
     created     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -78,28 +73,32 @@ CREATE TABLE IF NOT EXISTS content.profession_dict (
         CHECK (status IN ('AUTO', 'APPROVED'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_profession_dict_name
-    ON content.profession_dict (lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_profession_dict_match_key
+    ON content.profession_dict (match_key);
 
-CREATE TABLE IF NOT EXISTS content.topic_dict (
+CREATE TABLE IF NOT EXISTS content.skill_dict (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     profession_id UUID NOT NULL REFERENCES content.profession_dict(id) ON DELETE CASCADE,
     name          VARCHAR(100) NOT NULL,
+    match_key     VARCHAR(100) NOT NULL,
     status        VARCHAR(16) NOT NULL DEFAULT 'AUTO',
     usage_count   INT NOT NULL DEFAULT 0,
     created       TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT chk_topic_dict_status
+    CONSTRAINT chk_skill_dict_status
         CHECK (status IN ('AUTO', 'APPROVED'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_topic_dict_profession_name
-    ON content.topic_dict (profession_id, lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_dict_profession_match_key
+    ON content.skill_dict (profession_id, match_key);
+
+CREATE INDEX IF NOT EXISTS idx_skill_dict_match_key
+    ON content.skill_dict (match_key);
 
 CREATE TABLE IF NOT EXISTS content.question_bank (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     profession_id    UUID NOT NULL REFERENCES content.profession_dict(id) ON DELETE CASCADE,
-    topic_id         UUID REFERENCES content.topic_dict(id) ON DELETE CASCADE,
+    skill_id         UUID NOT NULL REFERENCES content.skill_dict(id) ON DELETE CASCADE,
     levels           VARCHAR(32)[] NOT NULL,
     text             TEXT NOT NULL,
     reference_answer TEXT,
@@ -107,27 +106,27 @@ CREATE TABLE IF NOT EXISTS content.question_bank (
     created          TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT chk_bank_levels
-        CHECK (levels <@ ARRAY['JUNIOR', 'MIDDLE', 'SENIOR']::varchar[]
+        CHECK (levels <@ ARRAY['NOEXP', 'JUNIOR', 'MIDDLE', 'SENIOR']::varchar[]
             AND cardinality(levels) >= 1),
     CONSTRAINT chk_bank_source
         CHECK (source IN ('CLAUDE', 'MANUAL'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_question_bank_selector
-    ON content.question_bank (profession_id, topic_id);
+    ON content.question_bank (profession_id, skill_id);
 
 CREATE TABLE IF NOT EXISTS training.session (
     id              UUID PRIMARY KEY,
     user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    skill           VARCHAR(100) NOT NULL,
     profession      VARCHAR(100) NOT NULL,
-    topic           VARCHAR(100),
     level           VARCHAR(32) NOT NULL,
     status          VARCHAR(32) NOT NULL,
     created         TIMESTAMPTZ NOT NULL,
     completed_at    TIMESTAMPTZ,
 
     CONSTRAINT chk_session_level
-        CHECK (level IN ('JUNIOR', 'MIDDLE', 'SENIOR')),
+        CHECK (level IN ('NOEXP', 'JUNIOR', 'MIDDLE', 'SENIOR')),
     CONSTRAINT chk_session_status
         CHECK (status IN ('CREATED', 'IN_PROGRESS', 'COMPLETED')),
     CONSTRAINT chk_session_completed_at
@@ -140,12 +139,10 @@ CREATE INDEX IF NOT EXISTS idx_session_user_id
 CREATE TABLE IF NOT EXISTS training.question (
     id                 UUID PRIMARY KEY,
     session_id         UUID NOT NULL REFERENCES training.session(id) ON DELETE CASCADE,
-    parent_question_id UUID REFERENCES training.question(id) ON DELETE CASCADE,
     bank_question_id   UUID REFERENCES content.question_bank(id) ON DELETE SET NULL,
     text               TEXT NOT NULL,
+    reference_answer   TEXT,
     order_index        INT NOT NULL,
-    follow_up          BOOLEAN NOT NULL DEFAULT FALSE,
-    follow_up_checked  BOOLEAN NOT NULL DEFAULT FALSE,
     answered           BOOL DEFAULT FALSE,
     answer_text        TEXT,
     answered_at        TIMESTAMPTZ,
@@ -154,10 +151,8 @@ CREATE TABLE IF NOT EXISTS training.question (
         CHECK (order_index BETWEEN 1 AND 50),
     CONSTRAINT chk_question_answer_has_text_and_timestamp
         CHECK (NOT answered OR (answer_text IS NOT NULL AND answered_at IS NOT NULL)),
-    CONSTRAINT chk_question_follow_up_parent
-        CHECK (follow_up = (parent_question_id IS NOT NULL)),
     CONSTRAINT uq_question_order
-        UNIQUE NULLS NOT DISTINCT (session_id, parent_question_id, order_index)
+        UNIQUE (session_id, order_index)
 );
 
 CREATE INDEX IF NOT EXISTS idx_question_session_id
@@ -257,8 +252,8 @@ CREATE TABLE IF NOT EXISTS interview.report (
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
 
-INSERT INTO content.profession_dict (name, status) VALUES
-    ('Java-разработчик', 'APPROVED'),
-    ('Python-разработчик', 'APPROVED'),
-    ('Инженер по тестированию', 'APPROVED')
+INSERT INTO content.profession_dict (name, match_key, status) VALUES
+    ('Java-разработчик', 'java разработчик', 'APPROVED'),
+    ('Python-разработчик', 'python разработчик', 'APPROVED'),
+    ('Инженер по тестированию', 'инженер тестированию', 'APPROVED')
 ON CONFLICT DO NOTHING;

@@ -5,15 +5,11 @@
 const BASE_URL: string =
   import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1'
 
-/** Публичные auth-ручки: для них refresh на 401 не имеет смысла (401 = плохие
- *  креды/протухший токен подтверждения), а для `/refresh` он ещё и зациклит. */
+/** Публичные auth-ручки: для них refresh на 401 не имеет смысла (401 = неверный
+ *  или протухший код), а для `/refresh` он ещё и зациклит. */
 const NO_REFRESH_PATHS = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/verify-email',
-  '/auth/resend-verification',
-  '/auth/forgot-password',
-  '/auth/reset-password',
+  '/auth/request-code',
+  '/auth/verify-code',
   '/auth/refresh',
 ]
 

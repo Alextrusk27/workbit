@@ -3,6 +3,8 @@ package ru.workbit.training.repository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -11,8 +13,10 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.ProfessionDict;
+import ru.workbit.content.model.SkillDict;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.util.DictText;
 
 import java.time.Instant;
 import java.util.List;
@@ -37,37 +41,27 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     private User aUser(String email) {
         return User.builder()
                 .email(email)
-                .password("hashed_password")
                 .build();
     }
 
     private TrainingSession aSession(UUID userId) {
         return TrainingSession.builder()
                 .userId(userId)
+                .skill("Spring Core")
                 .profession("Java-разработчик")
                 .level(TrainingSession.Level.JUNIOR)
                 .build();
     }
 
-    private TrainingQuestion aMainQuestion(TrainingSession session, int orderIndex) {
-        return aMainQuestion(session, orderIndex, null);
+    private TrainingQuestion aQuestion(TrainingSession session, int orderIndex) {
+        return aQuestion(session, orderIndex, null);
     }
 
-    private TrainingQuestion aMainQuestion(TrainingSession session, int orderIndex, UUID bankQuestionId) {
+    private TrainingQuestion aQuestion(TrainingSession session, int orderIndex, UUID bankQuestionId) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)
                 .text("Вопрос " + orderIndex)
-                .orderIndex(orderIndex)
-                .build();
-    }
-
-    private TrainingQuestion aFollowUpQuestion(TrainingSession session, UUID parentQuestionId, int orderIndex) {
-        return TrainingQuestion.builder()
-                .trainingSession(session)
-                .parentQuestionId(parentQuestionId)
-                .followUp(true)
-                .text("Уточнение " + orderIndex)
                 .orderIndex(orderIndex)
                 .build();
     }
@@ -82,12 +76,22 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     private ProfessionDict aProfession(String name) {
         return ProfessionDict.builder()
                 .name(name)
+                .matchKey(DictText.matchKey(name))
                 .build();
     }
 
-    private BankQuestion aBankQuestion(UUID professionId) {
+    private SkillDict aSkill(UUID professionId, String name) {
+        return SkillDict.builder()
+                .professionId(professionId)
+                .name(name)
+                .matchKey(DictText.matchKey(name))
+                .build();
+    }
+
+    private BankQuestion aBankQuestion(UUID professionId, UUID skillId) {
         return BankQuestion.builder()
                 .professionId(professionId)
+                .skillId(skillId)
                 .levels(List.of("JUNIOR"))
                 .text("Вопрос из банка")
                 .build();
@@ -106,8 +110,9 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
             var user = em.persistAndFlush(aUser("set-null@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
             var profession = em.persistAndFlush(aProfession("Set Null Profession"));
-            var bankQuestion = em.persistAndFlush(aBankQuestion(profession.getId()));
-            var question = em.persistAndFlush(aMainQuestion(session, 1, bankQuestion.getId()));
+            var skill = em.persistAndFlush(aSkill(profession.getId(), "Set Null Skill"));
+            var bankQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId()));
+            var question = em.persistAndFlush(aQuestion(session, 1, bankQuestion.getId()));
 
             // when — физическое удаление вопроса банка нативным SQL, чтобы проверить реальный
             // ON DELETE SET NULL в БД, минуя JPA-кеш
@@ -133,84 +138,91 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     class UniqueOrder {
 
         @Test
-        @DisplayName("Два вопроса с parent=NULL и одинаковым order_index в одной сессии — нарушение (NULLS NOT DISTINCT)")
-        void throwsWhenSameParentNullAndSameOrderIndexInSession() {
+        @DisplayName("Два вопроса с одинаковым order_index в одной сессии — нарушение уникальности при flush")
+        void throwsWhenSameOrderIndexInSameSession() {
             // given
             var user = em.persistAndFlush(aUser("dup-order@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            em.persistAndFlush(aMainQuestion(session, 1));
+            em.persistAndFlush(aQuestion(session, 1));
 
             // when / then
-            assertThatThrownBy(() -> em.persistAndFlush(aMainQuestion(session, 1)))
+            assertThatThrownBy(() -> em.persistAndFlush(aQuestion(session, 1)))
                     .isInstanceOf(Exception.class);
         }
 
         @Test
-        @DisplayName("Одинаковый order_index при разных parent_question_id допустим")
-        void allowsSameOrderIndexForDifferentParents() {
+        @DisplayName("Одинаковый order_index в разных сессиях допустим")
+        void allowsSameOrderIndexForDifferentSessions() {
             // given
-            var user = em.persistAndFlush(aUser("same-order-diff-parent@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var parentA = em.persistAndFlush(aMainQuestion(session, 1));
-            var parentB = em.persistAndFlush(aMainQuestion(session, 2));
+            var user = em.persistAndFlush(aUser("same-order-diff-session@example.com"));
+            var sessionA = em.persistAndFlush(aSession(user.getId()));
+            var sessionB = em.persistAndFlush(aSession(user.getId()));
 
             // when
-            var childA = em.persistAndFlush(aFollowUpQuestion(session, parentA.getId(), 1));
-            var childB = em.persistAndFlush(aFollowUpQuestion(session, parentB.getId(), 1));
+            var questionA = em.persistAndFlush(aQuestion(sessionA, 1));
+            var questionB = em.persistAndFlush(aQuestion(sessionB, 1));
 
             // then
-            assertThat(childA.getId()).isNotNull();
-            assertThat(childB.getId()).isNotNull();
+            assertThat(questionA.getId()).isNotNull();
+            assertThat(questionB.getId()).isNotNull();
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("CascadeDeleteParent")
-    class CascadeDeleteParent {
+    @DisplayName("OrderIndexRange")
+    class OrderIndexRange {
 
-        @Test
-        @DisplayName("Удаление родительского вопроса каскадно удаляет follow-up")
-        void deletingParentCascadesFollowUp() {
+        @ParameterizedTest
+        @ValueSource(ints = {0, 51})
+        @DisplayName("order_index вне диапазона 1..50 нарушает CHECK-констрейнт chk_question_order_index")
+        void throwsWhenOrderIndexOutOfRange(int invalidOrderIndex) {
             // given
-            var user = em.persistAndFlush(aUser("cascade-parent@example.com"));
+            var user = em.persistAndFlush(aUser("order-range-" + invalidOrderIndex + "@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
-            var followUp = em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 1));
+            var bad = aQuestion(session, invalidOrderIndex);
 
-            // when — физическое удаление родителя нативным SQL, чтобы проверить реальный
-            // ON DELETE CASCADE в БД, минуя JPA-кеш
-            em.getEntityManager()
-                    .createNativeQuery("DELETE FROM training.question WHERE id = :id")
-                    .setParameter("id", parent.getId())
-                    .executeUpdate();
-            em.flush();
-            em.clear();
+            // when / then
+            assertThatThrownBy(() -> em.persistAndFlush(bad))
+                    .isInstanceOf(Exception.class);
+        }
+
+        @Test
+        @DisplayName("Границы диапазона 1 и 50 допустимы")
+        void allowsBoundaryOrderIndexValues() {
+            // given
+            var user = em.persistAndFlush(aUser("order-range-boundary@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+
+            // when
+            var low = em.persistAndFlush(aQuestion(session, 1));
+            var high = em.persistAndFlush(aQuestion(session, 50));
 
             // then
-            assertThat(repository.findById(parent.getId())).isEmpty();
-            assertThat(repository.findById(followUp.getId())).isEmpty();
+            assertThat(low.getId()).isNotNull();
+            assertThat(high.getId()).isNotNull();
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("FollowUpParentConstraint")
-    class FollowUpParentConstraint {
+    @DisplayName("AnsweredConsistency")
+    class AnsweredConsistency {
 
         @Test
-        @DisplayName("follow_up=true без parent_question_id — нарушение констрейнта")
-        void throwsWhenFollowUpTrueWithoutParent() {
+        @DisplayName("answered=true с answer_text=null нарушает CHECK-констрейнт")
+        void throwsWhenAnsweredTrueWithNullAnswerText() {
             // given
-            var user = em.persistAndFlush(aUser("chk-followup-no-parent@example.com"));
+            var user = em.persistAndFlush(aUser("chk-answer-text@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
             var bad = TrainingQuestion.builder()
                     .trainingSession(session)
-                    .followUp(true)
-                    .text("Уточнение без родителя")
+                    .text("Вопрос")
                     .orderIndex(1)
+                    .answered(true)
+                    .answeredAt(Instant.now())
                     .build();
 
             // when / then
@@ -219,225 +231,244 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("follow_up=false с заполненным parent_question_id — нарушение констрейнта")
-        void throwsWhenFollowUpFalseWithParent() {
+        @DisplayName("answered=true с answered_at=null нарушает CHECK-констрейнт")
+        void throwsWhenAnsweredTrueWithNullAnsweredAt() {
             // given
-            var user = em.persistAndFlush(aUser("chk-followup-with-parent@example.com"));
+            var user = em.persistAndFlush(aUser("chk-answered-at@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
             var bad = TrainingQuestion.builder()
                     .trainingSession(session)
-                    .parentQuestionId(parent.getId())
-                    .followUp(false)
-                    .text("Не уточнение, но с родителем")
+                    .text("Вопрос")
                     .orderIndex(1)
+                    .answered(true)
+                    .answerText("Ответ")
                     .build();
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))
                     .isInstanceOf(Exception.class);
         }
+
+        @Test
+        @DisplayName("answered=true с заполненными answer_text и answered_at сохраняется без ошибок")
+        void savesWhenAnsweredTrueWithBothFieldsSet() {
+            // given
+            var user = em.persistAndFlush(aUser("chk-answered-ok@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            var good = answered(aQuestion(session, 1), Instant.now());
+
+            // when
+            var saved = em.persistFlushFind(good);
+
+            // then
+            assertThat(saved.isAnswered()).isTrue();
+            assertThat(saved.getAnswerText()).isEqualTo("Ответ");
+            assertThat(saved.getAnsweredAt()).isNotNull();
+        }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("FindNextUnansweredMain")
-    class FindNextUnansweredMain {
+    @DisplayName("SessionLevelCheck")
+    class SessionLevelCheck {
 
         @Test
-        @DisplayName("Возвращает мейн-вопрос с наименьшим order_index, игнорируя уточнения")
-        void returnsLowestOrderIndexUnansweredMain() {
+        @DisplayName("Уровень NOEXP у сессии проходит CHECK-констрейнт chk_session_level")
+        void noexpLevelIsAllowed() {
             // given
-            var user = em.persistAndFlush(aUser("next-main@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var main1 = em.persistAndFlush(answered(aMainQuestion(session, 1), Instant.now()));
-            var main2 = em.persistAndFlush(aMainQuestion(session, 2));
-            em.persistAndFlush(aMainQuestion(session, 3));
-            em.persistAndFlush(aFollowUpQuestion(session, main1.getId(), 1));
+            var user = em.persistAndFlush(aUser("noexp-level@example.com"));
+            var session = TrainingSession.builder()
+                    .userId(user.getId())
+                    .skill("Основы Java")
+                    .profession("Java-разработчик")
+                    .level(TrainingSession.Level.NOEXP)
+                    .build();
 
             // when
-            var result = repository.findNextUnansweredMain(session.getId());
+            var saved = em.persistFlushFind(session);
+
+            // then
+            assertThat(saved.getLevel()).isEqualTo(TrainingSession.Level.NOEXP);
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FindNextUnanswered")
+    class FindNextUnanswered {
+
+        @Test
+        @DisplayName("Возвращает вопрос с наименьшим order_index среди неотвеченных")
+        void returnsLowestOrderIndexUnanswered() {
+            // given
+            var user = em.persistAndFlush(aUser("next-unanswered@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(answered(aQuestion(session, 1), Instant.now()));
+            var next = em.persistAndFlush(aQuestion(session, 2));
+            em.persistAndFlush(aQuestion(session, 3));
+
+            // when
+            var result = repository.findNextUnanswered(session.getId());
 
             // then
             assertThat(result).isPresent();
-            assertThat(result.get().getId()).isEqualTo(main2.getId());
+            assertThat(result.get().getId()).isEqualTo(next.getId());
         }
 
         @Test
-        @DisplayName("Возвращает empty, когда все мейн-вопросы отвечены")
-        void returnsEmptyWhenAllMainAnswered() {
+        @DisplayName("Возвращает empty, когда все вопросы отвечены")
+        void returnsEmptyWhenAllAnswered() {
             // given
-            var user = em.persistAndFlush(aUser("next-main-empty@example.com"));
+            var user = em.persistAndFlush(aUser("next-unanswered-empty@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            em.persistAndFlush(answered(aMainQuestion(session, 1), Instant.now()));
+            em.persistAndFlush(answered(aQuestion(session, 1), Instant.now()));
 
             // when / then
-            assertThat(repository.findNextUnansweredMain(session.getId())).isEmpty();
+            assertThat(repository.findNextUnanswered(session.getId())).isEmpty();
         }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("FindNextUnansweredFollowUp")
-    class FindNextUnansweredFollowUp {
 
         @Test
-        @DisplayName("Возвращает уточняющий вопрос с наименьшим order_index, игнорируя мейн-вопросы")
-        void returnsLowestOrderIndexUnansweredFollowUp() {
+        @DisplayName("Учитывает только вопросы запрошенной сессии")
+        void scopesToRequestedSessionOnly() {
             // given
-            var user = em.persistAndFlush(aUser("next-followup@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
-            em.persistAndFlush(answered(aFollowUpQuestion(session, parent.getId(), 1), Instant.now()));
-            var followUp2 = em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 2));
+            var user = em.persistAndFlush(aUser("next-unanswered-scope@example.com"));
+            var sessionA = em.persistAndFlush(aSession(user.getId()));
+            var sessionB = em.persistAndFlush(aSession(user.getId()));
+            var questionA = em.persistAndFlush(aQuestion(sessionA, 1));
+            em.persistAndFlush(aQuestion(sessionB, 1));
 
             // when
-            var result = repository.findNextUnansweredFollowUp(session.getId());
+            var result = repository.findNextUnanswered(sessionA.getId());
 
             // then
             assertThat(result).isPresent();
-            assertThat(result.get().getId()).isEqualTo(followUp2.getId());
-        }
-
-        @Test
-        @DisplayName("Возвращает empty, когда уточняющих вопросов нет")
-        void returnsEmptyWhenNoFollowUpQuestions() {
-            // given
-            var user = em.persistAndFlush(aUser("next-followup-empty@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            em.persistAndFlush(aMainQuestion(session, 1));
-
-            // when / then
-            assertThat(repository.findNextUnansweredFollowUp(session.getId())).isEmpty();
+            assertThat(result.get().getId()).isEqualTo(questionA.getId());
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("FindLastAnsweredUnchecked")
-    class FindLastAnsweredUnchecked {
+    @DisplayName("CountBySessionIds")
+    class CountBySessionIds {
 
         @Test
-        @DisplayName("Возвращает последний отвеченный непроверенный вопрос по answered_at DESC")
-        void returnsMostRecentlyAnsweredUnchecked() {
+        @DisplayName("Считает total и answered раздельно по каждой сессии, не путая значения между ними")
+        void countsTotalAndAnsweredPerSessionSeparately() {
             // given
-            var user = em.persistAndFlush(aUser("last-unchecked@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var now = Instant.now();
-            em.persistAndFlush(answered(aMainQuestion(session, 1), now.minusSeconds(60)));
-            var newer = em.persistAndFlush(answered(aMainQuestion(session, 2), now));
+            var user = em.persistAndFlush(aUser("counts-multi@example.com"));
+            var sessionA = em.persistAndFlush(aSession(user.getId()));
+            var sessionB = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(answered(aQuestion(sessionA, 1), Instant.now()));
+            em.persistAndFlush(aQuestion(sessionA, 2));
+            em.persistAndFlush(aQuestion(sessionA, 3));
+            em.persistAndFlush(answered(aQuestion(sessionB, 1), Instant.now()));
+            em.persistAndFlush(answered(aQuestion(sessionB, 2), Instant.now()));
 
             // when
-            var result = repository.findLastAnsweredWithoutFollowUpCheck(session.getId());
+            var result = repository.countBySessionIds(List.of(sessionA.getId(), sessionB.getId()));
 
             // then
-            assertThat(result).isPresent();
-            assertThat(result.get().getId()).isEqualTo(newer.getId());
+            assertThat(result).hasSize(2);
+            var countsA = result.stream()
+                    .filter(c -> c.getSessionId().equals(sessionA.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            var countsB = result.stream()
+                    .filter(c -> c.getSessionId().equals(sessionB.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(countsA.getTotal()).isEqualTo(3);
+            assertThat(countsA.getAnswered()).isEqualTo(1);
+            assertThat(countsB.getTotal()).isEqualTo(2);
+            assertThat(countsB.getAnswered()).isEqualTo(2);
         }
 
         @Test
-        @DisplayName("Игнорирует вопросы с follow_up_checked=true")
-        void ignoresCheckedQuestions() {
+        @DisplayName("Сессия, где отвечены все вопросы — answered равен total")
+        void allAnsweredSessionHasAnsweredEqualToTotal() {
             // given
-            var user = em.persistAndFlush(aUser("last-unchecked-ignores-checked@example.com"));
+            var user = em.persistAndFlush(aUser("counts-all-answered@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            var now = Instant.now();
-            var checked = answered(aMainQuestion(session, 1), now);
-            checked.setFollowUpChecked(true);
-            em.persistAndFlush(checked);
-            var unchecked = em.persistAndFlush(answered(aMainQuestion(session, 2), now.minusSeconds(60)));
+            em.persistAndFlush(answered(aQuestion(session, 1), Instant.now()));
+            em.persistAndFlush(answered(aQuestion(session, 2), Instant.now()));
 
             // when
-            var result = repository.findLastAnsweredWithoutFollowUpCheck(session.getId());
+            var result = repository.countBySessionIds(List.of(session.getId()));
 
             // then
-            assertThat(result).isPresent();
-            assertThat(result.get().getId()).isEqualTo(unchecked.getId());
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getTotal()).isEqualTo(2);
+            assertThat(result.get(0).getAnswered()).isEqualTo(2);
         }
 
         @Test
-        @DisplayName("Возвращает empty, когда нет отвеченных непроверенных вопросов")
-        void returnsEmptyWhenNoAnsweredUncheckedQuestions() {
+        @DisplayName("Сессия без единого отвеченного вопроса — answered равен 0, не null")
+        void noneAnsweredSessionHasAnsweredZero() {
             // given
-            var user = em.persistAndFlush(aUser("last-unchecked-empty@example.com"));
+            var user = em.persistAndFlush(aUser("counts-none-answered@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            em.persistAndFlush(aMainQuestion(session, 1));
-
-            // when / then
-            assertThat(repository.findLastAnsweredWithoutFollowUpCheck(session.getId())).isEmpty();
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("FindAllByParentQuestionIdOrderByOrderIndex")
-    class FindAllByParentQuestionIdOrderByOrderIndex {
-
-        @Test
-        @DisplayName("Возвращает уточнения родителя, отсортированные по order_index")
-        void returnsFollowUpsOrderedByOrderIndex() {
-            // given
-            var user = em.persistAndFlush(aUser("followups-by-parent@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
-            var followUp2 = em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 2));
-            var followUp1 = em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 1));
+            em.persistAndFlush(aQuestion(session, 1));
+            em.persistAndFlush(aQuestion(session, 2));
 
             // when
-            var result = repository.findAllByParentQuestionIdOrderByOrderIndex(parent.getId());
+            var result = repository.countBySessionIds(List.of(session.getId()));
 
             // then
-            assertThat(result).extracting(TrainingQuestion::getId)
-                    .containsExactly(followUp1.getId(), followUp2.getId());
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getTotal()).isEqualTo(2);
+            assertThat(result.get(0).getAnswered()).isEqualTo(0);
         }
 
         @Test
-        @DisplayName("Возвращает пустой список, когда у родителя нет уточнений")
-        void returnsEmptyListWhenNoFollowUps() {
+        @DisplayName("Сессия без единого вопроса не попадает в результат")
+        void sessionWithoutQuestionsIsAbsentFromResult() {
             // given
-            var user = em.persistAndFlush(aUser("followups-by-parent-empty@example.com"));
+            var user = em.persistAndFlush(aUser("counts-no-questions@example.com"));
             var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
 
-            // when / then
-            assertThat(repository.findAllByParentQuestionIdOrderByOrderIndex(parent.getId())).isEmpty();
-        }
-    }
+            // when
+            var result = repository.countBySessionIds(List.of(session.getId()));
 
-    // =========================================================================
-
-    @Nested
-    @DisplayName("CountByParentQuestionId")
-    class CountByParentQuestionId {
-
-        @Test
-        @DisplayName("Возвращает количество уточнений родителя")
-        void returnsCountOfFollowUps() {
-            // given
-            var user = em.persistAndFlush(aUser("count-followups@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
-            em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 1));
-            em.persistAndFlush(aFollowUpQuestion(session, parent.getId(), 2));
-
-            // when / then
-            assertThat(repository.countByParentQuestionId(parent.getId())).isEqualTo(2);
+            // then
+            assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("Возвращает 0, когда у родителя нет уточнений")
-        void returnsZeroWhenNoFollowUps() {
+        @DisplayName("Id чужой сессии в списке не подмешивает лишних строк")
+        void doesNotMixInRowsForSessionNotRequested() {
             // given
-            var user = em.persistAndFlush(aUser("count-followups-empty@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var parent = em.persistAndFlush(aMainQuestion(session, 1));
+            var user = em.persistAndFlush(aUser("counts-foreign@example.com"));
+            var requestedSession = em.persistAndFlush(aSession(user.getId()));
+            var foreignSession = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(aQuestion(requestedSession, 1));
+            em.persistAndFlush(aQuestion(foreignSession, 1));
+            em.persistAndFlush(aQuestion(foreignSession, 2));
 
-            // when / then
-            assertThat(repository.countByParentQuestionId(parent.getId())).isZero();
+            // when
+            var result = repository.countBySessionIds(List.of(requestedSession.getId()));
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getSessionId()).isEqualTo(requestedSession.getId());
+            assertThat(result.get(0).getTotal()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Пустой список id — фактическое поведение: пустой результат без ошибки")
+        void emptySessionIdsListReturnsEmptyResult() {
+            // given
+            var user = em.persistAndFlush(aUser("counts-empty-list@example.com"));
+            var session = em.persistAndFlush(aSession(user.getId()));
+            em.persistAndFlush(aQuestion(session, 1));
+
+            // when
+            var result = repository.countBySessionIds(List.of());
+
+            // then
+            assertThat(result).isEmpty();
         }
     }
 }

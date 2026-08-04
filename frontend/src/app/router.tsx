@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import App from '@/App'
 import { RootLayout } from '@/components/layout/RootLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
@@ -14,10 +14,6 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ErrorPage } from '@/pages/ErrorPage'
 import { BrandPage } from '@/pages/BrandPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
-import { RegisterPage } from '@/pages/auth/RegisterPage'
-import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
 import { HubPage } from '@/pages/HubPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TrainingListPage } from '@/pages/training/TrainingListPage'
@@ -73,14 +69,9 @@ export const router = createBrowserRouter([
         children: [
           {
             element: <RedirectIfAuthed />,
-            children: [
-              { path: 'login', element: <LoginPage /> },
-              { path: 'register', element: <RegisterPage /> },
-            ],
+            children: [{ path: 'login', element: <LoginPage /> }],
           },
-          { path: 'verify-email', element: <VerifyEmailPage /> },
-          { path: 'forgot-password', element: <ForgotPasswordPage /> },
-          { path: 'reset-password', element: <ResetPasswordPage /> },
+          { path: 'register', element: <Navigate to="/login" replace /> },
         ],
       },
       {

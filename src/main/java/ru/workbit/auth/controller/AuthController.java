@@ -20,6 +20,7 @@ import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.dto.ApiError;
+import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.security.service.RateLimiterService;
 import ru.workbit.util.ClientIp;
@@ -30,67 +31,43 @@ import static ru.workbit.auth.service.AuthCookieService.REFRESH_COOKIE_NAME;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@Tag(name = "Auth", description = "Регистрация, вход, управление паролем и токенами")
+@Tag(name = "Auth", description = "Вход по коду из письма и управление токенами")
 public class AuthController {
     private final AuthService authService;
     private final AuthCookieService cookieService;
     private final RateLimiterService rateLimiter;
+    private final RateLimitProperties rateLimitProperties;
 
-    @PostMapping("/register")
+    @PostMapping("/request-code")
     @Loggable
-    @Operation(summary = "Регистрация", description = "Создаёт пользователя и отправляет письмо для подтверждения email.")
+    @Operation(summary = "Запрос кода входа",
+            description = "Отправляет одноразовый шестизначный код на email. Отдельной регистрации нет: если пользователя с таким email ещё не было, он создаётся при первом запросе кода. Код действует 15 минут.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Пользователь создан, письмо отправлено"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Email уже используется", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> register(@RequestBody @Valid RegistrationRequest request,
-                                                  HttpServletRequest httpRequest) {
-        rateLimiter.check("register:" + ClientIp.from(httpRequest));
-        authService.register(request);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/verify-email")
-    @Loggable
-    @Operation(summary = "Подтверждение email", description = "Подтверждает email по токену из письма и сразу выдаёт токены в HttpOnly-cookie access_token и refresh_token.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Email подтверждён, токены выданы в cookie access_token и refresh_token"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Токен недействителен, истёк или уже использован", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> verifyEmail(@RequestBody @Valid VerifyEmailRequest request) {
-        var tokens = authService.verifyEmail(request.token());
-        return withAuthCookies(ResponseEntity.ok(), tokens).build();
-    }
-
-    @PostMapping("/resend-verification")
-    @Loggable
-    @Operation(summary = "Повторная отправка письма подтверждения",
-            description = "Если активный пользователь с неподтверждённым email существует, отправляет письмо повторно. Ответ всегда 200.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Запрос принят"),
+            @ApiResponse(responseCode = "200", description = "Код отправлен на email"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> resendVerification(@RequestBody @Valid ResendVerificationRequest request,
-                                                            HttpServletRequest httpRequest) {
-        rateLimiter.check("resend-verification:" + ClientIp.from(httpRequest));
-        authService.resendVerification(request);
+    public ResponseEntity<@NotNull Void> requestCode(@RequestBody @Valid RequestCodeRequest request,
+                                                     HttpServletRequest httpRequest) {
+        rateLimiter.check("request-code:" + ClientIp.from(httpRequest));
+        authService.requestCode(request);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/login")
+    @PostMapping("/verify-code")
     @Loggable
-    @Operation(summary = "Вход по email и паролю", description = "Выдаёт пару access/refresh токенов в HttpOnly-cookie access_token и refresh_token.")
+    @Operation(summary = "Вход по коду",
+            description = "Проверяет код из письма и выдаёт токены в HttpOnly-cookie access_token и refresh_token. Успешный ввод кода подтверждает email.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Токены выданы в cookie access_token и refresh_token"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Неверные учётные данные, email не подтверждён или пользователь деактивирован", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(responseCode = "401", description = "Код неверен, истёк или исчерпаны попытки", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> login(@RequestBody @Valid LoginRequest request) {
-        var tokens = authService.login(request);
+    public ResponseEntity<@NotNull Void> verifyCode(@RequestBody @Valid VerifyCodeRequest request,
+                                                    HttpServletRequest httpRequest) {
+        rateLimiter.check("verify-code:" + ClientIp.from(httpRequest), rateLimitProperties.verifyCode());
+        var tokens = authService.verifyCode(request);
         return withAuthCookies(ResponseEntity.ok(), tokens).build();
     }
 
@@ -125,52 +102,6 @@ public class AuthController {
         }
 
         return withClearCookies(ResponseEntity.noContent()).build();
-    }
-
-    @PatchMapping("/change-password")
-    @Loggable
-    @Operation(summary = "Смена пароля", description = "Меняет пароль текущего пользователя. Штатно аутентификация идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger UI.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Пароль изменён"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Старый пароль неверен или нет токена", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> changePassword(@RequestBody @Valid ChangePasswordRequest request,
-                                                        @Parameter(hidden = true)
-                                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
-
-        authService.changePassword(request, userDetails.getId());
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/forgot-password")
-    @Loggable
-    @Operation(summary = "Запрос сброса пароля",
-            description = "Если активный пользователь с таким email существует, отправляет письмо со ссылкой сброса. Ответ всегда 200 (не раскрывает наличие email).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Запрос принят"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request,
-                                                        HttpServletRequest httpRequest) {
-        rateLimiter.check("forgot-password:" + ClientIp.from(httpRequest));
-        authService.remindPassword(request);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/reset-password")
-    @Loggable
-    @Operation(summary = "Сброс пароля", description = "Устанавливает новый пароль по токену из письма и отзывает все refresh-токены пользователя.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Пароль сброшен"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Токен недействителен, истёк или уже использован", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
-        authService.resetPassword(request.token(), request.newPassword());
-        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/delete")

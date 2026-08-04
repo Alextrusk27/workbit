@@ -10,20 +10,23 @@ public record TrainingSessionResponse(
         @Schema(description = "Идентификатор сессии")
         UUID id,
 
-        @Schema(description = "Профессия, по которой проводится собеседование", example = "Java-разработчик")
+        @Schema(description = "Навык, который тренируется", example = "Spring Boot")
+        String skill,
+
+        @Schema(description = "Профессия, в контексте которой тренируется навык", example = "Java-разработчик")
         String profession,
 
-        @Schema(description = "Тема тренировки, null если не задана", example = "Spring Boot")
-        String topic,
-
-        @Schema(description = "Целевой уровень кандидата", example = "Middle")
+        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
         TrainingSession.Level level,
 
         @Schema(description = "Статус сессии")
         TrainingSession.Status status,
 
-        @Schema(description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)", example = "3")
+        @Schema(description = "Количество вопросов, на которые уже дан ответ", example = "3")
         int answeredCount,
+
+        @Schema(description = "Всего вопросов в сессии", example = "10")
+        int totalQuestions,
 
         @Schema(description = "Момент создания сессии")
         Instant created,

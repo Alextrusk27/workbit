@@ -67,7 +67,7 @@ export function HomePage() {
   usePageTitle()
   const { isAuthenticated } = useAuth()
   const [tab, setTab] = useState(0)
-  const startTo = isAuthenticated ? '/app' : '/register'
+  const startTo = isAuthenticated ? '/app' : '/login'
 
   const onTabKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowRight') setTab((t) => (t + 1) % tabs.length)

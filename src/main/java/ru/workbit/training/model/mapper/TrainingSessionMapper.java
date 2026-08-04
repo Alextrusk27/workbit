@@ -19,5 +19,6 @@ public interface TrainingSessionMapper {
     TrainingSession toEntity(CreateSessionRequest request);
 
     @Mapping(target = "answeredCount", source = "answeredCount")
-    TrainingSessionResponse toResponse(TrainingSession session, int answeredCount);
+    @Mapping(target = "totalQuestions", source = "totalQuestions")
+    TrainingSessionResponse toResponse(TrainingSession session, int answeredCount, int totalQuestions);
 }

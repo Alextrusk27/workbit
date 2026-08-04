@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { StatusTag } from '@/components/app/StatusTag'
 import { Alert } from '@/components/ui/Alert'
@@ -18,6 +18,7 @@ import {
 import {
   useDeleteSession,
   useReport,
+  useRestartSession,
   useSessions,
 } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
@@ -134,7 +135,7 @@ function EmptyState() {
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
       <h2 className="text-ink text-xl font-bold">Пока нет тренировок</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Запустите первую тренировку — рецензент подберёт вопросы под профессию и
+        Запустите первую тренировку — рецензент подберёт вопросы под навык и
         уровень, а в конце разберёт ваши ответы.
       </p>
       <Link
@@ -162,16 +163,27 @@ function CardScore({ sessionId }: { sessionId: string }) {
 }
 
 function SessionCard({ session }: { session: TrainingSession }) {
+  const navigate = useNavigate()
   const del = useDeleteSession()
-  const [confirming, setConfirming] = useState(false)
+  const restart = useRestartSession()
+  const [confirming, setConfirming] = useState<'delete' | 'restart' | null>(
+    null,
+  )
   const completed = session.status === 'COMPLETED'
   const openHref = completed
     ? `/app/training/${session.id}/report`
     : `/app/training/${session.id}`
 
   const onDelete = () => {
-    setConfirming(false)
+    setConfirming(null)
     del.mutate(session.id)
+  }
+
+  const onRestart = () => {
+    setConfirming(null)
+    restart.mutate(session.id, {
+      onSuccess: () => navigate(`/app/training/${session.id}`),
+    })
   }
 
   return (
@@ -211,22 +223,46 @@ function SessionCard({ session }: { session: TrainingSession }) {
         >
           {completed ? 'Разбор' : 'Продолжить'}
         </Link>
+        {completed && (
+          <button
+            type="button"
+            onClick={() => setConfirming('restart')}
+            disabled={restart.isPending}
+            className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
+          >
+            {restart.isPending ? 'Готовим…' : 'Пройти заново'}
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => setConfirming(true)}
+          onClick={() => setConfirming('delete')}
           disabled={del.isPending}
           className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
         >
           Удалить
         </button>
+        {restart.isError && (
+          <p className="text-danger text-[12.5px]">
+            {getErrorMessage(restart.error)}
+          </p>
+        )}
       </div>
 
       <ConfirmDialog
-        open={confirming}
+        open={confirming === 'delete'}
         title="Удалить тренировку?"
         text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором. Действие необратимо.`}
         onConfirm={onDelete}
-        onClose={() => setConfirming(false)}
+        onClose={() => setConfirming(null)}
+      />
+
+      <ConfirmDialog
+        open={confirming === 'restart'}
+        title="Пройти заново?"
+        text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты. Действие необратимо.`}
+        confirmLabel="Пройти заново"
+        onConfirm={onRestart}
+        onClose={() => setConfirming(null)}
       />
     </li>
   )

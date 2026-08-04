@@ -29,9 +29,9 @@ import static org.mockito.Mockito.*;
 class EmailServiceTest {
 
     private static final String TO = "user@workbit.ru";
-    private static final String TOKEN = "abc123token";
-    private static final String BASE_URL = "https://workbit.ru";
+    private static final String CODE = "123456";
     private static final String FROM_MAIL = "noreply@workbit.ru";
+    private static final String BASE_URL = "https://workbit.ru";
 
     @Mock
     private JavaMailSender mailSender;
@@ -53,54 +53,50 @@ class EmailServiceTest {
     }
 
     @Nested
-    @DisplayName("SendVerificationMail")
-    class SendVerificationMail {
+    @DisplayName("SendLoginCodeMail")
+    class SendLoginCodeMail {
 
         @Test
         @DisplayName("Вызывает правильный шаблон и send при успешной отправке")
         void callsCorrectTemplateAndSend() {
             // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/verification"), any(Context.class)))
-                    .thenReturn("<html>verify</html>");
+            when(templateEngine.process(eq("email/login-code"), any(Context.class)))
+                    .thenReturn("<html>code</html>");
 
             // when
-            service.sendVerificationMail(TO, TOKEN);
+            service.sendLoginCodeMail(TO, CODE);
 
             // then
-            verify(templateEngine).process(eq("email/verification"), any(Context.class));
+            verify(templateEngine).process(eq("email/login-code"), any(Context.class));
             verify(mailSender).send(any(MimeMessage.class));
         }
 
         @Test
-        @DisplayName("Передаёт корректный verificationUrl в контекст шаблона")
-        void setsCorrectVerificationUrl() {
+        @DisplayName("Передаёт код в контекст шаблона")
+        void setsCodeInTemplateContext() {
             // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/verification"), contextCaptor.capture()))
-                    .thenReturn("<html>verify</html>");
+            when(templateEngine.process(eq("email/login-code"), contextCaptor.capture()))
+                    .thenReturn("<html>code</html>");
 
             // when
-            service.sendVerificationMail(TO, TOKEN);
+            service.sendLoginCodeMail(TO, CODE);
 
             // then
             var capturedContext = contextCaptor.getValue();
-            var expectedUrl = BASE_URL + "/verify-email?token=" + TOKEN;
-            assertThat(capturedContext.getVariable("verificationUrl")).isEqualTo(expectedUrl);
+            assertThat(capturedContext.getVariable("code")).isEqualTo(CODE);
         }
 
         @Test
         @DisplayName("Бросает EmailSendException, когда MimeMessage#setSubject кидает MessagingException")
         void throwsEmailSendExceptionOnMessagingException() {
             // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
-            when(templateEngine.process(eq("email/verification"), any(Context.class)))
-                    .thenReturn("<html>verify</html>");
+            when(templateEngine.process(eq("email/login-code"), any(Context.class)))
+                    .thenReturn("<html>code</html>");
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
@@ -112,15 +108,15 @@ class EmailServiceTest {
             }
 
             // when / then
-            assertThatThrownBy(() -> service.sendVerificationMail(TO, TOKEN))
+            assertThatThrownBy(() -> service.sendLoginCodeMail(TO, CODE))
                     .isInstanceOf(EmailSendException.class)
-                    .hasMessage("Failed to send verification email");
+                    .hasMessage("Failed to send login code email");
         }
     }
 
     @Nested
-    @DisplayName("SendResetPasswordMail")
-    class SendResetPasswordMail {
+    @DisplayName("SendAccountDeletionWarningMail")
+    class SendAccountDeletionWarningMail {
 
         @Test
         @DisplayName("Вызывает правильный шаблон и send при успешной отправке")
@@ -129,34 +125,15 @@ class EmailServiceTest {
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/reset-password"), any(Context.class)))
-                    .thenReturn("<html>reset</html>");
+            when(templateEngine.process(eq("email/account-deletion-warning"), any(Context.class)))
+                    .thenReturn("<html>warning</html>");
 
             // when
-            service.sendResetPasswordMail(TO, TOKEN);
+            service.sendAccountDeletionWarningMail(TO);
 
             // then
-            verify(templateEngine).process(eq("email/reset-password"), any(Context.class));
+            verify(templateEngine).process(eq("email/account-deletion-warning"), any(Context.class));
             verify(mailSender).send(any(MimeMessage.class));
-        }
-
-        @Test
-        @DisplayName("Передаёт корректный resetUrl в контекст шаблона")
-        void setsCorrectResetUrl() {
-            // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
-            when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
-            when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/reset-password"), contextCaptor.capture()))
-                    .thenReturn("<html>reset</html>");
-
-            // when
-            service.sendResetPasswordMail(TO, TOKEN);
-
-            // then
-            var capturedContext = contextCaptor.getValue();
-            var expectedUrl = BASE_URL + "/reset-password?token=" + TOKEN;
-            assertThat(capturedContext.getVariable("resetUrl")).isEqualTo(expectedUrl);
         }
 
         @Test
@@ -165,8 +142,8 @@ class EmailServiceTest {
             // given
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
-            when(templateEngine.process(eq("email/reset-password"), any(Context.class)))
-                    .thenReturn("<html>reset</html>");
+            when(templateEngine.process(eq("email/account-deletion-warning"), any(Context.class)))
+                    .thenReturn("<html>warning</html>");
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
@@ -177,30 +154,29 @@ class EmailServiceTest {
             }
 
             // when / then
-            assertThatThrownBy(() -> service.sendResetPasswordMail(TO, TOKEN))
+            assertThatThrownBy(() -> service.sendAccountDeletionWarningMail(TO))
                     .isInstanceOf(EmailSendException.class)
-                    .hasMessage("Failed to send reset password email");
+                    .hasMessage("Failed to send account deletion warning email");
         }
     }
 
     @Nested
-    @DisplayName("OnVerificationEmailRequested")
-    class OnVerificationEmailRequested {
+    @DisplayName("OnLoginCodeEmailRequested")
+    class OnLoginCodeEmailRequested {
 
         @Test
-        @DisplayName("Вызывает sendVerificationMail с данными из события")
-        void delegatesToSendVerificationMail() {
+        @DisplayName("Вызывает sendLoginCodeMail с данными из события")
+        void delegatesToSendLoginCodeMail() {
             // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/verification"), any(Context.class)))
-                    .thenReturn("<html>verify</html>");
+            when(templateEngine.process(eq("email/login-code"), any(Context.class)))
+                    .thenReturn("<html>code</html>");
 
-            var event = new VerificationEmailEvent(TO, TOKEN);
+            var event = new LoginCodeEmailEvent(TO, CODE);
 
             // when
-            service.onVerificationEmailRequested(event);
+            service.onLoginCodeEmailRequested(event);
 
             // then
             verify(mailSender).send(any(MimeMessage.class));
@@ -210,10 +186,9 @@ class EmailServiceTest {
         @DisplayName("Проглатывает EmailSendException и не пробрасывает её")
         void swallowsEmailSendException() {
             // given
-            when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
-            when(templateEngine.process(eq("email/verification"), any(Context.class)))
-                    .thenReturn("<html>verify</html>");
+            when(templateEngine.process(eq("email/login-code"), any(Context.class)))
+                    .thenReturn("<html>code</html>");
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
@@ -223,32 +198,32 @@ class EmailServiceTest {
             } catch (MessagingException ignored) {
             }
 
-            var event = new VerificationEmailEvent(TO, TOKEN);
+            var event = new LoginCodeEmailEvent(TO, CODE);
 
             // when / then
-            assertThatCode(() -> service.onVerificationEmailRequested(event))
+            assertThatCode(() -> service.onLoginCodeEmailRequested(event))
                     .doesNotThrowAnyException();
         }
     }
 
     @Nested
-    @DisplayName("OnResetPasswordEmailRequested")
-    class OnResetPasswordEmailRequested {
+    @DisplayName("OnAccountDeletionWarningRequested")
+    class OnAccountDeletionWarningRequested {
 
         @Test
-        @DisplayName("Вызывает sendResetPasswordMail с данными из события")
-        void delegatesToSendResetPasswordMail() {
+        @DisplayName("Вызывает sendAccountDeletionWarningMail с данными из события")
+        void delegatesToSendAccountDeletionWarningMail() {
             // given
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(mailSender.createMimeMessage()).thenReturn(realMimeMessage());
-            when(templateEngine.process(eq("email/reset-password"), any(Context.class)))
-                    .thenReturn("<html>reset</html>");
+            when(templateEngine.process(eq("email/account-deletion-warning"), any(Context.class)))
+                    .thenReturn("<html>warning</html>");
 
-            var event = new ResetPasswordEmailEvent(TO, TOKEN);
+            var event = new AccountDeletionWarningEmailEvent(TO);
 
             // when
-            service.onResetPasswordEmailRequested(event);
+            service.onAccountDeletionWarningRequested(event);
 
             // then
             verify(mailSender).send(any(MimeMessage.class));
@@ -260,8 +235,8 @@ class EmailServiceTest {
             // given
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
-            when(templateEngine.process(eq("email/reset-password"), any(Context.class)))
-                    .thenReturn("<html>reset</html>");
+            when(templateEngine.process(eq("email/account-deletion-warning"), any(Context.class)))
+                    .thenReturn("<html>warning</html>");
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
@@ -271,10 +246,10 @@ class EmailServiceTest {
             } catch (MessagingException ignored) {
             }
 
-            var event = new ResetPasswordEmailEvent(TO, TOKEN);
+            var event = new AccountDeletionWarningEmailEvent(TO);
 
             // when / then
-            assertThatCode(() -> service.onResetPasswordEmailRequested(event))
+            assertThatCode(() -> service.onAccountDeletionWarningRequested(event))
                     .doesNotThrowAnyException();
         }
     }

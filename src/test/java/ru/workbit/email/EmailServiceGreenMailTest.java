@@ -23,14 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EmailServiceGreenMailTest {
 
     private static final String TO = "user@workbit.ru";
-    private static final String TOKEN = "abc123token";
+    private static final String CODE = "123456";
     private static final String BASE_URL = "https://workbit.ru";
     private static final String FROM_MAIL = "noreply@workbit.ru";
     private static final String FROM_NAME = "Workbit";
-    private static final int RESET_TTL_MINUTES = 15;
 
     @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(ServerSetupTest.SMTP);
+    GreenMailExtension greenMail = new GreenMailExtension(ServerSetupTest.SMTP);
 
     private EmailService service;
 
@@ -40,7 +39,7 @@ class EmailServiceGreenMailTest {
         mailSender.setHost("127.0.0.1");
         mailSender.setPort(greenMail.getSmtp().getPort());
 
-        var mailProperties = new MailProperties(FROM_NAME, FROM_MAIL, BASE_URL, RESET_TTL_MINUTES);
+        var mailProperties = new MailProperties(FROM_NAME, FROM_MAIL, BASE_URL);
 
         service = new EmailService(mailSender, mailProperties, templateEngine());
     }
@@ -84,17 +83,16 @@ class EmailServiceGreenMailTest {
     }
 
     @Nested
-    @DisplayName("SendVerificationMail")
-    class SendVerificationMail {
+    @DisplayName("SendLoginCodeMail")
+    class SendLoginCodeMail {
 
-        private static final String SUBJECT = "Подтверждение электронной почты";
-        private static final String EXPECTED_URL = BASE_URL + "/verify-email?token=" + TOKEN;
+        private static final String SUBJECT = "Код для входа в Workbit";
 
         @Test
         @DisplayName("Доставляет письмо с корректными заголовками на SMTP-сервер")
         void deliversMailWithCorrectHeaders() throws Exception {
             // when
-            service.sendVerificationMail(TO, TOKEN);
+            service.sendLoginCodeMail(TO, CODE);
 
             // then
             var message = singleReceivedMessage();
@@ -104,46 +102,14 @@ class EmailServiceGreenMailTest {
         }
 
         @Test
-        @DisplayName("Подставляет verificationUrl в HTML-тело письма")
-        void rendersVerificationUrlInBody() throws Exception {
+        @DisplayName("Подставляет код в HTML-тело письма")
+        void rendersCodeInBody() throws Exception {
             // when
-            service.sendVerificationMail(TO, TOKEN);
+            service.sendLoginCodeMail(TO, CODE);
 
             // then
             var body = htmlBody(singleReceivedMessage());
-            assertThat(body).contains(EXPECTED_URL);
-        }
-    }
-
-    @Nested
-    @DisplayName("SendResetPasswordMail")
-    class SendResetPasswordMail {
-
-        private static final String SUBJECT = "Изменение пароля для аккаунта";
-        private static final String EXPECTED_URL = BASE_URL + "/reset-password?token=" + TOKEN;
-
-        @Test
-        @DisplayName("Доставляет письмо с корректными заголовками на SMTP-сервер")
-        void deliversMailWithCorrectHeaders() throws Exception {
-            // when
-            service.sendResetPasswordMail(TO, TOKEN);
-
-            // then
-            var message = singleReceivedMessage();
-            assertThat(message.getSubject()).isEqualTo(SUBJECT);
-            assertThat(message.getFrom()[0].toString()).isEqualTo(FROM_MAIL);
-            assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
-        }
-
-        @Test
-        @DisplayName("Подставляет resetUrl в HTML-тело письма")
-        void rendersResetUrlInBody() throws Exception {
-            // when
-            service.sendResetPasswordMail(TO, TOKEN);
-
-            // then
-            var body = htmlBody(singleReceivedMessage());
-            assertThat(body).contains(EXPECTED_URL);
+            assertThat(body).contains(CODE);
         }
     }
 
@@ -181,36 +147,20 @@ class EmailServiceGreenMailTest {
     }
 
     @Nested
-    @DisplayName("OnVerificationEmailRequested")
-    class OnVerificationEmailRequested {
+    @DisplayName("OnLoginCodeEmailRequested")
+    class OnLoginCodeEmailRequested {
 
         @Test
         @DisplayName("Доставляет письмо по данным из события")
         void deliversMailFromEvent() throws Exception {
             // when
-            service.onVerificationEmailRequested(new VerificationEmailEvent(TO, TOKEN));
+            service.onLoginCodeEmailRequested(new LoginCodeEmailEvent(TO, CODE));
 
             // then
             var message = singleReceivedMessage();
-            assertThat(message.getSubject()).isEqualTo("Подтверждение электронной почты");
+            assertThat(message.getSubject()).isEqualTo("Код для входа в Workbit");
             assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
-        }
-    }
-
-    @Nested
-    @DisplayName("OnResetPasswordEmailRequested")
-    class OnResetPasswordEmailRequested {
-
-        @Test
-        @DisplayName("Доставляет письмо по данным из события")
-        void deliversMailFromEvent() throws Exception {
-            // when
-            service.onResetPasswordEmailRequested(new ResetPasswordEmailEvent(TO, TOKEN));
-
-            // then
-            var message = singleReceivedMessage();
-            assertThat(message.getSubject()).isEqualTo("Изменение пароля для аккаунта");
-            assertThat(message.getAllRecipients()[0].toString()).isEqualTo(TO);
+            assertThat(htmlBody(message)).contains(CODE);
         }
     }
 

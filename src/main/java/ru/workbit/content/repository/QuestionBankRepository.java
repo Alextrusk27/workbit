@@ -13,7 +13,7 @@ public interface QuestionBankRepository extends JpaRepository<@NotNull BankQuest
     @Query(value = """
             SELECT qb.* FROM content.question_bank qb
             WHERE qb.profession_id = :professionId
-              AND qb.topic_id IS NOT DISTINCT FROM CAST(:topicId AS uuid)
+              AND qb.skill_id = :skillId
               AND :level = ANY(qb.levels)
               AND NOT EXISTS (
                   SELECT 1
@@ -24,5 +24,5 @@ public interface QuestionBankRepository extends JpaRepository<@NotNull BankQuest
             ORDER BY random()
             LIMIT :limit
             """, nativeQuery = true)
-    List<BankQuestion> sampleUnseen(UUID professionId, UUID topicId, String level, UUID userId, int limit);
+    List<BankQuestion> sampleUnseen(UUID professionId, UUID skillId, String level, UUID userId, int limit);
 }

@@ -10,9 +10,7 @@ public abstract class AbstractPostgresIT {
     // @Container/@Testcontainers останавливают контейнер после каждого класса,
     // и при нескольких IT-классах Spring переиспользует кэшированный контекст
     // со старым (уже мёртвым) JDBC URL → connection timeout. Ryuk удалит контейнер при завершении JVM.
-    static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer("postgres:16")
-                    .withInitScript("schema.sql");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16");
 
     static {
         POSTGRES.start();

@@ -187,7 +187,7 @@ class SkillDictRepositoryIT extends AbstractPostgresIT {
         @Test
         @DisplayName("Профессия резолвится по ключу от другого написания того же названия")
         void resolvesProfessionByMatchKeyFromDifferentWording() {
-            // given — сид из schema.sql: ('Java-разработчик', 'APPROVED')
+            // given — сид из V1__init.sql: ('Java-разработчик', 'APPROVED')
             var seedProfessionId = (UUID) em.getEntityManager()
                     .createNativeQuery("SELECT id FROM content.profession_dict WHERE match_key = 'java разработчик'")
                     .getSingleResult();

@@ -517,7 +517,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @Test
         @DisplayName("Конфликт с сид-профессией инкрементит usage_count, не трогая status и каноническое имя")
         void conflictsWithSeededProfessionKeepsApprovedStatusAndCanonicalName() {
-            // given — сид из schema.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
+            // given — сид из V1__init.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
             var seedId = (UUID) em.getEntityManager()
                     .createNativeQuery("SELECT id FROM content.profession_dict WHERE match_key = 'java разработчик'")
                     .getSingleResult();
@@ -536,7 +536,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         @Test
         @DisplayName("Конфликт с сид-профессией при другом порядке слов и предлоге тоже находит существующую строку")
         void conflictsWithSeededProfessionDifferentWordOrder() {
-            // given — сид из schema.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
+            // given — сид из V1__init.sql: ('Java-разработчик', 'APPROVED'), usage_count по умолчанию 0
             var seedId = (UUID) em.getEntityManager()
                     .createNativeQuery("SELECT id FROM content.profession_dict WHERE match_key = 'java разработчик'")
                     .getSingleResult();

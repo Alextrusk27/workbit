@@ -1,0 +1,11 @@
+.git/
+.github/
+.idea/
+.claude/
+.agents/
+ai-workspace/
+frontend/
+docs/
+target/
+.env
+*.md

@@ -24,9 +24,14 @@ app:
     from-mail: noreply@workbit.ru
     base-url: https://workbit.ru
 
+server:
+  shutdown: graceful
+
 spring:
   application:
     name: ${app.name}
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   http:
     client:
       connect-timeout: 5s
@@ -49,6 +54,9 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.ssl.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 jwt:
   secret: ${JWT_SECRET}

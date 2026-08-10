@@ -144,7 +144,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true));
 
             // then
             verify(userRepository, never()).save(any());
@@ -165,7 +165,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(savedUser)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true));
 
             // then
             var userCaptor = ArgumentCaptor.forClass(User.class);
@@ -176,6 +176,54 @@ class AuthServiceTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().email()).isEqualTo(EMAIL);
             assertThat(eventCaptor.getValue().code()).isEqualTo(RAW_CODE);
+        }
+
+        @Test
+        @DisplayName("Проставляет дату согласия новому пользователю")
+        void setsPersonalDataConsentAtForNewUser() {
+            // given
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+            var savedUser = unverifiedUser();
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            when(loginCodeService.issue(savedUser)).thenReturn(RAW_CODE);
+
+            // when
+            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+
+            // then
+            assertThat(savedUser.getPersonalDataConsentAt()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
+        }
+
+        @Test
+        @DisplayName("Проставляет дату согласия существующему пользователю без согласия")
+        void setsPersonalDataConsentAtForExistingUserWithoutConsent() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
+
+            // when
+            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+
+            // then
+            assertThat(user.getPersonalDataConsentAt()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
+        }
+
+        @Test
+        @DisplayName("Не перезаписывает дату согласия, если она уже проставлена")
+        void doesNotOverwriteExistingPersonalDataConsentAt() {
+            // given
+            var user = verifiedUser();
+            var consentAt = Instant.now().minus(Duration.ofDays(30));
+            user.setPersonalDataConsentAt(consentAt);
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
+
+            // when
+            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+
+            // then
+            assertThat(user.getPersonalDataConsentAt()).isEqualTo(consentAt);
         }
     }
 

@@ -37,7 +37,8 @@ export function useAuth() {
 
 export function useRequestCode() {
   return useMutation({
-    mutationFn: (email: string) => authApi.requestCode(email),
+    mutationFn: (vars: { email: string; personalDataConsent: boolean }) =>
+      authApi.requestCode(vars.email, vars.personalDataConsent),
   })
 }
 

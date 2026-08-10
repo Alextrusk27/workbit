@@ -40,4 +40,7 @@ public class User {
 
     @Column(name = "deletion_warned_at")
     private Instant deletionWarnedAt;
+
+    @Column(name = "personal_data_consent_at")
+    private Instant personalDataConsentAt;
 }

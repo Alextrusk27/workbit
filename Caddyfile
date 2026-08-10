@@ -14,5 +14,7 @@ workbit.ru {
 }
 
 www.workbit.ru {
+	tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/workbit.key
+
 	redir https://workbit.ru{uri} permanent
 }

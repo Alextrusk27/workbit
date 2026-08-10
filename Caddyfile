@@ -1,0 +1,18 @@
+workbit.ru {
+	tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/workbit.key
+
+	handle /api/v1/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		root * /srv
+		encode gzip
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+www.workbit.ru {
+	redir https://workbit.ru{uri} permanent
+}

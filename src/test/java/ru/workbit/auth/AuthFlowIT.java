@@ -131,7 +131,7 @@ class AuthFlowIT extends AbstractPostgresIT {
     private String requestCode(String email) {
         var response = rest.postForEntity(
                 BASE + "/request-code",
-                new RequestCodeRequest(email),
+                new RequestCodeRequest(email, true),
                 Void.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return email;
@@ -213,7 +213,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // when
             var response = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
 
             // then
@@ -241,7 +241,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // when
             var response = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
 
             // then
@@ -260,7 +260,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // when
             var response = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
 
             // then
@@ -584,7 +584,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // and — email освободился, запрос кода снова заводит пользователя и присылает код
             var requestCodeResponse = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
             assertThat(requestCodeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(codeCaptor.getCode(email)).isNotNull();
@@ -712,7 +712,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // request code (заводит пользователя, так как email ещё не встречался)
             var requestCodeResponse = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
             assertThat(requestCodeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -740,7 +740,7 @@ class AuthFlowIT extends AbstractPostgresIT {
             // request a new login code (repeated login)
             var secondRequestCodeResponse = rest.postForEntity(
                     BASE + "/request-code",
-                    new RequestCodeRequest(email),
+                    new RequestCodeRequest(email, true),
                     Void.class);
             assertThat(secondRequestCodeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
             var newCode = codeFor(email);

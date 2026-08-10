@@ -40,13 +40,16 @@ export function CodeForm({
   }
 
   const onResend = () => {
-    resend.mutate(email, {
-      onSuccess: () => {
-        setCooldown(COOLDOWN_SECONDS)
-        setCode('')
+    resend.mutate(
+      { email, personalDataConsent: true },
+      {
+        onSuccess: () => {
+          setCooldown(COOLDOWN_SECONDS)
+          setCode('')
+        },
+        onError: () => setCooldown(COOLDOWN_SECONDS),
       },
-      onError: () => setCooldown(COOLDOWN_SECONDS),
-    })
+    )
   }
 
   const resendLabel = resend.isPending

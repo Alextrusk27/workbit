@@ -42,6 +42,9 @@ public class AuthService {
     public void requestCode(RequestCodeRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseGet(() -> createUser(request.email()));
+        if (user.getPersonalDataConsentAt() == null) {
+            user.setPersonalDataConsentAt(Instant.now());
+        }
 
         issueCode(user);
         log.info("Login code requested uid={}", user.getId());

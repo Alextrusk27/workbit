@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS auth.users (
     email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
     created             TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deletion_warned_at  TIMESTAMPTZ
+    deletion_warned_at  TIMESTAMPTZ,
+    personal_data_consent_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS auth.refresh_token (

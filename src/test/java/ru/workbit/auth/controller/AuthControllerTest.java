@@ -93,7 +93,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 200 при успешном запросе кода")
         void returnsOkOnSuccess() throws Exception {
             // given
-            var request = new RequestCodeRequest(EMAIL);
+            var request = new RequestCodeRequest(EMAIL, true);
             doNothing().when(authService).requestCode(any());
 
             // when / then
@@ -109,7 +109,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 400, когда email невалиден")
         void returns400WhenEmailInvalid() throws Exception {
             // given
-            var request = new RequestCodeRequest("not-an-email");
+            var request = new RequestCodeRequest("not-an-email", true);
 
             // when / then
             mvc.perform(post(BASE + "/request-code")
@@ -124,7 +124,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 429, когда превышен лимит запросов")
         void returns429WhenRateLimitExceeded() throws Exception {
             // given
-            var request = new RequestCodeRequest(EMAIL);
+            var request = new RequestCodeRequest(EMAIL, true);
             doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
 
             // when / then
@@ -135,6 +135,36 @@ class AuthControllerTest {
                     .andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"))
                     .andExpect(jsonPath("$.message").value("Too many requests."))
                     .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда согласие на обработку персональных данных не дано")
+        void returns400WhenPersonalDataConsentFalse() throws Exception {
+            // given
+            var request = new RequestCodeRequest(EMAIL, false);
+
+            // when / then
+            mvc.perform(post(BASE + "/request-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда поле personalDataConsent отсутствует в теле запроса")
+        void returns400WhenPersonalDataConsentMissing() throws Exception {
+            // given — сырой JSON без поля personalDataConsent десериализуется в false
+            var requestJson = "{\"email\": \"" + EMAIL + "\"}";
+
+            // when / then
+            mvc.perform(post(BASE + "/request-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJson))
+                    .andExpect(status().isBadRequest());
 
             verifyNoInteractions(authService);
         }

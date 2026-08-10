@@ -7,8 +7,11 @@ export interface UserResponse {
 }
 
 export const authApi = {
-  requestCode: (email: string) =>
-    apiFetch<void>('/auth/request-code', { method: 'POST', body: { email } }),
+  requestCode: (email: string, personalDataConsent: boolean) =>
+    apiFetch<void>('/auth/request-code', {
+      method: 'POST',
+      body: { email, personalDataConsent },
+    }),
 
   verifyCode: (email: string, code: string) =>
     apiFetch<void>('/auth/verify-code', {

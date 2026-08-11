@@ -2,7 +2,6 @@ package ru.workbit.interview.repository;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.interview.model.InterviewSession;
 
@@ -31,8 +30,4 @@ public interface InterviewSessionRepository extends JpaRepository<@NotNull Inter
             WHERE s.id = :id
             """)
     Optional<InterviewSession> findWithQuestionsById(@NotNull UUID id);
-
-    @Modifying
-    @Query("DELETE FROM InterviewSession s WHERE s.userId = :userId")
-    void deleteAllByUserId(@NotNull UUID userId);
 }

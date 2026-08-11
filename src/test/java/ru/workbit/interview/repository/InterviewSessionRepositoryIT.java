@@ -207,45 +207,4 @@ class InterviewSessionRepositoryIT extends AbstractPostgresIT {
         }
     }
 
-    // =========================================================================
-
-    @Nested
-    @DisplayName("DeleteAllByUserId")
-    class DeleteAllByUserId {
-
-        @Test
-        @DisplayName("Удаляет все сессии пользователя")
-        void deletesAllSessionsForUser() {
-            // given
-            var user = em.persistAndFlush(aUser("delete-all@example.com"));
-            var snapshot = em.persistAndFlush(aVacancySnapshot());
-            em.persistAndFlush(aSession(user.getId(), snapshot.getId()));
-            em.persistAndFlush(aSession(user.getId(), snapshot.getId()));
-
-            // when
-            repository.deleteAllByUserId(user.getId());
-            em.clear();
-
-            // then
-            assertThat(repository.findAllByUserIdOrderByCreatedDesc(user.getId())).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Не трогает сессии другого пользователя")
-        void keepsOtherUsersSessions() {
-            // given
-            var user = em.persistAndFlush(aUser("delete-target@example.com"));
-            var otherUser = em.persistAndFlush(aUser("delete-untouched@example.com"));
-            var snapshot = em.persistAndFlush(aVacancySnapshot());
-            var otherSession = em.persistAndFlush(aSession(otherUser.getId(), snapshot.getId()));
-            em.persistAndFlush(aSession(user.getId(), snapshot.getId()));
-
-            // when
-            repository.deleteAllByUserId(user.getId());
-            em.clear();
-
-            // then
-            assertThat(repository.findById(otherSession.getId())).isPresent();
-        }
-    }
 }

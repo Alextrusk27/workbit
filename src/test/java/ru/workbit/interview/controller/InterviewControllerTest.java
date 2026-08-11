@@ -241,40 +241,6 @@ class InterviewControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // GET /sessions
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("GetAllSessions")
-    class GetAllSessions {
-
-        @Test
-        @DisplayName("Возвращает 200 со списком сессий пользователя")
-        void returns200WithSessions() throws Exception {
-            // given
-            var sessionId = UUID.randomUUID();
-            when(interviewService.getAll(USER_ID)).thenReturn(List.of(sessionResponse(sessionId)));
-
-            // when / then
-            mvc.perform(get(BASE + "/sessions")
-                            .with(user(principal())))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isArray())
-                    .andExpect(jsonPath("$[0].id").value(sessionId.toString()));
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда нет аутентификации")
-        void returns401WithoutAuthentication() throws Exception {
-            // when / then
-            mvc.perform(get(BASE + "/sessions"))
-                    .andExpect(status().isUnauthorized());
-
-            verifyNoInteractions(interviewService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
     // GET /sessions/{sessionId}
     // -------------------------------------------------------------------------
 
@@ -655,56 +621,6 @@ class InterviewControllerTest {
 
             // when / then
             mvc.perform(get(BASE + "/sessions/" + sessionId + "/report"))
-                    .andExpect(status().isUnauthorized());
-
-            verifyNoInteractions(interviewService);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // DELETE /sessions/{sessionId}
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("DeleteSession")
-    class DeleteSession {
-
-        @Test
-        @DisplayName("Возвращает 204 и передаёт в сервис userId и sessionId")
-        void returns204AndDeletesSession() throws Exception {
-            // given
-            var sessionId = UUID.randomUUID();
-
-            // when / then
-            mvc.perform(delete(BASE + "/sessions/" + sessionId)
-                            .with(user(principal())))
-                    .andExpect(status().isNoContent());
-
-            verify(interviewService).delete(sessionId, USER_ID);
-        }
-
-        @Test
-        @DisplayName("Возвращает 404, когда сессия не найдена")
-        void returns404WhenNotFound() throws Exception {
-            // given
-            var sessionId = UUID.randomUUID();
-            doThrow(new NotFoundException("Session not found"))
-                    .when(interviewService).delete(sessionId, USER_ID);
-
-            // when / then
-            mvc.perform(delete(BASE + "/sessions/" + sessionId)
-                            .with(user(principal())))
-                    .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("Возвращает 401, когда нет аутентификации")
-        void returns401WithoutAuthentication() throws Exception {
-            // given
-            var sessionId = UUID.randomUUID();
-
-            // when / then
-            mvc.perform(delete(BASE + "/sessions/" + sessionId))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(interviewService);

@@ -13,8 +13,6 @@ import java.util.UUID;
 
 public interface InterviewSessionRepository extends JpaRepository<@NotNull InterviewSession, @NotNull UUID> {
 
-    boolean existsByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
-
     List<InterviewSession> findAllByUserIdOrderByCreatedDesc(@NotNull UUID userId);
 
     Optional<InterviewSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);

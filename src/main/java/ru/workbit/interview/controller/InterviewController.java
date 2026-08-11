@@ -62,19 +62,6 @@ public class InterviewController {
                 .body(session);
     }
 
-    @GetMapping("/sessions")
-    @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Список сессий интервью пользователя", description = "Возвращает сессии интервью текущего пользователя, новые первыми.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Список сессий")
-    })
-    public ResponseEntity<@NotNull List<InterviewSessionResponse>> getAllSessions(
-            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return ResponseEntity.ok(interviewService.getAll(userDetails.getId()));
-    }
-
     @GetMapping("/sessions/{sessionId}")
     @Loggable(logArgs = true, logResult = true)
     @Operation(summary = "Получить сессию по id", description = "Возвращает сессию интервью текущего пользователя.")
@@ -162,22 +149,6 @@ public class InterviewController {
             @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(interviewService.getReport(sessionId, userDetails.getId()));
-    }
-
-    @DeleteMapping("/sessions/{sessionId}")
-    @Loggable(logArgs = true)
-    @Operation(summary = "Удалить сессию", description = "Удаляет сессию интервью вместе с вопросами, ответами и отчётом.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Сессия удалена"),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
-    public ResponseEntity<@NotNull Void> deleteSession(
-            @PathVariable UUID sessionId,
-            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        interviewService.delete(sessionId, userDetails.getId());
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/vacancies")

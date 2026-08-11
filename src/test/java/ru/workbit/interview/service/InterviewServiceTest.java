@@ -405,49 +405,6 @@ class InterviewServiceTest {
     }
 
     @Nested
-    @DisplayName("GetAll")
-    class GetAll {
-
-        @Test
-        @DisplayName("Мапит счётчик отвеченных вопросов и имя вакансии по каждой сессии, без записи в счётчике - 0")
-        void mapsAnsweredCountsAndVacancyNamesPerSession() {
-            // given
-            UUID userId = UUID.randomUUID();
-            UUID sessionWithAnswers = UUID.randomUUID();
-            UUID sessionWithoutAnswers = UUID.randomUUID();
-            UUID vacancySnapshotIdA = UUID.randomUUID();
-            UUID vacancySnapshotIdB = UUID.randomUUID();
-            InterviewSession first = aSession(sessionWithAnswers, userId, InterviewSession.Status.IN_PROGRESS,
-                    vacancySnapshotIdA, 10);
-            InterviewSession second = aSession(sessionWithoutAnswers, userId, InterviewSession.Status.CREATED,
-                    vacancySnapshotIdB, 8);
-            when(interviewSessionRepository.findAllByUserIdOrderByCreatedDesc(userId)).thenReturn(List.of(first, second));
-
-            InterviewQuestionRepository.AnsweredCount answeredCount = mock(InterviewQuestionRepository.AnsweredCount.class);
-            when(answeredCount.getSessionId()).thenReturn(sessionWithAnswers);
-            when(answeredCount.getCount()).thenReturn(5L);
-            when(interviewQuestionRepository.countAnsweredBySessionIds(List.of(sessionWithAnswers, sessionWithoutAnswers)))
-                    .thenReturn(List.of(answeredCount));
-
-            VacancySnapshotView vacancyA = aVacancySnapshotView("От 1 года до 3 лет");
-            VacancySnapshotView vacancyB = aVacancySnapshotView("Нет опыта");
-            when(vacancyService.getSnapshotViews(List.of(vacancySnapshotIdA, vacancySnapshotIdB)))
-                    .thenReturn(Map.of(vacancySnapshotIdA, vacancyA, vacancySnapshotIdB, vacancyB));
-
-            InterviewSessionResponse firstResponse = mock(InterviewSessionResponse.class);
-            InterviewSessionResponse secondResponse = mock(InterviewSessionResponse.class);
-            when(interviewSessionMapper.toResponse(first, vacancyA, 5)).thenReturn(firstResponse);
-            when(interviewSessionMapper.toResponse(second, vacancyB, 0)).thenReturn(secondResponse);
-
-            // when
-            List<InterviewSessionResponse> result = interviewService.getAll(userId);
-
-            // then
-            assertThat(result).containsExactly(firstResponse, secondResponse);
-        }
-    }
-
-    @Nested
     @DisplayName("NextQuestion")
     class NextQuestion {
 
@@ -1212,38 +1169,4 @@ class InterviewServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("Delete")
-    class Delete {
-
-        @Test
-        @DisplayName("Сессия не найдена у пользователя - NotFoundException, удаление не вызывается")
-        void throwsWhenSessionNotFound() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            when(interviewSessionRepository.existsByIdAndUserId(sessionId, userId)).thenReturn(false);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.delete(sessionId, userId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Session not found");
-            verify(interviewSessionRepository, never()).deleteById(any());
-        }
-
-        @Test
-        @DisplayName("Сессия принадлежит пользователю - удаляется по id")
-        void deletesSessionWhenOwnedByUser() {
-            // given
-            UUID sessionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            when(interviewSessionRepository.existsByIdAndUserId(sessionId, userId)).thenReturn(true);
-
-            // when
-            interviewService.delete(sessionId, userId);
-
-            // then
-            verify(interviewSessionRepository).deleteById(sessionId);
-        }
-    }
 }

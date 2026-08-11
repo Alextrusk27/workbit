@@ -1,0 +1,255 @@
+[English](README.md) | **Русский**
+
+<div align="center">
+
+# Workbit
+
+**AI-копайлот соискателя: подготовка к собеседованиям на базе LLM**
+
+Пользователь тренирует навыки в формате «вопрос — ответ — разбор» и проходит пробные интервью
+по реальным вакансиям hh.ru, отвечая текстом или голосом.
+
+🌐 [workbit.ru](https://workbit.ru)
+
+![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-migrations-CC0200?logo=flyway&logoColor=white)
+![gRPC](https://img.shields.io/badge/gRPC-SpeechKit_STT-244c5a?logo=grpc&logoColor=white)
+
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![TanStack Query](https://img.shields.io/badge/TanStack_Query-FF4154?logo=reactquery&logoColor=white)
+
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
+![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
+![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
+
+</div>
+
+---
+
+## 📑 Оглавление
+
+- [Возможности](#-возможности)
+- [Скриншоты](#-скриншоты)
+- [Стек](#-стек)
+- [Интеграции](#-интеграции)
+- [Архитектура](#-архитектура)
+- [Технические особенности](#-технические-особенности)
+- [Структура репозитория](#-структура-репозитория)
+- [Локальный запуск](#-локальный-запуск)
+- [Тесты](#-тесты)
+- [CI/CD](#-cicd)
+- [Документация](#-документация)
+
+## ✨ Возможности
+
+- 🎯 **AI-интервью по вакансии** — вставьте ссылку на вакансию hh.ru: вопросы генерируются под требуемый опыт (noexp / junior / middle / senior), по ходу беседы задаются уточняющие вопросы, в конце — отчёт с оценкой, вероятностью оффера, рекомендациями и самым слабым навыком (с переходом в тренажёр).
+- 📚 **Тренажёр навыков** — тренировка по паре «навык + профессия» на выбранном уровне сложности: вопросы из банка с добором от LLM, эталонный ответ по кнопке, итоговый разбор с оценкой. Свободный ввод канонизируется словарями и LLM-нормализатором.
+
+## 📸 Скриншоты
+
+**Главная — живое демо интервью: вопрос, голосовой ответ и разбор с оценкой**
+
+![Главная страница](docs/screenshots/home.png)
+
+**AI-интервью — чат по реальной вакансии hh.ru с уточняющими вопросами**
+
+![Прогон AI-интервью](docs/screenshots/interview-session.png)
+
+**Разбор AI-интервью — средний балл, вероятность оффера, рекомендации и самое слабое место с переходом в тренажёр**
+
+![Разбор AI-интервью](docs/screenshots/interview-report.png)
+
+**Тренажёр навыков — вопрос-ответ с эталонным ответом по кнопке**
+
+![Прогон тренировки](docs/screenshots/training-session.png)
+
+**Разбор тренировки — оценка, итог рецензента и разбор каждого ответа**
+
+![Разбор тренировки](docs/screenshots/training-report.png)
+
+**Маркетинговые страницы режимов**
+
+| AI-интервью | Тренажёр навыков |
+|---|---|
+| ![Страница AI-интервью](docs/screenshots/ai-interview.png) | ![Страница тренажёра навыков](docs/screenshots/skills-trainer.png) |
+
+**Тарифы — Бесплатно / Про / Макс и пакеты докупки поверх любого тарифа**
+
+![Тарифы](docs/screenshots/pricing.png)
+
+## 🧱 Стек
+
+### Бэкенд
+
+| Область | Технологии |
+|---|---|
+| Ядро | Java 25, Spring Boot 4 (Web, Data JPA, Security, WebSocket, Validation, Actuator, AspectJ) |
+| БД | PostgreSQL 16, Flyway (схема на домен), Hibernate (`ddl-auto: validate`) |
+| Безопасность | Spring Security + JWT (JJWT), HttpOnly-куки, in-memory rate limiting per-IP |
+| LLM | Yandex AI Studio через OpenAI-совместимый API (`openai-java`), 19 промптов-агентов |
+| Речь | Yandex SpeechKit STT v3 — двунаправленный gRPC-стрим, стабы из proto при сборке (`protobuf-maven-plugin`) |
+| Почта | Spring Mail + Thymeleaf-шаблоны, доменные события Spring (AFTER_COMMIT) |
+| Инструменты | Lombok, MapStruct, jsoup, ULID, springdoc-openapi (Swagger UI в dev) |
+
+### Фронтенд
+
+| Область | Технологии |
+|---|---|
+| Ядро | React 19, TypeScript, Vite, react-router 7 |
+| Стили | Tailwind CSS v4 (CSS-first, дизайн-токены), тёмная/светлая темы |
+| Данные | TanStack Query (кэш, мутации, silent refresh на 401) |
+| Анимации | motion (`motion/react`) с уважением к `prefers-reduced-motion` |
+| Голос | AudioWorklet → Int16 LPCM 16 кГц → WebSocket на бэкенд |
+| Качество | oxlint, Prettier (+`prettier-plugin-tailwindcss`) |
+
+### Тестирование
+
+| Область | Технологии |
+|---|---|
+| Юнит | JUnit 5, Mockito (`-javaagent`, JDK 25) — service-слой в изоляции |
+| Web-срез | `@WebMvcTest` + MockMvc с реальной security-цепочкой |
+| Персистентность | Testcontainers (postgres:16) + `@DataJpaTest` на схеме из миграций Flyway |
+| Почта | GreenMail — реальная SMTP-доставка и проверка HTML-тела письма |
+| E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate поверх Testcontainers |
+| Покрытие | JaCoCo (отчёт на `mvn verify`) |
+
+### Инфраструктура
+
+| Область | Технологии |
+|---|---|
+| Контейнеры | Docker, многосервисный Compose (postgres + backend + caddy) |
+| Прокси | Caddy — TLS, reverse proxy `/api`, статика SPA |
+| CI/CD | GitHub Actions: тесты на PR, релиз в Yandex Container Registry и деплой на VM с `master` |
+| Хостинг | Yandex Cloud (VM, Container Registry), отдельный диск под данные PostgreSQL |
+
+## 🔌 Интеграции
+
+| Сервис | Роль |
+|---|---|
+| **hh.ru API** | данные вакансии по ссылке для AI-интервью: требуемый опыт, навыки, описание |
+| **Yandex AI Studio** | LLM за генерацией вопросов, follow-up, разборами и нормализацией ввода — 19 промптов-агентов |
+| **Yandex SpeechKit STT v3** | потоковое распознавание речи для голосового ввода |
+| **SMTP-почта** | транзакционные письма с кодом входа |
+
+## 🏗 Архитектура
+
+```mermaid
+flowchart TB
+    SPA["SPA — React 19 + Vite"]
+    SPA -->|"REST /api, JWT в HttpOnly-куках"| BE
+    SPA -->|"WebSocket: LPCM-аудио"| BE
+
+    subgraph BE["Spring Boot — package by feature, кросс-доменная связь через Spring events"]
+        direction LR
+        auth ~~~ training ~~~ interview ~~~ vacancy
+        content ~~~ llm ~~~ speech ~~~ email
+    end
+
+    BE -->|"схема на домен, Flyway"| PG[("PostgreSQL 16")]
+    vacancy -->|"данные вакансии"| HH["hh.ru API"]
+    llm -->|"OpenAI-совместимый API, 19 агентов"| YA["Yandex AI Studio"]
+    speech -->|"двунаправленный gRPC-стрим"| STT["Yandex SpeechKit STT v3"]
+    email -->|"SMTP"| MX["Почта"]
+```
+
+Голосовой ответ проходит один поток без промежуточных файлов — браузер стримит аудио, а гипотезы текста возвращаются по мере распознавания:
+
+```mermaid
+sequenceDiagram
+    participant B as Браузер (AudioWorklet)
+    participant W as Бэкенд (WebSocket-прокси)
+    participant S as SpeechKit STT v3
+
+    B->>W: чанки Int16 LPCM 16 кГц
+    W->>S: двунаправленный gRPC-стрим
+    S-->>W: partial / final / refinement
+    W-->>B: гипотезы текста в реальном времени
+    Note over W: лимит длины сессии — на сервере
+```
+
+## 🔍 Технические особенности
+
+- **Package-by-feature + схема БД на домен** — `auth`, `training`, `interview`, `vacancy`, `content`, `llm`, `email`, `speech`; наружу только DTO, кросс-доменная связь через Spring events.
+- **Грейдовый роутинг LLM-агентов** — генератор вопросов, follow-up и ревьюер разрезаны по опыту кандидата (4×3 агента), роутинг по строке опыта из hh API.
+- **Голосовой ввод (потоковое распознавание речи)** — диктовка ответов через Yandex SpeechKit STT v3: браузерный AudioWorklet шлёт LPCM-чанки по WebSocket, бэкенд проксирует их в двунаправленный gRPC-стрим SpeechKit и возвращает partial/final/refinement-гипотезы; лимит длины сессии — на сервере.
+- **Беспарольный вход** — email + одноразовый 6-значный код из письма, отдельной регистрации нет; JWT-токены в HttpOnly-куках, silent refresh на 401.
+- **Канонизация свободного ввода** — Unicode-нормализация (NFKC, типографские дефисы), ключи сравнения по значащим словам, словари с upsert и LLM-нормализатор как барьер против мусорного ввода.
+- **Приватность по 152-ФЗ** — физическое удаление аккаунта каскадами БД, автоудаление неактивных, запрет пользовательского контента в логах (`@Sensitive`, аспект логирования с MDC), заголовок отказа от обучения моделей на данных пользователей.
+- **Плавная деградация LLM** — прекчек вырожденных ответов модели, один повторный вызов, осмысленные HTTP-статусы (409 «вопросы кончились» vs 503 «AI-сервис недоступен»).
+
+## 🗂 Структура репозитория
+
+```
+src/                  бэкенд (Maven, ru.workbit:workbit)
+  main/resources/db/migration/   миграции Flyway
+  main/proto/                    контракт SpeechKit STT
+frontend/             SPA (React + Vite)
+docs/                 описания REST-контрактов и юридические документы
+Dockerfile            образ бэкенда
+docker-compose.yml    локальная разработка (postgres)
+compose.prod.yml      прод: postgres + backend + caddy
+Caddyfile             конфиг reverse proxy
+```
+
+## 🚀 Локальный запуск
+
+Требования: JDK 25, Node.js 22+, Docker.
+
+1. **База данных**
+
+   ```sh
+   docker compose up -d postgres
+   ```
+
+2. **Бэкенд** (профиль `dev`, порт 8080)
+
+   ```sh
+   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+   ```
+
+   Нужны переменные окружения (список — в `application.yml`): без ключей Yandex не работают генерация вопросов и голосовой ввод, без SMTP-пароля не приходит код входа.
+
+3. **Фронтенд** (порт 5173)
+
+   ```sh
+   npm install --prefix frontend
+   npm run dev --prefix frontend
+   ```
+
+   Открывать строго `http://localhost:5173` (dev-CORS бэкенда разрешает только этот origin). Swagger UI в dev: `http://localhost:8080/swagger-ui.html`.
+
+## 🧪 Тесты
+
+```sh
+mvn test     # юнит-тесты (*Test)
+mvn verify   # + интеграционные (*IT): Testcontainers, нужен Docker
+```
+
+Фронтенд: `npm run lint` и `npm run build` (автотестов пока нет).
+
+## ⚙️ CI/CD
+
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — на PR в `develop`: `mvn verify`, линт и сборка фронтенда.
+- **Deploy** ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) — на push в `master`: тесты, сборка образа бэкенда в Yandex Container Registry, выкладка на VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy, TLS и статика фронтенда — через Caddy).
+
+## 📚 Документация
+
+REST-контракты (человекочитаемые описания API):
+
+- [Аутентификация](docs/auth-api.md) — вход по коду, refresh, logout, удаление аккаунта
+- [Тренажёр навыков](docs/training-api.md) — сессии, вопросы, подсказки словарей, отчёт
+- [AI-интервью](docs/interview-api.md) — сессии по вакансии, follow-up, отчёт, агрегация по вакансиям
+- [Распознавание речи](docs/speech-api.md) — WebSocket-протокол STT
+
+Юридические документы (фронтенд рендерит их на `/privacy`, `/user-agreement`, `/offer`; источник текста — только эти файлы):
+
+- [Политика конфиденциальности](docs/privacy-policy.md)
+- [Пользовательское соглашение](docs/user-agreement.md)
+- [Оферта](docs/offer.md)

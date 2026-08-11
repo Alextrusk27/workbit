@@ -11,23 +11,9 @@ import java.util.UUID;
 
 public interface InterviewQuestionRepository extends JpaRepository<@NotNull InterviewQuestion, @NotNull UUID> {
 
-    interface AnsweredCount {
-        UUID getSessionId();
-
-        long getCount();
-    }
-
     long countBySessionIdAndFollowUpFalseAndAnsweredTrue(UUID sessionId);
 
     long countByParentQuestionId(UUID parentQuestionId);
-
-    @Query("""
-            SELECT q.session.id AS sessionId, COUNT(q) AS count
-            FROM InterviewQuestion q
-            WHERE q.session.id IN :sessionIds AND q.answered = true AND q.followUp = false
-            GROUP BY q.session.id
-            """)
-    List<AnsweredCount> countAnsweredBySessionIds(List<UUID> sessionIds);
 
     @Query("""
             SELECT q FROM InterviewQuestion q

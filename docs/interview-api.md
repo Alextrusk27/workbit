@@ -29,7 +29,7 @@ AI-интервью по конкретной вакансии hh.ru: польз
 приходит).
 
 Сессии и вопросы привязаны к пользователю из токена. Большинство ручек (получение сессии,
-список, следующий вопрос, завершение, отчёт, удаление) сами ищут ресурс с учётом `userId`,
+следующий вопрос, завершение, отчёт) сами ищут ресурс с учётом `userId`,
 поэтому чужой ресурс для них просто «не существует» — ответ `404`. Исключение — отправка ответа
 (`POST .../questions/{questionId}`): там вопрос сначала ищется по `questionId` без учёта
 владельца, и если он оказывается чужим, это разбирается явно — ответ `403`. Ручки агрегации по
@@ -42,13 +42,11 @@ AI-интервью по конкретной вакансии hh.ru: польз
 | Метод | Путь | Назначение | Авторизация |
 |---|---|---|---|
 | POST | `/sessions` | создать сессию интервью по ссылке на вакансию | cookie `access_token` |
-| GET | `/sessions` | список сессий текущего пользователя | cookie `access_token` |
 | GET | `/sessions/{sessionId}` | получить сессию по id | cookie `access_token` |
 | POST | `/sessions/{sessionId}/questions/next` | получить текущий неотвеченный вопрос (основной или уточняющий) | cookie `access_token` |
 | POST | `/sessions/{sessionId}/questions/{questionId}` | отправить ответ на вопрос | cookie `access_token` |
 | POST | `/sessions/{sessionId}/finish` | завершить интервью и сформировать отчёт | cookie `access_token` |
 | GET | `/sessions/{sessionId}/report` | получить ранее сформированный отчёт | cookie `access_token` |
-| DELETE | `/sessions/{sessionId}` | удалить сессию вместе с вопросами, ответами и отчётом | cookie `access_token` |
 
 ## Справочные значения
 
@@ -73,7 +71,7 @@ record SubmitAnswerBody(@NotBlank String answerText)
 вакансия при этом валидируется отдельно: если по вычлененному id hh.ru вернул 404 или пометил
 вакансию архивной — `404`, а не `400` (ссылка синтаксически валидна, но вакансии недоступны).
 
-`POST .../questions/next`, `POST .../finish`, `GET .../report` и `DELETE` тела не принимают.
+`POST .../questions/next`, `POST .../finish` и `GET .../report` тела не принимают.
 
 Пример `CreateInterviewSessionRequest`:
 
@@ -112,9 +110,6 @@ record InterviewReportResponse(
   `/vacancies` ниже (числовой id вакансии на hh.ru строкой): по нему фронт ведёт со страницы
   прогона на страницу вакансии. Список вопросов в ответе нет — они уже сгенерированы на
   бэке, но, как и в тренажёре, отдаются по одному через `.../questions/next`.
-- **`GET /sessions`** — `200`, `List<InterviewSessionResponse>` — все сессии текущего
-  пользователя целиком, без пагинации (в отличие от `training`, где та же ручка отдаёт
-  `PagedModel`). Порядок гарантирован: новые первыми, по убыванию `created`.
 - **`GET /sessions/{sessionId}`** — `200`, `InterviewSessionResponse` с актуальным
   `answeredCount`.
 - **`POST .../questions/next`** — `200`, `InterviewQuestionResponse`. Возвращает неотвеченный
@@ -134,7 +129,6 @@ record InterviewReportResponse(
 - **`POST .../finish`** — `201` с `InterviewReportResponse` и заголовком `Location`
   (`/sessions/{id}/report`).
 - **`GET .../report`** — `200`, `InterviewReportResponse`.
-- **`DELETE /sessions/{sessionId}`** — `204`, пустое тело.
 
 Пример `InterviewSessionResponse` (свежесозданная сессия):
 
@@ -321,8 +315,9 @@ record InterviewReportResponse(
   дадут ровно один отчёт: проигравший запрос получит `409`.
 - **`answeredCount`** в `InterviewSessionResponse` считает только отвеченные основные вопросы
   (уточняющие не входят), даже если по факту в сессии есть отвеченные уточнения.
-- **Удаление** — физическое: сессия удаляется вместе со всеми вопросами, ответами и отчётом (не
-  soft delete).
+- **Удаление** — физическое и только целиком по вакансии (`DELETE /vacancies/{vacancyId}`, см.
+  ниже): сессии удаляются вместе со всеми вопросами, ответами и отчётами (не soft delete).
+  Ручки удаления отдельной сессии нет.
 
 ## Агрегация по вакансиям — `/api/v1/interview/vacancies`
 

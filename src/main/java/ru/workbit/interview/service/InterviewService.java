@@ -36,10 +36,8 @@ import ru.workbit.vacancy.service.VacancyService;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
@@ -81,27 +79,6 @@ public class InterviewService {
         int answeredCount = (int) interviewQuestionRepository
                 .countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId);
         return interviewSessionMapper.toResponse(session, vacancy, answeredCount);
-    }
-
-    public List<InterviewSessionResponse> getAll(UUID userId) {
-        List<InterviewSession> sessions = interviewSessionRepository.findAllByUserIdOrderByCreatedDesc(userId);
-
-        Map<UUID, Long> answered = interviewQuestionRepository
-                .countAnsweredBySessionIds(sessions.stream().map(InterviewSession::getId).toList())
-                .stream()
-                .collect(Collectors.toMap(
-                        InterviewQuestionRepository.AnsweredCount::getSessionId,
-                        InterviewQuestionRepository.AnsweredCount::getCount));
-
-        Map<UUID, VacancySnapshotView> vacancies = vacancyService.getSnapshotViews(
-                sessions.stream().map(InterviewSession::getVacancySnapshotId).toList());
-
-        return sessions.stream()
-                .map(session -> interviewSessionMapper.toResponse(
-                        session,
-                        vacancies.get(session.getVacancySnapshotId()),
-                        answered.getOrDefault(session.getId(), 0L).intValue()))
-                .toList();
     }
 
     public InterviewQuestionResponse nextQuestion(UUID sessionId, UUID userId) {
@@ -222,15 +199,6 @@ public class InterviewService {
         }
 
         return interviewReportMapper.toResponse(report, session, answeredSorted(session));
-    }
-
-    @Transactional
-    public void delete(UUID sessionId, UUID userId) {
-        if (!interviewSessionRepository.existsByIdAndUserId(sessionId, userId)) {
-            log.warn("User {} has no interview session {}", userId, sessionId);
-            throw new NotFoundException("Session not found");
-        }
-        interviewSessionRepository.deleteById(sessionId);
     }
 
     private static LlmInterviewQuestionsRequest toQuestionsRequest(VacancyData vacancyData) {

@@ -103,8 +103,6 @@ export const interviewApi = {
       body: data,
     }),
 
-  listSessions: () => apiFetch<InterviewSession[]>(`${BASE}/sessions`),
-
   getSession: (sessionId: string) =>
     apiFetch<InterviewSession>(`${BASE}/sessions/${sessionId}`),
 
@@ -127,9 +125,6 @@ export const interviewApi = {
 
   getReport: (sessionId: string) =>
     apiFetch<InterviewReport>(`${BASE}/sessions/${sessionId}/report`),
-
-  deleteSession: (sessionId: string) =>
-    apiFetch<void>(`${BASE}/sessions/${sessionId}`, { method: 'DELETE' }),
 
   listVacancies: () => apiFetch<InterviewVacancy[]>(`${BASE}/vacancies`),
 

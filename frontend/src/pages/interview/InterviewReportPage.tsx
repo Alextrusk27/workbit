@@ -83,6 +83,7 @@ export function InterviewReportPage() {
           weakestSkill={report.weakestSkill}
           trainingTo={`/app/training/new?${trainingParams}`}
           answeredCount={report.questions.length}
+          sessionId={report.sessionId}
         />
       </div>
 
@@ -96,7 +97,7 @@ export function InterviewReportPage() {
               key={q.questionId}
               className="border-divider mt-8 border-t pt-8 first:mt-0 first:border-0 first:pt-0"
             >
-              <CaseEntry question={q} />
+              <CaseEntry question={q} sessionId={report.sessionId} />
             </li>
           ))}
         </ol>

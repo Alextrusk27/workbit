@@ -80,6 +80,7 @@ export function TrainingReportPage() {
         <ReportSummary
           avgScore={report.avgScore}
           overallFeedback={report.overallFeedback}
+          sessionId={report.sessionId}
         />
       </div>
 

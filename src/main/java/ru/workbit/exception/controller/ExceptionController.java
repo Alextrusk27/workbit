@@ -99,6 +99,14 @@ public class ExceptionController {
                         Collections.singletonList(e.getMessage())));
     }
 
+    @ExceptionHandler(PaymentRequiredException.class)
+    public ResponseEntity<@NotNull ApiError> handlePaymentRequired(final PaymentRequiredException e) {
+        log.warn("Payment required exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                .body(ApiError.of(HttpStatus.PAYMENT_REQUIRED, "Payment required.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<@NotNull ApiError> handleConflict(final ConflictException e) {
         log.warn("Conflict exception: {}", e.getMessage());

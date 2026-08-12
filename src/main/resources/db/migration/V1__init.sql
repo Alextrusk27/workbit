@@ -3,6 +3,7 @@ CREATE SCHEMA IF NOT EXISTS vacancy;
 CREATE SCHEMA IF NOT EXISTS content;
 CREATE SCHEMA IF NOT EXISTS training;
 CREATE SCHEMA IF NOT EXISTS interview;
+CREATE SCHEMA IF NOT EXISTS billing;
 
 CREATE TABLE IF NOT EXISTS auth.users (
     id                  UUID PRIMARY KEY,
@@ -251,6 +252,24 @@ CREATE TABLE IF NOT EXISTS interview.report (
         CHECK (avg_score BETWEEN 1.0 AND 5.0),
     CONSTRAINT chk_report_offer_probability
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
+);
+
+CREATE TABLE IF NOT EXISTS billing.account (
+    user_id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    plan                 VARCHAR(32) NOT NULL,
+    plan_expires_at      TIMESTAMPTZ,
+    plan_interviews_left INT NOT NULL,
+    plan_trainings_left  INT NOT NULL,
+    pack_interviews_left INT NOT NULL,
+    pack_trainings_left  INT NOT NULL,
+
+    CONSTRAINT chk_account_plan
+        CHECK (plan IN ('FREE', 'PRO', 'MAX')),
+    CONSTRAINT chk_account_left_non_negative
+        CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0
+            AND pack_interviews_left >= 0 AND pack_trainings_left >= 0),
+    CONSTRAINT chk_account_paid_plan_expires
+        CHECK (plan = 'FREE' OR plan_expires_at IS NOT NULL)
 );
 
 INSERT INTO content.profession_dict (name, match_key, status) VALUES

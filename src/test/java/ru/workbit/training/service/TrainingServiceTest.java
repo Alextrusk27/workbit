@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +19,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
@@ -29,6 +31,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.training.dto.CreateSessionRequest;
 import ru.workbit.training.dto.NormalizeInputRequest;
@@ -73,6 +76,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -101,6 +106,8 @@ class TrainingServiceTest {
     TrainingWriter trainingWriter;
     @Mock
     LlmService llmService;
+    @Mock
+    QuotaService quotaService;
     @Mock
     TrainingSessionMapper trainingSessionMapper;
     @Mock
@@ -976,6 +983,51 @@ class TrainingServiceTest {
             assertThat(mappedEntity.getProfession()).isEqualTo(strippedSuggestion);
             verify(trainingWriter).upsertDictionaries(SKILL, strippedSuggestion);
         }
+
+        @Test
+        @DisplayName("Проверка квоты тренировок выполняется до генерации вопросов LLM")
+        void checksQuotaBeforeGeneratingQuestions() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
+            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
+            stubProfessionAndSkillApproved();
+            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
+                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
+
+            List<BankQuestion> bank = bankQuestions(7);
+            when(questionBankRepository.sampleUnseen(
+                    professionId, skillId, "MIDDLE", userId, TrainingService.QUESTION_CAP))
+                    .thenReturn(bank);
+            List<String> generated = List.of("Сгенерированный 1", "Сгенерированный 2", "Сгенерированный 3");
+            when(llmService.generateTrainingQuestions(eq("middle"), any())).thenReturn(new LlmTrainingQuestions(generated));
+            when(trainingWriter.createSession(mappedEntity, bank, generated))
+                    .thenReturn(mock(TrainingSessionResponse.class));
+
+            // when
+            trainingService.create(request, userId);
+
+            // then
+            InOrder order = inOrder(quotaService, llmService);
+            order.verify(quotaService).checkTrainingAvailable(userId);
+            order.verify(llmService).generateTrainingQuestions(eq("middle"), any());
+        }
+
+        @Test
+        @DisplayName("Квота тренировок исчерпана - PaymentRequiredException пробрасывается, LLM и словари не вызываются, сессия не создаётся")
+        void throwsWhenTrainingQuotaExhausted() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MIDDLE);
+            doThrow(new PaymentRequiredException("Training quota exhausted"))
+                    .when(quotaService).checkTrainingAvailable(userId);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(PaymentRequiredException.class)
+                    .hasMessage("Training quota exhausted");
+            verifyNoInteractions(trainingSessionMapper, llmService, trainingWriter, questionBankRepository,
+                    professionDictRepository, skillDictRepository);
+        }
     }
 
     @Nested
@@ -1499,6 +1551,22 @@ class TrainingServiceTest {
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("No new questions available");
             verifyNoInteractions(trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Тариф FREE (checkPaidPlan бросает ForbiddenException) - пробрасывается, LLM и writer не вызываются")
+        void throwsWhenPaidPlanRequired() {
+            // given
+            List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
+            TrainingSession session = sessionWithQuestions(existing);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            doThrow(new ForbiddenException("Paid plan required")).when(quotaService).checkPaidPlan(userId);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Paid plan required");
+            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
         }
     }
 

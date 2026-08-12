@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
@@ -45,12 +46,14 @@ public class InterviewWriter {
     private final InterviewQuestionRepository interviewQuestionRepository;
 
     private final VacancyService vacancyService;
+    private final QuotaService quotaService;
 
     private final InterviewQuestionMapper interviewQuestionMapper;
     private final InterviewReportMapper interviewReportMapper;
 
     @Transactional
     public InterviewSession createSession(VacancyData vacancyData, UUID userId, List<String> questions) {
+        quotaService.debitInterview(userId);
 
         UUID vacancySnapshotId = vacancyService.saveSnapshot(vacancyData);
         InterviewSession session = saveNewSession(userId, questions, vacancySnapshotId);

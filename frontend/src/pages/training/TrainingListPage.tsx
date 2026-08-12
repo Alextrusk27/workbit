@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
+import { QuotaBadge } from '@/components/app/QuotaBadge'
 import { StatusTag } from '@/components/app/StatusTag'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
@@ -10,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import type { SessionStatus, TrainingSession } from '@/features/training/api'
+import { trainingErrorMessage } from '@/features/training/errors'
 import {
   sessionHeadline,
   sessionSubtitle,
@@ -54,9 +56,12 @@ export function TrainingListPage() {
         eyebrow="Тренажёр"
         title="Мои тренировки"
         actions={
-          <Link to="/app/training/new" className={buttonClasses()}>
-            Новая тренировка
-          </Link>
+          <div className="flex items-center gap-4">
+            <QuotaBadge kind="training" />
+            <Link to="/app/training/new" className={buttonClasses()}>
+              Новая тренировка
+            </Link>
+          </div>
         }
       />
 
@@ -245,7 +250,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
         </button>
         {restart.isError && (
           <p className="text-danger text-[12.5px]">
-            {getErrorMessage(restart.error)}
+            {trainingErrorMessage(restart.error)}
           </p>
         )}
       </div>

@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
@@ -63,6 +64,8 @@ class TrainingWriterTest {
     ProfessionDictRepository professionDictRepository;
     @Mock
     SkillDictRepository skillDictRepository;
+    @Mock
+    QuotaService quotaService;
     @Mock
     TrainingSessionMapper trainingSessionMapper;
     @Mock
@@ -148,6 +151,7 @@ class TrainingWriterTest {
             assertThat(third.getReferenceAnswer()).isNull();
 
             verify(trainingSessionRepository).save(session);
+            verify(quotaService).debitTraining(session.getUserId());
         }
 
         @Test
@@ -307,6 +311,7 @@ class TrainingWriterTest {
             assertThat(session.getStatus()).isEqualTo(TrainingSession.Status.CREATED);
             assertThat(session.getCompletedAt()).isNull();
             verify(trainingSessionRepository).save(session);
+            verify(quotaService).debitTraining(session.getUserId());
         }
 
         @Test

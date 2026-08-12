@@ -15,6 +15,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.VacancyFetchException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.interview.dto.CreateInterviewSessionRequest;
@@ -221,6 +222,24 @@ class InterviewControllerTest {
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.errors[0]").value("Vacancy not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 402, когда квота интервью исчерпана")
+        void returns402WhenQuotaExhausted() throws Exception {
+            // given
+            var request = new CreateInterviewSessionRequest(VACANCY_URL);
+            when(interviewService.createSession(eq(VACANCY_URL), any()))
+                    .thenThrow(new PaymentRequiredException("Interview quota exhausted"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isPaymentRequired())
+                    .andExpect(jsonPath("$.message").value("Payment required."))
+                    .andExpect(jsonPath("$.errors[0]").value("Interview quota exhausted"));
         }
 
         @Test

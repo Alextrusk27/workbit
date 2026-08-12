@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
@@ -58,6 +59,8 @@ class InterviewWriterTest {
     @Mock
     VacancyService vacancyService;
     @Mock
+    QuotaService quotaService;
+    @Mock
     InterviewQuestionMapper interviewQuestionMapper;
     @Mock
     InterviewReportMapper interviewReportMapper;
@@ -98,6 +101,7 @@ class InterviewWriterTest {
             }
 
             verify(interviewSessionRepository).save(result);
+            verify(quotaService).debitInterview(userId);
         }
 
         @Test

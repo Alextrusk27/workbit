@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
@@ -56,6 +57,7 @@ public class InterviewService {
     private final InterviewWriter interviewWriter;
     private final VacancyService vacancyService;
     private final LlmService llmService;
+    private final QuotaService quotaService;
 
     private final InterviewSessionMapper interviewSessionMapper;
     private final InterviewQuestionMapper interviewQuestionMapper;
@@ -65,6 +67,8 @@ public class InterviewService {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
 
         checkNoUnfinishedInterview(vacancyData, userId);
+
+        quotaService.checkInterviewAvailable(userId);
 
         List<String> questions = generateQuestions(vacancyData);
 

@@ -6,6 +6,8 @@ const TRAINING_DETAIL = {
   PROFESSION_NOT_RECOGNIZED: 'Profession not recognized',
   NO_NEW_QUESTIONS: 'No new questions available',
   QUESTION_LIMIT_REACHED: 'Question limit reached',
+  QUOTA_EXHAUSTED: 'Training quota exhausted',
+  PAID_PLAN_REQUIRED: 'Paid plan required',
 } as const
 
 function trainingDetail(error: unknown): string | null {
@@ -24,6 +26,10 @@ const RU_MESSAGE: Record<string, string> = {
     'Новых вопросов этого уровня по навыку не нашлось — всё, что можно спросить, вы уже прошли. Завершите тренировку и получите разбор.',
   [TRAINING_DETAIL.QUESTION_LIMIT_REACHED]:
     'Достигнут потолок вопросов в одной тренировке. Завершите её и получите разбор.',
+  [TRAINING_DETAIL.QUOTA_EXHAUSTED]:
+    'Тренировки на вашем тарифе закончились. Обновите тариф или докупите пакет на странице тарифов.',
+  [TRAINING_DETAIL.PAID_PLAN_REQUIRED]:
+    'Добор вопросов доступен на тарифах Про и Макс.',
 }
 
 /** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст. */

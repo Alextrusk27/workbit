@@ -17,6 +17,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
@@ -253,6 +254,24 @@ class TrainingControllerTest {
                     .andExpect(jsonPath("$.status").value("UNPROCESSABLE_CONTENT"))
                     .andExpect(jsonPath("$.message").value("Unprocessable content."))
                     .andExpect(jsonPath("$.errors[0]").value("Profession not recognized"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 402, когда квота тренировок исчерпана")
+        void returns402WhenQuotaExhausted() throws Exception {
+            // given
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            when(trainingService.create(any(), any()))
+                    .thenThrow(new PaymentRequiredException("Training quota exhausted"));
+
+            // when / then
+            mvc.perform(post(BASE + "/sessions")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isPaymentRequired())
+                    .andExpect(jsonPath("$.message").value("Payment required."))
+                    .andExpect(jsonPath("$.errors[0]").value("Training quota exhausted"));
         }
     }
 

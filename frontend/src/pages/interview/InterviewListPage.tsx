@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
+import { QuotaBadge } from '@/components/app/QuotaBadge'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
 import { Container } from '@/components/ui/Container'
@@ -63,9 +64,12 @@ export function InterviewListPage() {
         eyebrow="Интервью"
         title="Мои интервью"
         actions={
-          <Link to="/app/interview/new" className={buttonClasses()}>
-            Новое интервью
-          </Link>
+          <div className="flex items-center gap-4">
+            <QuotaBadge kind="interview" />
+            <Link to="/app/interview/new" className={buttonClasses()}>
+              Новое интервью
+            </Link>
+          </div>
         }
       />
 

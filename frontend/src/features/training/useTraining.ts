@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { billingKeys } from '@/features/billing/useBilling'
 import {
   trainingApi,
   type CreateTrainingRequest,
@@ -95,7 +96,10 @@ export function useCreateSession() {
   return useMutation({
     mutationFn: (data: CreateTrainingRequest) =>
       trainingApi.createSession(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.sessions })
+      qc.invalidateQueries({ queryKey: billingKeys.quota })
+    },
   })
 }
 
@@ -125,6 +129,7 @@ export function useRestartSession() {
       qc.setQueryData(keys.session(session.id), session)
       qc.removeQueries({ queryKey: keys.report(session.id) })
       qc.invalidateQueries({ queryKey: keys.sessions })
+      qc.invalidateQueries({ queryKey: billingKeys.quota })
     },
   })
 }

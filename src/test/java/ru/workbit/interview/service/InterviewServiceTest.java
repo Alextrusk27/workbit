@@ -8,14 +8,17 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
@@ -55,6 +58,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -76,6 +81,8 @@ class InterviewServiceTest {
     VacancyService vacancyService;
     @Mock
     LlmService llmService;
+    @Mock
+    QuotaService quotaService;
     @Mock
     InterviewSessionMapper interviewSessionMapper;
     @Mock
@@ -356,6 +363,47 @@ class InterviewServiceTest {
             verify(interviewSessionRepository, never())
                     .existsByUserIdAndVacancySnapshotIdInAndStatusNot(any(), any(), any());
             verify(interviewWriter).createSession(vacancyData, userId, questions);
+        }
+
+        @Test
+        @DisplayName("Проверка квоты интервью выполняется до генерации вопросов LLM")
+        void checksQuotaBeforeGeneratingQuestions() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<String> questions = List.of("В1", "В2", "В3", "В4", "В5");
+            when(llmService.generateInterviewQuestions(any(), any())).thenReturn(new LlmInterviewQuestions(questions));
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), questions.size());
+            when(interviewWriter.createSession(vacancyData, userId, questions)).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(eq(createdSession), eq(vacancyData), eq(0)))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            InOrder order = inOrder(quotaService, llmService);
+            order.verify(quotaService).checkInterviewAvailable(userId);
+            order.verify(llmService).generateInterviewQuestions(any(), any());
+        }
+
+        @Test
+        @DisplayName("Квота интервью исчерпана - PaymentRequiredException пробрасывается, LLM не вызывается, сессия не создаётся")
+        void throwsWhenInterviewQuotaExhausted() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+            doThrow(new PaymentRequiredException("Interview quota exhausted"))
+                    .when(quotaService).checkInterviewAvailable(userId);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
+                    .isInstanceOf(PaymentRequiredException.class)
+                    .hasMessage("Interview quota exhausted");
+            verifyNoInteractions(llmService, interviewWriter);
         }
     }
 

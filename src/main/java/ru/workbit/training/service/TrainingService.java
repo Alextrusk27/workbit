@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
@@ -77,12 +78,15 @@ public class TrainingService {
     private final QuestionBankRepository questionBankRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
+    private final QuotaService quotaService;
 
     private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingQuestionMapper trainingQuestionMapper;
     private final TrainingReportMapper trainingReportMapper;
 
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
+        quotaService.checkTrainingAvailable(userId);
+
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
         session.setSkill(DictText.normalize(session.getSkill()));
@@ -172,6 +176,7 @@ public class TrainingService {
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
+        quotaService.checkPaidPlan(userId);
 
         List<TrainingQuestion> questions = session.getQuestions();
         checkRoomForMoreQuestions(sessionId, questions);

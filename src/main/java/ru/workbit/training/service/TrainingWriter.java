@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.billing.service.QuotaService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
@@ -45,6 +46,7 @@ class TrainingWriter {
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
     private final SkillDictRepository skillDictRepository;
+    private final QuotaService quotaService;
 
     private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingReportMapper trainingReportMapper;
@@ -64,6 +66,8 @@ class TrainingWriter {
     @Transactional
     public TrainingSessionResponse createSession(TrainingSession session, List<BankQuestion> bankQuestions,
                                                  List<String> generatedQuestions) {
+        quotaService.debitTraining(session.getUserId());
+
         List<TrainingQuestion> questions = new ArrayList<>();
         for (BankQuestion bankQuestion : bankQuestions) {
             questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
@@ -111,6 +115,7 @@ class TrainingWriter {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionCompleted(session);
+        quotaService.debitTraining(session.getUserId());
 
         for (TrainingQuestion question : session.getQuestions()) {
             question.setFeedback(null);

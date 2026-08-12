@@ -27,7 +27,7 @@ export function PricingPage() {
         готовитесь всерьёз — под реальные вакансии и голосом.
       </PageHero>
 
-      <section className="py-22">
+      <section className="py-16">
         <Container>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.map((p, i) => (
@@ -79,7 +79,7 @@ export function PricingPage() {
         </Container>
       </section>
 
-      <section className="pb-22">
+      <section className="pb-16">
         <Container>
           <Reveal>
             <CtaPanel

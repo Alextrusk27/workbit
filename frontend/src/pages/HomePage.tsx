@@ -110,7 +110,7 @@ export function HomePage() {
         </Container>
       </header>
 
-      <section className="py-22">
+      <section className="py-16">
         <Container>
           <Reveal>
             <SectionHead title="Всё как на настоящем интервью">
@@ -130,7 +130,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section id="demo" className="scroll-mt-20 py-22">
+      <section id="demo" className="scroll-mt-20 py-16">
         <Container>
           <Reveal>
             <SectionHead title="Как проходит сессия">
@@ -238,7 +238,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section id="pricing" className="scroll-mt-20 py-22">
+      <section id="pricing" className="scroll-mt-20 py-16">
         <Container>
           <Reveal>
             <SectionHead title="Простые и честные тарифы">
@@ -260,7 +260,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section className="pb-22">
+      <section className="pb-16">
         <Container>
           <Reveal>
             <CtaPanel

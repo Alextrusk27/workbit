@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DictationHints } from '@/components/speech/DictationHints'
 import { MicButton } from '@/components/speech/MicButton'
 import { Alert } from '@/components/ui/Alert'
@@ -9,6 +9,7 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import { Textarea } from '@/components/ui/Textarea'
+import { useQuota } from '@/features/billing/useBilling'
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { trainingApi } from '@/features/training/api'
 import type { TrainingQuestion, TrainingSession } from '@/features/training/api'
@@ -71,6 +72,7 @@ interface LiveItem {
 function SessionRun({ session }: { session: TrainingSession }) {
   const navigate = useNavigate()
   const options = useTrainingOptions()
+  const quota = useQuota()
   const batch = options.data?.questionCap ?? 10
   const maxQuestions = options.data?.maxQuestions ?? 50
   const min = options.data?.minAnswersToFinish ?? 3
@@ -250,6 +252,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
         error={finish.isError ? getErrorMessage(finish.error) : null}
         onFinish={onFinish}
         batch={Math.min(batch, maxQuestions - total)}
+        upsell={quota.data?.plan === 'FREE'}
         addPending={more.isPending}
         addError={more.isError ? trainingErrorMessage(more.error) : null}
         onAddQuestions={onAddQuestions}
@@ -336,6 +339,7 @@ function FinishBar({
   error,
   onFinish,
   batch,
+  upsell,
   addPending,
   addError,
   onAddQuestions,
@@ -347,6 +351,7 @@ function FinishBar({
   error: string | null
   onFinish: () => void
   batch: number
+  upsell: boolean
   addPending: boolean
   addError: string | null
   onAddQuestions: () => void
@@ -370,9 +375,11 @@ function FinishBar({
     <div className="border-divider mt-12 border-t pt-9">
       {capReached && (
         <p className="text-muted mb-4 text-sm">
-          {batch > 0
-            ? `Вопросы закончились — возьмите ещё ${batch} ${questionsWord(batch)} или завершите тренировку и получите разбор.`
-            : 'Достигнут потолок вопросов в одной тренировке — её можно завершить.'}
+          {batch <= 0
+            ? 'Достигнут потолок вопросов в одной тренировке — её можно завершить.'
+            : upsell
+              ? 'Вопросы закончились — завершите тренировку и получите разбор.'
+              : `Вопросы закончились — возьмите ещё ${batch} ${questionsWord(batch)} или завершите тренировку и получите разбор.`}
         </p>
       )}
       {error && (
@@ -386,22 +393,35 @@ function FinishBar({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3.5">
-        {capReached && batch > 0 && (
-          <Button
-            variant="secondary"
-            onClick={onAddQuestions}
-            disabled={addPending}
-          >
-            {addPending ? (
-              <>
-                <Spinner className="mr-2" />
-                Подбираем вопросы…
-              </>
-            ) : (
-              `Ещё ${batch} ${questionsWord(batch)}`
-            )}
-          </Button>
-        )}
+        {capReached &&
+          batch > 0 &&
+          (upsell ? (
+            <p className="text-dim text-sm">
+              Добор вопросов доступен на тарифах{' '}
+              <Link
+                to="/pricing"
+                className="text-indigo hover:text-violet transition-colors"
+              >
+                Про и Макс
+              </Link>
+              .
+            </p>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={onAddQuestions}
+              disabled={addPending}
+            >
+              {addPending ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Подбираем вопросы…
+                </>
+              ) : (
+                `Ещё ${batch} ${questionsWord(batch)}`
+              )}
+            </Button>
+          ))}
         {canFinish ? (
           <Button variant="secondary" onClick={onFinish}>
             Завершить и получить разбор

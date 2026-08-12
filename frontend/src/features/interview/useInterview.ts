@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { billingKeys } from '@/features/billing/useBilling'
 import {
   interviewApi,
   type CreateInterviewRequest,
@@ -50,6 +51,7 @@ export function useCreateInterview() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.vacancies })
       qc.invalidateQueries({ queryKey: ['interview', 'vacancy'] })
+      qc.invalidateQueries({ queryKey: billingKeys.quota })
     },
   })
 }

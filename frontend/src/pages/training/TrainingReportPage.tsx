@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { trainingErrorMessage } from '@/features/training/errors'
 import { sessionSubtitle } from '@/features/training/labels'
 import { useReport, useRestartSession } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
@@ -100,7 +101,7 @@ export function TrainingReportPage() {
 
       {restart.isError && (
         <div className="mt-8">
-          <Alert>{getErrorMessage(restart.error)}</Alert>
+          <Alert>{trainingErrorMessage(restart.error)}</Alert>
         </div>
       )}
 

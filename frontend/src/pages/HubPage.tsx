@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Container } from '@/components/ui/Container'
+import { PLAN_LABELS } from '@/features/billing/labels'
+import { useQuota } from '@/features/billing/useBilling'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -27,6 +29,41 @@ function SectionCard({
       </h2>
       <p className="text-muted mt-3 text-[14.5px]">{description}</p>
     </Link>
+  )
+}
+
+function PlanLine() {
+  const { data } = useQuota()
+  if (!data) return null
+
+  const until = data.planExpiresAt
+    ? ` до ${new Date(data.planExpiresAt).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`
+    : ''
+
+  return (
+    <p className="text-dim mt-10 text-[13.5px]">
+      Тариф:{' '}
+      <span className="text-ink font-semibold">
+        {PLAN_LABELS[data.plan]}
+        {until}
+      </span>
+      <span className="tabular-nums">
+        {' '}
+        · осталось интервью: {data.planInterviewsLeft + data.packInterviewsLeft}
+        , тренировок: {data.planTrainingsLeft + data.packTrainingsLeft}
+      </span>{' '}
+      ·{' '}
+      <Link
+        to="/pricing"
+        className="text-indigo hover:text-violet transition-colors"
+      >
+        Тарифы
+      </Link>
+    </p>
   )
 }
 
@@ -58,6 +95,8 @@ export function HubPage() {
           description="Собеседование под конкретную вакансию с hh.ru. Вопросы по её требованиям, а в конце — разбор и вероятность оффера."
         />
       </div>
+
+      <PlanLine />
     </Container>
   )
 }

@@ -242,8 +242,8 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title="Простые и честные тарифы">
-              Начните бесплатно. Про — когда готовитесь всерьёз, Безлимит —
-              когда сессий нужно больше.
+              Начните бесплатно. Про — когда готовитесь всерьёз, Макс — когда
+              сессий нужно больше.
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">

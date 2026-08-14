@@ -34,6 +34,7 @@ import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.training.dto.CreateSessionRequest;
+import ru.workbit.training.dto.FeedbackRequest;
 import ru.workbit.training.dto.NormalizeInputRequest;
 import ru.workbit.training.dto.NormalizeInputResponse;
 import ru.workbit.training.dto.ReferenceAnswerResponse;
@@ -46,11 +47,13 @@ import ru.workbit.training.dto.TrainingSkillMatch;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
 import ru.workbit.training.model.mapper.TrainingQuestionMapper;
 import ru.workbit.training.model.mapper.TrainingReportMapper;
 import ru.workbit.training.model.mapper.TrainingSessionMapper;
 import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
+import ru.workbit.training.repository.TrainingUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCaseReview;
@@ -96,6 +99,8 @@ class TrainingServiceTest {
     TrainingSessionRepository trainingSessionRepository;
     @Mock
     TrainingQuestionRepository trainingQuestionRepository;
+    @Mock
+    TrainingUserFeedbackRepository trainingUserFeedbackRepository;
     @Mock
     ProfessionDictRepository professionDictRepository;
     @Mock
@@ -1709,6 +1714,148 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.submitAnswer(request))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Question already answered");
+        }
+    }
+
+    @Nested
+    @DisplayName("SubmitQuestionFeedback")
+    class SubmitQuestionFeedback {
+
+        private final UUID userId = UUID.randomUUID();
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID questionId = UUID.randomUUID();
+
+        private TrainingQuestion questionInSession(UUID ownerId) {
+            TrainingSession session = aSession(sessionId, ownerId, PROFESSION);
+            return TrainingQuestion.builder()
+                    .id(questionId).trainingSession(session).text("Вопрос").orderIndex(1).build();
+        }
+
+        @Test
+        @DisplayName("Валидный запрос - сохраняет фидбэк с sessionId/questionId и полями из запроса")
+        void savesFeedbackWithRequestFields() {
+            // given
+            TrainingQuestion question = questionInSession(userId);
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(
+                    TrainingUserFeedback.Vote.DOWN, List.of("Оценка занижена"), "Комментарий");
+
+            // when
+            trainingService.submitQuestionFeedback(sessionId, questionId, userId, request);
+
+            // then
+            ArgumentCaptor<TrainingUserFeedback> captor = ArgumentCaptor.forClass(TrainingUserFeedback.class);
+            verify(trainingUserFeedbackRepository).save(captor.capture());
+            TrainingUserFeedback saved = captor.getValue();
+            assertThat(saved.getSessionId()).isEqualTo(sessionId);
+            assertThat(saved.getQuestionId()).isEqualTo(questionId);
+            assertThat(saved.getVote()).isEqualTo(TrainingUserFeedback.Vote.DOWN);
+            assertThat(saved.getReasons()).containsExactly("Оценка занижена");
+            assertThat(saved.getComment()).isEqualTo("Комментарий");
+        }
+
+        @Test
+        @DisplayName("Вопрос не найден - NotFoundException")
+        void throwsWhenQuestionNotFound() {
+            // given
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitQuestionFeedback(sessionId, questionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+            verifyNoInteractions(trainingUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другому пользователю - ForbiddenException")
+        void throwsWhenQuestionOwnedByAnotherUser() {
+            // given
+            TrainingQuestion question = questionInSession(UUID.randomUUID());
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitQuestionFeedback(sessionId, questionId, userId, request))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Access denied");
+            verifyNoInteractions(trainingUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другой сессии, чем в запросе - ConflictException")
+        void throwsWhenQuestionBelongsToAnotherSession() {
+            // given
+            TrainingQuestion question = questionInSession(userId);
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitQuestionFeedback(
+                    UUID.randomUUID(), questionId, userId, request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Invalid session");
+            verifyNoInteractions(trainingUserFeedbackRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("SubmitReportFeedback")
+    class SubmitReportFeedback {
+
+        private final UUID userId = UUID.randomUUID();
+        private final UUID sessionId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Отчёт сформирован - сохраняет фидбэк с questionId=null")
+        void savesFeedbackWithNullQuestionId() {
+            // given
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setReport(TrainingReport.builder().avgScore(4.0).overallFeedback("Фидбэк").build());
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), "Отлично");
+
+            // when
+            trainingService.submitReportFeedback(sessionId, userId, request);
+
+            // then
+            ArgumentCaptor<TrainingUserFeedback> captor = ArgumentCaptor.forClass(TrainingUserFeedback.class);
+            verify(trainingUserFeedbackRepository).save(captor.capture());
+            TrainingUserFeedback saved = captor.getValue();
+            assertThat(saved.getSessionId()).isEqualTo(sessionId);
+            assertThat(saved.getQuestionId()).isNull();
+            assertThat(saved.getVote()).isEqualTo(TrainingUserFeedback.Vote.UP);
+            assertThat(saved.getComment()).isEqualTo("Отлично");
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена у пользователя - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitReportFeedback(sessionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(trainingUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Отчёт ещё не сформирован - NotFoundException")
+        void throwsWhenReportNotYetGenerated() {
+            // given
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            when(trainingSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            FeedbackRequest request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.submitReportFeedback(sessionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Report not found");
+            verifyNoInteractions(trainingUserFeedbackRepository);
         }
     }
 

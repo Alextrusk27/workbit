@@ -16,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.interview.dto.CreateInterviewSessionRequest;
+import ru.workbit.interview.dto.FeedbackRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
@@ -113,6 +114,45 @@ public class InterviewController {
     ) {
         interviewService.submitAnswer(
                 new SubmitAnswerRequest(userDetails.getId(), sessionId, questionId, request.answerText()));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/{sessionId}/questions/{questionId}/feedback")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Оценить разбор вопроса", description = "Сохраняет отзыв пользователя на разбор вопроса: лайк или дизлайк, у дизлайка — причины и необязательный комментарий. Отзыв анонимно помогает улучшать вопросы и разборы, пользователю обратно не показывается.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Отзыв сохранён"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Вопрос принадлежит другому пользователю", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Вопрос не найден", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Вопрос не принадлежит указанной сессии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull Void> submitQuestionFeedback(
+            @PathVariable UUID sessionId,
+            @PathVariable UUID questionId,
+            @RequestBody @Valid @Sensitive FeedbackRequest request,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        interviewService.submitQuestionFeedback(sessionId, questionId, userDetails.getId(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/{sessionId}/report/feedback")
+    @Loggable(logArgs = true)
+    @Operation(summary = "Оценить итоговый отчёт", description = "Сохраняет отзыв пользователя на итоговый отчёт интервью: лайк или дизлайк, у дизлайка — причины и необязательный комментарий.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Отзыв сохранён"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Сессия или отчёт не найдены", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull Void> submitReportFeedback(
+            @PathVariable UUID sessionId,
+            @RequestBody @Valid @Sensitive FeedbackRequest request,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        interviewService.submitReportFeedback(sessionId, userDetails.getId(), request);
         return ResponseEntity.noContent().build();
     }
 

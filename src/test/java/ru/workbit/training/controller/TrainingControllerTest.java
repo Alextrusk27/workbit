@@ -22,12 +22,14 @@ import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.training.dto.CreateSessionRequest;
+import ru.workbit.training.dto.FeedbackRequest;
 import ru.workbit.training.dto.NormalizeInputRequest;
 import ru.workbit.training.dto.NormalizeInputResponse;
 import ru.workbit.training.dto.ReferenceAnswerResponse;
 import ru.workbit.training.dto.TrainingOptionsResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
 import ru.workbit.training.service.TrainingService;
 import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.config.SecurityConfig;
@@ -916,6 +918,268 @@ class TrainingControllerTest {
         void returns401WithoutAuthentication() throws Exception {
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(post(uri()))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions/{sessionId}/questions/{questionId}/feedback
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("SubmitQuestionFeedback")
+    class SubmitQuestionFeedback {
+
+        private final UUID sessionId = UUID.fromString("66666666-6666-6666-6666-666666666666");
+        private final UUID questionId = UUID.fromString("77777777-7777-7777-7777-777777777777");
+
+        private String uri() {
+            return BASE + "/sessions/" + sessionId + "/questions/" + questionId + "/feedback";
+        }
+
+        @Test
+        @DisplayName("Возвращает 204 и передаёт в сервис sessionId, questionId, userId и тело запроса")
+        void returns204AndPassesRequestToService() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.DOWN, List.of("Оценка занижена"), "Комментарий");
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isNoContent());
+
+            // then
+            verify(trainingService).submitQuestionFeedback(sessionId, questionId, USER_ID, request);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда vote отсутствует")
+        void returns400WhenVoteMissing() throws Exception {
+            // given
+            var body = """
+                    {"reasons":[]}
+                    """;
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда reasons отсутствует")
+        void returns400WhenReasonsMissing() throws Exception {
+            // given
+            var body = """
+                    {"vote":"DOWN"}
+                    """;
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда reasons длиннее 10 элементов")
+        void returns400WhenReasonsTooMany() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.DOWN, List.of(
+                    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"), null);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда элемент reasons длиннее 100 символов")
+        void returns400WhenReasonTooLong() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.DOWN, List.of("a".repeat(101)), null);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда comment длиннее 2000 символов")
+        void returns400WhenCommentTooLong() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), "a".repeat(2001));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 403, когда вопрос принадлежит другому пользователю")
+        void returns403WhenForbidden() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+            doThrow(new ForbiddenException("Access denied"))
+                    .when(trainingService).submitQuestionFeedback(sessionId, questionId, USER_ID, request);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда вопрос не найден")
+        void returns404WhenQuestionNotFound() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+            doThrow(new NotFoundException("Question not found"))
+                    .when(trainingService).submitQuestionFeedback(sessionId, questionId, USER_ID, request);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 409, когда вопрос не принадлежит указанной сессии")
+        void returns409WhenQuestionFromAnotherSession() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+            doThrow(new ConflictException("Invalid session"))
+                    .when(trainingService).submitQuestionFeedback(sessionId, questionId, USER_ID, request);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(uri())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /sessions/{sessionId}/report/feedback
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("SubmitReportFeedback")
+    class SubmitReportFeedback {
+
+        private final UUID sessionId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+
+        private String uri() {
+            return BASE + "/sessions/" + sessionId + "/report/feedback";
+        }
+
+        @Test
+        @DisplayName("Возвращает 204 и передаёт в сервис sessionId, userId и тело запроса")
+        void returns204AndPassesRequestToService() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isNoContent());
+
+            // then
+            verify(trainingService).submitReportFeedback(sessionId, USER_ID, request);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда vote отсутствует")
+        void returns400WhenVoteMissing() throws Exception {
+            // given
+            var body = """
+                    {"reasons":[]}
+                    """;
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда сессия или отчёт не найдены")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+            doThrow(new NotFoundException("Report not found"))
+                    .when(trainingService).submitReportFeedback(sessionId, USER_ID, request);
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var request = new FeedbackRequest(TrainingUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
+            mvc.perform(post(uri())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

@@ -184,6 +184,22 @@ CREATE TABLE IF NOT EXISTS training.report (
         CHECK (avg_score BETWEEN 1.0 AND 5.0)
 );
 
+CREATE TABLE IF NOT EXISTS training.user_feedback (
+    id           UUID PRIMARY KEY,
+    session_id   UUID NOT NULL REFERENCES training.session(id) ON DELETE CASCADE,
+    question_id  UUID REFERENCES training.question(id) ON DELETE CASCADE,
+    vote         VARCHAR(8) NOT NULL,
+    reasons      TEXT[] NOT NULL,
+    comment      TEXT,
+    created      TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_user_feedback_vote
+        CHECK (vote IN ('UP', 'DOWN'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_id
+    ON training.user_feedback(session_id);
+
 CREATE TABLE IF NOT EXISTS interview.session (
     id                  UUID PRIMARY KEY,
     user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -253,6 +269,22 @@ CREATE TABLE IF NOT EXISTS interview.report (
     CONSTRAINT chk_report_offer_probability
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
+
+CREATE TABLE IF NOT EXISTS interview.user_feedback (
+    id           UUID PRIMARY KEY,
+    session_id   UUID NOT NULL REFERENCES interview.session(id) ON DELETE CASCADE,
+    question_id  UUID REFERENCES interview.question(id) ON DELETE CASCADE,
+    vote         VARCHAR(8) NOT NULL,
+    reasons      TEXT[] NOT NULL,
+    comment      TEXT,
+    created      TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_user_feedback_vote
+        CHECK (vote IN ('UP', 'DOWN'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_id
+    ON interview.user_feedback(session_id);
 
 CREATE TABLE IF NOT EXISTS billing.account (
     user_id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,

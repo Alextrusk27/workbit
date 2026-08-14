@@ -10,6 +10,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.interview.dto.FeedbackRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
@@ -17,11 +18,13 @@ import ru.workbit.interview.dto.SubmitAnswerRequest;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
+import ru.workbit.interview.model.InterviewUserFeedback;
 import ru.workbit.interview.model.mapper.InterviewQuestionMapper;
 import ru.workbit.interview.model.mapper.InterviewReportMapper;
 import ru.workbit.interview.model.mapper.InterviewSessionMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
+import ru.workbit.interview.repository.InterviewUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
 import ru.workbit.llm.dto.LlmInterviewFollowUpDecision;
@@ -54,6 +57,7 @@ public class InterviewService {
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
+    private final InterviewUserFeedbackRepository interviewUserFeedbackRepository;
     private final InterviewWriter interviewWriter;
     private final VacancyService vacancyService;
     private final LlmService llmService;
@@ -169,6 +173,27 @@ public class InterviewService {
         if (session.getStatus() == InterviewSession.Status.CREATED) {
             session.setStatus(InterviewSession.Status.IN_PROGRESS);
         }
+    }
+
+    @Transactional
+    public void submitQuestionFeedback(UUID sessionId, UUID questionId, UUID userId, FeedbackRequest request) {
+        InterviewQuestion question = interviewQuestionRepository.findWithSessionById(questionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+        checkQuestionOwnership(question, userId);
+        checkQuestionSession(question, sessionId);
+
+        interviewUserFeedbackRepository.save(buildUserFeedback(sessionId, questionId, request));
+    }
+
+    @Transactional
+    public void submitReportFeedback(UUID sessionId, UUID userId, FeedbackRequest request) {
+        InterviewSession session = interviewSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        if (session.getReport() == null) {
+            throw new NotFoundException("Report not found");
+        }
+
+        interviewUserFeedbackRepository.save(buildUserFeedback(sessionId, null, request));
     }
 
     public InterviewReportResponse createReport(UUID sessionId, UUID userId) {
@@ -299,6 +324,17 @@ public class InterviewService {
                         .skip(1)
                         .map(q -> new LlmInterviewFollowUp(q.getText(), q.getAnswerText()))
                         .toList());
+    }
+
+    private static InterviewUserFeedback buildUserFeedback(UUID sessionId, UUID questionId,
+                                                           FeedbackRequest request) {
+        return InterviewUserFeedback.builder()
+                .sessionId(sessionId)
+                .questionId(questionId)
+                .vote(request.vote())
+                .reasons(request.reasons())
+                .comment(request.comment())
+                .build();
     }
 
     private void checkQuestionOwnership(InterviewQuestion question, UUID userId) {

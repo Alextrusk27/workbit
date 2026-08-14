@@ -19,6 +19,7 @@ import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
+import ru.workbit.interview.dto.FeedbackRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.dto.InterviewSessionResponse;
@@ -26,11 +27,13 @@ import ru.workbit.interview.dto.SubmitAnswerRequest;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
+import ru.workbit.interview.model.InterviewUserFeedback;
 import ru.workbit.interview.model.mapper.InterviewQuestionMapper;
 import ru.workbit.interview.model.mapper.InterviewReportMapper;
 import ru.workbit.interview.model.mapper.InterviewSessionMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
+import ru.workbit.interview.repository.InterviewUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
 import ru.workbit.llm.dto.LlmInterviewAnswerReview;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
@@ -75,6 +78,8 @@ class InterviewServiceTest {
     InterviewSessionRepository interviewSessionRepository;
     @Mock
     InterviewQuestionRepository interviewQuestionRepository;
+    @Mock
+    InterviewUserFeedbackRepository interviewUserFeedbackRepository;
     @Mock
     InterviewWriter interviewWriter;
     @Mock
@@ -900,6 +905,154 @@ class InterviewServiceTest {
             assertThatThrownBy(() -> interviewService.submitAnswer(request))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Question already answered");
+        }
+    }
+
+    @Nested
+    @DisplayName("SubmitQuestionFeedback")
+    class SubmitQuestionFeedback {
+
+        private final UUID userId = UUID.randomUUID();
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID questionId = UUID.randomUUID();
+
+        private InterviewQuestion questionInSession(UUID ownerId) {
+            InterviewSession session = aSession(sessionId, ownerId, InterviewSession.Status.IN_PROGRESS,
+                    UUID.randomUUID(), 5);
+            InterviewQuestion question = aQuestion(questionId, null, 1, false, true, "Вопрос", "Ответ");
+            question.setSession(session);
+            return question;
+        }
+
+        @Test
+        @DisplayName("Валидный запрос - сохраняет фидбэк с sessionId/questionId и полями из запроса")
+        void savesFeedbackWithRequestFields() {
+            // given
+            InterviewQuestion question = questionInSession(userId);
+            when(interviewQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(
+                    InterviewUserFeedback.Vote.DOWN, List.of("Оценка занижена"), "Комментарий");
+
+            // when
+            interviewService.submitQuestionFeedback(sessionId, questionId, userId, request);
+
+            // then
+            ArgumentCaptor<InterviewUserFeedback> captor = ArgumentCaptor.forClass(InterviewUserFeedback.class);
+            verify(interviewUserFeedbackRepository).save(captor.capture());
+            InterviewUserFeedback saved = captor.getValue();
+            assertThat(saved.getSessionId()).isEqualTo(sessionId);
+            assertThat(saved.getQuestionId()).isEqualTo(questionId);
+            assertThat(saved.getVote()).isEqualTo(InterviewUserFeedback.Vote.DOWN);
+            assertThat(saved.getReasons()).containsExactly("Оценка занижена");
+            assertThat(saved.getComment()).isEqualTo("Комментарий");
+        }
+
+        @Test
+        @DisplayName("Вопрос не найден - NotFoundException")
+        void throwsWhenQuestionNotFound() {
+            // given
+            when(interviewQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.submitQuestionFeedback(sessionId, questionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+            verifyNoInteractions(interviewUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другому пользователю - ForbiddenException")
+        void throwsWhenQuestionOwnedByAnotherUser() {
+            // given
+            InterviewQuestion question = questionInSession(UUID.randomUUID());
+            when(interviewQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.submitQuestionFeedback(sessionId, questionId, userId, request))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Access denied");
+            verifyNoInteractions(interviewUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Вопрос принадлежит другой сессии, чем в запросе - ConflictException")
+        void throwsWhenQuestionBelongsToAnotherSession() {
+            // given
+            InterviewQuestion question = questionInSession(userId);
+            when(interviewQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.submitQuestionFeedback(
+                    UUID.randomUUID(), questionId, userId, request))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("Invalid session");
+            verifyNoInteractions(interviewUserFeedbackRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("SubmitReportFeedback")
+    class SubmitReportFeedback {
+
+        private final UUID userId = UUID.randomUUID();
+        private final UUID sessionId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Отчёт сформирован - сохраняет фидбэк с questionId=null")
+        void savesFeedbackWithNullQuestionId() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.COMPLETED,
+                    UUID.randomUUID(), 5);
+            session.setReport(InterviewReport.builder()
+                    .avgScore(4.0).offerProbability(InterviewReport.OfferProbability.HIGH)
+                    .overallFeedback("Фидбэк").build());
+            when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), "Отлично");
+
+            // when
+            interviewService.submitReportFeedback(sessionId, userId, request);
+
+            // then
+            ArgumentCaptor<InterviewUserFeedback> captor = ArgumentCaptor.forClass(InterviewUserFeedback.class);
+            verify(interviewUserFeedbackRepository).save(captor.capture());
+            InterviewUserFeedback saved = captor.getValue();
+            assertThat(saved.getSessionId()).isEqualTo(sessionId);
+            assertThat(saved.getQuestionId()).isNull();
+            assertThat(saved.getVote()).isEqualTo(InterviewUserFeedback.Vote.UP);
+            assertThat(saved.getComment()).isEqualTo("Отлично");
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена у пользователя - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.submitReportFeedback(sessionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(interviewUserFeedbackRepository);
+        }
+
+        @Test
+        @DisplayName("Отчёт ещё не сформирован - NotFoundException")
+        void throwsWhenReportNotYetGenerated() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    UUID.randomUUID(), 5);
+            when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+            FeedbackRequest request = new FeedbackRequest(InterviewUserFeedback.Vote.UP, List.of(), null);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.submitReportFeedback(sessionId, userId, request))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Report not found");
+            verifyNoInteractions(interviewUserFeedbackRepository);
         }
     }
 

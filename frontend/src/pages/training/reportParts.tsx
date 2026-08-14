@@ -33,13 +33,17 @@ export function QuestionEntry({
 }
 
 /** Эталонный ответ по кнопке: до первого клика запрос не уходит, дальше
- *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM. */
+ *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM.
+ *  `withFeedback` добавляет лайк/дизлайк под текстом — для прогона, где
+ *  виджета кейса ещё нет; в отчёте оценивается кейс целиком. */
 export function ReferenceAnswer({
   sessionId,
   questionId,
+  withFeedback = false,
 }: {
   sessionId: string
   questionId: string
+  withFeedback?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const { data, isFetching, isError, error } = useReferenceAnswer(
@@ -75,9 +79,20 @@ export function ReferenceAnswer({
         </div>
       )}
       {data && (
-        <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">
-          {data.answer}
-        </p>
+        <>
+          <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">
+            {data.answer}
+          </p>
+          {withFeedback && (
+            <FeedbackWidget
+              variant="reference"
+              className="border-divider mt-4 border-t pt-3.5"
+              submit={(body) =>
+                trainingApi.questionFeedback(sessionId, questionId, body)
+              }
+            />
+          )}
+        </>
       )}
     </div>
   )

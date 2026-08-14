@@ -220,6 +220,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
                 <ReferenceAnswer
                   sessionId={session.id}
                   questionId={item.q.questionId}
+                  withFeedback
                 />
               </>
             )}

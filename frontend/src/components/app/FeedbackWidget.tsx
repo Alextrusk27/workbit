@@ -11,13 +11,34 @@ export interface FeedbackBody {
   comment?: string
 }
 
-const REASONS = [
-  'Вопрос не по теме',
-  'Оценка занижена',
-  'Разбор поверхностный',
-  'Эталонный ответ неточный',
-  'Другое',
-]
+const VARIANTS = {
+  case: {
+    ask: 'Разбор полезен?',
+    like: 'Разбор полезен',
+    dislike: 'Разбор не полезен',
+    whatsWrong: 'Что не так с разбором',
+    reasons: [
+      'Вопрос не по теме',
+      'Оценка занижена',
+      'Оценка завышена',
+      'Разбор поверхностный',
+      'Эталонный ответ неточный',
+      'Другое',
+    ],
+  },
+  reference: {
+    ask: 'Эталонный ответ полезен?',
+    like: 'Эталонный ответ полезен',
+    dislike: 'Эталонный ответ не полезен',
+    whatsWrong: 'Что не так с эталонным ответом',
+    reasons: [
+      'Эталонный ответ неточный',
+      'Слишком поверхностный',
+      'Не отвечает на вопрос',
+      'Другое',
+    ],
+  },
+} as const
 
 type FeedbackState = 'idle' | 'liked' | 'disliked-open' | 'sent'
 
@@ -87,15 +108,19 @@ function thumbClasses(selected: boolean): string {
   )
 }
 
-/** Лайк/дизлайк у разбора: лайк уходит сразу, дизлайк раскрывает панель с
- *  причинами. Ошибки отправки глотаются — фидбэк не критичный путь. */
+/** Лайк/дизлайк у разбора или эталонного ответа: лайк уходит сразу, дизлайк
+ *  раскрывает панель с причинами. Ошибки отправки глотаются — фидбэк не
+ *  критичный путь. */
 export function FeedbackWidget({
   submit,
   className,
+  variant = 'case',
 }: {
   submit: (body: FeedbackBody) => Promise<unknown>
   className?: string
+  variant?: keyof typeof VARIANTS
 }) {
+  const texts = VARIANTS[variant]
   const [state, setState] = useState<FeedbackState>('idle')
   const [reasons, setReasons] = useState<string[]>([])
   const [comment, setComment] = useState('')
@@ -157,10 +182,10 @@ export function FeedbackWidget({
   return (
     <div className={className}>
       <div className="flex items-center gap-2.5">
-        <span className="text-dim text-[13px]">Разбор полезен?</span>
+        <span className="text-dim text-[13px]">{texts.ask}</span>
         <button
           type="button"
-          aria-label="Разбор полезен"
+          aria-label={texts.like}
           aria-pressed={state === 'liked'}
           onClick={onLike}
           className={thumbClasses(state === 'liked')}
@@ -169,7 +194,7 @@ export function FeedbackWidget({
         </button>
         <button
           type="button"
-          aria-label="Разбор не полезен"
+          aria-label={texts.dislike}
           aria-pressed={state === 'disliked-open'}
           onClick={onDislike}
           className={thumbClasses(state === 'disliked-open')}
@@ -189,10 +214,10 @@ export function FeedbackWidget({
             className="border-line bg-glass mt-3 max-w-[560px] rounded-xl border p-5"
           >
             <h4 className="text-ink text-sm font-semibold">
-              Что не так с разбором?
+              {texts.whatsWrong}?
             </h4>
             <div className="mt-3 flex flex-wrap gap-2">
-              {REASONS.map((reason) => {
+              {texts.reasons.map((reason) => {
                 const selected = reasons.includes(reason)
                 return (
                   <button
@@ -217,7 +242,7 @@ export function FeedbackWidget({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Расскажите своими словами (необязательно)…"
-              aria-label="Что не так с разбором"
+              aria-label={texts.whatsWrong}
               className={cn(
                 'border-line bg-surface text-ink mt-3 min-h-14 w-full rounded-md border px-3.5 py-2.5 text-sm leading-relaxed',
                 'placeholder:text-dim resize-y transition-colors',

@@ -2,11 +2,10 @@ import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
-import type { Quota, UsageEvent, UsageTarget } from '@/features/billing/api'
+import type { UsageEvent, UsageTarget } from '@/features/billing/api'
 import { PLAN_LABELS } from '@/features/billing/labels'
 import { useQuota, useUsage } from '@/features/billing/useBilling'
 import { motionTokens } from '@/lib/motion'
-import { trainingsWord } from '@/lib/plural'
 
 const TARGET_LABELS: Record<UsageTarget, string> = {
   INTERVIEW: 'AI-интервью',
@@ -21,37 +20,13 @@ function latestCreditBatch(events: UsageEvent[] | undefined): UsageEvent[] {
   )
 }
 
-function packTitle(credit: UsageEvent): string {
-  const unit =
-    credit.target === 'INTERVIEW' ? 'интервью' : trainingsWord(credit.delta)
-  return `+${credit.delta} ${unit} зачислены`
-}
-
-function packSubtitle(credit: UsageEvent, quota: Quota): string {
-  if (credit.target === 'INTERVIEW') {
-    const left = quota.planInterviewsLeft + quota.packInterviewsLeft
-    return `Пакет не сгорает — теперь доступно ${left} интервью.`
-  }
-  const left = quota.planTrainingsLeft + quota.packTrainingsLeft
-  const unit = trainingsWord(left)
-  const verb =
-    unit === 'тренировка'
-      ? 'доступна'
-      : unit === 'тренировки'
-        ? 'доступны'
-        : 'доступно'
-  return `Пакет не сгорает — теперь ${verb} ${left} ${unit}.`
-}
-
-function CheckCircle({ size }: { size: 'lg' | 'md' }) {
+function CheckCircle() {
   return (
-    <span
-      className={`bg-ok/14 mx-auto flex items-center justify-center rounded-full ${size === 'lg' ? 'size-14' : 'size-12'}`}
-    >
+    <span className="bg-ok/14 mx-auto flex size-14 items-center justify-center rounded-full">
       <svg
         viewBox="0 0 24 24"
-        width={size === 'lg' ? 26 : 22}
-        height={size === 'lg' ? 26 : 22}
+        width={26}
+        height={26}
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -66,8 +41,8 @@ function CheckCircle({ size }: { size: 'lg' | 'md' }) {
   )
 }
 
-/** Модалка после возврата с оплаты: тариф с зачислениями либо короткий
- *  вариант для пакета — по последнему зачислению из истории операций. */
+/** Модалка после возврата с оплаты: тариф и зачисления
+ *  из последней CREDIT-пачки истории операций. */
 export function PaymentSuccessModal({
   open,
   onClose,
@@ -89,7 +64,6 @@ export function PaymentSuccessModal({
   }, [open, onClose])
 
   const credits = latestCreditBatch(usage?.events)
-  const isPack = credits.length === 1 && quota
 
   return (
     <AnimatePresence>
@@ -117,61 +91,47 @@ export function PaymentSuccessModal({
             aria-label="Оплата прошла"
             className="border-line bg-pop shadow-chat w-full max-w-[440px] rounded-2xl border p-7 text-center"
           >
-            {isPack ? (
-              <>
-                <CheckCircle size="md" />
-                <h3 className="text-ink mt-[18px] text-[18px] font-bold">
-                  {packTitle(credits[0])}
-                </h3>
-                <p className="text-muted mt-2 text-[14.5px]">
-                  {packSubtitle(credits[0], quota)}
-                </p>
-              </>
-            ) : (
-              <>
-                <CheckCircle size="lg" />
-                <h3 className="text-ink mt-[18px] text-[20px] font-bold">
-                  Оплата прошла
-                </h3>
-                {quota && (
-                  <p className="text-muted mt-2 text-[14.5px]">
-                    Тариф{' '}
-                    <span className="text-ink font-semibold">
-                      {PLAN_LABELS[quota.plan]}
+            <CheckCircle />
+            <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+              Оплата прошла
+            </h3>
+            {quota && (
+              <p className="text-muted mt-2 text-[14.5px]">
+                Тариф{' '}
+                <span className="text-ink font-semibold">
+                  {PLAN_LABELS[quota.plan]}
+                </span>
+                {quota.planExpiresAt &&
+                  ` активен до ${new Date(
+                    quota.planExpiresAt,
+                  ).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}`}
+              </p>
+            )}
+            {credits.length > 0 && (
+              <div className="mt-5 flex flex-col gap-2">
+                {credits.map((credit) => (
+                  <div
+                    key={credit.target}
+                    className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
+                  >
+                    <span className="text-ink text-sm">
+                      {TARGET_LABELS[credit.target]}
                     </span>
-                    {quota.planExpiresAt &&
-                      ` активен до ${new Date(
-                        quota.planExpiresAt,
-                      ).toLocaleDateString('ru-RU', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}`}
-                  </p>
-                )}
-                {credits.length > 0 && (
-                  <div className="mt-5 flex flex-col gap-2">
-                    {credits.map((credit) => (
-                      <div
-                        key={credit.target}
-                        className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
-                      >
-                        <span className="text-ink text-sm">
-                          {TARGET_LABELS[credit.target]}
-                        </span>
-                        <span className="text-ok text-sm font-semibold tabular-nums">
-                          +{credit.delta}
-                        </span>
-                      </div>
-                    ))}
+                    <span className="text-ok text-sm font-semibold tabular-nums">
+                      +{credit.delta}
+                    </span>
                   </div>
-                )}
-                {user && (
-                  <p className="text-dim mt-3.5 text-[12.5px]">
-                    Чек отправили на {user.email}
-                  </p>
-                )}
-              </>
+                ))}
+              </div>
+            )}
+            {user && (
+              <p className="text-dim mt-3.5 text-[12.5px]">
+                Чек отправили на {user.email}
+              </p>
             )}
             <Button className="mt-5 w-full" onClick={onClose}>
               Продолжить

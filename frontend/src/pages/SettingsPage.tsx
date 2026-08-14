@@ -24,8 +24,8 @@ import { usePageTitle } from '@/lib/usePageTitle'
 
 const DELETE_WARNING =
   'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. Все ' +
-  'неиспользованные лимиты — по подписке и купленным пакетам — сгорают без ' +
-  'возврата. Восстановить их будет нельзя.'
+  'неиспользованные лимиты тарифа сгорают без возврата. Восстановить их ' +
+  'будет нельзя.'
 
 function formatExpiry(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -119,7 +119,7 @@ function PlanSection() {
       )}
 
       <p className="text-dim mt-5 text-sm">
-        Сменить тариф или докупить пакет можно на странице{' '}
+        Сменить или продлить тариф можно на странице{' '}
         <Link
           to="/pricing"
           className="text-indigo hover:text-violet transition-colors"
@@ -137,10 +137,9 @@ function LimitCard({
   counters,
 }: {
   title: string
-  counters: { plan: UsageCounter; pack: UsageCounter }
+  counters: UsageCounter
 }) {
-  const left = counters.plan.left + counters.pack.left
-  const total = counters.plan.total + counters.pack.total
+  const { left, total } = counters
   const used = total - left
   const usedShare = total > 0 ? (used / total) * 100 : 0
 
@@ -160,9 +159,7 @@ function LimitCard({
         />
       </div>
       <p className="text-dim mt-2.5 text-[12.5px] tabular-nums">
-        Использовано {used} · Подписка {counters.plan.left} из{' '}
-        {counters.plan.total} · Пакет {counters.pack.left} из{' '}
-        {counters.pack.total}
+        Использовано {used} из {total}
       </p>
     </div>
   )

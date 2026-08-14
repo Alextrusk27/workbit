@@ -72,14 +72,3 @@ export const plans: Plan[] = [
     ],
   },
 ]
-
-export interface Pack {
-  title: string
-  price: string
-}
-
-/** Разовые пакеты — докупаются поверх любого тарифа и не сгорают. */
-export const packs: Pack[] = [
-  { title: '+5 AI-интервью', price: '290 ₽' },
-  { title: '+10 тренировок', price: '90 ₽' },
-]

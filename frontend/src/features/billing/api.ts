@@ -7,8 +7,6 @@ export interface Quota {
   planExpiresAt: string | null
   planInterviewsLeft: number
   planTrainingsLeft: number
-  packInterviewsLeft: number
-  packTrainingsLeft: number
 }
 
 export interface UsageCounter {
@@ -28,8 +26,8 @@ export interface UsageEvent {
 }
 
 export interface Usage {
-  interviews: { plan: UsageCounter; pack: UsageCounter }
-  trainings: { plan: UsageCounter; pack: UsageCounter }
+  interviews: UsageCounter
+  trainings: UsageCounter
   events: UsageEvent[]
 }
 

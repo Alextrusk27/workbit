@@ -56,8 +56,8 @@ function PlanLine() {
       </span>
       <span className="tabular-nums">
         {' '}
-        · осталось интервью: {data.planInterviewsLeft + data.packInterviewsLeft}
-        , тренировок: {data.planTrainingsLeft + data.packTrainingsLeft}
+        · осталось интервью: {data.planInterviewsLeft}, тренировок:{' '}
+        {data.planTrainingsLeft}
       </span>{' '}
       ·{' '}
       <Link

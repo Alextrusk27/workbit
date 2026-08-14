@@ -292,18 +292,11 @@ CREATE TABLE IF NOT EXISTS billing.account (
     plan_expires_at      TIMESTAMPTZ,
     plan_interviews_left INT NOT NULL,
     plan_trainings_left  INT NOT NULL,
-    pack_interviews_left INT NOT NULL,
-    pack_trainings_left  INT NOT NULL,
-    pack_interviews_total INT NOT NULL DEFAULT 0,
-    pack_trainings_total INT NOT NULL DEFAULT 0,
 
     CONSTRAINT chk_account_plan
         CHECK (plan IN ('FREE', 'PRO', 'MAX')),
     CONSTRAINT chk_account_left_non_negative
-        CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0
-            AND pack_interviews_left >= 0 AND pack_trainings_left >= 0),
-    CONSTRAINT chk_account_pack_total_non_negative
-        CHECK (pack_interviews_total >= 0 AND pack_trainings_total >= 0),
+        CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0),
     CONSTRAINT chk_account_paid_plan_expires
         CHECK (plan = 'FREE' OR plan_expires_at IS NOT NULL)
 );

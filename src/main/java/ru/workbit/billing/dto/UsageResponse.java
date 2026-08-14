@@ -7,24 +7,15 @@ import java.time.Instant;
 import java.util.List;
 
 public record UsageResponse(
-        @Schema(description = "Счётчики интервью")
-        UsageCounters interviews,
+        @Schema(description = "Счётчик интервью текущего тарифа")
+        UsageCounter interviews,
 
-        @Schema(description = "Счётчики тренировок")
-        UsageCounters trainings,
+        @Schema(description = "Счётчик тренировок текущего тарифа")
+        UsageCounter trainings,
 
         @Schema(description = "История операций, новые первыми")
         List<UsageEventResponse> events
 ) {
-    public record UsageCounters(
-            @Schema(description = "Подписочная квота текущего тарифа")
-            UsageCounter plan,
-
-            @Schema(description = "Квота из докупленных пакетов")
-            UsageCounter pack
-    ) {
-    }
-
     public record UsageCounter(
             @Schema(description = "Остаток", example = "4")
             int left,

@@ -46,21 +46,17 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
                 .plan(BillingAccount.Plan.FREE)
                 .planInterviewsLeft(planInterviewsLeft)
                 .planTrainingsLeft(planTrainingsLeft)
-                .packInterviewsLeft(0)
-                .packTrainingsLeft(0)
                 .build();
     }
 
     private BillingAccount aProAccount(UUID userId, Instant planExpiresAt, int planInterviewsLeft,
-                                        int planTrainingsLeft, int packInterviewsLeft, int packTrainingsLeft) {
+                                        int planTrainingsLeft) {
         return BillingAccount.builder()
                 .userId(userId)
                 .plan(BillingAccount.Plan.PRO)
                 .planExpiresAt(planExpiresAt)
                 .planInterviewsLeft(planInterviewsLeft)
                 .planTrainingsLeft(planTrainingsLeft)
-                .packInterviewsLeft(packInterviewsLeft)
-                .packTrainingsLeft(packTrainingsLeft)
                 .build();
     }
 
@@ -85,10 +81,6 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getPlanExpiresAt()).isNull();
             assertThat(saved.getPlanInterviewsLeft()).isEqualTo(FREE_INTERVIEWS);
             assertThat(saved.getPlanTrainingsLeft()).isEqualTo(FREE_TRAININGS);
-            assertThat(saved.getPackInterviewsLeft()).isZero();
-            assertThat(saved.getPackTrainingsLeft()).isZero();
-            assertThat(saved.getPackInterviewsTotal()).isZero();
-            assertThat(saved.getPackTrainingsTotal()).isZero();
         }
 
         @Test
@@ -153,7 +145,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         void debitsOnActiveProPlan() {
             // given
             var user = em.persistAndFlush(aUser("billing-debit-plan-interview-pro@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5, 0, 0));
+            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5));
 
             // when
             int updated = repository.debitPlanInterview(user.getId(), Instant.now());
@@ -187,7 +179,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         void returnsZeroWhenProPlanExpired() {
             // given
             var user = em.persistAndFlush(aUser("billing-debit-plan-interview-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5, 0, 0));
+            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5));
 
             // when
             int updated = repository.debitPlanInterview(user.getId(), Instant.now());
@@ -228,7 +220,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         void debitsOnActiveProPlan() {
             // given
             var user = em.persistAndFlush(aUser("billing-debit-plan-training-pro@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5, 0, 0));
+            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5));
 
             // when
             int updated = repository.debitPlanTraining(user.getId(), Instant.now());
@@ -262,7 +254,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         void returnsZeroWhenProPlanExpired() {
             // given
             var user = em.persistAndFlush(aUser("billing-debit-plan-training-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5, 0, 0));
+            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5));
 
             // when
             int updated = repository.debitPlanTraining(user.getId(), Instant.now());
@@ -272,88 +264,6 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
             assertThat(saved.getPlanTrainingsLeft()).isEqualTo(5);
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("DebitPackInterview")
-    class DebitPackInterview {
-
-        @Test
-        @DisplayName("Списывает pack-остаток независимо от плана и истёкшего срока")
-        void debitsRegardlessOfExpiredPlan() {
-            // given — PRO с истёкшим plan_expires_at: списание пакета не зависит от активности плана
-            var user = em.persistAndFlush(aUser("billing-debit-pack-interview-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 0, 0, 2, 5));
-
-            // when
-            int updated = repository.debitPackInterview(user.getId());
-
-            // then
-            assertThat(updated).isEqualTo(1);
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPackInterviewsLeft()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при нулевом pack_interviews_left")
-        void returnsZeroWhenNoPackInterviewsLeft() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-debit-pack-interview-zero@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 1, 3));
-
-            // when
-            int updated = repository.debitPackInterview(user.getId());
-
-            // then
-            assertThat(updated).isZero();
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPackInterviewsLeft()).isZero();
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("DebitPackTraining")
-    class DebitPackTraining {
-
-        @Test
-        @DisplayName("Списывает pack-остаток независимо от плана и истёкшего срока")
-        void debitsRegardlessOfExpiredPlan() {
-            // given — PRO с истёкшим plan_expires_at: списание пакета не зависит от активности плана
-            var user = em.persistAndFlush(aUser("billing-debit-pack-training-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 0, 0, 5, 2));
-
-            // when
-            int updated = repository.debitPackTraining(user.getId());
-
-            // then
-            assertThat(updated).isEqualTo(1);
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPackTrainingsLeft()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при нулевом pack_trainings_left")
-        void returnsZeroWhenNoPackTrainingsLeft() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-debit-pack-training-zero@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 1, 3));
-
-            // when
-            int updated = repository.debitPackTraining(user.getId());
-
-            // then
-            assertThat(updated).isZero();
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPackTrainingsLeft()).isZero();
         }
     }
 
@@ -374,9 +284,8 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             assertThatThrownBy(() -> em.getEntityManager()
                     .createNativeQuery("""
                             INSERT INTO billing.account
-                                (user_id, plan, plan_expires_at, plan_interviews_left, plan_trainings_left,
-                                 pack_interviews_left, pack_trainings_left)
-                            VALUES (:userId, 'BAD_PLAN', now() + interval '1 hour', 1, 3, 0, 0)
+                                (user_id, plan, plan_expires_at, plan_interviews_left, plan_trainings_left)
+                            VALUES (:userId, 'BAD_PLAN', now() + interval '1 hour', 1, 3)
                             """)
                     .setParameter("userId", user.getId())
                     .executeUpdate())
@@ -400,7 +309,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         void throwsOnPaidPlanWithoutExpiry() {
             // given
             var user = em.persistAndFlush(aUser("billing-constraint-no-expiry@example.com"));
-            var bad = aProAccount(user.getId(), null, 5, 5, 0, 0);
+            var bad = aProAccount(user.getId(), null, 5, 5);
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))

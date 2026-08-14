@@ -50,16 +50,13 @@ class QuotaServiceTest {
     QuotaService quotaService;
 
     private static BillingAccount anAccount(BillingAccount.Plan plan, Instant planExpiresAt,
-                                            int planInterviewsLeft, int planTrainingsLeft,
-                                            int packInterviewsLeft, int packTrainingsLeft) {
+                                            int planInterviewsLeft, int planTrainingsLeft) {
         return BillingAccount.builder()
                 .userId(USER_ID)
                 .plan(plan)
                 .planExpiresAt(planExpiresAt)
                 .planInterviewsLeft(planInterviewsLeft)
                 .planTrainingsLeft(planTrainingsLeft)
-                .packInterviewsLeft(packInterviewsLeft)
-                .packTrainingsLeft(packTrainingsLeft)
                 .build();
     }
 
@@ -68,7 +65,7 @@ class QuotaServiceTest {
     class GetQuota {
 
         @Test
-        @DisplayName("Строки в БД нет - виртуальный дефолт FREE (1 интервью, 3 тренировки), пакеты нулевые")
+        @DisplayName("Строки в БД нет - виртуальный дефолт FREE (1 интервью, 3 тренировки)")
         void returnsFreeDefaultWhenNoRow() {
             // given
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.empty());
@@ -77,7 +74,7 @@ class QuotaServiceTest {
             QuotaResponse result = quotaService.getQuota(USER_ID);
 
             // then
-            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.FREE, null, 1, 3, 0, 0));
+            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.FREE, null, 1, 3));
         }
 
         @Test
@@ -85,29 +82,29 @@ class QuotaServiceTest {
         void returnsAccountAsIsWhenPlanActive() {
             // given
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, future, 7, 15, 2, 4);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, future, 7, 15);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
             QuotaResponse result = quotaService.getQuota(USER_ID);
 
             // then
-            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.PRO, future, 7, 15, 2, 4));
+            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.PRO, future, 7, 15));
         }
 
         @Test
-        @DisplayName("Истёкший PRO - читается как FREE с нулевыми подписочными остатками, planExpiresAt null, pack-остатки сохраняются")
-        void readsExpiredPlanAsFreeKeepingPackLeft() {
+        @DisplayName("Истёкший PRO - читается как FREE с нулевыми остатками, planExpiresAt null")
+        void readsExpiredPlanAsFree() {
             // given
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10, 3, 6);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
             QuotaResponse result = quotaService.getQuota(USER_ID);
 
             // then
-            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0, 3, 6));
+            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0));
         }
     }
 
@@ -116,10 +113,10 @@ class QuotaServiceTest {
     class CheckInterviewAvailable {
 
         @Test
-        @DisplayName("Суммарный остаток интервью (plan+pack) равен нулю - PaymentRequiredException")
+        @DisplayName("Остаток интервью равен нулю - PaymentRequiredException")
         void throwsWhenNoInterviewsLeft() {
             // given
-            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 0, 3, 0, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 0, 3);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -129,11 +126,11 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Истёкший PRO с нулевым pack-остатком интервью - PaymentRequiredException")
-        void throwsWhenExpiredPlanAndNoPackLeft() {
+        @DisplayName("Истёкший PRO - PaymentRequiredException, несписанный остаток не учитывается")
+        void throwsWhenPlanExpired() {
             // given
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10, 0, 6);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -143,10 +140,10 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Подписочный остаток нулевой, но pack > 0 - проходит без исключения")
-        void passesWhenPackLeftCoversZeroPlan() {
+        @DisplayName("Остаток интервью больше нуля - проходит без исключения")
+        void passesWhenInterviewsLeft() {
             // given
-            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 0, 3, 2, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 1, 0);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -159,10 +156,10 @@ class QuotaServiceTest {
     class CheckTrainingAvailable {
 
         @Test
-        @DisplayName("Суммарный остаток тренировок (plan+pack) равен нулю - PaymentRequiredException")
+        @DisplayName("Остаток тренировок равен нулю - PaymentRequiredException")
         void throwsWhenNoTrainingsLeft() {
             // given
-            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 1, 0, 0, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 1, 0);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -172,11 +169,11 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Истёкший PRO с нулевым pack-остатком тренировок - PaymentRequiredException")
-        void throwsWhenExpiredPlanAndNoPackLeft() {
+        @DisplayName("Истёкший PRO - PaymentRequiredException, несписанный остаток не учитывается")
+        void throwsWhenPlanExpired() {
             // given
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10, 6, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -186,10 +183,10 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Подписочный остаток нулевой, но pack > 0 - проходит без исключения")
-        void passesWhenPackLeftCoversZeroPlan() {
+        @DisplayName("Остаток тренировок больше нуля - проходит без исключения")
+        void passesWhenTrainingsLeft() {
             // given
-            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 1, 0, 0, 3);
+            BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 0, 3);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -218,7 +215,7 @@ class QuotaServiceTest {
         void throwsWhenPlanExpired() {
             // given
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10, 0, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -232,7 +229,7 @@ class QuotaServiceTest {
         void passesWhenPlanIsActivePro() {
             // given
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.PRO, future, 5, 10, 0, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, future, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -244,7 +241,7 @@ class QuotaServiceTest {
         void passesWhenPlanIsActiveMax() {
             // given
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 40, 0, 0);
+            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 40);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -257,7 +254,7 @@ class QuotaServiceTest {
     class GetUsage {
 
         @Test
-        @DisplayName("Строки в БД нет - виртуальный дефолт FREE по обоим счётчикам (total = сетка FREE), пакеты нулевые")
+        @DisplayName("Строки в БД нет - виртуальный дефолт FREE по обоим счётчикам (total = сетка FREE)")
         void returnsFreeDefaultCountersWhenNoRow() {
             // given
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.empty());
@@ -267,29 +264,17 @@ class QuotaServiceTest {
             UsageResponse result = quotaService.getUsage(USER_ID);
 
             // then
-            assertThat(result.interviews().plan()).isEqualTo(new UsageResponse.UsageCounter(1, 1));
-            assertThat(result.interviews().pack()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
-            assertThat(result.trainings().plan()).isEqualTo(new UsageResponse.UsageCounter(3, 3));
-            assertThat(result.trainings().pack()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
+            assertThat(result.interviews()).isEqualTo(new UsageResponse.UsageCounter(1, 1));
+            assertThat(result.trainings()).isEqualTo(new UsageResponse.UsageCounter(3, 3));
             assertThat(result.events()).isEmpty();
         }
 
         @Test
-        @DisplayName("Активный тариф PRO - plan left из аккаунта, total из сетки тарифа; pack left/total из полей аккаунта")
+        @DisplayName("Активный тариф PRO - left из аккаунта, total из сетки тарифа")
         void returnsAccountCountersWhenPlanActive() {
             // given
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
-            BillingAccount account = BillingAccount.builder()
-                    .userId(USER_ID)
-                    .plan(BillingAccount.Plan.PRO)
-                    .planExpiresAt(future)
-                    .planInterviewsLeft(7)
-                    .planTrainingsLeft(15)
-                    .packInterviewsLeft(2)
-                    .packInterviewsTotal(5)
-                    .packTrainingsLeft(4)
-                    .packTrainingsTotal(10)
-                    .build();
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, future, 7, 15);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
             when(usageEventRepository.findAllByUserIdOrderByAtDesc(USER_ID)).thenReturn(List.of());
 
@@ -297,30 +282,18 @@ class QuotaServiceTest {
             UsageResponse result = quotaService.getUsage(USER_ID);
 
             // then
-            assertThat(result.interviews().plan())
+            assertThat(result.interviews())
                     .isEqualTo(new UsageResponse.UsageCounter(7, BillingAccount.Plan.PRO.getInterviews()));
-            assertThat(result.interviews().pack()).isEqualTo(new UsageResponse.UsageCounter(2, 5));
-            assertThat(result.trainings().plan())
+            assertThat(result.trainings())
                     .isEqualTo(new UsageResponse.UsageCounter(15, BillingAccount.Plan.PRO.getTrainings()));
-            assertThat(result.trainings().pack()).isEqualTo(new UsageResponse.UsageCounter(4, 10));
         }
 
         @Test
-        @DisplayName("Истёкший платный тариф - plan-счётчики нулевые (0/0), pack-счётчики остаются как в аккаунте")
+        @DisplayName("Истёкший платный тариф - счётчики нулевые (0/0)")
         void returnsZeroedPlanCountersWhenPlanExpired() {
             // given
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
-            BillingAccount account = BillingAccount.builder()
-                    .userId(USER_ID)
-                    .plan(BillingAccount.Plan.PRO)
-                    .planExpiresAt(past)
-                    .planInterviewsLeft(5)
-                    .planTrainingsLeft(10)
-                    .packInterviewsLeft(3)
-                    .packInterviewsTotal(5)
-                    .packTrainingsLeft(6)
-                    .packTrainingsTotal(10)
-                    .build();
+            BillingAccount account = anAccount(BillingAccount.Plan.PRO, past, 5, 10);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
             when(usageEventRepository.findAllByUserIdOrderByAtDesc(USER_ID)).thenReturn(List.of());
 
@@ -328,10 +301,8 @@ class QuotaServiceTest {
             UsageResponse result = quotaService.getUsage(USER_ID);
 
             // then
-            assertThat(result.interviews().plan()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
-            assertThat(result.trainings().plan()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
-            assertThat(result.interviews().pack()).isEqualTo(new UsageResponse.UsageCounter(3, 5));
-            assertThat(result.trainings().pack()).isEqualTo(new UsageResponse.UsageCounter(6, 10));
+            assertThat(result.interviews()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
+            assertThat(result.trainings()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
         }
 
         @Test
@@ -382,33 +353,6 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Списание с plan-остатка успешно (>0) - pack не трогается")
-        void debitsFromPlanFirst() {
-            // given
-            when(billingAccountRepository.debitPlanInterview(eq(USER_ID), any())).thenReturn(1);
-
-            // when
-            quotaService.debitInterview(USER_ID, INTERVIEW_LABEL);
-
-            // then
-            verify(billingAccountRepository, never()).debitPackInterview(any());
-        }
-
-        @Test
-        @DisplayName("Plan-остаток исчерпан (0) - списывается pack")
-        void fallsBackToPackWhenPlanExhausted() {
-            // given
-            when(billingAccountRepository.debitPlanInterview(eq(USER_ID), any())).thenReturn(0);
-            when(billingAccountRepository.debitPackInterview(USER_ID)).thenReturn(1);
-
-            // when
-            quotaService.debitInterview(USER_ID, INTERVIEW_LABEL);
-
-            // then
-            verify(billingAccountRepository).debitPackInterview(USER_ID);
-        }
-
-        @Test
         @DisplayName("Успешное списание - сохраняет SPEND-событие с переданным label и target INTERVIEW")
         void savesSpendEventWithLabelAndTarget() {
             // given
@@ -429,11 +373,10 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("И plan, и pack вернули 0 - PaymentRequiredException, событие не сохраняется")
-        void throwsWhenBothPlanAndPackExhausted() {
+        @DisplayName("Списание вернуло 0 - PaymentRequiredException, событие не сохраняется")
+        void throwsWhenPlanExhausted() {
             // given
             when(billingAccountRepository.debitPlanInterview(eq(USER_ID), any())).thenReturn(0);
-            when(billingAccountRepository.debitPackInterview(USER_ID)).thenReturn(0);
 
             // when / then
             assertThatThrownBy(() -> quotaService.debitInterview(USER_ID, INTERVIEW_LABEL))
@@ -464,33 +407,6 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("Списание с plan-остатка успешно (>0) - pack не трогается")
-        void debitsFromPlanFirst() {
-            // given
-            when(billingAccountRepository.debitPlanTraining(eq(USER_ID), any())).thenReturn(1);
-
-            // when
-            quotaService.debitTraining(USER_ID, TRAINING_LABEL);
-
-            // then
-            verify(billingAccountRepository, never()).debitPackTraining(any());
-        }
-
-        @Test
-        @DisplayName("Plan-остаток исчерпан (0) - списывается pack")
-        void fallsBackToPackWhenPlanExhausted() {
-            // given
-            when(billingAccountRepository.debitPlanTraining(eq(USER_ID), any())).thenReturn(0);
-            when(billingAccountRepository.debitPackTraining(USER_ID)).thenReturn(1);
-
-            // when
-            quotaService.debitTraining(USER_ID, TRAINING_LABEL);
-
-            // then
-            verify(billingAccountRepository).debitPackTraining(USER_ID);
-        }
-
-        @Test
         @DisplayName("Успешное списание - сохраняет SPEND-событие с переданным label и target TRAINING")
         void savesSpendEventWithLabelAndTarget() {
             // given
@@ -511,11 +427,10 @@ class QuotaServiceTest {
         }
 
         @Test
-        @DisplayName("И plan, и pack вернули 0 - PaymentRequiredException, событие не сохраняется")
-        void throwsWhenBothPlanAndPackExhausted() {
+        @DisplayName("Списание вернуло 0 - PaymentRequiredException, событие не сохраняется")
+        void throwsWhenPlanExhausted() {
             // given
             when(billingAccountRepository.debitPlanTraining(eq(USER_ID), any())).thenReturn(0);
-            when(billingAccountRepository.debitPackTraining(USER_ID)).thenReturn(0);
 
             // when / then
             assertThatThrownBy(() -> quotaService.debitTraining(USER_ID, TRAINING_LABEL))

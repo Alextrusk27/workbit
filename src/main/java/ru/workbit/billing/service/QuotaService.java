@@ -41,41 +41,29 @@ public class QuotaService {
         if (account == null) {
             BillingAccount.Plan free = BillingAccount.Plan.FREE;
             return new UsageResponse(
-                    new UsageResponse.UsageCounters(
-                            new UsageResponse.UsageCounter(free.getInterviews(), free.getInterviews()),
-                            new UsageResponse.UsageCounter(0, 0)),
-                    new UsageResponse.UsageCounters(
-                            new UsageResponse.UsageCounter(free.getTrainings(), free.getTrainings()),
-                            new UsageResponse.UsageCounter(0, 0)),
+                    new UsageResponse.UsageCounter(free.getInterviews(), free.getInterviews()),
+                    new UsageResponse.UsageCounter(free.getTrainings(), free.getTrainings()),
                     events);
         }
 
         boolean planActive = isPlanActive(account);
         return new UsageResponse(
-                new UsageResponse.UsageCounters(
-                        planCounter(planActive, account.getPlanInterviewsLeft(),
-                                account.getPlan().getInterviews()),
-                        new UsageResponse.UsageCounter(
-                                account.getPackInterviewsLeft(), account.getPackInterviewsTotal())),
-                new UsageResponse.UsageCounters(
-                        planCounter(planActive, account.getPlanTrainingsLeft(),
-                                account.getPlan().getTrainings()),
-                        new UsageResponse.UsageCounter(
-                                account.getPackTrainingsLeft(), account.getPackTrainingsTotal())),
+                planCounter(planActive, account.getPlanInterviewsLeft(),
+                        account.getPlan().getInterviews()),
+                planCounter(planActive, account.getPlanTrainingsLeft(),
+                        account.getPlan().getTrainings()),
                 events);
     }
 
     public void checkInterviewAvailable(UUID userId) {
-        QuotaResponse quota = effectiveQuota(userId);
-        if (quota.planInterviewsLeft() + quota.packInterviewsLeft() == 0) {
+        if (effectiveQuota(userId).planInterviewsLeft() == 0) {
             log.warn("Interview quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Interview quota exhausted");
         }
     }
 
     public void checkTrainingAvailable(UUID userId) {
-        QuotaResponse quota = effectiveQuota(userId);
-        if (quota.planTrainingsLeft() + quota.packTrainingsLeft() == 0) {
+        if (effectiveQuota(userId).planTrainingsLeft() == 0) {
             log.warn("Training quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Training quota exhausted");
         }
@@ -91,8 +79,7 @@ public class QuotaService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void debitInterview(UUID userId, String label) {
         insertIfAbsent(userId);
-        if (billingAccountRepository.debitPlanInterview(userId, Instant.now()) == 0
-                && billingAccountRepository.debitPackInterview(userId) == 0) {
+        if (billingAccountRepository.debitPlanInterview(userId, Instant.now()) == 0) {
             log.warn("Interview quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Interview quota exhausted");
         }
@@ -102,8 +89,7 @@ public class QuotaService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void debitTraining(UUID userId, String label) {
         insertIfAbsent(userId);
-        if (billingAccountRepository.debitPlanTraining(userId, Instant.now()) == 0
-                && billingAccountRepository.debitPackTraining(userId) == 0) {
+        if (billingAccountRepository.debitPlanTraining(userId, Instant.now()) == 0) {
             log.warn("Training quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Training quota exhausted");
         }
@@ -113,12 +99,10 @@ public class QuotaService {
     private static QuotaResponse toEffective(BillingAccount account) {
         if (isPlanActive(account)) {
             return new QuotaResponse(account.getPlan(), account.getPlanExpiresAt(),
-                    account.getPlanInterviewsLeft(), account.getPlanTrainingsLeft(),
-                    account.getPackInterviewsLeft(), account.getPackTrainingsLeft());
+                    account.getPlanInterviewsLeft(), account.getPlanTrainingsLeft());
         }
 
-        return new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0,
-                account.getPackInterviewsLeft(), account.getPackTrainingsLeft());
+        return new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0);
     }
 
     private static boolean isPlanActive(BillingAccount account) {
@@ -134,7 +118,7 @@ public class QuotaService {
 
     private static QuotaResponse freeDefault() {
         BillingAccount.Plan free = BillingAccount.Plan.FREE;
-        return new QuotaResponse(free, null, free.getInterviews(), free.getTrainings(), 0, 0);
+        return new QuotaResponse(free, null, free.getInterviews(), free.getTrainings());
     }
 
     private QuotaResponse effectiveQuota(UUID userId) {

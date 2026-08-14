@@ -66,7 +66,7 @@ class TrainingWriter {
     @Transactional
     public TrainingSessionResponse createSession(TrainingSession session, List<BankQuestion> bankQuestions,
                                                  List<String> generatedQuestions) {
-        quotaService.debitTraining(session.getUserId());
+        quotaService.debitTraining(session.getUserId(), spendLabel(session));
 
         List<TrainingQuestion> questions = new ArrayList<>();
         for (BankQuestion bankQuestion : bankQuestions) {
@@ -115,7 +115,7 @@ class TrainingWriter {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionCompleted(session);
-        quotaService.debitTraining(session.getUserId());
+        quotaService.debitTraining(session.getUserId(), spendLabel(session));
 
         for (TrainingQuestion question : session.getQuestions()) {
             question.setFeedback(null);
@@ -130,6 +130,10 @@ class TrainingWriter {
         trainingSessionRepository.save(session);
 
         return trainingSessionMapper.toResponse(session, 0, session.getQuestions().size());
+    }
+
+    private static String spendLabel(TrainingSession session) {
+        return "Тренировка — " + session.getSkill() + ", " + session.getLevel().getLabel();
     }
 
     private static TrainingQuestion buildQuestion(TrainingSession session, String text, UUID bankQuestionId,

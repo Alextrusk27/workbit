@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.workbit.billing.dto.QuotaResponse;
+import ru.workbit.billing.dto.UsageResponse;
 import ru.workbit.billing.model.BillingAccount;
+import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.security.config.SecurityConfig;
@@ -90,6 +92,59 @@ class BillingControllerTest {
         void returns401WithoutAuthentication() throws Exception {
             // when / then
             mvc.perform(get(BASE + "/quota"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(quotaService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /usage
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GetUsage")
+    class GetUsage {
+
+        @Test
+        @DisplayName("Возвращает 200 со счётчиками и историей операций")
+        void returns200WithUsage() throws Exception {
+            // given
+            var at = Instant.parse("2026-08-10T12:00:00Z");
+            var response = new UsageResponse(
+                    new UsageResponse.UsageCounters(
+                            new UsageResponse.UsageCounter(1, 1),
+                            new UsageResponse.UsageCounter(0, 0)),
+                    new UsageResponse.UsageCounters(
+                            new UsageResponse.UsageCounter(2, 3),
+                            new UsageResponse.UsageCounter(0, 0)),
+                    List.of(new UsageResponse.UsageEventResponse(
+                            at, UsageEvent.Kind.SPEND, UsageEvent.Target.TRAINING, 1,
+                            "Тренировка — Java, Уверенный")));
+            when(quotaService.getUsage(USER_ID)).thenReturn(response);
+
+            // when / then
+            mvc.perform(get(BASE + "/usage")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.interviews.plan.left").value(1))
+                    .andExpect(jsonPath("$.interviews.plan.total").value(1))
+                    .andExpect(jsonPath("$.interviews.pack.left").value(0))
+                    .andExpect(jsonPath("$.interviews.pack.total").value(0))
+                    .andExpect(jsonPath("$.trainings.plan.left").value(2))
+                    .andExpect(jsonPath("$.trainings.plan.total").value(3))
+                    .andExpect(jsonPath("$.events[0].at").value("2026-08-10T12:00:00Z"))
+                    .andExpect(jsonPath("$.events[0].kind").value("SPEND"))
+                    .andExpect(jsonPath("$.events[0].target").value("TRAINING"))
+                    .andExpect(jsonPath("$.events[0].delta").value(1))
+                    .andExpect(jsonPath("$.events[0].label").value("Тренировка — Java, Уверенный"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/usage"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(quotaService);

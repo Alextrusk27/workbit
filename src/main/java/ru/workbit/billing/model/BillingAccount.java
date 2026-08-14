@@ -37,6 +37,12 @@ public class BillingAccount {
     @Column(name = "pack_trainings_left", nullable = false)
     private int packTrainingsLeft;
 
+    @Column(name = "pack_interviews_total", nullable = false)
+    private int packInterviewsTotal;
+
+    @Column(name = "pack_trainings_total", nullable = false)
+    private int packTrainingsTotal;
+
     @Getter
     public enum Plan {
         FREE(1, 3),

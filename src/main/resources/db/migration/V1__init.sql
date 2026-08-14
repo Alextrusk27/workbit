@@ -294,15 +294,39 @@ CREATE TABLE IF NOT EXISTS billing.account (
     plan_trainings_left  INT NOT NULL,
     pack_interviews_left INT NOT NULL,
     pack_trainings_left  INT NOT NULL,
+    pack_interviews_total INT NOT NULL DEFAULT 0,
+    pack_trainings_total INT NOT NULL DEFAULT 0,
 
     CONSTRAINT chk_account_plan
         CHECK (plan IN ('FREE', 'PRO', 'MAX')),
     CONSTRAINT chk_account_left_non_negative
         CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0
             AND pack_interviews_left >= 0 AND pack_trainings_left >= 0),
+    CONSTRAINT chk_account_pack_total_non_negative
+        CHECK (pack_interviews_total >= 0 AND pack_trainings_total >= 0),
     CONSTRAINT chk_account_paid_plan_expires
         CHECK (plan = 'FREE' OR plan_expires_at IS NOT NULL)
 );
+
+CREATE TABLE IF NOT EXISTS billing.usage_event (
+    id       UUID PRIMARY KEY,
+    user_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    at       TIMESTAMPTZ NOT NULL,
+    kind     VARCHAR(16) NOT NULL,
+    target   VARCHAR(16) NOT NULL,
+    delta    INT NOT NULL,
+    label    TEXT NOT NULL,
+
+    CONSTRAINT chk_usage_event_kind
+        CHECK (kind IN ('SPEND', 'CREDIT')),
+    CONSTRAINT chk_usage_event_target
+        CHECK (target IN ('INTERVIEW', 'TRAINING')),
+    CONSTRAINT chk_usage_event_delta
+        CHECK (delta > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_event_user_id_at
+    ON billing.usage_event(user_id, at DESC);
 
 INSERT INTO content.profession_dict (name, match_key, status) VALUES
     ('Java-разработчик', 'java разработчик', 'APPROVED'),

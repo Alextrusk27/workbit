@@ -87,6 +87,8 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getPlanTrainingsLeft()).isEqualTo(FREE_TRAININGS);
             assertThat(saved.getPackInterviewsLeft()).isZero();
             assertThat(saved.getPackTrainingsLeft()).isZero();
+            assertThat(saved.getPackInterviewsTotal()).isZero();
+            assertThat(saved.getPackTrainingsTotal()).isZero();
         }
 
         @Test

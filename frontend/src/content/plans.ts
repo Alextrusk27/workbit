@@ -2,6 +2,8 @@ export interface Plan {
   name: string
   /** Кому подходит — подпись под названием. */
   audience: string
+  /** Код продукта на бэке — есть только у платных тарифов. */
+  product?: 'PLAN_PRO' | 'PLAN_MAX'
   price: string
   /** Перечёркнутая цена до скидки — показывается вместе с плашкой discount. */
   oldPrice?: string
@@ -39,6 +41,7 @@ export const plans: Plan[] = [
   {
     name: 'Про',
     audience: 'Для активного поиска',
+    product: 'PLAN_PRO',
     price: '790 ₽',
     oldPrice: '1090 ₽',
     discount: '−30%',
@@ -62,6 +65,7 @@ export const plans: Plan[] = [
   {
     name: 'Макс',
     audience: 'Для интенсивной подготовки',
+    product: 'PLAN_MAX',
     price: '1290 ₽',
     oldPrice: '2090 ₽',
     discount: '−40%',

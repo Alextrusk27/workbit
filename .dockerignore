@@ -7,5 +7,5 @@ ai-workspace/
 frontend/
 docs/
 target/
-.env
+*.env
 *.md

@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Alert } from '@/components/ui/Alert'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { PlanCard } from '@/components/ui/PlanCard'
@@ -7,12 +9,29 @@ import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { plans } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
+import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
+import type { PaymentProduct } from '@/features/billing/api'
+import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export function PricingPage() {
   usePageTitle('Тарифы')
   const { isAuthenticated } = useAuth()
+  const createPayment = useCreatePayment()
+  const [error, setError] = useState<string | null>(null)
   const startTo = isAuthenticated ? '/app' : '/login'
+
+  const buy = (product: PaymentProduct) => {
+    if (createPayment.isPending) return
+    setError(null)
+    createPayment.mutate(product, {
+      onSuccess: ({ paymentId, paymentUrl }) => {
+        sessionStorage.setItem(PAYMENT_ID_KEY, paymentId)
+        window.location.assign(paymentUrl)
+      },
+      onError: (e) => setError(getErrorMessage(e)),
+    })
+  }
 
   return (
     <>
@@ -29,10 +48,25 @@ export function PricingPage() {
 
       <section className="py-16">
         <Container>
+          {error && (
+            <div className="mx-auto mb-6 max-w-[560px]">
+              <Alert>{error}</Alert>
+            </div>
+          )}
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {plans.map((p, i) => (
               <Reveal key={p.name} delay={i * 0.05}>
-                <PlanCard plan={p} features={p.features} to={startTo} />
+                <PlanCard
+                  plan={p}
+                  features={p.features}
+                  to={startTo}
+                  onSelect={
+                    isAuthenticated && p.product
+                      ? () => buy(p.product!)
+                      : undefined
+                  }
+                  disabled={createPayment.isPending}
+                />
               </Reveal>
             ))}
           </div>

@@ -141,6 +141,12 @@ jobs:
             exit 1
           fi
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          docker images "${{ env.IMAGE }}" --format '{{.Repository}}:{{.Tag}}' \
+            | while read -r img; do
+                [ "$img" = "$image" ] && continue
+                [ "$img" = "$prev" ] && continue
+                docker rmi "$img" || echo "failed to remove $img"
+              done
           EOF
 
       - name: Smoke test backend

@@ -9,6 +9,10 @@ workbit.ru {
 		root * /srv
 		encode gzip
 		try_files {path} /index.html
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@rest not path /assets/*
+		header @rest Cache-Control "no-cache"
 		file_server
 	}
 }

@@ -89,6 +89,9 @@ jobs:
     needs: [ backend, frontend ]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment:
+      name: production
+      url: https://workbit.ru
     steps:
       - uses: actions/checkout@v4
 

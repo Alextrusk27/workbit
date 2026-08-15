@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
+import { FeedbackWidget } from '@/components/app/FeedbackWidget'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import type {
-  InterviewQuestion,
-  OfferProbability,
+import {
+  interviewApi,
+  type InterviewQuestion,
+  type OfferProbability,
 } from '@/features/interview/api'
 import { OFFER_TONE, type OfferTone } from '@/features/interview/labels'
 import { cn } from '@/lib/cn'
@@ -44,7 +46,13 @@ export function QuestionEntry({
 
 /** Вопрос в отчёте: ответ кандидата и пометка рецензента с оценкой за весь
  *  кейс (уточнения в отчёт не попадают — их удаляют при завершении). */
-export function CaseEntry({ question }: { question: InterviewQuestion }) {
+export function CaseEntry({
+  question,
+  sessionId,
+}: {
+  question: InterviewQuestion
+  sessionId: string
+}) {
   return (
     <div>
       <QuestionEntry
@@ -58,6 +66,12 @@ export function CaseEntry({ question }: { question: InterviewQuestion }) {
           {question.feedback}
         </MarginNote>
       )}
+      <FeedbackWidget
+        className="mt-4"
+        submit={(body) =>
+          interviewApi.questionFeedback(sessionId, question.questionId, body)
+        }
+      />
     </div>
   )
 }
@@ -93,6 +107,7 @@ export function ReportSummary({
   weakestSkill,
   trainingTo,
   answeredCount,
+  sessionId,
 }: {
   avgScore: number | null
   offerProbability: OfferProbability
@@ -101,6 +116,7 @@ export function ReportSummary({
   weakestSkill: string | null
   trainingTo: string
   answeredCount: number
+  sessionId: string
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
@@ -138,6 +154,10 @@ export function ReportSummary({
         <p className="text-muted mt-3 max-w-[78ch] text-[15px] whitespace-pre-wrap">
           {overallFeedback}
         </p>
+        <FeedbackWidget
+          className="border-divider mt-[18px] border-t pt-3.5"
+          submit={(body) => interviewApi.reportFeedback(sessionId, body)}
+        />
       </div>
 
       {recommendations && (

@@ -52,6 +52,12 @@ export interface SubmitAnswerVars {
   answerText: string
 }
 
+export interface FeedbackRequest {
+  vote: 'UP' | 'DOWN'
+  reasons: string[]
+  comment?: string
+}
+
 export interface InterviewVacancy {
   vacancyId: string
   vacancyName: string
@@ -125,6 +131,22 @@ export const interviewApi = {
 
   getReport: (sessionId: string) =>
     apiFetch<InterviewReport>(`${BASE}/sessions/${sessionId}/report`),
+
+  questionFeedback: (
+    sessionId: string,
+    questionId: string,
+    body: FeedbackRequest,
+  ) =>
+    apiFetch<void>(
+      `${BASE}/sessions/${sessionId}/questions/${questionId}/feedback`,
+      { method: 'POST', body },
+    ),
+
+  reportFeedback: (sessionId: string, body: FeedbackRequest) =>
+    apiFetch<void>(`${BASE}/sessions/${sessionId}/report/feedback`, {
+      method: 'POST',
+      body,
+    }),
 
   listVacancies: () => apiFetch<InterviewVacancy[]>(`${BASE}/vacancies`),
 

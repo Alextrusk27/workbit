@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { FeedbackWidget } from '@/components/app/FeedbackWidget'
 import { Alert } from '@/components/ui/Alert'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
-import type { TrainingQuestion } from '@/features/training/api'
+import { trainingApi, type TrainingQuestion } from '@/features/training/api'
 import { useReferenceAnswer } from '@/features/training/useTraining'
 import { getErrorMessage } from '@/lib/api'
 
@@ -32,13 +33,17 @@ export function QuestionEntry({
 }
 
 /** Эталонный ответ по кнопке: до первого клика запрос не уходит, дальше
- *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM. */
+ *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM.
+ *  `withFeedback` добавляет лайк/дизлайк под текстом — для прогона, где
+ *  виджета кейса ещё нет; в отчёте оценивается кейс целиком. */
 export function ReferenceAnswer({
   sessionId,
   questionId,
+  withFeedback = false,
 }: {
   sessionId: string
   questionId: string
+  withFeedback?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const { data, isFetching, isError, error } = useReferenceAnswer(
@@ -74,9 +79,20 @@ export function ReferenceAnswer({
         </div>
       )}
       {data && (
-        <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">
-          {data.answer}
-        </p>
+        <>
+          <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">
+            {data.answer}
+          </p>
+          {withFeedback && (
+            <FeedbackWidget
+              variant="reference"
+              className="border-divider mt-4 border-t pt-3.5"
+              submit={(body) =>
+                trainingApi.questionFeedback(sessionId, questionId, body)
+              }
+            />
+          )}
+        </>
       )}
     </div>
   )
@@ -103,6 +119,12 @@ export function CaseEntry({
         </MarginNote>
       )}
       <ReferenceAnswer sessionId={sessionId} questionId={question.questionId} />
+      <FeedbackWidget
+        className="mt-4"
+        submit={(body) =>
+          trainingApi.questionFeedback(sessionId, question.questionId, body)
+        }
+      />
     </div>
   )
 }
@@ -111,9 +133,11 @@ export function CaseEntry({
 export function ReportSummary({
   avgScore,
   overallFeedback,
+  sessionId,
 }: {
   avgScore: number | null
   overallFeedback: string
+  sessionId: string
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-3">
@@ -145,6 +169,10 @@ export function ReportSummary({
           Разбор сгенерирован ИИ и может содержать ошибки. Относитесь к оценкам
           и рекомендациям как к ориентиру.
         </p>
+        <FeedbackWidget
+          className="border-divider mt-[18px] border-t pt-3.5"
+          submit={(body) => trainingApi.reportFeedback(sessionId, body)}
+        />
       </div>
     </div>
   )

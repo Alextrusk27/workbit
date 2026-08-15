@@ -1,8 +1,11 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
+import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Container } from '@/components/ui/Container'
 import { PLAN_LABELS } from '@/features/billing/labels'
-import { useQuota } from '@/features/billing/useBilling'
+import { billingKeys, useQuota } from '@/features/billing/useBilling'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -53,8 +56,8 @@ function PlanLine() {
       </span>
       <span className="tabular-nums">
         {' '}
-        · осталось интервью: {data.planInterviewsLeft + data.packInterviewsLeft}
-        , тренировок: {data.planTrainingsLeft + data.packTrainingsLeft}
+        · осталось интервью: {data.planInterviewsLeft}, тренировок:{' '}
+        {data.planTrainingsLeft}
       </span>{' '}
       ·{' '}
       <Link
@@ -69,6 +72,17 @@ function PlanLine() {
 
 export function HubPage() {
   usePageTitle('Личный кабинет')
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [paid] = useState(() => searchParams.get('payment') === 'ok')
+  const [paymentOpen, setPaymentOpen] = useState(paid)
+
+  useEffect(() => {
+    if (!paid) return
+    qc.invalidateQueries({ queryKey: billingKeys.quota })
+    navigate('/app', { replace: true })
+  }, [paid, navigate, qc])
 
   return (
     <Container>
@@ -97,6 +111,13 @@ export function HubPage() {
       </div>
 
       <PlanLine />
+
+      {paid && (
+        <PaymentSuccessModal
+          open={paymentOpen}
+          onClose={() => setPaymentOpen(false)}
+        />
+      )}
     </Container>
   )
 }

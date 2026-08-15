@@ -184,6 +184,22 @@ CREATE TABLE IF NOT EXISTS training.report (
         CHECK (avg_score BETWEEN 1.0 AND 5.0)
 );
 
+CREATE TABLE IF NOT EXISTS training.user_feedback (
+    id           UUID PRIMARY KEY,
+    session_id   UUID NOT NULL REFERENCES training.session(id) ON DELETE CASCADE,
+    question_id  UUID REFERENCES training.question(id) ON DELETE CASCADE,
+    vote         VARCHAR(8) NOT NULL,
+    reasons      TEXT[] NOT NULL,
+    comment      TEXT,
+    created      TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_user_feedback_vote
+        CHECK (vote IN ('UP', 'DOWN'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_id
+    ON training.user_feedback(session_id);
+
 CREATE TABLE IF NOT EXISTS interview.session (
     id                  UUID PRIMARY KEY,
     user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -254,23 +270,56 @@ CREATE TABLE IF NOT EXISTS interview.report (
         CHECK (offer_probability IN ('LOW', 'MEDIUM', 'HIGH'))
 );
 
+CREATE TABLE IF NOT EXISTS interview.user_feedback (
+    id           UUID PRIMARY KEY,
+    session_id   UUID NOT NULL REFERENCES interview.session(id) ON DELETE CASCADE,
+    question_id  UUID REFERENCES interview.question(id) ON DELETE CASCADE,
+    vote         VARCHAR(8) NOT NULL,
+    reasons      TEXT[] NOT NULL,
+    comment      TEXT,
+    created      TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT chk_user_feedback_vote
+        CHECK (vote IN ('UP', 'DOWN'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_id
+    ON interview.user_feedback(session_id);
+
 CREATE TABLE IF NOT EXISTS billing.account (
     user_id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     plan                 VARCHAR(32) NOT NULL,
     plan_expires_at      TIMESTAMPTZ,
     plan_interviews_left INT NOT NULL,
     plan_trainings_left  INT NOT NULL,
-    pack_interviews_left INT NOT NULL,
-    pack_trainings_left  INT NOT NULL,
 
     CONSTRAINT chk_account_plan
         CHECK (plan IN ('FREE', 'PRO', 'MAX')),
     CONSTRAINT chk_account_left_non_negative
-        CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0
-            AND pack_interviews_left >= 0 AND pack_trainings_left >= 0),
+        CHECK (plan_interviews_left >= 0 AND plan_trainings_left >= 0),
     CONSTRAINT chk_account_paid_plan_expires
         CHECK (plan = 'FREE' OR plan_expires_at IS NOT NULL)
 );
+
+CREATE TABLE IF NOT EXISTS billing.usage_event (
+    id       UUID PRIMARY KEY,
+    user_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    at       TIMESTAMPTZ NOT NULL,
+    kind     VARCHAR(16) NOT NULL,
+    target   VARCHAR(16) NOT NULL,
+    delta    INT NOT NULL,
+    label    TEXT NOT NULL,
+
+    CONSTRAINT chk_usage_event_kind
+        CHECK (kind IN ('SPEND', 'CREDIT')),
+    CONSTRAINT chk_usage_event_target
+        CHECK (target IN ('INTERVIEW', 'TRAINING')),
+    CONSTRAINT chk_usage_event_delta
+        CHECK (delta > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_event_user_id_at
+    ON billing.usage_event(user_id, at DESC);
 
 INSERT INTO content.profession_dict (name, match_key, status) VALUES
     ('Java-разработчик', 'java разработчик', 'APPROVED'),

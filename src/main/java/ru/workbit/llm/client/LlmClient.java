@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 public class LlmClient {
     public static final String MODEL_DEGRADED = "LLM_MODEL_DEGRADED";
 
+    private static final String STUB_USER_INPUT = "Выполни задачу.";
     private static final Pattern CJK =
             Pattern.compile("[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]");
 
@@ -108,6 +109,7 @@ public class LlmClient {
                         .id(props.agents().get(agentKey))
                         .variables(variablesBuilder.build())
                         .build())
+                .input(STUB_USER_INPUT)
                 .text(responseType)
                 .build();
     }

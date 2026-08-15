@@ -53,7 +53,7 @@ public class InterviewWriter {
 
     @Transactional
     public InterviewSession createSession(VacancyData vacancyData, UUID userId, List<String> questions) {
-        quotaService.debitInterview(userId);
+        quotaService.debitInterview(userId, "Интервью — " + vacancyData.name());
 
         UUID vacancySnapshotId = vacancyService.saveSnapshot(vacancyData);
         InterviewSession session = saveNewSession(userId, questions, vacancySnapshotId);

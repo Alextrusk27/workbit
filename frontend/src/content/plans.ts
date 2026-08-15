@@ -3,6 +3,10 @@ export interface Plan {
   /** Кому подходит — подпись под названием. */
   audience: string
   price: string
+  /** Перечёркнутая цена до скидки — показывается вместе с плашкой discount. */
+  oldPrice?: string
+  /** Текст плашки скидки, например «−30%». */
+  discount?: string
   period: string
   cta: string
   featured: boolean
@@ -35,7 +39,9 @@ export const plans: Plan[] = [
   {
     name: 'Про',
     audience: 'Для активного поиска',
-    price: '490 ₽',
+    price: '790 ₽',
+    oldPrice: '1090 ₽',
+    discount: '−30%',
     period: '/ месяц',
     cta: 'Перейти на Про',
     featured: true,
@@ -56,7 +62,9 @@ export const plans: Plan[] = [
   {
     name: 'Макс',
     audience: 'Для интенсивной подготовки',
-    price: '990 ₽',
+    price: '1290 ₽',
+    oldPrice: '2090 ₽',
+    discount: '−40%',
     period: '/ месяц',
     cta: 'Перейти на Макс',
     featured: false,
@@ -71,15 +79,4 @@ export const plans: Plan[] = [
       'Всё остальное — как в Про',
     ],
   },
-]
-
-export interface Pack {
-  title: string
-  price: string
-}
-
-/** Разовые пакеты — докупаются поверх любого тарифа и не сгорают. */
-export const packs: Pack[] = [
-  { title: '+5 AI-интервью', price: '290 ₽' },
-  { title: '+10 тренировок', price: '90 ₽' },
 ]

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.workbit.billing.dto.QuotaResponse;
+import ru.workbit.billing.dto.UsageResponse;
 import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
@@ -42,5 +43,20 @@ public class BillingController {
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(quotaService.getQuota(userDetails.getId()));
+    }
+
+    @GetMapping("/usage")
+    @Loggable
+    @Operation(summary = "Статистика лимитов и история операций",
+            description = "Возвращает счётчики остатков раздельно по подписке и пакетам (остаток и сколько выдано всего) и историю списаний и зачислений, новые первыми. Подписочные счётчики истёкшего платного тарифа отдаются нулями; пакетные не сгорают.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Статистика лимитов"),
+            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull UsageResponse> getUsage(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(quotaService.getUsage(userDetails.getId()));
     }
 }

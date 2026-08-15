@@ -13,9 +13,8 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
 
     @Modifying
     @Query(value = """
-            INSERT INTO billing.account (user_id, plan, plan_interviews_left, plan_trainings_left,
-                pack_interviews_left, pack_trainings_left)
-            VALUES (:userId, 'FREE', :freeInterviews, :freeTrainings, 0, 0)
+            INSERT INTO billing.account (user_id, plan, plan_interviews_left, plan_trainings_left)
+            VALUES (:userId, 'FREE', :freeInterviews, :freeTrainings)
             ON CONFLICT (user_id) DO NOTHING
             """, nativeQuery = true)
     void insertIfAbsent(UUID userId, int freeInterviews, int freeTrainings);
@@ -35,18 +34,4 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
               AND (plan = 'FREE' OR plan_expires_at > :now)
             """, nativeQuery = true)
     int debitPlanTraining(UUID userId, Instant now);
-
-    @Modifying
-    @Query(value = """
-            UPDATE billing.account SET pack_interviews_left = pack_interviews_left - 1
-            WHERE user_id = :userId AND pack_interviews_left > 0
-            """, nativeQuery = true)
-    int debitPackInterview(UUID userId);
-
-    @Modifying
-    @Query(value = """
-            UPDATE billing.account SET pack_trainings_left = pack_trainings_left - 1
-            WHERE user_id = :userId AND pack_trainings_left > 0
-            """, nativeQuery = true)
-    int debitPackTraining(UUID userId);
 }

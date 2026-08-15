@@ -151,7 +151,8 @@ class TrainingWriterTest {
             assertThat(third.getReferenceAnswer()).isNull();
 
             verify(trainingSessionRepository).save(session);
-            verify(quotaService).debitTraining(session.getUserId());
+            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
+                    + TrainingSession.Level.MIDDLE.getLabel());
         }
 
         @Test
@@ -311,7 +312,30 @@ class TrainingWriterTest {
             assertThat(session.getStatus()).isEqualTo(TrainingSession.Status.CREATED);
             assertThat(session.getCompletedAt()).isNull();
             verify(trainingSessionRepository).save(session);
-            verify(quotaService).debitTraining(session.getUserId());
+            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
+                    + TrainingSession.Level.MIDDLE.getLabel());
+        }
+
+        @Test
+        @DisplayName("Списывает тренировку с label «Тренировка — {навык}, {лейбл уровня}»")
+        void debitsTrainingWithFormattedLabel() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .id(sessionId).skill("Java").profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .status(TrainingSession.Status.COMPLETED)
+                    .questions(new ArrayList<>())
+                    .build();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(
+                    new TrainingSessionResponse(sessionId, "Java", PROFESSION, TrainingSession.Level.MIDDLE,
+                            TrainingSession.Status.CREATED, 0, 0, null, null));
+
+            // when
+            trainingWriter.restartSession(sessionId);
+
+            // then
+            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — Java, Уверенный");
         }
 
         @Test

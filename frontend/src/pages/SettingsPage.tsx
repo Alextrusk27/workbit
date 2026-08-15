@@ -3,18 +3,42 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { Chip } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useAuth, useDeleteAccount } from '@/features/auth/useAuth'
+import type {
+  UsageCounter,
+  UsageEvent,
+  UsageEventKind,
+  UsageTarget,
+} from '@/features/billing/api'
 import { PLAN_LABELS } from '@/features/billing/labels'
-import { useQuota } from '@/features/billing/useBilling'
+import { useQuota, useUsage } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
+import { cn } from '@/lib/cn'
+import { trainingsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
+
+const DELETE_WARNING =
+  'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. Все ' +
+  'неиспользованные лимиты тарифа сгорают без возврата. Восстановить их ' +
+  'будет нельзя.'
+
+function formatExpiry(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
 
 export function SettingsPage() {
   usePageTitle('Настройки')
   const { user } = useAuth()
+  const { data: quota } = useQuota()
 
   return (
     <Container className="max-w-160">
@@ -24,17 +48,26 @@ export function SettingsPage() {
         title="Аккаунт"
       >
         {user && (
-          <>
-            Вы вошли как <span className="text-ink">{user.email}</span>
-          </>
+          <span className="flex flex-wrap items-center gap-2.5">
+            <span>
+              Вы вошли как <span className="text-ink">{user.email}</span>
+            </span>
+            {quota && (
+              <span className="border-indigo/40 bg-indigo/12 text-indigo inline-flex rounded-full border px-3 py-0.5 text-[12.5px] font-semibold">
+                {PLAN_LABELS[quota.plan]}
+                {quota.planExpiresAt &&
+                  ` · до ${formatExpiry(quota.planExpiresAt)}`}
+              </span>
+            )}
+          </span>
         )}
       </AppPageHeader>
 
-      <div className="mt-12">
+      <div className="mt-10">
         <PlanSection />
       </div>
 
-      <div className="mt-12">
+      <div className="mt-10">
         <DeleteAccountSection />
       </div>
     </Container>
@@ -42,7 +75,8 @@ export function SettingsPage() {
 }
 
 function PlanSection() {
-  const { data, isLoading } = useQuota()
+  const { data: quota, isLoading } = useQuota()
+  const usage = useUsage()
 
   return (
     <section>
@@ -56,51 +90,213 @@ function PlanSection() {
         </div>
       )}
 
-      {data && (
+      {quota && (
+        <p className="text-ink mt-4 font-semibold">
+          {PLAN_LABELS[quota.plan]}
+          {quota.planExpiresAt && (
+            <span className="text-muted font-normal">
+              {' '}
+              · действует до {formatExpiry(quota.planExpiresAt)}
+            </span>
+          )}
+        </p>
+      )}
+
+      {usage.data && (
         <>
-          <p className="text-ink mt-4 font-semibold">
-            {PLAN_LABELS[data.plan]}
-            {data.planExpiresAt && (
-              <span className="text-muted font-normal">
-                {' '}
-                · действует до{' '}
-                {new Date(data.planExpiresAt).toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </span>
-            )}
-          </p>
-          <dl className="text-muted mt-3 max-w-[48ch] text-sm">
-            <div className="flex justify-between gap-4">
-              <dt>По подписке</dt>
-              <dd className="tabular-nums">
-                интервью: {data.planInterviewsLeft}, тренировок:{' '}
-                {data.planTrainingsLeft}
-              </dd>
-            </div>
-            <div className="mt-1.5 flex justify-between gap-4">
-              <dt>Пакеты</dt>
-              <dd className="tabular-nums">
-                интервью: {data.packInterviewsLeft}, тренировок:{' '}
-                {data.packTrainingsLeft}
-              </dd>
-            </div>
-          </dl>
-          <p className="text-dim mt-3 text-sm">
-            Сменить тариф или докупить пакет можно на странице{' '}
-            <Link
-              to="/pricing"
-              className="text-indigo hover:text-violet transition-colors"
-            >
-              тарифов
-            </Link>
-            .
-          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <LimitCard title="AI-интервью" counters={usage.data.interviews} />
+            <LimitCard title="Тренировки" counters={usage.data.trainings} />
+          </div>
+          <UsageHistory events={usage.data.events} />
         </>
       )}
+
+      {usage.isError && (
+        <p className="text-dim mt-4 text-sm">
+          Остатки и история операций временно недоступны.
+        </p>
+      )}
+
+      <p className="text-dim mt-5 text-sm">
+        Сменить или продлить тариф можно на странице{' '}
+        <Link
+          to="/pricing"
+          className="text-indigo hover:text-violet transition-colors"
+        >
+          тарифов
+        </Link>
+        .
+      </p>
     </section>
+  )
+}
+
+function LimitCard({
+  title,
+  counters,
+}: {
+  title: string
+  counters: UsageCounter
+}) {
+  const { left, total } = counters
+  const used = total - left
+  const usedShare = total > 0 ? (used / total) * 100 : 0
+
+  return (
+    <div className="border-line bg-card rounded-xl border p-5">
+      <Eyebrow>{title}</Eyebrow>
+      <p className="mt-2">
+        <span className="text-ink text-[28px] font-extrabold tracking-[-0.02em] tabular-nums">
+          {left}
+        </span>
+        <span className="text-muted text-sm"> доступно из {total}</span>
+      </p>
+      <div className="bg-line mt-3.5 h-1.5 overflow-hidden rounded-full">
+        <div
+          className="bg-grad h-full rounded-full"
+          style={{ width: `${usedShare}%` }}
+        />
+      </div>
+      <p className="text-dim mt-2.5 text-[12.5px] tabular-nums">
+        Использовано {used} из {total}
+      </p>
+    </div>
+  )
+}
+
+interface HistoryRow {
+  at: string
+  kind: UsageEventKind
+  label: string
+  deltas: { target: UsageTarget; delta: number }[]
+}
+
+function toRows(events: UsageEvent[]): HistoryRow[] {
+  const rows: HistoryRow[] = []
+  for (const event of events) {
+    const last = rows[rows.length - 1]
+    if (last && last.at === event.at && last.label === event.label) {
+      last.deltas.push({ target: event.target, delta: event.delta })
+    } else {
+      rows.push({
+        at: event.at,
+        kind: event.kind,
+        label: event.label,
+        deltas: [{ target: event.target, delta: event.delta }],
+      })
+    }
+  }
+  return rows
+}
+
+function deltaText(row: HistoryRow): string {
+  const sign = row.kind === 'SPEND' ? '−' : '+'
+  return row.deltas
+    .map(({ target, delta }) => {
+      const unit = target === 'INTERVIEW' ? 'интервью' : trainingsWord(delta)
+      return `${sign}${delta} ${unit}`
+    })
+    .join(', ')
+}
+
+function formatEventDate(iso: string): string {
+  const date = new Date(iso)
+  const day = date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  })
+  const time = date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${day}, ${time}`
+}
+
+const HISTORY_PREVIEW = 5
+
+const KIND_FILTERS = [
+  { value: 'ALL', label: 'Все' },
+  { value: 'SPEND', label: 'Списания' },
+  { value: 'CREDIT', label: 'Пополнения' },
+] as const
+
+type KindFilter = (typeof KIND_FILTERS)[number]['value']
+
+function UsageHistory({ events }: { events: UsageEvent[] }) {
+  const [filter, setFilter] = useState<KindFilter>('ALL')
+  const [expanded, setExpanded] = useState(false)
+
+  const rows = toRows(events)
+  const filtered =
+    filter === 'ALL' ? rows : rows.filter((r) => r.kind === filter)
+  const visible = expanded ? filtered : filtered.slice(0, HISTORY_PREVIEW)
+
+  const count = (value: KindFilter) =>
+    value === 'ALL' ? rows.length : rows.filter((r) => r.kind === value).length
+
+  return (
+    <div className="mt-7">
+      <h3 className="text-ink text-[15px] font-semibold">История операций</h3>
+
+      {rows.length === 0 ? (
+        <p className="text-dim mt-3 text-sm">Операций пока нет.</p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {KIND_FILTERS.map(({ value, label }) => (
+              <Chip
+                key={value}
+                selected={filter === value}
+                count={count(value)}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </Chip>
+            ))}
+          </div>
+
+          <ul className="mt-3">
+            {visible.map((row) => (
+              <li
+                key={`${row.at}|${row.label}`}
+                className="border-divider flex items-baseline gap-4 border-t py-[11px] last:border-b"
+              >
+                <span className="text-dim w-[140px] shrink-0 text-[13px] tabular-nums">
+                  {formatEventDate(row.at)}
+                </span>
+                <span className="text-ink flex-1 text-sm break-words">
+                  {row.label}
+                </span>
+                <span
+                  className={cn(
+                    'text-[13px] whitespace-nowrap tabular-nums',
+                    row.kind === 'SPEND' ? 'text-muted' : 'text-ok',
+                  )}
+                >
+                  {deltaText(row)}
+                </span>
+              </li>
+            ))}
+            {visible.length === 0 && (
+              <li className="text-dim border-divider border-t py-[11px] text-sm last:border-b">
+                Таких операций нет.
+              </li>
+            )}
+          </ul>
+
+          {!expanded && filtered.length > HISTORY_PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="text-dim hover:text-ink focus-visible:outline-indigo mt-3 rounded-sm text-[13px] underline underline-offset-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              Показать все операции
+            </button>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 
@@ -119,10 +315,7 @@ function DeleteAccountSection() {
   return (
     <section>
       <h2 className="text-ink text-[21px] font-bold">Удаление аккаунта</h2>
-      <p className="text-muted mt-2 max-w-[48ch] text-sm">
-        Аккаунт и вся история интервью и тренировок удаляются безвозвратно.
-        Восстановить их будет нельзя.
-      </p>
+      <p className="text-muted mt-2 max-w-[48ch] text-sm">{DELETE_WARNING}</p>
 
       {del.isError && (
         <div className="mt-5">
@@ -142,7 +335,7 @@ function DeleteAccountSection() {
       <ConfirmDialog
         open={confirming}
         title="Удалить аккаунт?"
-        text="Все интервью, тренировки и отчёты будут потеряны. Действие необратимо."
+        text={DELETE_WARNING}
         onConfirm={onDelete}
         onClose={() => setConfirming(false)}
       />

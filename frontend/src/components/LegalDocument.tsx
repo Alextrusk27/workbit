@@ -59,7 +59,7 @@ type LegalDocumentProps = {
 export function LegalDocument({ title, source }: LegalDocumentProps) {
   usePageTitle(title)
   return (
-    <Container className="py-16 sm:py-22">
+    <Container className="py-16">
       <article className="max-w-3xl">
         <Eyebrow>Правовое</Eyebrow>
         <Markdown remarkPlugins={[remarkGfm]} components={components}>

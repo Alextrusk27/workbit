@@ -101,7 +101,7 @@ class InterviewWriterTest {
             }
 
             verify(interviewSessionRepository).save(result);
-            verify(quotaService).debitInterview(userId);
+            verify(quotaService).debitInterview(userId, "Интервью — " + VACANCY_DATA.name());
         }
 
         @Test
@@ -119,6 +119,21 @@ class InterviewWriterTest {
             // then
             assertThat(result.getTotalQuestions()).isZero();
             assertThat(result.getQuestions()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Списывает интервью с label «Интервью — {название вакансии}»")
+        void debitsInterviewWithFormattedLabel() {
+            // given
+            UUID userId = UUID.randomUUID();
+            when(vacancyService.saveSnapshot(VACANCY_DATA)).thenReturn(UUID.randomUUID());
+            when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            interviewWriter.createSession(VACANCY_DATA, userId, List.of("Вопрос 1"));
+
+            // then
+            verify(quotaService).debitInterview(userId, "Интервью — Java-разработчик");
         }
     }
 

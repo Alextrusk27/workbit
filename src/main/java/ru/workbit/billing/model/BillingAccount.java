@@ -31,12 +31,6 @@ public class BillingAccount {
     @Column(name = "plan_trainings_left", nullable = false)
     private int planTrainingsLeft;
 
-    @Column(name = "pack_interviews_left", nullable = false)
-    private int packInterviewsLeft;
-
-    @Column(name = "pack_trainings_left", nullable = false)
-    private int packTrainingsLeft;
-
     @Getter
     public enum Plan {
         FREE(1, 3),

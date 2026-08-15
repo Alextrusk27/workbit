@@ -25,11 +25,13 @@ import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
 import ru.workbit.training.model.mapper.TrainingQuestionMapper;
 import ru.workbit.training.model.mapper.TrainingReportMapper;
 import ru.workbit.training.model.mapper.TrainingSessionMapper;
 import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
+import ru.workbit.training.repository.TrainingUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmTrainingCase;
@@ -73,6 +75,7 @@ public class TrainingService {
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final TrainingQuestionRepository trainingQuestionRepository;
+    private final TrainingUserFeedbackRepository trainingUserFeedbackRepository;
     private final ProfessionDictRepository professionDictRepository;
     private final SkillDictRepository skillDictRepository;
     private final QuestionBankRepository questionBankRepository;
@@ -214,6 +217,27 @@ public class TrainingService {
         if (session.getStatus() == TrainingSession.Status.CREATED) {
             session.setStatus(TrainingSession.Status.IN_PROGRESS);
         }
+    }
+
+    @Transactional
+    public void submitQuestionFeedback(UUID sessionId, UUID questionId, UUID userId, FeedbackRequest request) {
+        TrainingQuestion question = trainingQuestionRepository.findWithSessionById(questionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+        checkQuestionOwnership(question, userId);
+        checkQuestionSession(question, sessionId);
+
+        trainingUserFeedbackRepository.save(buildUserFeedback(sessionId, questionId, request));
+    }
+
+    @Transactional
+    public void submitReportFeedback(UUID sessionId, UUID userId, FeedbackRequest request) {
+        TrainingSession session = trainingSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        if (session.getReport() == null) {
+            throw new NotFoundException("Report not found");
+        }
+
+        trainingUserFeedbackRepository.save(buildUserFeedback(sessionId, null, request));
     }
 
     /**
@@ -553,6 +577,17 @@ public class TrainingService {
                     sessionId, answered.size(), MIN_ANSWERED_TO_FINISH);
             throw new ConflictException("Not enough answered questions to finish");
         }
+    }
+
+    private static TrainingUserFeedback buildUserFeedback(UUID sessionId, UUID questionId,
+                                                          FeedbackRequest request) {
+        return TrainingUserFeedback.builder()
+                .sessionId(sessionId)
+                .questionId(questionId)
+                .vote(request.vote())
+                .reasons(request.reasons())
+                .comment(request.comment())
+                .build();
     }
 
     private void checkUserSession(UUID sessionId, UUID userId) {

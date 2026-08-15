@@ -24,7 +24,7 @@ const columns = [
 
 export function Footer() {
   return (
-    <footer className="border-divider mt-20 border-t">
+    <footer className="border-divider mt-12 border-t">
       <Container className="pt-9 pb-6">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
           <div className="max-w-[34ch]">

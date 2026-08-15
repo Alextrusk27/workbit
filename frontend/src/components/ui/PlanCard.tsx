@@ -29,7 +29,20 @@ export function PlanCard({ plan, features, to, className }: PlanCardProps) {
       )}
       <h3 className="text-ink text-[19px] font-bold">{plan.name}</h3>
       <p className="text-muted mt-1 text-sm">{plan.audience}</p>
-      <p className="text-ink mt-4.5 text-[40px] leading-none font-extrabold tracking-[-0.03em] tabular-nums">
+      {plan.oldPrice && (
+        <p className="mt-4.5 flex items-center gap-2.5">
+          <s className="text-dim text-[15px] tabular-nums">{plan.oldPrice}</s>
+          <span className="bg-grad rounded-full px-2.5 py-[3px] text-xs font-semibold whitespace-nowrap text-white">
+            {plan.discount}
+          </span>
+        </p>
+      )}
+      <p
+        className={cn(
+          'text-ink text-[40px] leading-none font-extrabold tracking-[-0.03em] tabular-nums',
+          plan.oldPrice ? 'mt-2' : 'mt-4.5',
+        )}
+      >
         {plan.price}
         <span className="text-muted ml-1.5 text-[15px] font-medium tracking-normal">
           {plan.period}

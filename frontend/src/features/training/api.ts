@@ -81,6 +81,12 @@ export interface SubmitAnswerVars {
   answerText: string
 }
 
+export interface FeedbackRequest {
+  vote: 'UP' | 'DOWN'
+  reasons: string[]
+  comment?: string
+}
+
 const BASE = '/training'
 
 export const trainingApi = {
@@ -148,6 +154,22 @@ export const trainingApi = {
 
   getReport: (sessionId: string) =>
     apiFetch<TrainingReport>(`${BASE}/sessions/${sessionId}/report`),
+
+  questionFeedback: (
+    sessionId: string,
+    questionId: string,
+    body: FeedbackRequest,
+  ) =>
+    apiFetch<void>(
+      `${BASE}/sessions/${sessionId}/questions/${questionId}/feedback`,
+      { method: 'POST', body },
+    ),
+
+  reportFeedback: (sessionId: string, body: FeedbackRequest) =>
+    apiFetch<void>(`${BASE}/sessions/${sessionId}/report/feedback`, {
+      method: 'POST',
+      body,
+    }),
 
   deleteSession: (sessionId: string) =>
     apiFetch<void>(`${BASE}/sessions/${sessionId}`, { method: 'DELETE' }),

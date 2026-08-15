@@ -35,7 +35,7 @@ export function FaqPage() {
         Коротко о формате, профессиях, оценке ответов и тарифах.
       </PageHero>
 
-      <section className="py-22">
+      <section className="py-16">
         <Container>
           <div className="mx-auto flex max-w-190 flex-col gap-3.5">
             {faq.map((item, i) => (
@@ -60,7 +60,7 @@ export function FaqPage() {
         </Container>
       </section>
 
-      <section className="pb-22">
+      <section className="pb-16">
         <Container>
           <Reveal>
             <CtaPanel

@@ -108,6 +108,8 @@ jobs:
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/workbit
+          image="${{ env.IMAGE }}:${{ github.sha }}"
+          prev=$(grep '^BACKEND_IMAGE=' .env 2>/dev/null | cut -d= -f2- || true)
           git -C secrets pull --ff-only
           umask 077
           : > .env.tmp
@@ -115,18 +117,30 @@ jobs:
             sops -d "$f" >> .env.tmp
             echo >> .env.tmp
           done
-          echo "BACKEND_IMAGE=${{ env.IMAGE }}:${{ github.sha }}" >> .env.tmp
-          mv .env.tmp .env
           token=$(curl -s -H 'Metadata-Flavor: Google' \
             'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
             | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
           docker login --username iam --password "$token" cr.yandex
-          docker compose -f compose.prod.yml pull backend
-          docker compose -f compose.prod.yml up -d
+          docker pull "$image"
+          echo "BACKEND_IMAGE=$image" >> .env.tmp
+          mv .env.tmp .env
+          if ! docker compose -f compose.prod.yml up -d --wait --wait-timeout 300; then
+            echo "new backend did not become healthy"
+            if [ -n "$prev" ] && [ "$prev" != "$image" ]; then
+              echo "rolling back to $prev"
+              sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$prev|" .env
+              docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
+                && echo "rollback done: prod is back on $prev" \
+                || echo "ROLLBACK FAILED: prod needs manual attention"
+            else
+              echo "no previous image to roll back to"
+            fi
+            exit 1
+          fi
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           EOF
 
-      - name: Smoke test
+      - name: Smoke test backend
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://workbit.ru/api/v1/auth/me || true)
@@ -143,3 +157,15 @@ jobs:
         run: |
           rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
             dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/"
+
+      - name: Smoke test frontend
+        run: |
+          html=$(curl -sf https://workbit.ru/) || { echo "index.html is not served"; exit 1; }
+          echo "$html" | grep -q 'id="root"' || { echo "served HTML has no app root"; exit 1; }
+          asset=$(echo "$html" | grep -o '/assets/[^"]*\.js' | head -1)
+          [ -n "$asset" ] || { echo "no js bundle referenced in index.html"; exit 1; }
+          ctype=$(curl -s -o /dev/null -w '%{content_type}' "https://workbit.ru$asset")
+          case "$ctype" in
+            *javascript*) echo "frontend is up ($asset)" ;;
+            *) echo "bundle $asset served as '$ctype' instead of javascript"; exit 1 ;;
+          esac

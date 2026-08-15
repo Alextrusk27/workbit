@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/Button'
+import { Spinner } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/useAuth'
 import type { UsageEvent, UsageTarget } from '@/features/billing/api'
 import { PLAN_LABELS } from '@/features/billing/labels'
@@ -41,13 +42,24 @@ function CheckCircle() {
   )
 }
 
+function PendingCircle() {
+  return (
+    <span className="bg-indigo/14 mx-auto flex size-14 items-center justify-center rounded-full">
+      <Spinner className="align-baseline" />
+    </span>
+  )
+}
+
 /** Модалка после возврата с оплаты: тариф и зачисления
- *  из последней CREDIT-пачки истории операций. */
+ *  из последней CREDIT-пачки истории операций. Пока оплату
+ *  не подтвердил webhook, показывает ожидание вместо тарифа. */
 export function PaymentSuccessModal({
   open,
+  pending,
   onClose,
 }: {
   open: boolean
+  pending: boolean
   onClose: () => void
 }) {
   const { user } = useAuth()
@@ -88,14 +100,20 @@ export function PaymentSuccessModal({
             }}
             role="dialog"
             aria-modal="true"
-            aria-label="Оплата прошла"
+            aria-label={pending ? 'Проверяем оплату' : 'Оплата прошла'}
             className="border-line bg-pop shadow-chat w-full max-w-[440px] rounded-2xl border p-7 text-center"
           >
-            <CheckCircle />
+            {pending ? <PendingCircle /> : <CheckCircle />}
             <h3 className="text-ink mt-[18px] text-[20px] font-bold">
-              Оплата прошла
+              {pending ? 'Проверяем оплату' : 'Оплата прошла'}
             </h3>
-            {quota && (
+            {pending && (
+              <p role="status" className="text-muted mt-2 text-[14.5px]">
+                Ждём подтверждения. Тариф активируется сам, обычно это занимает
+                несколько секунд.
+              </p>
+            )}
+            {!pending && quota && (
               <p className="text-muted mt-2 text-[14.5px]">
                 Тариф{' '}
                 <span className="text-ink font-semibold">
@@ -111,7 +129,7 @@ export function PaymentSuccessModal({
                   })}`}
               </p>
             )}
-            {credits.length > 0 && (
+            {!pending && credits.length > 0 && (
               <div className="mt-5 flex flex-col gap-2">
                 {credits.map((credit) => (
                   <div
@@ -128,7 +146,7 @@ export function PaymentSuccessModal({
                 ))}
               </div>
             )}
-            {user && (
+            {!pending && user && (
               <p className="text-dim mt-3.5 text-[12.5px]">
                 Чек отправили на {user.email}
               </p>

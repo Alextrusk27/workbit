@@ -149,6 +149,7 @@ export function HubPage() {
       {paid && (
         <PaymentSuccessModal
           open={paymentOpen}
+          pending={!!paymentId && payment?.status !== 'PAID'}
           onClose={() => setPaymentOpen(false)}
         />
       )}

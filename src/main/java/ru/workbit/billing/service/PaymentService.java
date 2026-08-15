@@ -41,20 +41,31 @@ public class PaymentService {
     public String confirm(Map<String, String> params) {
         PaymentProvider.Notification notification = paymentProvider.parseNotification(params);
         Payment payment = paymentRepository.findByInvId(notification.invId())
-                .orElseThrow(() -> new IllegalArgumentException("Unknown payment"));
+                .orElseThrow(() -> {
+                    log.warn("Payment notification for unknown invId {}", notification.invId());
+                    return new IllegalArgumentException("Unknown payment");
+                });
         if (notification.amount().compareTo(payment.getAmount()) != 0) {
             log.warn("Payment notification with wrong amount for invId {}: {}",
                     payment.getInvId(), notification.amount());
             throw new IllegalArgumentException("Amount mismatch");
         }
 
-        if (paymentRepository.markPaid(payment.getId(), Instant.now()) == 1) {
-            Payment.Product product = payment.getProduct();
-            quotaService.creditPlan(payment.getUserId(), product.getPlan(), product.getLabel());
-            log.info("Payment {} (invId {}) confirmed for user {}",
-                    payment.getId(), payment.getInvId(), payment.getUserId());
-        }
+        confirmPaid(payment);
         return paymentProvider.notificationResponse(payment.getInvId());
+    }
+
+    @Transactional
+    public boolean confirmPaid(Payment payment) {
+        if (paymentRepository.markPaid(payment.getId(), Instant.now()) != 1) {
+            return false;
+        }
+
+        Payment.Product product = payment.getProduct();
+        quotaService.creditPlan(payment.getUserId(), product.getPlan(), product.getLabel());
+        log.info("Payment {} (invId {}) confirmed for user {}",
+                payment.getId(), payment.getInvId(), payment.getUserId());
+        return true;
     }
 
     public PaymentStatusResponse get(UUID id, UUID userId) {

@@ -13,6 +13,8 @@ public interface PaymentProvider {
 
     String notificationResponse(int invId);
 
+    boolean isPaid(Payment payment);
+
     record Notification(int invId, BigDecimal amount) {
     }
 }

@@ -8,6 +8,7 @@ public record RobokassaProperties(
         String password1,
         String password2,
         boolean test,
-        String paymentUrl
+        String paymentUrl,
+        String stateUrl
 ) {
 }

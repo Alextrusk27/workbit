@@ -32,6 +32,9 @@ spring:
     name: ${app.name}
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  flyway:
+    placeholders:
+      payment_inv_id_start: ${PAYMENT_INV_ID_START:1000000}
   http:
     client:
       connect-timeout: 5s
@@ -69,6 +72,7 @@ billing:
     password2: ${ROBOKASSA_PASSWORD2}
     test: ${ROBOKASSA_TEST:false}
     payment-url: https://auth.robokassa.ru/Merchant/Index.aspx
+    state-url: https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt
 
 springdoc:
   api-docs:

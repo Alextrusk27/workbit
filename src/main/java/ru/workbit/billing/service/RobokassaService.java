@@ -3,10 +3,19 @@ package ru.workbit.billing.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import ru.workbit.billing.config.RobokassaProperties;
 import ru.workbit.billing.model.Payment;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,7 +29,11 @@ import java.util.Map;
 @Slf4j
 public class RobokassaService implements PaymentProvider {
 
+    private static final String RESULT_OK = "0";
+    private static final String STATE_PAID = "100";
+
     private final RobokassaProperties properties;
+    private final RestClient robokassaRestClient;
 
     @Override
     public String paymentUrl(Payment payment, String email) {
@@ -66,6 +79,66 @@ public class RobokassaService implements PaymentProvider {
     @Override
     public String notificationResponse(int invId) {
         return "OK" + invId;
+    }
+
+    @Override
+    public boolean isPaid(Payment payment) {
+        if (properties.test()) {
+            return false;
+        }
+
+        String invId = String.valueOf(payment.getInvId());
+        String signature = sha256Hex(String.join(":",
+                properties.merchantLogin(), invId, properties.password2()));
+        try {
+            String xml = robokassaRestClient.get()
+                    .uri(builder -> builder
+                            .queryParam("MerchantLogin", properties.merchantLogin())
+                            .queryParam("InvoiceID", invId)
+                            .queryParam("Signature", signature)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
+            return isPaidState(xml, payment.getInvId());
+        } catch (RestClientException e) {
+            log.warn("Robokassa state request failed for invId {}", payment.getInvId(), e);
+            return false;
+        }
+    }
+
+    private static boolean isPaidState(String xml, int invId) {
+        Document document = parseXml(xml, invId);
+        if (document == null) {
+            return false;
+        }
+
+        String resultCode = code(document, "Result");
+        if (!RESULT_OK.equals(resultCode)) {
+            log.warn("Robokassa state request rejected for invId {}: result code {}", invId, resultCode);
+            return false;
+        }
+        return STATE_PAID.equals(code(document, "State"));
+    }
+
+    private static Document parseXml(String xml, int invId) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            return factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+        } catch (Exception e) {
+            log.warn("Unreadable Robokassa state response for invId {}", invId, e);
+            return null;
+        }
+    }
+
+    private static String code(Document document, String parent) {
+        NodeList parents = document.getElementsByTagName(parent);
+        if (parents.getLength() == 0) {
+            return null;
+        }
+        NodeList codes = ((Element) parents.item(0)).getElementsByTagName("Code");
+        return codes.getLength() == 0 ? null : codes.item(0).getTextContent().trim();
     }
 
     private static String sha256Hex(String value) {

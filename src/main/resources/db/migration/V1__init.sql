@@ -321,7 +321,7 @@ CREATE TABLE IF NOT EXISTS billing.usage_event (
 CREATE INDEX IF NOT EXISTS idx_usage_event_user_id_at
     ON billing.usage_event(user_id, at DESC);
 
-CREATE SEQUENCE IF NOT EXISTS billing.payment_inv_id_seq;
+CREATE SEQUENCE IF NOT EXISTS billing.payment_inv_id_seq START WITH ${payment_inv_id_start};
 
 CREATE TABLE IF NOT EXISTS billing.payment (
     id       UUID PRIMARY KEY,

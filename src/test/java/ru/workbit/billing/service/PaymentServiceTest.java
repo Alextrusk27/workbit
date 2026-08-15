@@ -191,6 +191,42 @@ class PaymentServiceTest {
     }
 
     @Nested
+    @DisplayName("ConfirmPaid")
+    class ConfirmPaid {
+
+        @Test
+        @DisplayName("markPaid вернул 1 — creditPlan вызван с планом и label продукта, возвращает true")
+        void creditsPlanAndReturnsTrueWhenMarkPaidSucceeds() {
+            // given
+            Payment payment = aPayment(Payment.Status.PENDING);
+            when(paymentRepository.markPaid(eq(PAYMENT_ID), any(Instant.class))).thenReturn(1);
+
+            // when
+            boolean result = paymentService.confirmPaid(payment);
+
+            // then
+            assertThat(result).isTrue();
+            verify(quotaService).creditPlan(USER_ID, Payment.Product.PLAN_PRO.getPlan(),
+                    Payment.Product.PLAN_PRO.getLabel());
+        }
+
+        @Test
+        @DisplayName("markPaid вернул 0 — creditPlan не вызван, возвращает false")
+        void doesNotCreditPlanAndReturnsFalseWhenMarkPaidFails() {
+            // given
+            Payment payment = aPayment(Payment.Status.PAID);
+            when(paymentRepository.markPaid(eq(PAYMENT_ID), any(Instant.class))).thenReturn(0);
+
+            // when
+            boolean result = paymentService.confirmPaid(payment);
+
+            // then
+            assertThat(result).isFalse();
+            verifyNoInteractions(quotaService);
+        }
+    }
+
+    @Nested
     @DisplayName("Get")
     class Get {
 

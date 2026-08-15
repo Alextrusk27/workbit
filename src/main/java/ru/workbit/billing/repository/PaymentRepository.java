@@ -7,12 +7,15 @@ import org.springframework.data.jpa.repository.Query;
 import ru.workbit.billing.model.Payment;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface PaymentRepository extends JpaRepository<@NotNull Payment, @NotNull UUID> {
 
     Optional<Payment> findByInvId(int invId);
+
+    List<Payment> findByStatusAndCreatedBetween(Payment.Status status, Instant from, Instant to);
 
     @Query(value = "SELECT nextval('billing.payment_inv_id_seq')", nativeQuery = true)
     int nextInvId();

@@ -34,4 +34,18 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
               AND (plan = 'FREE' OR plan_expires_at > :now)
             """, nativeQuery = true)
     int debitPlanTraining(UUID userId, Instant now);
+
+    @Modifying
+    @Query(value = """
+            UPDATE billing.account SET
+                plan = :plan,
+                plan_expires_at = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
+                    THEN plan_expires_at ELSE :now END) + INTERVAL '30 days',
+                plan_interviews_left = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
+                    THEN plan_interviews_left ELSE 0 END) + :interviews,
+                plan_trainings_left = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
+                    THEN plan_trainings_left ELSE 0 END) + :trainings
+            WHERE user_id = :userId
+            """, nativeQuery = true)
+    void creditPlan(UUID userId, String plan, int interviews, int trainings, Instant now);
 }

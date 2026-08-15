@@ -83,6 +83,14 @@ export const router = createBrowserRouter([
             element: <AppLayout />,
             children: [
               { index: true, element: <HubPage /> },
+              {
+                path: 'billing/success',
+                element: <Navigate to="/app?payment=ok" replace />,
+              },
+              {
+                path: 'billing/fail',
+                element: <Navigate to="/app?payment=fail" replace />,
+              },
               { path: 'settings', element: <SettingsPage /> },
               { path: 'training', element: <TrainingListPage /> },
               { path: 'training/new', element: <NewTrainingPage /> },

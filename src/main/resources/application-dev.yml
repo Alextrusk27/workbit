@@ -28,6 +28,13 @@ jwt:
   secret: test-secret-key-not-used-in-production-123
   expiration: 3600000
 
+billing:
+  robokassa:
+    merchant-login: ${ROBOKASSA_MERCHANT_LOGIN:workbit-dev}
+    password1: ${ROBOKASSA_PASSWORD1:dev-password1}
+    password2: ${ROBOKASSA_PASSWORD2:dev-password2}
+    test: true
+
 springdoc:
   api-docs:
     enabled: true

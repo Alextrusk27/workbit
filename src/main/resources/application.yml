@@ -62,6 +62,14 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:15m}
 
+billing:
+  robokassa:
+    merchant-login: ${ROBOKASSA_MERCHANT_LOGIN}
+    password1: ${ROBOKASSA_PASSWORD1}
+    password2: ${ROBOKASSA_PASSWORD2}
+    test: ${ROBOKASSA_TEST:false}
+    payment-url: https://auth.robokassa.ru/Merchant/Index.aspx
+
 springdoc:
   api-docs:
     enabled: false

@@ -31,7 +31,26 @@ export interface Usage {
   events: UsageEvent[]
 }
 
+export type PaymentProduct = 'PLAN_PRO' | 'PLAN_MAX'
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED'
+
+export interface PaymentCreated {
+  paymentId: string
+  paymentUrl: string
+}
+
+export interface Payment {
+  status: PaymentStatus
+  product: PaymentProduct
+}
+
 export const billingApi = {
   quota: () => apiFetch<Quota>('/billing/quota'),
   usage: () => apiFetch<Usage>('/billing/usage'),
+  createPayment: (product: PaymentProduct) =>
+    apiFetch<PaymentCreated>('/billing/payments', {
+      method: 'POST',
+      body: { product },
+    }),
+  payment: (id: string) => apiFetch<Payment>(`/billing/payments/${id}`),
 }

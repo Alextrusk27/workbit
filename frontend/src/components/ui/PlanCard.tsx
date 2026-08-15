@@ -7,11 +7,21 @@ interface PlanCardProps {
   plan: Plan
   features: string[]
   to: string
+  /** Обработчик CTA вместо ссылки — например, запуск оплаты. */
+  onSelect?: () => void
+  disabled?: boolean
   className?: string
 }
 
 /** Карточка тарифа: цена, состав и переход к оформлению. */
-export function PlanCard({ plan, features, to, className }: PlanCardProps) {
+export function PlanCard({
+  plan,
+  features,
+  to,
+  onSelect,
+  disabled,
+  className,
+}: PlanCardProps) {
   return (
     <div
       className={cn(
@@ -58,15 +68,29 @@ export function PlanCard({ plan, features, to, className }: PlanCardProps) {
           </li>
         ))}
       </ul>
-      <Link
-        to={to}
-        className={buttonClasses({
-          variant: plan.featured ? 'primary' : 'secondary',
-          className: 'mt-6.5 w-full',
-        })}
-      >
-        {plan.cta}
-      </Link>
+      {onSelect ? (
+        <button
+          type="button"
+          onClick={onSelect}
+          disabled={disabled}
+          className={buttonClasses({
+            variant: plan.featured ? 'primary' : 'secondary',
+            className: 'mt-6.5 w-full',
+          })}
+        >
+          {plan.cta}
+        </button>
+      ) : (
+        <Link
+          to={to}
+          className={buttonClasses({
+            variant: plan.featured ? 'primary' : 'secondary',
+            className: 'mt-6.5 w-full',
+          })}
+        >
+          {plan.cta}
+        </Link>
+      )}
     </div>
   )
 }

@@ -321,6 +321,27 @@ CREATE TABLE IF NOT EXISTS billing.usage_event (
 CREATE INDEX IF NOT EXISTS idx_usage_event_user_id_at
     ON billing.usage_event(user_id, at DESC);
 
+CREATE SEQUENCE IF NOT EXISTS billing.payment_inv_id_seq;
+
+CREATE TABLE IF NOT EXISTS billing.payment (
+    id       UUID PRIMARY KEY,
+    inv_id   INTEGER NOT NULL UNIQUE,
+    user_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    product  VARCHAR(32) NOT NULL,
+    amount   NUMERIC(10,2) NOT NULL,
+    status   VARCHAR(16) NOT NULL,
+    created  TIMESTAMPTZ NOT NULL,
+    paid_at  TIMESTAMPTZ,
+
+    CONSTRAINT chk_payment_product
+        CHECK (product IN ('PLAN_PRO', 'PLAN_MAX')),
+    CONSTRAINT chk_payment_status
+        CHECK (status IN ('PENDING', 'PAID', 'FAILED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_user_id
+    ON billing.payment(user_id);
+
 INSERT INTO content.profession_dict (name, match_key, status) VALUES
     ('Java-разработчик', 'java разработчик', 'APPROVED'),
     ('Python-разработчик', 'python разработчик', 'APPROVED'),

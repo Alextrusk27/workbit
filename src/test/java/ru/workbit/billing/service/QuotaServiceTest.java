@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ class QuotaServiceTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String INTERVIEW_LABEL = "Интервью — Java-разработчик";
     private static final String TRAINING_LABEL = "Тренировка — Java, Уверенный";
+    private static final String CREDIT_LABEL = "Тариф «Про» на 30 дней";
 
     @Mock
     BillingAccountRepository billingAccountRepository;
@@ -437,6 +439,54 @@ class QuotaServiceTest {
                     .isInstanceOf(PaymentRequiredException.class)
                     .hasMessage("Training quota exhausted");
             verify(usageEventRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("CreditPlan")
+    class CreditPlan {
+
+        @Test
+        @DisplayName("insertIfAbsent вызывается, billingAccountRepository.creditPlan - с планом, сеткой квот и now")
+        void callsInsertIfAbsentAndCreditsAccount() {
+            // when
+            quotaService.creditPlan(USER_ID, BillingAccount.Plan.PRO, CREDIT_LABEL);
+
+            // then
+            verify(billingAccountRepository).insertIfAbsent(
+                    USER_ID, BillingAccount.Plan.FREE.getInterviews(), BillingAccount.Plan.FREE.getTrainings());
+            verify(billingAccountRepository).creditPlan(eq(USER_ID), eq(BillingAccount.Plan.PRO.name()),
+                    eq(BillingAccount.Plan.PRO.getInterviews()), eq(BillingAccount.Plan.PRO.getTrainings()),
+                    any(Instant.class));
+        }
+
+        @Test
+        @DisplayName("Сохраняет два CREDIT-события с одинаковым at и label - INTERVIEW и TRAINING с дельтой из сетки плана")
+        void savesTwoCreditEventsWithSameAtAndLabel() {
+            // when
+            quotaService.creditPlan(USER_ID, BillingAccount.Plan.PRO, CREDIT_LABEL);
+
+            // then
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            verify(usageEventRepository, times(2)).save(captor.capture());
+            List<UsageEvent> saved = captor.getAllValues();
+
+            UsageEvent interviewEvent = saved.get(0);
+            UsageEvent trainingEvent = saved.get(1);
+
+            assertThat(interviewEvent.getUserId()).isEqualTo(USER_ID);
+            assertThat(interviewEvent.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(interviewEvent.getTarget()).isEqualTo(UsageEvent.Target.INTERVIEW);
+            assertThat(interviewEvent.getDelta()).isEqualTo(BillingAccount.Plan.PRO.getInterviews());
+            assertThat(interviewEvent.getLabel()).isEqualTo(CREDIT_LABEL);
+
+            assertThat(trainingEvent.getUserId()).isEqualTo(USER_ID);
+            assertThat(trainingEvent.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(trainingEvent.getTarget()).isEqualTo(UsageEvent.Target.TRAINING);
+            assertThat(trainingEvent.getDelta()).isEqualTo(BillingAccount.Plan.PRO.getTrainings());
+            assertThat(trainingEvent.getLabel()).isEqualTo(CREDIT_LABEL);
+
+            assertThat(interviewEvent.getAt()).isEqualTo(trainingEvent.getAt());
         }
     }
 }

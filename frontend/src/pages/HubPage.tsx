@@ -3,9 +3,15 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
+import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
 import { PLAN_LABELS } from '@/features/billing/labels'
-import { billingKeys, useQuota } from '@/features/billing/useBilling'
+import {
+  PAYMENT_ID_KEY,
+  billingKeys,
+  usePayment,
+  useQuota,
+} from '@/features/billing/useBilling'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -76,13 +82,26 @@ export function HubPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [paid] = useState(() => searchParams.get('payment') === 'ok')
+  const [failed] = useState(() => searchParams.get('payment') === 'fail')
   const [paymentOpen, setPaymentOpen] = useState(paid)
+  const [paymentId] = useState(() =>
+    paid ? sessionStorage.getItem(PAYMENT_ID_KEY) : null,
+  )
+  const { data: payment } = usePayment(paymentId)
 
   useEffect(() => {
-    if (!paid) return
+    if (!paid && !failed) return
+    if (failed) sessionStorage.removeItem(PAYMENT_ID_KEY)
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     navigate('/app', { replace: true })
-  }, [paid, navigate, qc])
+  }, [paid, failed, navigate, qc])
+
+  useEffect(() => {
+    if (payment?.status !== 'PAID') return
+    sessionStorage.removeItem(PAYMENT_ID_KEY)
+    qc.invalidateQueries({ queryKey: billingKeys.quota })
+    qc.invalidateQueries({ queryKey: billingKeys.usage })
+  }, [payment?.status, qc])
 
   return (
     <Container>
@@ -94,6 +113,21 @@ export function HubPage() {
         Тренажёр прокачивает один навык под вашу профессию и уровень. Интервью
         готовит к конкретной вакансии с hh.ru и оценивает шансы на оффер.
       </AppPageHeader>
+
+      {failed && (
+        <div className="mt-8 max-w-[560px]">
+          <Alert>
+            Оплата не прошла, деньги не списаны. Попробуйте ещё раз на{' '}
+            <Link
+              to="/pricing"
+              className="underline underline-offset-2 transition-colors"
+            >
+              странице тарифов
+            </Link>
+            .
+          </Alert>
+        </div>
+      )}
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2">
         <SectionCard

@@ -11,6 +11,7 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.billing.model.BillingAccount;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
 
     private static final int FREE_INTERVIEWS = BillingAccount.Plan.FREE.getInterviews();
     private static final int FREE_TRAININGS = BillingAccount.Plan.FREE.getTrainings();
+    private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
     @Autowired
     private BillingAccountRepository repository;
@@ -264,6 +266,91 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
             assertThat(saved.getPlanTrainingsLeft()).isEqualTo(5);
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("CreditPlan")
+    class CreditPlan {
+
+        @Test
+        @DisplayName("FREE-аккаунт: план и остатки задаются с нуля, срок = now + 30 дней")
+        void startsFreshFromFreeAccount() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-credit-from-free@example.com"));
+            em.persistAndFlush(aFreeAccount(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS));
+
+            // when
+            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
+
+            // then — остаток FREE не суммируется, срок отсчитывается от now
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
+            assertThat(saved.getPlanExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(10);
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("Активный платный тариф: срок продлевается от старого, остатки суммируются")
+        void extendsActivePaidPlan() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-credit-active-paid@example.com"));
+            var oldExpiresAt = NOW.plusSeconds(3600);
+            em.persistAndFlush(aProAccount(user.getId(), oldExpiresAt, 3, 5));
+
+            // when
+            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
+
+            // then
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
+            assertThat(saved.getPlanExpiresAt()).isEqualTo(oldExpiresAt.plus(Duration.ofDays(30)));
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(13);
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(25);
+        }
+
+        @Test
+        @DisplayName("Истёкший платный тариф: считается как FREE — срок и остатки задаются с нуля")
+        void resetsExpiredPaidPlan() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-credit-expired-paid@example.com"));
+            em.persistAndFlush(aProAccount(user.getId(), NOW.minusSeconds(3600), 3, 5));
+
+            // when
+            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
+
+            // then — старые остатки отброшены, срок отсчитывается от now
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
+            assertThat(saved.getPlanExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(10);
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("Смена плана при активном тарифе (PRO -> MAX): срок продлевается, остатки суммируются")
+        void upgradesPlanWhileActive() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-credit-upgrade@example.com"));
+            var oldExpiresAt = NOW.plusSeconds(3600);
+            em.persistAndFlush(aProAccount(user.getId(), oldExpiresAt, 3, 5));
+
+            // when
+            repository.creditPlan(user.getId(), "MAX", 25, 50, NOW);
+
+            // then
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.MAX);
+            assertThat(saved.getPlanExpiresAt()).isEqualTo(oldExpiresAt.plus(Duration.ofDays(30)));
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(28);
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(55);
         }
     }
 

@@ -96,6 +96,17 @@ public class QuotaService {
         saveSpendEvent(userId, UsageEvent.Target.TRAINING, label);
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void creditPlan(UUID userId, BillingAccount.Plan plan, String label) {
+        insertIfAbsent(userId);
+        Instant now = Instant.now();
+        billingAccountRepository.creditPlan(userId, plan.name(),
+                plan.getInterviews(), plan.getTrainings(), now);
+        saveCreditEvent(userId, UsageEvent.Target.INTERVIEW, plan.getInterviews(), label, now);
+        saveCreditEvent(userId, UsageEvent.Target.TRAINING, plan.getTrainings(), label, now);
+        log.info("Credited plan {} to user {}", plan, userId);
+    }
+
     private static QuotaResponse toEffective(BillingAccount account) {
         if (isPlanActive(account)) {
             return new QuotaResponse(account.getPlan(), account.getPlanExpiresAt(),
@@ -138,6 +149,18 @@ public class QuotaService {
                 .kind(UsageEvent.Kind.SPEND)
                 .target(target)
                 .delta(1)
+                .label(label)
+                .build());
+    }
+
+    private void saveCreditEvent(UUID userId, UsageEvent.Target target, int delta,
+                                 String label, Instant at) {
+        usageEventRepository.save(UsageEvent.builder()
+                .userId(userId)
+                .at(at)
+                .kind(UsageEvent.Kind.CREDIT)
+                .target(target)
+                .delta(delta)
                 .label(label)
                 .build());
     }

@@ -23,3 +23,19 @@ updates:
     groups:
       actions:
         patterns: [ "*" ]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker-minor-patch:
+        update-types: [ minor, patch ]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      compose-minor-patch:
+        update-types: [ minor, patch ]

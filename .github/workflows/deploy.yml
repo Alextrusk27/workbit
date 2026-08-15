@@ -103,17 +103,20 @@ jobs:
             compose.prod.yml Caddyfile \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/"
 
-      - name: Pin image and restart
+      - name: Render .env from workbit-secrets and restart
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/workbit
-          image="${{ env.IMAGE }}:${{ github.sha }}"
-          if grep -q '^BACKEND_IMAGE=' .env; then
-            sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$image|" .env
-          else
-            echo "BACKEND_IMAGE=$image" >> .env
-          fi
+          git -C secrets pull --ff-only
+          umask 077
+          : > .env.tmp
+          for f in secrets/prod/*.env; do
+            sops -d "$f" >> .env.tmp
+            echo >> .env.tmp
+          done
+          echo "BACKEND_IMAGE=${{ env.IMAGE }}:${{ github.sha }}" >> .env.tmp
+          mv .env.tmp .env
           token=$(curl -s -H 'Metadata-Flavor: Google' \
             'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
             | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)

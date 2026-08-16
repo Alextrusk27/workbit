@@ -19,7 +19,7 @@ import {
   IconRole,
   IconStar,
 } from '@/components/marketing/icons'
-import { plans } from '@/content/plans'
+import { plans, promoActive } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/cn'
@@ -102,7 +102,7 @@ export function HomePage() {
               </Link>
             </div>
             <p className="text-dim mt-4.5 text-[13.5px]">
-              3 интервью в месяц бесплатно
+              1 интервью и 3 тренировки — бесплатно
             </p>
           </div>
 
@@ -244,6 +244,8 @@ export function HomePage() {
             <SectionHead title="Простые и честные тарифы">
               Начните бесплатно. Про — когда готовитесь всерьёз, Макс — когда
               сессий нужно больше.
+              {promoActive &&
+                ' До 1 октября к покупке — до 5 интервью в подарок.'}
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">

@@ -7,7 +7,7 @@ import { PlanCard } from '@/components/ui/PlanCard'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import { plans } from '@/content/plans'
+import { plans, promoActive } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import type { PaymentProduct } from '@/features/billing/api'
@@ -43,7 +43,8 @@ export function PricingPage() {
         }
       >
         Начните бесплатно, чтобы понять формат. Переходите на Про, когда
-        готовитесь всерьёз — под реальные вакансии и голосом.
+        готовитесь всерьёз, — больше интервью, глубокие тренировки и динамика по
+        вакансии.
       </PageHero>
 
       <section className="py-16">
@@ -72,8 +73,11 @@ export function PricingPage() {
           </div>
 
           <p className="text-dim mt-7 text-center text-[13.5px]">
-            Цены указаны для примера и могут измениться до запуска. Условия
-            оплаты платного тарифа определяет{' '}
+            {promoActive &&
+              'До 1 октября — интервью в подарок к каждой покупке: +2 на Про и +5 на Максе. '}
+            Тариф действует 30 дней с момента оплаты. Не хватило лимита —
+            оплатите тариф ещё раз: срок продлится, а лимиты добавятся к
+            оставшимся. Условия оплаты определяет{' '}
             <Link
               to="/offer"
               className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"

@@ -8,7 +8,7 @@ export function QuotaBadge({ kind }: { kind: 'interview' | 'training' }) {
     kind === 'interview' ? data.planInterviewsLeft : data.planTrainingsLeft
   return (
     <span className="text-dim text-[13px] whitespace-nowrap tabular-nums">
-      Осталось: {left}
+      {left === null ? 'Безлимит' : `Осталось: ${left}`}
     </span>
   )
 }

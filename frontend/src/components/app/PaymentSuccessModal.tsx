@@ -13,12 +13,30 @@ const TARGET_LABELS: Record<UsageTarget, string> = {
   TRAINING: 'Тренировки',
 }
 
+const BATCH_WINDOW_MS = 10_000
+
 function latestCreditBatch(events: UsageEvent[] | undefined): UsageEvent[] {
-  const first = events?.find((e) => e.kind === 'CREDIT')
-  if (!first || !events) return []
-  return events.filter(
-    (e) => e.kind === 'CREDIT' && e.at === first.at && e.label === first.label,
-  )
+  if (!events) return []
+  const start = events.findIndex((e) => e.kind === 'CREDIT')
+  if (start < 0) return []
+  const firstAt = new Date(events[start].at).getTime()
+  const batch: UsageEvent[] = []
+  for (let i = start; i < events.length; i++) {
+    const event = events[i]
+    if (event.kind !== 'CREDIT') break
+    if (firstAt - new Date(event.at).getTime() > BATCH_WINDOW_MS) break
+    batch.push(event)
+  }
+  return batch
+}
+
+function toCreditRows(batch: UsageEvent[]) {
+  const packLabel = batch[batch.length - 1]?.label
+  return [...batch].reverse().map((event) => ({
+    key: `${event.label}-${event.target}`,
+    name: event.label === packLabel ? TARGET_LABELS[event.target] : event.label,
+    delta: event.delta,
+  }))
 }
 
 function CheckCircle() {
@@ -75,7 +93,7 @@ export function PaymentSuccessModal({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  const credits = latestCreditBatch(usage?.events)
+  const credits = toCreditRows(latestCreditBatch(usage?.events))
 
   return (
     <AnimatePresence>
@@ -133,17 +151,25 @@ export function PaymentSuccessModal({
               <div className="mt-5 flex flex-col gap-2">
                 {credits.map((credit) => (
                   <div
-                    key={credit.target}
+                    key={credit.key}
                     className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
                   >
-                    <span className="text-ink text-sm">
-                      {TARGET_LABELS[credit.target]}
-                    </span>
+                    <span className="text-ink text-sm">{credit.name}</span>
                     <span className="text-ok text-sm font-semibold tabular-nums">
                       +{credit.delta}
                     </span>
                   </div>
                 ))}
+                {quota?.plan === 'MAX' && (
+                  <div className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5">
+                    <span className="text-ink text-sm">
+                      {TARGET_LABELS.TRAINING}
+                    </span>
+                    <span className="text-ok text-sm font-semibold">
+                      Безлимит
+                    </span>
+                  </div>
+                )}
               </div>
             )}
             {!pending && user && (

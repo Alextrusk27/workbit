@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { cn } from '@/lib/cn'
 
 interface AppPageHeaderProps {
   back?: { to: string; label: string }
-  eyebrow: string
+  eyebrow?: string
   title: ReactNode
   /** Подводка под заголовком. */
   children?: ReactNode
@@ -31,8 +32,13 @@ export function AppPageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <h1 className="text-ink mt-2.5 text-[clamp(28px,3.6vw,38px)] font-extrabold">
+          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+          <h1
+            className={cn(
+              'text-ink text-[clamp(28px,3.6vw,38px)] font-extrabold',
+              eyebrow && 'mt-2.5',
+            )}
+          >
             {title}
           </h1>
         </div>

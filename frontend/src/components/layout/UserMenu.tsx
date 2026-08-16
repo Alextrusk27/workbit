@@ -85,14 +85,14 @@ export function UserMenu() {
               onClick={() => setOpen(false)}
               className={itemClass}
             >
-              Личный кабинет
+              Рабочий стол
             </Link>
             <Link
               to="/app/settings"
               onClick={() => setOpen(false)}
               className={itemClass}
             >
-              Настройки
+              Аккаунт
             </Link>
             <button
               type="button"

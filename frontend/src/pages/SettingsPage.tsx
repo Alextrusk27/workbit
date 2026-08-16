@@ -36,17 +36,13 @@ function formatExpiry(iso: string): string {
 }
 
 export function SettingsPage() {
-  usePageTitle('Настройки')
+  usePageTitle('Аккаунт')
   const { user } = useAuth()
   const { data: quota } = useQuota()
 
   return (
     <Container className="max-w-160">
-      <AppPageHeader
-        back={{ to: '/app', label: 'Личный кабинет' }}
-        eyebrow="Настройки"
-        title="Аккаунт"
-      >
+      <AppPageHeader title="Аккаунт">
         {user && (
           <span className="flex flex-wrap items-center gap-2.5">
             <span>
@@ -140,6 +136,23 @@ function LimitCard({
   counters: UsageCounter
 }) {
   const { left, total } = counters
+
+  if (left === null || total === null) {
+    return (
+      <div className="border-line bg-card rounded-xl border p-5">
+        <Eyebrow>{title}</Eyebrow>
+        <p className="mt-2">
+          <span className="text-ink text-[28px] font-extrabold tracking-[-0.02em]">
+            Безлимит
+          </span>
+        </p>
+        <p className="text-dim mt-2.5 text-[12.5px]">
+          Без ограничений на вашем тарифе
+        </p>
+      </div>
+    )
+  }
+
   const used = total - left
   const usedShare = total > 0 ? (used / total) * 100 : 0
 

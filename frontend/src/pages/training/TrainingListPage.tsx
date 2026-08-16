@@ -52,7 +52,7 @@ export function TrainingListPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app', label: 'Личный кабинет' }}
+        back={{ to: '/app', label: 'Рабочий стол' }}
         eyebrow="Тренажёр"
         title="Мои тренировки"
         actions={

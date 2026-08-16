@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -49,6 +51,8 @@ class PaymentServiceTest {
     PaymentProvider paymentProvider;
     @Mock
     QuotaService quotaService;
+    @Mock
+    GiftService giftService;
 
     @InjectMocks
     PaymentService paymentService;
@@ -151,7 +155,7 @@ class PaymentServiceTest {
         }
 
         @Test
-        @DisplayName("Happy path — markPaid вернул 1, creditPlan вызван с планом и label продукта, возвращён ответ провайдера")
+        @DisplayName("Happy path — markPaid вернул 1, creditPlan вызван с планом и label продукта, промо-подарок выдан с тем же Instant, что и markPaid, возвращён ответ провайдера")
         void creditsPlanOnFirstConfirmation() {
             // given
             when(paymentProvider.parseNotification(PARAMS))
@@ -166,12 +170,19 @@ class PaymentServiceTest {
 
             // then
             assertThat(result).isEqualTo(NOTIFICATION_RESPONSE);
-            verify(quotaService).creditPlan(USER_ID, Payment.Product.PLAN_PRO.getPlan(),
+            InOrder inOrder = inOrder(quotaService, giftService);
+            inOrder.verify(quotaService).creditPlan(USER_ID, Payment.Product.PLAN_PRO.getPlan(),
                     Payment.Product.PLAN_PRO.getLabel());
+
+            ArgumentCaptor<Instant> markPaidCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(paymentRepository).markPaid(eq(PAYMENT_ID), markPaidCaptor.capture());
+            ArgumentCaptor<Instant> giftCaptor = ArgumentCaptor.forClass(Instant.class);
+            inOrder.verify(giftService).grantPromoGift(eq(payment), giftCaptor.capture());
+            assertThat(giftCaptor.getValue()).isEqualTo(markPaidCaptor.getValue());
         }
 
         @Test
-        @DisplayName("Повторное уведомление — markPaid вернул 0, creditPlan не вызван, ответ провайдера всё равно возвращён")
+        @DisplayName("Повторное уведомление — markPaid вернул 0, creditPlan и подарок не вызываются, ответ провайдера всё равно возвращён")
         void isIdempotentOnRepeatedNotification() {
             // given
             when(paymentProvider.parseNotification(PARAMS))
@@ -186,7 +197,7 @@ class PaymentServiceTest {
 
             // then
             assertThat(result).isEqualTo(NOTIFICATION_RESPONSE);
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(quotaService, giftService);
         }
     }
 
@@ -195,7 +206,7 @@ class PaymentServiceTest {
     class ConfirmPaid {
 
         @Test
-        @DisplayName("markPaid вернул 1 — creditPlan вызван с планом и label продукта, возвращает true")
+        @DisplayName("markPaid вернул 1 — creditPlan вызван с планом и label продукта, затем выдан промо-подарок с тем же Instant, что и markPaid, возвращает true")
         void creditsPlanAndReturnsTrueWhenMarkPaidSucceeds() {
             // given
             Payment payment = aPayment(Payment.Status.PENDING);
@@ -206,12 +217,19 @@ class PaymentServiceTest {
 
             // then
             assertThat(result).isTrue();
-            verify(quotaService).creditPlan(USER_ID, Payment.Product.PLAN_PRO.getPlan(),
+            InOrder inOrder = inOrder(quotaService, giftService);
+            inOrder.verify(quotaService).creditPlan(USER_ID, Payment.Product.PLAN_PRO.getPlan(),
                     Payment.Product.PLAN_PRO.getLabel());
+
+            ArgumentCaptor<Instant> markPaidCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(paymentRepository).markPaid(eq(PAYMENT_ID), markPaidCaptor.capture());
+            ArgumentCaptor<Instant> giftCaptor = ArgumentCaptor.forClass(Instant.class);
+            inOrder.verify(giftService).grantPromoGift(eq(payment), giftCaptor.capture());
+            assertThat(giftCaptor.getValue()).isEqualTo(markPaidCaptor.getValue());
         }
 
         @Test
-        @DisplayName("markPaid вернул 0 — creditPlan не вызван, возвращает false")
+        @DisplayName("markPaid вернул 0 — creditPlan и подарок не вызываются, возвращает false")
         void doesNotCreditPlanAndReturnsFalseWhenMarkPaidFails() {
             // given
             Payment payment = aPayment(Payment.Status.PAID);
@@ -222,7 +240,7 @@ class PaymentServiceTest {
 
             // then
             assertThat(result).isFalse();
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(quotaService, giftService);
         }
     }
 

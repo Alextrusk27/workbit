@@ -17,11 +17,11 @@ public record UsageResponse(
         List<UsageEventResponse> events
 ) {
     public record UsageCounter(
-            @Schema(description = "Остаток", example = "4")
-            int left,
+            @Schema(description = "Остаток; null — безлимит", example = "4")
+            Integer left,
 
-            @Schema(description = "Выдано всего", example = "10")
-            int total
+            @Schema(description = "Выдано всего; null — безлимит", example = "10")
+            Integer total
     ) {
     }
 

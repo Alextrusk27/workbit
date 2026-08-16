@@ -272,6 +272,33 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
+    @DisplayName("CreditInterviews")
+    class CreditInterviews {
+
+        @Test
+        @DisplayName("Прибавляет к остатку интервью, остальные поля строки не трогает")
+        void addsToInterviewsLeftWithoutAffectingOtherFields() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-credit-interviews@example.com"));
+            var expiresAt = NOW.plusSeconds(3600);
+            em.persistAndFlush(aProAccount(user.getId(), expiresAt, 5, 7));
+
+            // when
+            repository.creditInterviews(user.getId(), 3);
+
+            // then
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(8);
+            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
+            assertThat(saved.getPlanExpiresAt()).isEqualTo(expiresAt);
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(7);
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
     @DisplayName("CreditPlan")
     class CreditPlan {
 
@@ -342,15 +369,16 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             em.persistAndFlush(aProAccount(user.getId(), oldExpiresAt, 3, 5));
 
             // when
-            repository.creditPlan(user.getId(), "MAX", 25, 50, NOW);
+            repository.creditPlan(user.getId(), "MAX", BillingAccount.Plan.MAX.getInterviews(),
+                    BillingAccount.Plan.MAX.getTrainings(), NOW);
 
             // then
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
             assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.MAX);
             assertThat(saved.getPlanExpiresAt()).isEqualTo(oldExpiresAt.plus(Duration.ofDays(30)));
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(28);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(55);
+            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(3 + BillingAccount.Plan.MAX.getInterviews());
+            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(5 + BillingAccount.Plan.MAX.getTrainings());
         }
     }
 

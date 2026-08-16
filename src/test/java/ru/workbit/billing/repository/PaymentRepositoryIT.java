@@ -40,12 +40,16 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
     }
 
     private Payment aPayment(UUID userId, int invId) {
+        return aPayment(userId, invId, Payment.Status.PENDING);
+    }
+
+    private Payment aPayment(UUID userId, int invId, Payment.Status status) {
         return Payment.builder()
                 .invId(invId)
                 .userId(userId)
                 .product(Payment.Product.PLAN_PRO)
                 .amount(Payment.Product.PLAN_PRO.getPrice())
-                .status(Payment.Status.PENDING)
+                .status(status)
                 .build(); // created — @Builder.Default
     }
 

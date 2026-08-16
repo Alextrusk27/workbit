@@ -37,6 +37,13 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
 
     @Modifying
     @Query(value = """
+            UPDATE billing.account SET plan_interviews_left = plan_interviews_left + :count
+            WHERE user_id = :userId
+            """, nativeQuery = true)
+    void creditInterviews(UUID userId, int count);
+
+    @Modifying
+    @Query(value = """
             UPDATE billing.account SET
                 plan = :plan,
                 plan_expires_at = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now

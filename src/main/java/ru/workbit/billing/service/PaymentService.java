@@ -22,6 +22,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentProvider paymentProvider;
     private final QuotaService quotaService;
+    private final GiftService giftService;
 
     @Transactional
     public PaymentCreateResponse create(UUID userId, Payment.Product product, String email) {
@@ -57,12 +58,14 @@ public class PaymentService {
 
     @Transactional
     public boolean confirmPaid(Payment payment) {
-        if (paymentRepository.markPaid(payment.getId(), Instant.now()) != 1) {
+        Instant paidAt = Instant.now();
+        if (paymentRepository.markPaid(payment.getId(), paidAt) != 1) {
             return false;
         }
 
         Payment.Product product = payment.getProduct();
         quotaService.creditPlan(payment.getUserId(), product.getPlan(), product.getLabel());
+        giftService.grantPromoGift(payment, paidAt);
         log.info("Payment {} (invId {}) confirmed for user {}",
                 payment.getId(), payment.getInvId(), payment.getUserId());
         return true;

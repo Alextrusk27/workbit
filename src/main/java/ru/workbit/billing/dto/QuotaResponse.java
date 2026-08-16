@@ -15,7 +15,7 @@ public record QuotaResponse(
         @Schema(description = "Остаток интервью по тарифу", example = "1")
         int planInterviewsLeft,
 
-        @Schema(description = "Остаток тренировок по тарифу", example = "3")
-        int planTrainingsLeft
+        @Schema(description = "Остаток тренировок по тарифу; null — безлимит (активный тариф Макс)", example = "3")
+        Integer planTrainingsLeft
 ) {
 }

@@ -33,16 +33,18 @@ public class BillingAccount {
 
     @Getter
     public enum Plan {
-        FREE(1, 3),
-        PRO(10, 20),
-        MAX(25, 50);
+        FREE(1, 3, false),
+        PRO(10, 20, false),
+        MAX(25, 0, true);
 
         private final int interviews;
         private final int trainings;
+        private final boolean unlimitedTrainings;
 
-        Plan(int interviews, int trainings) {
+        Plan(int interviews, int trainings, boolean unlimitedTrainings) {
             this.interviews = interviews;
             this.trainings = trainings;
+            this.unlimitedTrainings = unlimitedTrainings;
         }
     }
 }

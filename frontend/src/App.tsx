@@ -2,6 +2,32 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { seoFor } from '@/content/seo'
+
+function HeadMeta() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    const { title, description, canonical } = seoFor(pathname)
+    document.title = title
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', description)
+    let link = document.querySelector('link[rel="canonical"]')
+    if (canonical) {
+      if (!link) {
+        link = document.createElement('link')
+        link.setAttribute('rel', 'canonical')
+        document.head.append(link)
+      }
+      link.setAttribute('href', canonical)
+    } else {
+      link?.remove()
+    }
+  }, [pathname])
+
+  return null
+}
 
 /** Прокрутка при навигации: к секции по хешу (#how), иначе — наверх.
  *  Уважает prefers-reduced-motion. Зависимость — location целиком (key меняется
@@ -30,6 +56,7 @@ function ScrollManager() {
 function App() {
   return (
     <div className="flex min-h-screen flex-col">
+      <HeadMeta />
       <ScrollManager />
       <a
         href="#main"

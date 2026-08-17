@@ -62,6 +62,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -185,6 +187,11 @@ jobs:
             *javascript*) echo "frontend is up ($asset)" ;;
             *) echo "bundle $asset served as '$ctype' instead of javascript"; exit 1 ;;
           esac
+          echo "$html" | grep -q 'rel="canonical"' || { echo "no canonical on /"; exit 1; }
+          curl -s https://workbit.ru/pricing | grep -q 'application/ld+json' || { echo "no json-ld on /pricing"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://workbit.ru/definitely-missing)
+          [ "$code" = "404" ] || { echo "soft 404: /definitely-missing answered $code"; exit 1; }
+          echo "seo checks passed"
 
   release:
     needs: deploy

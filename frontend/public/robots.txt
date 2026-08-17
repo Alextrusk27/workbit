@@ -1,8 +1,12 @@
 User-agent: *
 Allow: /
-Disallow: /app
-Disallow: /login
-Disallow: /register
-Disallow: /brand
+Disallow: /app$
+Disallow: /app/
+Disallow: /login$
+Disallow: /login/
+Disallow: /register$
+Disallow: /register/
+Disallow: /brand$
+Disallow: /brand/
 
 Sitemap: https://workbit.ru/sitemap.xml

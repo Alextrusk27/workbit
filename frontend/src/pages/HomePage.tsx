@@ -21,7 +21,6 @@ import {
 } from '@/components/marketing/icons'
 import { plans, promoActive } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
-import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/cn'
 
 const features = [
@@ -64,7 +63,6 @@ const tabs = [
 ]
 
 export function HomePage() {
-  usePageTitle()
   const { isAuthenticated } = useAuth()
   const [tab, setTab] = useState(0)
   const startTo = isAuthenticated ? '/app' : '/login'

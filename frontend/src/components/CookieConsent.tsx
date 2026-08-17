@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/Button'
@@ -7,12 +7,14 @@ import { motionTokens, springs } from '@/lib/motion'
 const CONSENT_KEY = 'workbit-cookie-consent'
 
 /** Баннер согласия на cookie. Показывается, пока пользователь не принял; выбор
- *  запоминаем в localStorage (ленивое чтение в initial state — без мигания). */
+ *  запоминаем в localStorage (чтение после маунта — SSR-совместимо). */
 export function CookieConsent() {
-  const [visible, setVisible] = useState(
-    () => !localStorage.getItem(CONSENT_KEY),
-  )
+  const [visible, setVisible] = useState(false)
   const reduce = useReducedMotion()
+
+  useEffect(() => {
+    if (!localStorage.getItem(CONSENT_KEY)) setVisible(true)
+  }, [])
 
   const accept = () => {
     localStorage.setItem(CONSENT_KEY, 'accepted')

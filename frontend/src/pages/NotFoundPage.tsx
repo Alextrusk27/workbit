@@ -2,10 +2,8 @@ import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 export function NotFoundPage() {
-  usePageTitle('Страница не найдена')
   return (
     <Container className="py-24 text-center sm:py-32">
       <Eyebrow className="text-indigo">404</Eyebrow>

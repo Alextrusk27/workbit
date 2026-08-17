@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingKeys } from '@/features/billing/useBilling'
+import { finishWithReportFallback } from '@/lib/api'
 import {
   trainingApi,
   type CreateTrainingRequest,
@@ -137,7 +138,11 @@ export function useRestartSession() {
 export function useFinishSession() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (sessionId: string) => trainingApi.finishSession(sessionId),
+    mutationFn: (sessionId: string) =>
+      finishWithReportFallback(
+        () => trainingApi.finishSession(sessionId),
+        () => trainingApi.getReport(sessionId),
+      ),
     onSuccess: (report, sessionId) => {
       qc.setQueryData(keys.report(sessionId), report)
       qc.invalidateQueries({ queryKey: keys.sessions })

@@ -50,10 +50,11 @@ public class LlmService {
 
     private static String experienceGrade(String experience) {
         return switch (experience == null ? "" : experience) {
-            case "Нет опыта" -> "noexp";
-            case "От 1 года до 3 лет" -> "middle";
-            case "От 3 до 6 лет", "Более 6 лет" -> "senior";
-            default -> "junior";
+            case "Нет опыта" -> "exp0";
+            case "От 1 года до 3 лет" -> "exp1";
+            case "От 3 до 6 лет" -> "exp3";
+            case "Более 6 лет" -> "exp6";
+            default -> "exp1";
         };
     }
 }

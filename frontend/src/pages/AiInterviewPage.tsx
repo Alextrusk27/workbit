@@ -11,7 +11,6 @@ import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
 import { IconChart, IconPencil, IconStar } from '@/components/marketing/icons'
 import { useAuth } from '@/features/auth/useAuth'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 const steps = [
   {
@@ -56,7 +55,6 @@ const advantages = [
 ]
 
 export function AiInterviewPage() {
-  usePageTitle('AI-интервью')
   const { isAuthenticated } = useAuth()
   const startTo = isAuthenticated ? '/app/interview/new' : '/login'
 

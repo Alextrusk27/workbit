@@ -1,0 +1,205 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE: cr.yandex/crpjbbfhkvsml3f9kh1n/workbit-backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Run unit tests
+        run: ./mvnw -B test
+
+  backend:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Yandex Container Registry
+        env:
+          YC_SA_KEY_ID: ${{ secrets.YC_SA_KEY_ID }}
+          YC_SA_ID: ${{ secrets.YC_SA_ID }}
+          YC_SA_PRIVATE_KEY: ${{ secrets.YC_SA_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+          umask 077
+          printf '%s\n' "$YC_SA_PRIVATE_KEY" | sed -n '/-----BEGIN/,$p' > sa_key.pem
+          iam=""
+          for i in 1 2 3; do
+            now=$(date +%s)
+            header=$(printf '{"typ":"JWT","alg":"PS256","kid":"%s"}' "$YC_SA_KEY_ID" | b64url)
+            payload=$(printf '{"iss":"%s","aud":"https://iam.api.cloud.yandex.net/iam/v1/tokens","iat":%s,"exp":%s}' "$YC_SA_ID" "$((now-60))" "$((now+600))" | b64url)
+            signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign sa_key.pem -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:32 -binary | b64url)
+            iam=$(curl -s -X POST -H 'Content-Type: application/json' \
+              -d "{\"jwt\":\"$header.$payload.$signature\"}" \
+              https://iam.api.cloud.yandex.net/iam/v1/tokens \
+              | grep -o '"iamToken": *"[^"]*' | cut -d'"' -f4) || true
+            [ -n "$iam" ] && break
+            echo "IAM attempt $i failed, retrying"; sleep 5
+          done
+          rm sa_key.pem
+          [ -n "$iam" ] || { echo "IAM token exchange failed"; exit 1; }
+          mkdir -p .docker
+          printf '{"auths":{"cr.yandex":{"auth":"%s"}}}' "$(printf 'iam:%s' "$iam" | openssl base64 -A)" > .docker/config.json
+
+      - name: Build and push
+        uses: docker://gcr.io/kaniko-project/executor:v1.24.0
+        env:
+          DOCKER_CONFIG: ${{ github.workspace }}/.docker
+        with:
+          args: >-
+            --context=dir://${{ github.workspace }}
+            --dockerfile=${{ github.workspace }}/Dockerfile
+            --destination=${{ env.IMAGE }}:${{ github.sha }}
+
+  frontend:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: /api/v1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: frontend/dist
+          retention-days: 1
+
+  deploy:
+    needs: [ backend, frontend ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Ensure rsync
+        run: command -v rsync >/dev/null || (apt-get update && apt-get install -y rsync)
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Upload compose and Caddyfile
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
+            compose.prod.yml Caddyfile \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/"
+
+      - name: Render .env from workbit-secrets and restart
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
+          set -euo pipefail
+          cd /opt/workbit
+          image="${{ env.IMAGE }}:${{ github.sha }}"
+          prev=$(grep '^BACKEND_IMAGE=' .env 2>/dev/null | cut -d= -f2- || true)
+          git -C secrets pull --ff-only
+          umask 077
+          : > .env.tmp
+          for f in secrets/prod/*.env; do
+            sops -d "$f" >> .env.tmp
+            echo >> .env.tmp
+          done
+          token=$(curl -s -H 'Metadata-Flavor: Google' \
+            'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
+            | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+          printf '%s' "$token" | docker login --username iam --password-stdin cr.yandex
+          docker pull "$image"
+          echo "BACKEND_IMAGE=$image" >> .env.tmp
+          mv .env.tmp .env
+          if ! docker compose -f compose.prod.yml up -d --wait --wait-timeout 300; then
+            echo "new backend did not become healthy"
+            if [ -n "$prev" ] && [ "$prev" != "$image" ]; then
+              echo "rolling back to $prev"
+              sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$prev|" .env
+              docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
+                && echo "rollback done: prod is back on $prev" \
+                || echo "ROLLBACK FAILED: prod needs manual attention"
+            else
+              echo "no previous image to roll back to"
+            fi
+            exit 1
+          fi
+          docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          docker images "${{ env.IMAGE }}" --format '{{.Repository}}:{{.Tag}}' \
+            | while read -r img; do
+                [ "$img" = "$image" ] && continue
+                [ "$img" = "$prev" ] && continue
+                docker rmi "$img" || echo "failed to remove $img"
+              done
+          EOF
+
+      - name: Smoke test backend
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' https://workbit.ru/api/v1/auth/me || true)
+            if [ "$code" = "401" ]; then
+              echo "backend is up"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "backend did not answer 401 within 150s (last code: $code)"
+          exit 1
+
+      - name: Upload frontend
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
+            dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/"
+
+      - name: Smoke test frontend
+        run: |
+          html=$(curl -sf --connect-timeout 5 --max-time 15 --retry 3 --retry-all-errors https://workbit.ru/) || { echo "index.html is not served"; exit 1; }
+          echo "$html" | grep -q 'id="root"' || { echo "served HTML has no app root"; exit 1; }
+          asset=$(echo "$html" | grep -o '/assets/[^"]*\.js' | head -1)
+          [ -n "$asset" ] || { echo "no js bundle referenced in index.html"; exit 1; }
+          ctype=$(curl -s --connect-timeout 5 --max-time 15 --retry 3 --retry-all-errors -o /dev/null -w '%{content_type}' "https://workbit.ru$asset") || { echo "bundle $asset is not served"; exit 1; }
+          case "$ctype" in
+            *javascript*) echo "frontend is up ($asset)" ;;
+            *) echo "bundle $asset served as '$ctype' instead of javascript"; exit 1 ;;
+          esac

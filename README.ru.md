@@ -25,9 +25,11 @@
 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
+![GitVerse](https://img.shields.io/badge/GitVerse-CI-1C64F2)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
+![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
+![Coverage](https://img.shields.io/badge/coverage-87%25_lines-44cc11)
 
 </div>
 
@@ -46,43 +48,25 @@
 - [Тесты](#-тесты)
 - [CI/CD](#-cicd)
 - [Документация](#-документация)
+- [Лицензия](#-лицензия)
 
 ## ✨ Возможности
 
 - 🎯 **AI-интервью по вакансии** — вставьте ссылку на вакансию hh.ru: вопросы генерируются под требуемый опыт (noexp / junior / middle / senior), по ходу беседы задаются уточняющие вопросы, в конце — отчёт с оценкой, вероятностью оффера, рекомендациями и самым слабым навыком (с переходом в тренажёр).
 - 📚 **Тренажёр навыков** — тренировка по паре «навык + профессия» на выбранном уровне сложности: вопросы из банка с добором от LLM, эталонный ответ по кнопке, итоговый разбор с оценкой. Свободный ввод канонизируется словарями и LLM-нормализатором.
+- 💳 **Подписка и квоты** — тарифы Старт / Про / Макс с месячными квотами на интервью и тренировки (на Максе тренировки безлимитны); разовая оплата через Робокассу, история операций в настройках.
 
 ## 📸 Скриншоты
 
-**Главная — живое демо интервью: вопрос, голосовой ответ и разбор с оценкой**
-
-![Главная страница](docs/screenshots/home.png)
-
-**AI-интервью — чат по реальной вакансии hh.ru с уточняющими вопросами**
-
-![Прогон AI-интервью](docs/screenshots/interview-session.png)
-
-**Разбор AI-интервью — средний балл, вероятность оффера, рекомендации и самое слабое место с переходом в тренажёр**
-
-![Разбор AI-интервью](docs/screenshots/interview-report.png)
-
-**Тренажёр навыков — вопрос-ответ с эталонным ответом по кнопке**
-
-![Прогон тренировки](docs/screenshots/training-session.png)
-
-**Разбор тренировки — оценка, итог рецензента и разбор каждого ответа**
-
-![Разбор тренировки](docs/screenshots/training-report.png)
-
-**Маркетинговые страницы режимов**
-
-| AI-интервью | Тренажёр навыков |
+| Главная — живое демо интервью | Тарифы — Старт / Про / Макс |
 |---|---|
+| ![Главная страница](docs/screenshots/home.png) | ![Тарифы](docs/screenshots/pricing.png) |
+| **AI-интервью — чат по реальной вакансии hh.ru** | **Разбор интервью — балл, вероятность оффера, слабый навык** |
+| ![Прогон AI-интервью](docs/screenshots/interview-session.png) | ![Разбор AI-интервью](docs/screenshots/interview-report.png) |
+| **Тренажёр — вопрос-ответ с эталоном по кнопке** | **Разбор тренировки — оценка и фидбэк по каждому ответу** |
+| ![Прогон тренировки](docs/screenshots/training-session.png) | ![Разбор тренировки](docs/screenshots/training-report.png) |
+| **Маркетинговая страница AI-интервью** | **Маркетинговая страница тренажёра** |
 | ![Страница AI-интервью](docs/screenshots/ai-interview.png) | ![Страница тренажёра навыков](docs/screenshots/skills-trainer.png) |
-
-**Тарифы — Бесплатно / Про / Макс и пакеты докупки поверх любого тарифа**
-
-![Тарифы](docs/screenshots/pricing.png)
 
 ## 🧱 Стек
 
@@ -96,6 +80,7 @@
 | LLM | Yandex AI Studio через OpenAI-совместимый API (`openai-java`), 19 промптов-агентов |
 | Речь | Yandex SpeechKit STT v3 — двунаправленный gRPC-стрим, стабы из proto при сборке (`protobuf-maven-plugin`) |
 | Почта | Spring Mail + Thymeleaf-шаблоны, доменные события Spring (AFTER_COMMIT) |
+| Биллинг | Квоты тарифов с атомарными списаниями; разовые платежи Робокассы — подписанные URL и вебхуки (SHA-256), минутная джоба сверки |
 | Инструменты | Lombok, MapStruct, jsoup, ULID, springdoc-openapi (Swagger UI в dev) |
 
 ### Фронтенд
@@ -118,7 +103,7 @@
 | Персистентность | Testcontainers (postgres:16) + `@DataJpaTest` на схеме из миграций Flyway |
 | Почта | GreenMail — реальная SMTP-доставка и проверка HTML-тела письма |
 | E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate поверх Testcontainers |
-| Покрытие | JaCoCo (отчёт на `mvn verify`) |
+| Покрытие | JaCoCo — 87% строк, 75% веток (разбивка по доменам — в [Тестах](#-тесты)) |
 
 ### Инфраструктура
 
@@ -126,7 +111,7 @@
 |---|---|
 | Контейнеры | Docker, многосервисный Compose (postgres + backend + caddy) |
 | Прокси | Caddy — TLS, reverse proxy `/api`, статика SPA |
-| CI/CD | GitHub Actions: тесты на PR, релиз в Yandex Container Registry и деплой на VM с `master` |
+| CI/CD | GitVerse CI: тесты на PR, релизный пайплайн с `master` (сборка образа kaniko → Yandex Container Registry, выкладка на VM) |
 | Хостинг | Yandex Cloud (VM, Container Registry), отдельный диск под данные PostgreSQL |
 
 ## 🔌 Интеграции
@@ -136,6 +121,7 @@
 | **hh.ru API** | данные вакансии по ссылке для AI-интервью: требуемый опыт, навыки, описание |
 | **Yandex AI Studio** | LLM за генерацией вопросов, follow-up, разборами и нормализацией ввода — 19 промптов-агентов |
 | **Yandex SpeechKit STT v3** | потоковое распознавание речи для голосового ввода |
+| **Робокасса** | разовая оплата тарифов: подпись ссылок на оплату, проверка вебхуков, сверка потерянных уведомлений |
 | **SMTP-почта** | транзакционные письма с кодом входа |
 
 ## 🏗 Архитектура
@@ -148,7 +134,7 @@ flowchart TB
 
     subgraph BE["Spring Boot — package by feature, кросс-доменная связь через Spring events"]
         direction LR
-        auth ~~~ training ~~~ interview ~~~ vacancy
+        auth ~~~ training ~~~ interview ~~~ vacancy ~~~ billing
         content ~~~ llm ~~~ speech ~~~ email
     end
 
@@ -156,6 +142,7 @@ flowchart TB
     vacancy -->|"данные вакансии"| HH["hh.ru API"]
     llm -->|"OpenAI-совместимый API, 19 агентов"| YA["Yandex AI Studio"]
     speech -->|"двунаправленный gRPC-стрим"| STT["Yandex SpeechKit STT v3"]
+    billing -->|"платежи, вебхуки"| RK["Робокасса"]
     email -->|"SMTP"| MX["Почта"]
 ```
 
@@ -176,13 +163,14 @@ sequenceDiagram
 
 ## 🔍 Технические особенности
 
-- **Package-by-feature + схема БД на домен** — `auth`, `training`, `interview`, `vacancy`, `content`, `llm`, `email`, `speech`; наружу только DTO, кросс-доменная связь через Spring events.
+- **Package-by-feature + схема БД на домен** — `auth`, `training`, `interview`, `vacancy`, `content`, `billing`, `llm`, `email`, `speech`; наружу только DTO, кросс-доменная связь через Spring events.
 - **Грейдовый роутинг LLM-агентов** — генератор вопросов, follow-up и ревьюер разрезаны по опыту кандидата (4×3 агента), роутинг по строке опыта из hh API.
 - **Голосовой ввод (потоковое распознавание речи)** — диктовка ответов через Yandex SpeechKit STT v3: браузерный AudioWorklet шлёт LPCM-чанки по WebSocket, бэкенд проксирует их в двунаправленный gRPC-стрим SpeechKit и возвращает partial/final/refinement-гипотезы; лимит длины сессии — на сервере.
 - **Беспарольный вход** — email + одноразовый 6-значный код из письма, отдельной регистрации нет; JWT-токены в HttpOnly-куках, silent refresh на 401.
 - **Канонизация свободного ввода** — Unicode-нормализация (NFKC, типографские дефисы), ключи сравнения по значащим словам, словари с upsert и LLM-нормализатор как барьер против мусорного ввода.
 - **Приватность по 152-ФЗ** — физическое удаление аккаунта каскадами БД, автоудаление неактивных, запрет пользовательского контента в логах (`@Sensitive`, аспект логирования с MDC), заголовок отказа от обучения моделей на данных пользователей.
 - **Плавная деградация LLM** — прекчек вырожденных ответов модели, один повторный вызов, осмысленные HTTP-статусы (409 «вопросы кончились» vs 503 «AI-сервис недоступен»).
+- **Идемпотентные платежи** — вебхук Робокассы подтверждает платёж условным `UPDATE` (конкурентные ретраи не задваивают начисление), тариф начисляется в той же транзакции, а потерянные вебхуки добирает минутная джоба сверки через статусный API провайдера.
 
 ## 🗂 Структура репозитория
 
@@ -192,6 +180,7 @@ src/                  бэкенд (Maven, ru.workbit:workbit)
   main/proto/                    контракт SpeechKit STT
 frontend/             SPA (React + Vite)
 docs/                 описания REST-контрактов и юридические документы
+.gitverse/workflows/  CI- и deploy-пайплайны (GitVerse)
 Dockerfile            образ бэкенда
 docker-compose.yml    локальная разработка (postgres)
 compose.prod.yml      прод: postgres + backend + caddy
@@ -211,7 +200,7 @@ Caddyfile             конфиг reverse proxy
 2. **Бэкенд** (профиль `dev`, порт 8080)
 
    ```sh
-   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 
    Нужны переменные окружения (список — в `application.yml`): без ключей Yandex не работают генерация вопросов и голосовой ввод, без SMTP-пароля не приходит код входа.
@@ -228,16 +217,40 @@ Caddyfile             конфиг reverse proxy
 ## 🧪 Тесты
 
 ```sh
-mvn test     # юнит-тесты (*Test)
-mvn verify   # + интеграционные (*IT): Testcontainers, нужен Docker
+./mvnw test     # юнит-тесты (*Test)
+./mvnw verify   # + интеграционные (*IT): Testcontainers, нужен Docker
 ```
 
 Фронтенд: `npm run lint` и `npm run build` (автотестов пока нет).
 
+Покрытие — JaCoCo на `./mvnw verify`: 87% строк, 75% веток (сгенерированные gRPC-стабы SpeechKit из отчёта исключены):
+
+<details>
+<summary>Разбивка по доменам</summary>
+
+| Домен | Строки | % |
+|---|---|---:|
+| `email` | `██████████` | 100% |
+| `billing` | `██████████` | 99% |
+| `interview` | `██████████` | 98% |
+| `auth` | `██████████` | 97% |
+| `training` | `██████████` | 97% |
+| `security` | `█████████░` | 93% |
+| `util` | `█████████░` | 92% |
+| `llm` | `█████████░` | 91% |
+| `exception` | `████████░░` | 78% |
+| `vacancy` | `████░░░░░░` | 35% |
+| `speech` | `██░░░░░░░░` | 19% |
+| **итого** | `█████████░` | **87%** |
+
+</details>
+
+Слабо покрытые `vacancy` и `speech` — тонкие обвязки внешних API (hh.ru и gRPC-стрим SpeechKit): они проверяются на живых сервисах, а не юнитами.
+
 ## ⚙️ CI/CD
 
-- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — на PR в `develop`: `mvn verify`, линт и сборка фронтенда.
-- **Deploy** ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) — на push в `master`: тесты, сборка образа бэкенда в Yandex Container Registry, выкладка на VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy, TLS и статика фронтенда — через Caddy).
+- **CI** ([`.gitverse/workflows/ci.yml`](.gitverse/workflows/ci.yml)) — на PR в `develop` и `master`: юнит-тесты (`./mvnw test`), линт и сборка фронтенда.
+- **Deploy** ([`.gitverse/workflows/deploy.yml`](.gitverse/workflows/deploy.yml)) — на push в `master`: юнит-тесты, сборка образа бэкенда через kaniko с публикацией в Yandex Container Registry, выкладка на VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy, TLS и статика фронтенда — через Caddy) с автооткатом и smoke-тестами. Еженедельный security-скан (Trivy, npm audit) ещё ждёт переноса с эпохи GitHub Actions.
 
 ## 📚 Документация
 
@@ -246,6 +259,7 @@ REST-контракты (человекочитаемые описания API):
 - [Аутентификация](docs/auth-api.md) — вход по коду, refresh, logout, удаление аккаунта
 - [Тренажёр навыков](docs/training-api.md) — сессии, вопросы, подсказки словарей, отчёт
 - [AI-интервью](docs/interview-api.md) — сессии по вакансии, follow-up, отчёт, агрегация по вакансиям
+- [Биллинг](docs/billing-api.md) — квоты тарифов, история операций, оплата через Робокассу
 - [Распознавание речи](docs/speech-api.md) — WebSocket-протокол STT
 
 Юридические документы (фронтенд рендерит их на `/privacy`, `/user-agreement`, `/offer`; источник текста — только эти файлы):
@@ -253,3 +267,7 @@ REST-контракты (человекочитаемые описания API):
 - [Политика конфиденциальности](docs/privacy-policy.md)
 - [Пользовательское соглашение](docs/user-agreement.md)
 - [Оферта](docs/offer.md)
+
+## 📄 Лицензия
+
+Проприетарная. Исходный код опубликован исключительно в ознакомительных целях — см. [LICENSE](LICENSE).

@@ -25,9 +25,11 @@ based on real hh.ru job postings, answering by text or voice.
 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
+![GitVerse](https://img.shields.io/badge/GitVerse-CI-1C64F2)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
+![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
+![Coverage](https://img.shields.io/badge/coverage-87%25_lines-44cc11)
 
 </div>
 
@@ -46,43 +48,25 @@ based on real hh.ru job postings, answering by text or voice.
 - [Tests](#-tests)
 - [CI/CD](#-cicd)
 - [Documentation](#-documentation)
+- [License](#-license)
 
 ## ✨ Features
 
 - 🎯 **AI interview for a job posting** — paste an hh.ru vacancy link: questions are generated for the required experience level (noexp / junior / middle / senior), follow-up questions are asked along the way, and the session ends with a report: a score, offer probability, recommendations, and your weakest skill (with a shortcut to the trainer).
 - 📚 **Skills trainer** — practice on a "skill + profession" pair at a chosen difficulty level: questions from a curated bank topped up by the LLM, a reference answer on demand, and a final review with a score. Free-form input is canonicalized via dictionaries and an LLM normalizer.
+- 💳 **Subscription plans** — Start / Pro / Max with monthly quotas for interviews and trainings (unlimited trainings on Max); one-time payments via Robokassa, usage history in the settings.
 
 ## 📸 Screenshots
 
-**Home page — a live interview demo: question, voice answer, and a review with a score**
-
-![Home page](docs/screenshots/home.png)
-
-**AI interview — a chat over a real hh.ru vacancy with follow-up questions**
-
-![AI interview session](docs/screenshots/interview-session.png)
-
-**AI interview report — average score, offer probability, recommendations, and the weakest skill with a shortcut to the trainer**
-
-![AI interview report](docs/screenshots/interview-report.png)
-
-**Skills trainer — Q&A with a reference answer on demand**
-
-![Training session](docs/screenshots/training-session.png)
-
-**Training report — a score, the reviewer's summary, and per-answer feedback**
-
-![Training report](docs/screenshots/training-report.png)
-
-**Marketing pages for both modes**
-
-| AI interview | Skills trainer |
+| Home — a live interview demo | Pricing — Start / Pro / Max plans |
 |---|---|
+| ![Home page](docs/screenshots/home.png) | ![Pricing](docs/screenshots/pricing.png) |
+| **AI interview — a chat over a real hh.ru vacancy** | **Interview report — score, offer probability, weakest skill** |
+| ![AI interview session](docs/screenshots/interview-session.png) | ![AI interview report](docs/screenshots/interview-report.png) |
+| **Skills trainer — Q&A with a reference answer on demand** | **Training report — a score and per-answer feedback** |
+| ![Training session](docs/screenshots/training-session.png) | ![Training report](docs/screenshots/training-report.png) |
+| **AI interview marketing page** | **Skills trainer marketing page** |
 | ![AI interview page](docs/screenshots/ai-interview.png) | ![Skills trainer page](docs/screenshots/skills-trainer.png) |
-
-**Pricing — Free / Pro / Max plans plus top-up packs on top of any plan**
-
-![Pricing](docs/screenshots/pricing.png)
 
 ## 🧱 Tech Stack
 
@@ -96,6 +80,7 @@ based on real hh.ru job postings, answering by text or voice.
 | LLM | Yandex AI Studio via an OpenAI-compatible API (`openai-java`), 19 prompt agents |
 | Speech | Yandex SpeechKit STT v3 — bidirectional gRPC streaming, stubs generated from proto at build time (`protobuf-maven-plugin`) |
 | Email | Spring Mail + Thymeleaf templates, Spring domain events (AFTER_COMMIT) |
+| Billing | Plan quotas with atomic debits; Robokassa one-time payments — signed URLs and webhooks (SHA-256), a per-minute reconciliation job |
 | Tooling | Lombok, MapStruct, jsoup, ULID, springdoc-openapi (Swagger UI in dev) |
 
 ### Frontend
@@ -118,7 +103,7 @@ based on real hh.ru job postings, answering by text or voice.
 | Persistence | Testcontainers (postgres:16) + `@DataJpaTest` on the Flyway-migrated schema |
 | Email | GreenMail — real SMTP delivery and assertions on the HTML body of the email |
 | E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate on top of Testcontainers |
-| Coverage | JaCoCo (report on `mvn verify`) |
+| Coverage | JaCoCo — 87% lines, 75% branches (per-domain breakdown in [Tests](#-tests)) |
 
 ### Infrastructure
 
@@ -126,7 +111,7 @@ based on real hh.ru job postings, answering by text or voice.
 |---|---|
 | Containers | Docker, multi-service Compose (postgres + backend + caddy) |
 | Proxy | Caddy — TLS, reverse proxy for `/api`, SPA static files |
-| CI/CD | GitHub Actions: tests on PRs, release to Yandex Container Registry and VM deploy from `master` |
+| CI/CD | GitVerse CI: tests on PRs, release pipeline from `master` (kaniko image build → Yandex Container Registry, VM rollout) |
 | Hosting | Yandex Cloud (VM, Container Registry), dedicated disk for PostgreSQL data |
 
 ## 🔌 Integrations
@@ -136,6 +121,7 @@ based on real hh.ru job postings, answering by text or voice.
 | **hh.ru API** | vacancy data by link for the AI interview: required experience, skills, description |
 | **Yandex AI Studio** | the LLM behind question generation, follow-ups, reviews, and input normalization — 19 prompt agents |
 | **Yandex SpeechKit STT v3** | streaming speech recognition for voice input |
+| **Robokassa** | one-time payments for subscription plans: payment URL signing, webhook verification, lost-webhook reconciliation |
 | **SMTP email** | transactional emails with the login code |
 
 ## 🏗 Architecture
@@ -148,7 +134,7 @@ flowchart TB
 
     subgraph BE["Spring Boot — package by feature, cross-domain via Spring events"]
         direction LR
-        auth ~~~ training ~~~ interview ~~~ vacancy
+        auth ~~~ training ~~~ interview ~~~ vacancy ~~~ billing
         content ~~~ llm ~~~ speech ~~~ email
     end
 
@@ -156,6 +142,7 @@ flowchart TB
     vacancy -->|"vacancy data"| HH["hh.ru API"]
     llm -->|"OpenAI-compatible API, 19 agents"| YA["Yandex AI Studio"]
     speech -->|"bidirectional gRPC stream"| STT["Yandex SpeechKit STT v3"]
+    billing -->|"payments, webhooks"| RK["Robokassa"]
     email -->|"SMTP"| MX["Mail"]
 ```
 
@@ -176,13 +163,14 @@ sequenceDiagram
 
 ## 🔍 Technical Highlights
 
-- **Package-by-feature + a DB schema per domain** — `auth`, `training`, `interview`, `vacancy`, `content`, `llm`, `email`, `speech`; only DTOs are exposed, cross-domain communication goes through Spring events.
+- **Package-by-feature + a DB schema per domain** — `auth`, `training`, `interview`, `vacancy`, `content`, `billing`, `llm`, `email`, `speech`; only DTOs are exposed, cross-domain communication goes through Spring events.
 - **Grade-based routing of LLM agents** — the question generator, follow-up, and reviewer agents are split by candidate experience (4×3 agents), routed by the experience string from the hh API.
 - **Voice input (streaming speech recognition)** — answers are dictated via Yandex SpeechKit STT v3: a browser AudioWorklet sends LPCM chunks over WebSocket, the backend proxies them into a bidirectional SpeechKit gRPC stream and returns partial/final/refinement hypotheses; session length is capped server-side.
 - **Passwordless login** — email + a one-time 6-digit code, no separate sign-up; JWT tokens in HttpOnly cookies, silent refresh on 401.
 - **Free-form input canonicalization** — Unicode normalization (NFKC, typographic hyphens), comparison keys built from significant words, dictionaries with upsert, and an LLM normalizer as a barrier against garbage input.
 - **Privacy under Russian law (152-FZ)** — physical account deletion via DB cascades, auto-deletion of inactive accounts, user content banned from logs (`@Sensitive`, a logging aspect with MDC), an opt-out header against training models on user data.
 - **Graceful LLM degradation** — a precheck for degenerate model responses, a single retry, meaningful HTTP statuses (409 "out of questions" vs 503 "AI service unavailable").
+- **Idempotent payments** — the Robokassa webhook confirms a payment with a conditional `UPDATE` (concurrent retries can't double-credit), the plan is credited in the same transaction, and a per-minute reconciliation job picks up lost webhooks via the provider's status API.
 
 ## 🗂 Repository Structure
 
@@ -192,6 +180,7 @@ src/                  backend (Maven, ru.workbit:workbit)
   main/proto/                    SpeechKit STT contract
 frontend/             SPA (React + Vite)
 docs/                 REST contract descriptions and legal documents
+.gitverse/workflows/  CI and deploy pipelines (GitVerse)
 Dockerfile            backend image
 docker-compose.yml    local development (postgres)
 compose.prod.yml      production: postgres + backend + caddy
@@ -211,7 +200,7 @@ Requirements: JDK 25, Node.js 22+, Docker.
 2. **Backend** (`dev` profile, port 8080)
 
    ```sh
-   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 
    Environment variables are required (the full list lives in `application.yml`): without the Yandex keys, question generation and voice input don't work; without the SMTP password, login code emails don't arrive.
@@ -228,16 +217,40 @@ Requirements: JDK 25, Node.js 22+, Docker.
 ## 🧪 Tests
 
 ```sh
-mvn test     # unit tests (*Test)
-mvn verify   # + integration tests (*IT): Testcontainers, requires Docker
+./mvnw test     # unit tests (*Test)
+./mvnw verify   # + integration tests (*IT): Testcontainers, requires Docker
 ```
 
 Frontend: `npm run lint` and `npm run build` (no automated tests yet).
 
+Coverage — JaCoCo on `./mvnw verify`: 87% lines, 75% branches (generated SpeechKit gRPC stubs are excluded from the report):
+
+<details>
+<summary>Per-domain breakdown</summary>
+
+| Domain | Lines | % |
+|---|---|---:|
+| `email` | `██████████` | 100% |
+| `billing` | `██████████` | 99% |
+| `interview` | `██████████` | 98% |
+| `auth` | `██████████` | 97% |
+| `training` | `██████████` | 97% |
+| `security` | `█████████░` | 93% |
+| `util` | `█████████░` | 92% |
+| `llm` | `█████████░` | 91% |
+| `exception` | `████████░░` | 78% |
+| `vacancy` | `████░░░░░░` | 35% |
+| `speech` | `██░░░░░░░░` | 19% |
+| **total** | `█████████░` | **87%** |
+
+</details>
+
+The weakly covered `vacancy` and `speech` are thin wrappers around external APIs (hh.ru and the SpeechKit gRPC stream) — they are exercised against the live services rather than by unit tests.
+
 ## ⚙️ CI/CD
 
-- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — on PRs to `develop`: `mvn verify`, frontend lint and build.
-- **Deploy** ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) — on push to `master`: tests, backend image build in Yandex Container Registry, rollout to the VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy; TLS and frontend static files served by Caddy).
+- **CI** ([`.gitverse/workflows/ci.yml`](.gitverse/workflows/ci.yml)) — on PRs to `develop` and `master`: unit tests (`./mvnw test`), frontend lint and build.
+- **Deploy** ([`.gitverse/workflows/deploy.yml`](.gitverse/workflows/deploy.yml)) — on push to `master`: unit tests, backend image build with kaniko and push to Yandex Container Registry, rollout to the VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy; TLS and frontend static files served by Caddy) with automatic rollback and smoke tests. The weekly security scan (Trivy, npm audit) is still pending its port from the GitHub Actions era.
 
 ## 📚 Documentation
 
@@ -246,6 +259,7 @@ REST contracts (human-readable API descriptions, in Russian):
 - [Authentication](docs/auth-api.md) — code-based login, refresh, logout, account deletion
 - [Skills trainer](docs/training-api.md) — sessions, questions, dictionary suggestions, report
 - [AI interview](docs/interview-api.md) — vacancy-based sessions, follow-ups, report, per-vacancy aggregation
+- [Billing](docs/billing-api.md) — plan quotas, usage history, Robokassa payments
 - [Speech recognition](docs/speech-api.md) — the STT WebSocket protocol
 
 Legal documents (in Russian; the frontend renders them at `/privacy`, `/user-agreement`, `/offer`, these files are the single source of the text):
@@ -253,3 +267,7 @@ Legal documents (in Russian; the frontend renders them at `/privacy`, `/user-agr
 - [Privacy policy](docs/privacy-policy.md)
 - [User agreement](docs/user-agreement.md)
 - [Public offer](docs/offer.md)
+
+## 📄 License
+
+Proprietary. The source code is published for review purposes only — see [LICENSE](LICENSE).

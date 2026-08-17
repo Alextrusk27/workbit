@@ -358,6 +358,12 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.13</version>
+                <configuration>
+                    <!-- Сгенерированные gRPC-стабы SpeechKit не считаем покрытием -->
+                    <excludes>
+                        <exclude>yandex/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

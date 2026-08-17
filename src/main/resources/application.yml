@@ -98,18 +98,18 @@ llm:
       training-question-generator-senior: ${TQG_SENIOR}
       training-reviewer: ${TRAINING_REVIEWER}
       training-reference-answer: ${TRAINING_REFERENCE_ANSWER}
-      interview-question-generator-noexp: ${IQG_NOEXP}
-      interview-question-generator-junior: ${IQG_JUNIOR}
-      interview-question-generator-middle: ${IQG_MIDDLE}
-      interview-question-generator-senior: ${IQG_SENIOR}
-      interview-follow-up-noexp: ${IFU_NOEXP}
-      interview-follow-up-junior: ${IFU_JUNIOR}
-      interview-follow-up-middle: ${IFU_MIDDLE}
-      interview-follow-up-senior: ${IFU_SENIOR}
-      interview-reviewer-noexp: ${IRV_NOEXP}
-      interview-reviewer-junior: ${IRV_JUNIOR}
-      interview-reviewer-middle: ${IRV_MIDDLE}
-      interview-reviewer-senior: ${IRV_SENIOR}
+      interview-question-generator-exp0: ${IQG_EXP0}
+      interview-question-generator-exp1: ${IQG_EXP1}
+      interview-question-generator-exp3: ${IQG_EXP3}
+      interview-question-generator-exp6: ${IQG_EXP6}
+      interview-follow-up-exp0: ${IFU_EXP0}
+      interview-follow-up-exp1: ${IFU_EXP1}
+      interview-follow-up-exp3: ${IFU_EXP3}
+      interview-follow-up-exp6: ${IFU_EXP6}
+      interview-reviewer-exp0: ${IRV_EXP0}
+      interview-reviewer-exp1: ${IRV_EXP1}
+      interview-reviewer-exp3: ${IRV_EXP3}
+      interview-reviewer-exp6: ${IRV_EXP6}
       input-normalizer: ${INPUT_NORMALIZER}
 
 speech:

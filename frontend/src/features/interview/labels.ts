@@ -43,9 +43,8 @@ export function trainingLevelCode(
   experience: string | null,
 ): TrainingLevelCode {
   if (experience === 'Нет опыта') return 'NOEXP'
-  if (experience === 'От 1 года до 3 лет') return 'MIDDLE'
-  if (experience === 'От 3 до 6 лет' || experience === 'Более 6 лет')
-    return 'SENIOR'
+  if (experience === 'От 3 до 6 лет') return 'MIDDLE'
+  if (experience === 'Более 6 лет') return 'SENIOR'
   return 'JUNIOR'
 }
 

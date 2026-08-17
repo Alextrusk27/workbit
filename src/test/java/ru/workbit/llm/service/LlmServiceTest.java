@@ -39,13 +39,13 @@ class LlmServiceTest {
 
     private static Stream<Arguments> experienceGrades() {
         return Stream.of(
-                Arguments.of("Нет опыта", "noexp"),
-                Arguments.of("От 1 года до 3 лет", "middle"),
-                Arguments.of("От 3 до 6 лет", "senior"),
-                Arguments.of("Более 6 лет", "senior"),
-                Arguments.of("", "junior"),
-                Arguments.of(null, "junior"),
-                Arguments.of("Неизвестная категория опыта", "junior")
+                Arguments.of("Нет опыта", "exp0"),
+                Arguments.of("От 1 года до 3 лет", "exp1"),
+                Arguments.of("От 3 до 6 лет", "exp3"),
+                Arguments.of("Более 6 лет", "exp6"),
+                Arguments.of("", "exp1"),
+                Arguments.of(null, "exp1"),
+                Arguments.of("Неизвестная категория опыта", "exp1")
         );
     }
 

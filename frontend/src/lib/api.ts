@@ -110,6 +110,35 @@ export async function apiFetch<T>(
   return parse<T>(res)
 }
 
+const REPORT_POLL_ATTEMPTS = 40
+const REPORT_POLL_DELAY_MS = 5000
+
+export async function finishWithReportFallback<T>(
+  finish: () => Promise<T>,
+  fetchReport: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await finish()
+  } catch (error) {
+    if (error instanceof ApiRequestError) throw error
+    for (let attempt = 0; attempt < REPORT_POLL_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, REPORT_POLL_DELAY_MS),
+        )
+      }
+      try {
+        return await fetchReport()
+      } catch (pollError) {
+        if (pollError instanceof ApiRequestError && pollError.status !== 404) {
+          throw pollError
+        }
+      }
+    }
+    throw error
+  }
+}
+
 /** Человекочитаемое сообщение для UI: бизнес-ошибку берём с бэка, сетевую — общей фразой. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) return error.message

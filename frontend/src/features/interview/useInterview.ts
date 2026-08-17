@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingKeys } from '@/features/billing/useBilling'
+import { finishWithReportFallback } from '@/lib/api'
 import {
   interviewApi,
   type CreateInterviewRequest,
@@ -65,7 +66,11 @@ export function useSubmitInterviewAnswer() {
 export function useFinishInterview() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (sessionId: string) => interviewApi.finishSession(sessionId),
+    mutationFn: (sessionId: string) =>
+      finishWithReportFallback(
+        () => interviewApi.finishSession(sessionId),
+        () => interviewApi.getReport(sessionId),
+      ),
     onSuccess: (report, sessionId) => {
       qc.setQueryData(keys.report(sessionId), report)
       qc.invalidateQueries({ queryKey: keys.session(sessionId) })

@@ -34,6 +34,8 @@ interface PlanCardProps {
   onSelect?: () => void
   disabled?: boolean
   className?: string
+  /** Уровень заголовка карточки в иерархии страницы. */
+  heading?: 'h2' | 'h3'
 }
 
 /** Карточка тарифа: цена, состав и переход к оформлению. */
@@ -44,6 +46,7 @@ export function PlanCard({
   onSelect,
   disabled,
   className,
+  heading: Heading = 'h3',
 }: PlanCardProps) {
   return (
     <div
@@ -60,7 +63,7 @@ export function PlanCard({
           Популярный
         </span>
       )}
-      <h3 className="text-ink text-[22px] font-bold">{plan.name}</h3>
+      <Heading className="text-ink text-[22px] font-bold">{plan.name}</Heading>
       {plan.oldPrice && (
         <p className="mt-4.5 flex items-center gap-2.5">
           <s className="text-dim text-[15px] tabular-nums">{plan.oldPrice}</s>

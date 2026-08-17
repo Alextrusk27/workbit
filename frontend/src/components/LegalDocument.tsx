@@ -2,7 +2,6 @@ import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 const components: Components = {
   h1: ({ children }) => (
@@ -52,12 +51,10 @@ const components: Components = {
 }
 
 type LegalDocumentProps = {
-  title: string
   source: string
 }
 
-export function LegalDocument({ title, source }: LegalDocumentProps) {
-  usePageTitle(title)
+export function LegalDocument({ source }: LegalDocumentProps) {
   return (
     <Container className="py-16">
       <article className="max-w-3xl">

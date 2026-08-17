@@ -10,7 +10,6 @@ import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
 import { IconClock, IconChart, IconRole } from '@/components/marketing/icons'
 import { useAuth } from '@/features/auth/useAuth'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 const steps = [
   {
@@ -64,7 +63,6 @@ const audience = [
 ]
 
 export function SkillsTrainerPage() {
-  usePageTitle('Тренажёр навыков')
   const { isAuthenticated } = useAuth()
   const startTo = isAuthenticated ? '/app/training/new' : '/login'
 

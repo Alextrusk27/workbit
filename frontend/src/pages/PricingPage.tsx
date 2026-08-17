@@ -12,10 +12,8 @@ import { useAuth } from '@/features/auth/useAuth'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import type { PaymentProduct } from '@/features/billing/api'
 import { getErrorMessage } from '@/lib/api'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 export function PricingPage() {
-  usePageTitle('Тарифы')
   const { isAuthenticated } = useAuth()
   const createPayment = useCreatePayment()
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +59,7 @@ export function PricingPage() {
                   plan={p}
                   features={p.features}
                   to={startTo}
+                  heading="h2"
                   onSelect={
                     isAuthenticated && p.product
                       ? () => buy(p.product!)

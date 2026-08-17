@@ -8,12 +8,23 @@ workbit.ru {
 	handle {
 		root * /srv
 		encode gzip
-		try_files {path} /index.html
+		@spa path /app /app/* /login /login/* /register /register/* /brand /brand/*
+		rewrite @spa /spa.html
+		try_files {path}/index.html {path}
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 		@rest not path /assets/*
 		header @rest Cache-Control "no-cache"
 		file_server
+	}
+
+	handle_errors {
+		@404 expression {err.status_code} == 404
+		handle @404 {
+			root * /srv
+			rewrite * /404.html
+			file_server
+		}
 	}
 }
 

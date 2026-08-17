@@ -5,12 +5,10 @@ import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { faq } from '@/content/faq'
-import { usePageTitle } from '@/lib/usePageTitle'
 
 const SUPPORT_EMAIL = 'support@workbit.ru'
 
 export function FaqPage() {
-  usePageTitle('Частые вопросы')
   const [copied, setCopied] = useState(false)
 
   const copySupportEmail = async () => {

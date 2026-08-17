@@ -37,9 +37,9 @@ export function Footer() {
 
           {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
-              <h2 className="text-dim mb-3.5 text-[13px] font-semibold tracking-[0.06em] uppercase">
+              <p className="text-dim mb-3.5 text-[13px] font-semibold tracking-[0.06em] uppercase">
                 {col.title}
-              </h2>
+              </p>
               <ul className="flex flex-col gap-[7px]">
                 {col.links.map((l) => (
                   <li key={l.to}>

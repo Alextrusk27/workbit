@@ -14,6 +14,7 @@ const links = [
   { label: 'AI-интервью', to: '/ai-interview' },
   { label: 'Тренажёр навыков', to: '/skills-trainer' },
   { label: 'Тарифы', to: '/pricing' },
+  { label: 'FAQ', to: '/faq' },
 ]
 
 function navLinkClass(isActive: boolean): string {
@@ -137,11 +138,6 @@ export function Header() {
                     </Link>
                   </li>
                 ))}
-                <li>
-                  <Link to="/faq" className="text-ink block py-3 text-base">
-                    FAQ
-                  </Link>
-                </li>
                 <li className="py-3">
                   <Link
                     to={isAuthenticated ? '/app' : '/login'}

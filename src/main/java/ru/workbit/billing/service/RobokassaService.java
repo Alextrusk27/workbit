@@ -12,15 +12,18 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import ru.workbit.billing.config.RobokassaProperties;
 import ru.workbit.billing.model.Payment;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -31,22 +34,26 @@ public class RobokassaService implements PaymentProvider {
 
     private static final String RESULT_OK = "0";
     private static final String STATE_PAID = "100";
+    private static final String TAX_NONE = "none";
 
     private final RobokassaProperties properties;
     private final RestClient robokassaRestClient;
+    private final ObjectMapper objectMapper;
 
     @Override
     public String paymentUrl(Payment payment, String email) {
         String outSum = payment.getAmount().toPlainString();
         String invId = String.valueOf(payment.getInvId());
+        String receipt = encodedReceipt(payment);
         String signature = sha256Hex(String.join(":",
-                properties.merchantLogin(), outSum, invId, properties.password1()));
+                properties.merchantLogin(), outSum, invId, receipt, properties.password1()));
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(properties.paymentUrl())
                 .queryParam("MerchantLogin", properties.merchantLogin())
                 .queryParam("OutSum", outSum)
                 .queryParam("InvId", invId)
                 .queryParam("Description", payment.getProduct().getDescription())
+                .queryParam("Receipt", receipt)
                 .queryParam("SignatureValue", signature)
                 .queryParam("Culture", "ru")
                 .queryParam("Email", email);
@@ -148,5 +155,18 @@ public class RobokassaService implements PaymentProvider {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private String encodedReceipt(Payment payment) {
+        Receipt receipt = new Receipt(List.of(new ReceiptItem(
+                payment.getProduct().getLabel(), 1, payment.getAmount(), TAX_NONE)));
+        return URLEncoder.encode(objectMapper.writeValueAsString(receipt), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+    }
+
+    record Receipt(List<ReceiptItem> items) {
+    }
+
+    record ReceiptItem(String name, int quantity, BigDecimal sum, String tax) {
     }
 }

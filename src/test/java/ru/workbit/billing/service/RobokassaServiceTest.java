@@ -10,6 +10,8 @@ import org.springframework.web.util.UriBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.workbit.billing.config.RobokassaProperties;
 import ru.workbit.billing.model.Payment;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -42,8 +44,12 @@ class RobokassaServiceTest {
             "https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt";
     private static final int INV_ID = 42;
     private static final BigDecimal AMOUNT = new BigDecimal("790.00");
+    private static final String ENCODED_RECEIPT =
+            "%7B%22items%22%3A%5B%7B%22name%22%3A%22%D0%A2%D0%B0%D1%80%D0%B8%D1%84%20%C2%AB%D0"
+                    + "%9F%D1%80%D0%BE%C2%BB%20%D0%BD%D0%B0%2030%20%D0%B4%D0%BD%D0%B5%D0%B9%22%2C"
+                    + "%22quantity%22%3A1%2C%22sum%22%3A790.00%2C%22tax%22%3A%22none%22%7D%5D%7D";
     private static final String INIT_SIGNATURE =
-            "c9487578adb0a95c4ada1e6a41e6ee8fd054112f90046f1fab837697dfa77c75";
+            "696df59d3889776905f0505047f12b337e28cbd2e223e7f3b1103ce015a31e71";
     private static final String RESULT_SIGNATURE =
             "60836e51c173fb0e9179ef1a469437cb64de341713330ed03783aa4e44cb4305";
     private static final String NON_NUMERIC_INV_ID_SIGNATURE =
@@ -57,11 +63,11 @@ class RobokassaServiceTest {
     }
 
     private static RobokassaService aService(boolean test) {
-        return new RobokassaService(aProperties(test), RestClient.create(STATE_URL));
+        return aService(test, RestClient.create(STATE_URL));
     }
 
     private static RobokassaService aService(boolean test, RestClient restClient) {
-        return new RobokassaService(aProperties(test), restClient);
+        return new RobokassaService(aProperties(test), restClient, new ObjectMapper());
     }
 
     private static Payment aPayment() {
@@ -113,19 +119,37 @@ class RobokassaServiceTest {
             assertThat(params.get("OutSum")).isEqualTo("790.00");
             assertThat(params.get("InvId")).isEqualTo(String.valueOf(INV_ID));
             assertThat(params.get("Description")).isEqualTo(Payment.Product.PLAN_PRO.getDescription());
+            assertThat(params.get("Receipt")).isEqualTo(ENCODED_RECEIPT);
             assertThat(params.get("SignatureValue")).isEqualTo(INIT_SIGNATURE);
             assertThat(params.get("Culture")).isEqualTo("ru");
             assertThat(params.get("Email")).isEqualTo(email);
         }
 
         @Test
-        @DisplayName("SignatureValue считается как sha256(MerchantLogin:OutSum:InvId:password1) — референсный вектор")
+        @DisplayName("SignatureValue считается как sha256(MerchantLogin:OutSum:InvId:Receipt:password1) — референсный вектор")
         void signatureMatchesReferenceVector() {
             // when
             String url = service.paymentUrl(aPayment(), "user@example.com");
 
             // then
             assertThat(queryParams(url).get("SignatureValue")).isEqualTo(INIT_SIGNATURE);
+        }
+
+        @Test
+        @DisplayName("Receipt — номенклатура из одной позиции: название продукта, quantity 1, sum = сумма платежа, tax none")
+        void receiptCarriesSingleItemNomenclature() {
+            // when
+            String url = service.paymentUrl(aPayment(), "user@example.com");
+
+            // then
+            String json = URLDecoder.decode(queryParams(url).get("Receipt"), StandardCharsets.UTF_8);
+            JsonNode items = new ObjectMapper().readTree(json).get("items");
+            assertThat(items).hasSize(1);
+            JsonNode item = items.get(0);
+            assertThat(item.get("name").asString()).isEqualTo(Payment.Product.PLAN_PRO.getLabel());
+            assertThat(item.get("quantity").asInt()).isEqualTo(1);
+            assertThat(item.get("sum").decimalValue()).isEqualByComparingTo(AMOUNT);
+            assertThat(item.get("tax").asString()).isEqualTo("none");
         }
 
         @Test

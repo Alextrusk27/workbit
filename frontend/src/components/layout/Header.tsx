@@ -150,7 +150,7 @@ export function Header() {
                       className: 'w-full',
                     })}
                   >
-                    {isAuthenticated ? 'Личный кабинет' : 'Войти'}
+                    {isAuthenticated ? 'Рабочий стол' : 'Войти'}
                   </Link>
                 </li>
               </ul>

@@ -6,12 +6,12 @@ export interface Quota {
   plan: Plan
   planExpiresAt: string | null
   planInterviewsLeft: number
-  planTrainingsLeft: number
+  planTrainingsLeft: number | null
 }
 
 export interface UsageCounter {
-  left: number
-  total: number
+  left: number | null
+  total: number | null
 }
 
 export type UsageEventKind = 'SPEND' | 'CREDIT'

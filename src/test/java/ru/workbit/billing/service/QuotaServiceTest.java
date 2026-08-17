@@ -108,6 +108,21 @@ class QuotaServiceTest {
             // then
             assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0));
         }
+
+        @Test
+        @DisplayName("Активный MAX - planTrainingsLeft null (безлимит тренировок), planInterviewsLeft из строки")
+        void returnsNullTrainingsLeftOnActiveMax() {
+            // given
+            Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
+            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 0);
+            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+
+            // when
+            QuotaResponse result = quotaService.getQuota(USER_ID);
+
+            // then
+            assertThat(result).isEqualTo(new QuotaResponse(BillingAccount.Plan.MAX, future, 20, null));
+        }
     }
 
     @Nested
@@ -189,6 +204,18 @@ class QuotaServiceTest {
         void passesWhenTrainingsLeft() {
             // given
             BillingAccount account = anAccount(BillingAccount.Plan.FREE, null, 0, 3);
+            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+
+            // when / then
+            quotaService.checkTrainingAvailable(USER_ID);
+        }
+
+        @Test
+        @DisplayName("Активный MAX - безлимит тренировок (planTrainingsLeft null) - проходит без исключения")
+        void passesWhenPlanIsActiveMaxUnlimited() {
+            // given
+            Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
+            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 0);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when / then
@@ -305,6 +332,24 @@ class QuotaServiceTest {
             // then
             assertThat(result.interviews()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
             assertThat(result.trainings()).isEqualTo(new UsageResponse.UsageCounter(0, 0));
+        }
+
+        @Test
+        @DisplayName("Активный тариф MAX - счётчик тренировок безлимитный (null/null), интервью - как обычно")
+        void returnsUnlimitedTrainingsCounterOnActiveMax() {
+            // given
+            Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
+            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 0);
+            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+            when(usageEventRepository.findAllByUserIdOrderByAtDesc(USER_ID)).thenReturn(List.of());
+
+            // when
+            UsageResponse result = quotaService.getUsage(USER_ID);
+
+            // then
+            assertThat(result.interviews())
+                    .isEqualTo(new UsageResponse.UsageCounter(20, BillingAccount.Plan.MAX.getInterviews()));
+            assertThat(result.trainings()).isEqualTo(new UsageResponse.UsageCounter(null, null));
         }
 
         @Test
@@ -440,6 +485,29 @@ class QuotaServiceTest {
                     .hasMessage("Training quota exhausted");
             verify(usageEventRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("Активный MAX (безлимит) - SPEND-событие пишется, но debitPlanTraining не вызывается")
+        void writesSpendEventWithoutDebitingOnUnlimitedMax() {
+            // given
+            Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
+            BillingAccount account = anAccount(BillingAccount.Plan.MAX, future, 20, 0);
+            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+
+            // when
+            quotaService.debitTraining(USER_ID, TRAINING_LABEL);
+
+            // then
+            verify(billingAccountRepository, never()).debitPlanTraining(any(), any());
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            verify(usageEventRepository).save(captor.capture());
+            UsageEvent saved = captor.getValue();
+            assertThat(saved.getUserId()).isEqualTo(USER_ID);
+            assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.SPEND);
+            assertThat(saved.getTarget()).isEqualTo(UsageEvent.Target.TRAINING);
+            assertThat(saved.getDelta()).isEqualTo(1);
+            assertThat(saved.getLabel()).isEqualTo(TRAINING_LABEL);
+        }
     }
 
     @Nested
@@ -487,6 +555,65 @@ class QuotaServiceTest {
             assertThat(trainingEvent.getLabel()).isEqualTo(CREDIT_LABEL);
 
             assertThat(interviewEvent.getAt()).isEqualTo(trainingEvent.getAt());
+        }
+
+        @Test
+        @DisplayName("План с безлимитными тренировками (MAX) - пишет только CREDIT-событие INTERVIEW, TRAINING не пишет")
+        void savesOnlyInterviewCreditEventForUnlimitedTrainingsPlan() {
+            // when
+            quotaService.creditPlan(USER_ID, BillingAccount.Plan.MAX, CREDIT_LABEL);
+
+            // then
+            verify(billingAccountRepository).creditPlan(eq(USER_ID), eq(BillingAccount.Plan.MAX.name()),
+                    eq(BillingAccount.Plan.MAX.getInterviews()), eq(BillingAccount.Plan.MAX.getTrainings()),
+                    any(Instant.class));
+
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            verify(usageEventRepository, times(1)).save(captor.capture());
+            UsageEvent interviewEvent = captor.getValue();
+
+            assertThat(interviewEvent.getUserId()).isEqualTo(USER_ID);
+            assertThat(interviewEvent.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(interviewEvent.getTarget()).isEqualTo(UsageEvent.Target.INTERVIEW);
+            assertThat(interviewEvent.getDelta()).isEqualTo(BillingAccount.Plan.MAX.getInterviews());
+            assertThat(interviewEvent.getLabel()).isEqualTo(CREDIT_LABEL);
+        }
+    }
+
+    @Nested
+    @DisplayName("CreditInterviews")
+    class CreditInterviews {
+
+        private static final int COUNT = 2;
+        private static final String GIFT_LABEL = GiftService.PROMO_LABEL;
+
+        @Test
+        @DisplayName("insertIfAbsent вызывается, billingAccountRepository.creditInterviews - с переданным count")
+        void callsInsertIfAbsentAndCreditsInterviews() {
+            // when
+            quotaService.creditInterviews(USER_ID, COUNT, GIFT_LABEL);
+
+            // then
+            verify(billingAccountRepository).insertIfAbsent(
+                    USER_ID, BillingAccount.Plan.FREE.getInterviews(), BillingAccount.Plan.FREE.getTrainings());
+            verify(billingAccountRepository).creditInterviews(USER_ID, COUNT);
+        }
+
+        @Test
+        @DisplayName("Сохраняет CREDIT-событие INTERVIEW с delta = count и переданным label")
+        void savesCreditEventWithCountAndLabel() {
+            // when
+            quotaService.creditInterviews(USER_ID, COUNT, GIFT_LABEL);
+
+            // then
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            verify(usageEventRepository).save(captor.capture());
+            UsageEvent saved = captor.getValue();
+            assertThat(saved.getUserId()).isEqualTo(USER_ID);
+            assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(saved.getTarget()).isEqualTo(UsageEvent.Target.INTERVIEW);
+            assertThat(saved.getDelta()).isEqualTo(COUNT);
+            assertThat(saved.getLabel()).isEqualTo(GIFT_LABEL);
         }
     }
 }

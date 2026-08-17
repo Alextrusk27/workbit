@@ -19,6 +19,7 @@
   --color-dim: #8a8ea3;
   --color-indigo: #6366f1;
   --color-violet: #8b5cf6;
+  --color-violet-strong: #7c3aed;
   --color-cyan: #0891b2;
   --color-star: #f59e0b;
   --color-star-off: rgba(23, 22, 43, 0.18);
@@ -74,6 +75,7 @@
     --color-dim: #6b7490;
     --color-indigo: #818cf8;
     --color-violet: #a78bfa;
+    --color-violet-strong: #a78bfa;
     --color-cyan: #67e8f9;
     --color-star: #fbbf24;
     --color-star-off: rgba(255, 255, 255, 0.22);

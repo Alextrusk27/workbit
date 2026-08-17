@@ -47,11 +47,14 @@ public class QuotaService {
         }
 
         boolean planActive = isPlanActive(account);
+        UsageResponse.UsageCounter trainings = planActive && account.getPlan().isUnlimitedTrainings()
+                ? new UsageResponse.UsageCounter(null, null)
+                : planCounter(planActive, account.getPlanTrainingsLeft(),
+                        account.getPlan().getTrainings());
         return new UsageResponse(
                 planCounter(planActive, account.getPlanInterviewsLeft(),
                         account.getPlan().getInterviews()),
-                planCounter(planActive, account.getPlanTrainingsLeft(),
-                        account.getPlan().getTrainings()),
+                trainings,
                 events);
     }
 
@@ -63,7 +66,8 @@ public class QuotaService {
     }
 
     public void checkTrainingAvailable(UUID userId) {
-        if (effectiveQuota(userId).planTrainingsLeft() == 0) {
+        Integer left = effectiveQuota(userId).planTrainingsLeft();
+        if (left != null && left == 0) {
             log.warn("Training quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Training quota exhausted");
         }
@@ -89,6 +93,10 @@ public class QuotaService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void debitTraining(UUID userId, String label) {
         insertIfAbsent(userId);
+        if (effectiveQuota(userId).planTrainingsLeft() == null) {
+            saveSpendEvent(userId, UsageEvent.Target.TRAINING, label);
+            return;
+        }
         if (billingAccountRepository.debitPlanTraining(userId, Instant.now()) == 0) {
             log.warn("Training quota exhausted for user {}", userId);
             throw new PaymentRequiredException("Training quota exhausted");
@@ -103,14 +111,25 @@ public class QuotaService {
         billingAccountRepository.creditPlan(userId, plan.name(),
                 plan.getInterviews(), plan.getTrainings(), now);
         saveCreditEvent(userId, UsageEvent.Target.INTERVIEW, plan.getInterviews(), label, now);
-        saveCreditEvent(userId, UsageEvent.Target.TRAINING, plan.getTrainings(), label, now);
+        if (!plan.isUnlimitedTrainings()) {
+            saveCreditEvent(userId, UsageEvent.Target.TRAINING, plan.getTrainings(), label, now);
+        }
         log.info("Credited plan {} to user {}", plan, userId);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void creditInterviews(UUID userId, int count, String label) {
+        insertIfAbsent(userId);
+        billingAccountRepository.creditInterviews(userId, count);
+        saveCreditEvent(userId, UsageEvent.Target.INTERVIEW, count, label, Instant.now());
+        log.info("Credited {} interviews to user {}", count, userId);
     }
 
     private static QuotaResponse toEffective(BillingAccount account) {
         if (isPlanActive(account)) {
             return new QuotaResponse(account.getPlan(), account.getPlanExpiresAt(),
-                    account.getPlanInterviewsLeft(), account.getPlanTrainingsLeft());
+                    account.getPlanInterviewsLeft(),
+                    account.getPlan().isUnlimitedTrainings() ? null : account.getPlanTrainingsLeft());
         }
 
         return new QuotaResponse(BillingAccount.Plan.FREE, null, 0, 0);

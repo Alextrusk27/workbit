@@ -63,7 +63,7 @@ function PlanLine() {
       <span className="tabular-nums">
         {' '}
         · осталось интервью: {data.planInterviewsLeft}, тренировок:{' '}
-        {data.planTrainingsLeft}
+        {data.planTrainingsLeft ?? 'безлимит'}
       </span>{' '}
       ·{' '}
       <Link
@@ -77,7 +77,7 @@ function PlanLine() {
 }
 
 export function HubPage() {
-  usePageTitle('Личный кабинет')
+  usePageTitle('Рабочий стол')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -105,13 +105,9 @@ export function HubPage() {
 
   return (
     <Container>
-      <AppPageHeader
-        back={{ to: '/', label: 'На главную' }}
-        eyebrow="Личный кабинет"
-        title="С чего начнём?"
-      >
-        Тренажёр прокачивает один навык под вашу профессию и уровень. Интервью
-        готовит к конкретной вакансии с hh.ru и оценивает шансы на оффер.
+      <AppPageHeader eyebrow="Рабочий стол" title="С чего начнём?">
+        Интервью готовит к конкретной вакансии с hh.ru и оценивает шансы на
+        оффер. Тренажёр прокачивает один навык под вашу профессию и уровень.
       </AppPageHeader>
 
       {failed && (
@@ -131,16 +127,16 @@ export function HubPage() {
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2">
         <SectionCard
-          to="/app/training"
-          eyebrow="Тренажёр"
-          title="Тренировка навыка"
-          description="Один навык за сессию: вопросы под навык, профессию и уровень сложности. Отвечайте по одному, разбор с оценками придёт в конце."
-        />
-        <SectionCard
           to="/app/interview"
           eyebrow="Интервью"
           title="Интервью под вакансию"
           description="Собеседование под конкретную вакансию с hh.ru. Вопросы по её требованиям, а в конце — разбор и вероятность оффера."
+        />
+        <SectionCard
+          to="/app/training"
+          eyebrow="Тренажёр"
+          title="Тренировка навыка"
+          description="Один навык за сессию: вопросы под навык, профессию и уровень сложности. Отвечайте по одному, разбор с оценками придёт в конце."
         />
       </div>
 

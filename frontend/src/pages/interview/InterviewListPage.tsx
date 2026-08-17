@@ -60,7 +60,7 @@ export function InterviewListPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app', label: 'Личный кабинет' }}
+        back={{ to: '/app', label: 'Рабочий стол' }}
         eyebrow="Интервью"
         title="Мои интервью"
         actions={

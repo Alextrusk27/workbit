@@ -40,7 +40,7 @@ public class BankQuestion {
 
     @Builder.Default
     @Column(nullable = false, updatable = false)
-    private String source = "CLAUDE";
+    private String source = "GENERATED";
 
     @Builder.Default
     @Column(nullable = false, updatable = false)

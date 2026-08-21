@@ -221,7 +221,7 @@ Caddyfile             конфиг reverse proxy
 ./mvnw verify   # + интеграционные (*IT): Testcontainers, нужен Docker
 ```
 
-Фронтенд: `npm run lint` и `npm run build` (автотестов пока нет).
+Фронтенд: `npm run lint`, `npm test` (Vitest) и `npm run build`.
 
 Покрытие — JaCoCo на `./mvnw verify`: 87% строк, 75% веток (сгенерированные gRPC-стабы SpeechKit из отчёта исключены):
 

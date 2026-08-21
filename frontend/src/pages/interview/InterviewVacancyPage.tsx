@@ -38,11 +38,11 @@ const OFFER_INLINE_CLASS = {
 } as const
 
 const Y_AXIS = [
-  { top: '0%', label: '★★★★★' },
-  { top: '25%', label: '★★★★' },
-  { top: '50%', label: '★★★' },
-  { top: '75%', label: '★★' },
-  { top: '100%', label: '★' },
+  { top: '0%', label: '★★★★★', short: '5' },
+  { top: '25%', label: '★★★★', short: '4' },
+  { top: '50%', label: '★★★', short: '3' },
+  { top: '75%', label: '★★', short: '2' },
+  { top: '100%', label: '★', short: '★' },
 ]
 
 function formatDate(iso: string): string {
@@ -296,7 +296,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
   const points = completedAttempts(detail).slice(-5)
   if (points.length === 0) {
     return (
-      <section className="border-line bg-card mt-7 rounded-xl border px-6 py-5.5">
+      <section className="border-line bg-card mt-7 rounded-xl border px-5 py-5 sm:px-6 sm:py-5.5">
         <h2 className="text-ink m-0 text-[15px] font-semibold">
           Прогресс по вакансии
         </h2>
@@ -320,8 +320,11 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
   const areaPath = `${linePath} L${xs[points.length - 1]} 100 L${xs[0]} 100 Z`
   const slots = Array.from({ length: 5 }, (_, i) => i)
 
+  const tileClass =
+    'border-line bg-glass min-w-0 rounded-[10px] border px-3 py-2.5 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0'
+
   return (
-    <section className="border-line bg-card mt-7 rounded-xl border px-6 py-5.5">
+    <section className="border-line bg-card mt-7 rounded-xl border px-5 py-5 sm:px-6 sm:py-5.5">
       <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
         <div>
           <h2 className="text-ink m-0 flex items-center gap-[7px] text-[15px] font-semibold">
@@ -330,21 +333,25 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           </h2>
           <p className="text-muted mt-1 text-[13.5px]">Оценка за попытку</p>
         </div>
-        <div className="flex flex-wrap gap-x-9 gap-y-4">
-          <div>
-            <p className="text-ink m-0 flex items-center gap-2 text-[19px] font-bold tabular-nums">
+        <div className="grid w-full grid-cols-3 gap-3 sm:flex sm:w-auto sm:flex-wrap sm:gap-x-9 sm:gap-y-4">
+          <div className={tileClass}>
+            <p className="text-ink m-0 flex items-center gap-2 text-[17px] font-bold tabular-nums sm:text-[19px]">
               {formatScore(best.avgScore!)}
               <Stars
                 value={Math.round(best.avgScore! * 2) / 2}
-                className="text-xs"
+                className="text-xs max-sm:hidden"
               />
+              <span className="text-star text-xs sm:hidden">★</span>
             </p>
-            <p className="text-dim mt-[3px] text-xs">Лучшая оценка</p>
+            <p className="text-dim mt-[3px] text-[11px] sm:text-xs">
+              <span className="sm:hidden">Лучшая</span>
+              <span className="max-sm:hidden">Лучшая оценка</span>
+            </p>
           </div>
-          <div>
+          <div className={tileClass}>
             <p
               className={cn(
-                'm-0 text-[19px] font-bold tabular-nums',
+                'm-0 text-[17px] font-bold tabular-nums sm:text-[19px]',
                 !delta && 'text-dim',
                 delta != null && delta > 0 && 'text-ok',
                 delta != null && delta < 0 && 'text-danger',
@@ -354,17 +361,17 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
                 ? '—'
                 : `${delta > 0 ? '+' : ''}${formatScore(delta)}`}
             </p>
-            <p className="text-dim mt-[3px] flex items-center gap-1.5 text-xs">
+            <p className="text-dim mt-[3px] flex items-center gap-1.5 text-[11px] sm:text-xs">
               Динамика
               <HintTip text="Общее направление оценок на графике — от первой попытки к последней" />
             </p>
           </div>
           {best.offerProbability && (
-            <div>
-              <p className="m-0 text-[19px] font-bold">
+            <div className={tileClass}>
+              <p className="m-0 text-[15px] font-bold sm:text-[19px]">
                 <OfferValue value={best.offerProbability} />
               </p>
-              <p className="text-dim mt-[3px] flex items-center gap-1.5 text-xs">
+              <p className="text-dim mt-[3px] flex items-center gap-1.5 text-[11px] sm:text-xs">
                 Оффер
                 <HintTip text="Вероятность оффера в лучшем интервью" />
               </p>
@@ -373,26 +380,36 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
         </div>
       </div>
 
-      <div className="mt-[22px] grid grid-cols-[52px_1fr]">
-        <div className="relative h-[170px]">
+      <div className="mt-[18px] grid grid-cols-[26px_1fr] sm:mt-[22px] sm:grid-cols-[52px_1fr]">
+        <div className="relative h-[150px] sm:h-[170px]">
           {Y_AXIS.map((y) => (
             <span
               key={y.top}
               style={{ top: y.top }}
-              className="text-star absolute right-2.5 -translate-y-1/2 text-[10px] tracking-[1px] whitespace-nowrap opacity-85"
+              className="absolute right-2 -translate-y-1/2 text-[10px] whitespace-nowrap sm:right-2.5 sm:tracking-[1px] sm:opacity-85"
             >
-              {y.label}
+              <span
+                className={cn(
+                  'tabular-nums sm:hidden',
+                  y.top === '100%' ? 'text-star' : 'text-dim',
+                )}
+              >
+                {y.short}
+              </span>
+              <span className="text-star max-sm:hidden">{y.label}</span>
             </span>
           ))}
         </div>
-        <div className="relative h-[170px]">
+        <div className="relative h-[150px] sm:h-[170px]">
           {Y_AXIS.map((y) => (
             <div
               key={y.top}
               style={{ top: y.top }}
               className={cn(
-                'border-line absolute right-0 left-0 h-0 border-t',
-                y.top !== '100%' && 'border-dashed',
+                'absolute right-0 left-0 h-0 border-t',
+                y.top === '100%'
+                  ? 'border-glass-line sm:border-line'
+                  : 'border-line sm:border-dashed',
               )}
             />
           ))}
@@ -419,7 +436,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
                   d={linePath}
                   fill="none"
                   stroke="url(#pgLine)"
-                  strokeWidth="2.5"
+                  className="[stroke-width:2] sm:[stroke-width:2.5]"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
@@ -432,8 +449,10 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
               key={p.sessionId}
               style={{ left: `${xs[i]}%`, top: `${ys[i]}%` }}
               className={cn(
-                'absolute mt-[-12px] -translate-x-1/2 -translate-y-full text-[12.5px] font-semibold tabular-nums',
-                i === points.length - 1 ? 'text-indigo' : 'text-ink',
+                'absolute -translate-x-1/2 -translate-y-full text-[11px] font-semibold tabular-nums sm:mt-[-12px] sm:text-[12.5px]',
+                i === points.length - 1
+                  ? 'text-ink border-indigo/45 bg-indigo/[0.18] sm:text-indigo mt-[-10px] rounded-full border px-[7px] py-px font-bold sm:border-0 sm:bg-transparent sm:p-0 sm:font-semibold'
+                  : 'text-muted sm:text-ink mt-[-9px]',
               )}
             >
               {formatScore(p.avgScore!)}
@@ -445,29 +464,31 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
                 key={i}
                 style={{ left: `${10 + i * 20}%`, top: `${ys[i]}%` }}
                 className={cn(
-                  'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_3px_rgba(129,140,248,0.18)]',
-                  i === points.length - 1 ? 'bg-[#a78bfa]' : 'bg-[#818cf8]',
+                  'absolute -translate-x-1/2 -translate-y-1/2 rounded-full sm:size-2.5 sm:shadow-[0_0_0_3px_rgba(129,140,248,0.18)]',
+                  i === points.length - 1
+                    ? 'size-[9px] bg-[#a78bfa] shadow-[0_0_0_3px_rgba(167,139,250,0.22)]'
+                    : 'size-2 bg-[#818cf8]',
                 )}
               />
             ) : (
               <div
                 key={i}
                 style={{ left: `${10 + i * 20}%`, top: '100%' }}
-                className="border-glass-line absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-dashed"
+                className="bg-glass-line sm:border-glass-line absolute h-[7px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-sm sm:size-2.5 sm:rounded-full sm:border-[1.5px] sm:border-dashed sm:bg-transparent"
               />
             ),
           )}
         </div>
       </div>
-      <div className="mt-2.5 grid grid-cols-[52px_1fr]">
+      <div className="mt-2 grid grid-cols-[26px_1fr] sm:mt-2.5 sm:grid-cols-[52px_1fr]">
         <span />
         <div className="flex">
           {slots.map((i) => (
             <span
               key={i}
               className={cn(
-                'text-dim flex-1 text-center text-xs',
-                i >= points.length && 'opacity-55',
+                'text-dim flex-1 text-center text-[11px] sm:text-xs',
+                i >= points.length && 'opacity-50 sm:opacity-55',
               )}
             >
               {i < points.length ? (
@@ -480,7 +501,12 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
                   </span>
                 </>
               ) : (
-                `Интервью ${completed.length + (i - points.length) + 1}`
+                <>
+                  <span className="sm:hidden">·</span>
+                  <span className="max-sm:hidden">
+                    {`Интервью ${completed.length + (i - points.length) + 1}`}
+                  </span>
+                </>
               )}
             </span>
           ))}

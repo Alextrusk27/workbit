@@ -221,7 +221,7 @@ Requirements: JDK 25, Node.js 22+, Docker.
 ./mvnw verify   # + integration tests (*IT): Testcontainers, requires Docker
 ```
 
-Frontend: `npm run lint` and `npm run build` (no automated tests yet).
+Frontend: `npm run lint`, `npm test` (Vitest) and `npm run build`.
 
 Coverage — JaCoCo on `./mvnw verify`: 87% lines, 75% branches (generated SpeechKit gRPC stubs are excluded from the report):
 

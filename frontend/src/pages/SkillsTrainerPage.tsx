@@ -95,7 +95,7 @@ export function SkillsTrainerPage() {
         тренировки.
       </PageHero>
 
-      <section className="py-16">
+      <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
             <SectionHead title="Тренировка за три клика">
@@ -130,7 +130,7 @@ export function SkillsTrainerPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
@@ -176,7 +176,7 @@ export function SkillsTrainerPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <SectionHead title="Для любой профессии">
@@ -196,7 +196,7 @@ export function SkillsTrainerPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <CtaPanel

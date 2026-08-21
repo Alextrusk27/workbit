@@ -41,13 +41,13 @@ export function UserMenu() {
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative max-w-[50vw] min-w-0 sm:max-w-55">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="text-muted hover:bg-glass hover:text-ink flex max-w-[50vw] touch-manipulation items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors sm:max-w-55"
+        className="text-muted hover:bg-glass hover:text-ink flex max-w-full touch-manipulation items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors"
       >
         <span className="min-w-0 truncate">{user.email}</span>
         <svg

@@ -205,7 +205,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
         name="AI-интервьюер"
         status={finishing ? 'формируем разбор' : 'интервью идёт'}
         bodyRef={bodyRef}
-        bodyClassName="h-[min(56vh,500px)]"
+        bodyClassName="h-[min(56svh,500px)]"
         footer={
           <Composer
             disabled={!current || finishing}

@@ -208,7 +208,7 @@ function deltaText(row: HistoryRow): string {
   return row.deltas
     .map(({ target, delta }) => {
       const unit = target === 'INTERVIEW' ? 'интервью' : trainingsWord(delta)
-      return `${sign}${delta} ${unit}`
+      return `${sign}${Math.abs(delta)} ${unit}`
     })
     .join(', ')
 }
@@ -273,17 +273,17 @@ function UsageHistory({ events }: { events: UsageEvent[] }) {
             {visible.map((row) => (
               <li
                 key={`${row.at}|${row.label}`}
-                className="border-divider flex items-baseline gap-4 border-t py-[11px] last:border-b"
+                className="border-divider grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 border-t py-[11px] last:border-b sm:flex sm:items-baseline sm:gap-4"
               >
-                <span className="text-dim w-[140px] shrink-0 text-[13px] tabular-nums">
+                <span className="text-dim col-start-1 row-start-1 text-[13px] tabular-nums sm:w-[140px] sm:shrink-0">
                   {formatEventDate(row.at)}
                 </span>
-                <span className="text-ink flex-1 text-sm break-words">
+                <span className="text-ink col-span-2 col-start-1 row-start-2 text-sm break-words sm:col-span-1 sm:flex-1">
                   {row.label}
                 </span>
                 <span
                   className={cn(
-                    'text-[13px] whitespace-nowrap tabular-nums',
+                    'col-start-2 row-start-1 text-right text-[13px] tabular-nums sm:text-left sm:whitespace-nowrap',
                     row.kind === 'SPEND' ? 'text-muted' : 'text-ok',
                   )}
                 >

@@ -220,6 +220,28 @@ jobs:
           [ "$code" = "404" ] || { echo "soft 404: /definitely-missing answered $code"; exit 1; }
           echo "seo checks passed"
 
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Authenticated smoke with live LLM call
+        run: |
+          SSH_KEY=~/.ssh/id_deploy \
+          SSH_DEST="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          LLM_CHECK=1 \
+          bash .github/scripts/prod-auth-smoke.sh
+
   release:
     needs: deploy
     runs-on: ubuntu-latest

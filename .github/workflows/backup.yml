@@ -1,0 +1,39 @@
+name: DB backup
+
+on:
+  schedule:
+    - cron: '40 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Dump database and rotate old backups
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
+          set -euo pipefail
+          cd /opt/workbit
+          umask 077
+          mkdir -p backups
+          backup="backups/daily-$(date +%Y%m%d-%H%M%S).dump"
+          docker compose -f compose.prod.yml exec -T postgres \
+            sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+          [ -s "$backup" ] || { echo "backup is empty"; exit 1; }
+          echo "database backed up to $backup ($(du -h "$backup" | cut -f1))"
+          find backups -name '*.dump' -mtime +14 -delete
+          echo "backups on disk:"
+          ls -lh backups
+          EOF

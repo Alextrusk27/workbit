@@ -64,12 +64,25 @@ export function HeroChatDemo() {
   const animated = motionConfig.shouldAnimate({ essential: true })
   const [phase, setPhase] = useState<Phase>(animated ? 'ask' : 'review')
   const [fading, setFading] = useState(false)
+  const [visible, setVisible] = useState(true)
+  const rootRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const questionRef = useRef<HTMLSpanElement>(null)
   const reviewRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     if (!animated) return
+    const root = rootRef.current
+    if (!root) return
+    const observer = new IntersectionObserver(([entry]) =>
+      setVisible(entry.isIntersecting),
+    )
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [animated])
+
+  useEffect(() => {
+    if (!animated || !visible) return
     let cancelled = false
 
     const sleep = (ms: number) =>
@@ -141,13 +154,15 @@ export function HeroChatDemo() {
     return () => {
       cancelled = true
     }
-  }, [animated])
+  }, [animated, visible])
 
   const recording = phase === 'recording'
 
   return (
     <div
+      ref={rootRef}
       role="img"
+      className="overflow-anchor-none"
       aria-label="Пример интервью: вопрос про HashMap, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой 4 из 5"
     >
       <div aria-hidden>

@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { UserMenu } from '@/components/layout/UserMenu'
 import { useAuth } from '@/features/auth/useAuth'
@@ -27,7 +28,7 @@ function navLinkClass(isActive: boolean): string {
 export function Header() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const reduce = useReducedMotion()
 
   useEffect(() => setOpen(false), [location])
@@ -70,7 +71,9 @@ export function Header() {
 
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            {isAuthenticated ? (
+            {isLoading ? (
+              <Skeleton className="h-7 w-[110px] rounded-md" />
+            ) : isAuthenticated ? (
               <UserMenu />
             ) : (
               <Link to="/login" className={buttonClasses({ size: 'sm' })}>
@@ -143,15 +146,19 @@ export function Header() {
                   </li>
                 ))}
                 <li className="py-3">
-                  <Link
-                    to={isAuthenticated ? '/app' : '/login'}
-                    className={buttonClasses({
-                      variant: 'secondary',
-                      className: 'w-full',
-                    })}
-                  >
-                    {isAuthenticated ? 'Рабочий стол' : 'Войти'}
-                  </Link>
+                  {isLoading ? (
+                    <Skeleton className="h-11 w-full rounded-lg" />
+                  ) : (
+                    <Link
+                      to={isAuthenticated ? '/app' : '/login'}
+                      className={buttonClasses({
+                        variant: 'secondary',
+                        className: 'w-full',
+                      })}
+                    >
+                      {isAuthenticated ? 'Рабочий стол' : 'Войти'}
+                    </Link>
+                  )}
                 </li>
               </ul>
             </Container>

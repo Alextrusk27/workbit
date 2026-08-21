@@ -44,8 +44,12 @@ export function Header() {
       style={{ backgroundColor: 'var(--nav-bg)' }}
     >
       <Container>
-        <div className="relative flex h-17 items-center gap-8">
-          <Link to="/" className="rounded-sm" aria-label="Workbit — на главную">
+        <div className="relative flex h-17 items-center gap-4 sm:gap-8">
+          <Link
+            to="/"
+            className="shrink-0 rounded-sm"
+            aria-label="Workbit — на главную"
+          >
             <Logo />
           </Link>
 
@@ -64,7 +68,7 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
             {isAuthenticated ? (
               <UserMenu />

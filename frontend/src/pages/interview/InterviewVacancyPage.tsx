@@ -60,6 +60,13 @@ function formatDay(iso: string): string {
   })
 }
 
+function formatDayShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 function formatScore(score: number): string {
   return score.toFixed(1).replace('.', ',')
 }
@@ -323,7 +330,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           </h2>
           <p className="text-muted mt-1 text-[13.5px]">Оценка за попытку</p>
         </div>
-        <div className="flex gap-9">
+        <div className="flex flex-wrap gap-x-9 gap-y-4">
           <div>
             <p className="text-ink m-0 flex items-center gap-2 text-[19px] font-bold tabular-nums">
               {formatScore(best.avgScore!)}
@@ -463,9 +470,18 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
                 i >= points.length && 'opacity-55',
               )}
             >
-              {i < points.length
-                ? formatDay(points[i].completedAt ?? points[i].created)
-                : `Интервью ${completed.length + (i - points.length) + 1}`}
+              {i < points.length ? (
+                <>
+                  <span className="sm:hidden">
+                    {formatDayShort(points[i].completedAt ?? points[i].created)}
+                  </span>
+                  <span className="max-sm:hidden">
+                    {formatDay(points[i].completedAt ?? points[i].created)}
+                  </span>
+                </>
+              ) : (
+                `Интервью ${completed.length + (i - points.length) + 1}`
+              )}
             </span>
           ))}
         </div>
@@ -523,7 +539,7 @@ function RecommendationRow({
 
   return (
     <li className="border-line flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3.5 py-3">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 max-sm:basis-full">
         <p className="text-ink m-0 text-sm font-semibold break-words">
           {rec.skill}
         </p>
@@ -620,7 +636,7 @@ function AttemptRow({
   const completed = attempt.status === 'COMPLETED'
 
   return (
-    <li className="border-line text-dim grid grid-cols-[90px_118px_80px_32px_1fr_auto] items-center gap-x-3.5 gap-y-1.5 border-t py-2.5 text-[12.5px] first:border-t-0">
+    <li className="border-line text-dim flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-t py-2.5 text-[12.5px] first:border-t-0 sm:grid sm:grid-cols-[90px_118px_80px_32px_1fr_auto]">
       <span className="text-ink font-medium">Интервью {index + 1}</span>
       <span>{formatDate(attempt.created)}</span>
       {completed && attempt.avgScore != null ? (

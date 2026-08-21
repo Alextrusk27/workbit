@@ -1,0 +1,62 @@
+name: Canary
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check prod availability
+        run: |
+          BASE=https://workbit.ru
+          check() {
+            home=$(curl -s -o home.html -w '%{http_code}' "$BASE/" || echo 000)
+            if [ "$home" != "200" ] || ! grep -q 'id="root"' home.html; then
+              echo "GET / -> $home"
+              return 1
+            fi
+            me=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/auth/me" || echo 000)
+            if [ "$me" != "401" ]; then
+              echo "GET /api/v1/auth/me -> $me (want 401)"
+              return 1
+            fi
+          }
+          for attempt in 1 2 3; do
+            if check; then
+              echo "prod is healthy"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "prod canary failed after 3 attempts"
+          exit 1
+
+  llm:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 6 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Authenticated smoke with live LLM call
+        run: |
+          SSH_KEY=~/.ssh/id_deploy \
+          SSH_DEST="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          LLM_CHECK=1 \
+          bash .github/scripts/prod-auth-smoke.sh

@@ -148,8 +148,8 @@ jobs:
           fi
           echo "BACKEND_IMAGE=$image" >> .env.tmp
           mv .env.tmp .env
-          if ! docker compose -f compose.prod.yml up -d --wait --wait-timeout 300; then
-            echo "new backend did not become healthy"
+          rollback() {
+            echo "$1"
             if [ -n "$prev" ] && [ "$prev" != "$image" ]; then
               echo "rolling back to $prev"
               sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$prev|" .env
@@ -160,8 +160,23 @@ jobs:
               echo "no previous image to roll back to"
             fi
             exit 1
-          fi
+          }
+          docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
+            || rollback "new backend did not become healthy"
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          code=""
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              --resolve workbit.ru:443:127.0.0.1 https://workbit.ru/api/v1/auth/me || true)
+            if [ "$code" = "401" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$code" != "401" ]; then
+            rollback "backend smoke failed: /api/v1/auth/me answered '$code' instead of 401"
+          fi
+          echo "backend smoke passed"
           docker images "${{ env.IMAGE }}" --format '{{.Repository}}:{{.Tag}}' \
             | while read -r img; do
                 [ "$img" = "$image" ] && continue

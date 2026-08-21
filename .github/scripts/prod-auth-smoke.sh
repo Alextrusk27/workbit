@@ -9,14 +9,14 @@ set -euo pipefail
 # опционально BASE (default https://workbit.ru), LLM_CHECK (default 0).
 
 BASE="${BASE:-https://workbit.ru}"
-EMAIL='claude-smoke@example.com'
+EMAIL='ci-smoke@example.com'
 JAR=$(mktemp)
 trap 'rm -f "$JAR"' EXIT
 
 CODE=$(ssh -i "$SSH_KEY" "$SSH_DEST" bash -s <<'EOSSH'
 set -euo pipefail
 cd /opt/workbit
-email='claude-smoke@example.com'
+email='ci-smoke@example.com'
 uid=$(docker compose -f compose.prod.yml exec -T postgres \
   sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atq' <<SQL
 INSERT INTO auth.users (id, email, email_verified, personal_data_consent_at)

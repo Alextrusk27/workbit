@@ -52,6 +52,7 @@ jobs:
         with:
           context: .
           push: true
+          provenance: false
           tags: ${{ env.IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -73,6 +74,10 @@ jobs:
 
       - name: Install
         run: npm ci
+        working-directory: frontend
+
+      - name: Test
+        run: npm test
         working-directory: frontend
 
       - name: Build
@@ -111,7 +116,7 @@ jobs:
 
       - name: Upload compose and Caddyfile
         run: |
-          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
+          rsync -az --inplace -e "ssh -i ~/.ssh/id_deploy" \
             compose.prod.yml Caddyfile \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/"
 
@@ -134,10 +139,21 @@ jobs:
             | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
           printf '%s' "$token" | docker login --username iam --password-stdin cr.yandex
           docker pull "$image"
+          mkdir -p backups
+          if [ -n "$(docker compose -f compose.prod.yml ps -q postgres)" ]; then
+            backup="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
+            docker compose -f compose.prod.yml exec -T postgres \
+              sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+            [ -s "$backup" ] || { echo "backup is empty"; exit 1; }
+            echo "database backed up to $backup ($(du -h "$backup" | cut -f1))"
+            find backups -name '*.dump' -mtime +14 -delete
+          else
+            echo "postgres is not running, skipping backup"
+          fi
           echo "BACKEND_IMAGE=$image" >> .env.tmp
           mv .env.tmp .env
-          if ! docker compose -f compose.prod.yml up -d --wait --wait-timeout 300; then
-            echo "new backend did not become healthy"
+          rollback() {
+            echo "$1"
             if [ -n "$prev" ] && [ "$prev" != "$image" ]; then
               echo "rolling back to $prev"
               sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$prev|" .env
@@ -148,8 +164,23 @@ jobs:
               echo "no previous image to roll back to"
             fi
             exit 1
-          fi
+          }
+          docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
+            || rollback "new backend did not become healthy"
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          code=""
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              --resolve workbit.ru:443:127.0.0.1 https://workbit.ru/api/v1/auth/me || true)
+            if [ "$code" = "401" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$code" != "401" ]; then
+            rollback "backend smoke failed: /api/v1/auth/me answered '$code' instead of 401"
+          fi
+          echo "backend smoke passed"
           docker images "${{ env.IMAGE }}" --format '{{.Repository}}:{{.Tag}}' \
             | while read -r img; do
                 [ "$img" = "$image" ] && continue
@@ -173,8 +204,14 @@ jobs:
 
       - name: Upload frontend
         run: |
-          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
+            dist/assets/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/assets/"
+          ls dist/assets | ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd /opt/workbit/www/assets && xargs -r -d '\n' touch --"
+          rsync -az --delete --exclude assets -e "ssh -i ~/.ssh/id_deploy" \
             dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/"
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "find /opt/workbit/www/assets -type f -mtime +14 -delete"
 
       - name: Smoke test frontend
         run: |
@@ -192,6 +229,28 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' https://workbit.ru/definitely-missing)
           [ "$code" = "404" ] || { echo "soft 404: /definitely-missing answered $code"; exit 1; }
           echo "seo checks passed"
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Authenticated smoke with live LLM call
+        run: |
+          SSH_KEY=~/.ssh/id_deploy \
+          SSH_DEST="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          LLM_CHECK=1 \
+          bash .github/scripts/prod-auth-smoke.sh
 
   release:
     needs: deploy

@@ -161,6 +161,10 @@
   background-image: var(--grad-plan);
 }
 
+@utility overflow-anchor-none {
+  overflow-anchor: none;
+}
+
 @utility scrollbar-slim {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line) transparent;

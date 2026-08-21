@@ -200,8 +200,14 @@ jobs:
 
       - name: Upload frontend
         run: |
-          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy" \
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
+            dist/assets/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/assets/"
+          ls dist/assets | ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd /opt/workbit/www/assets && xargs -r -d '\n' touch --"
+          rsync -az --delete --exclude assets -e "ssh -i ~/.ssh/id_deploy" \
             dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/"
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "find /opt/workbit/www/assets -type f -mtime +14 -delete"
 
       - name: Smoke test frontend
         run: |

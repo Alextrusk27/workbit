@@ -75,8 +75,8 @@ export function HomePage() {
 
   return (
     <>
-      <header className="glow-hero relative overflow-hidden pt-24 pb-20">
-        <Container className="relative grid items-center gap-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+      <header className="glow-hero relative overflow-hidden pt-10 pb-12 sm:pt-24 sm:pb-20">
+        <Container className="relative grid items-center gap-9 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
           <div>
             <Badge>AI-рецензент оценивает каждый ответ</Badge>
             <h1 className="text-ink mt-6 text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
@@ -108,7 +108,7 @@ export function HomePage() {
         </Container>
       </header>
 
-      <section className="py-16">
+      <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
             <SectionHead title="Всё как на настоящем интервью">
@@ -128,7 +128,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section id="demo" className="scroll-mt-20 py-16">
+      <section id="demo" className="scroll-mt-20 py-10 sm:py-16">
         <Container>
           <Reveal>
             <SectionHead title="Как проходит сессия">
@@ -236,7 +236,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section id="pricing" className="scroll-mt-20 py-16">
+      <section id="pricing" className="scroll-mt-20 py-10 sm:py-16">
         <Container>
           <Reveal>
             <SectionHead title="Простые и честные тарифы">
@@ -260,7 +260,7 @@ export function HomePage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <CtaPanel

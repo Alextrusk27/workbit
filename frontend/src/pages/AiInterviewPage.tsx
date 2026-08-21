@@ -86,7 +86,7 @@ export function AiInterviewPage() {
         текстом или голосом, в конце — вердикт и вероятность оффера.
       </PageHero>
 
-      <section className="py-16">
+      <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
             <SectionHead title="Три шага до вердикта">
@@ -106,7 +106,7 @@ export function AiInterviewPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -156,7 +156,7 @@ export function AiInterviewPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <SectionHead title="Что вы получаете после сессии">
@@ -175,7 +175,7 @@ export function AiInterviewPage() {
         </Container>
       </section>
 
-      <section className="pb-16">
+      <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <CtaPanel

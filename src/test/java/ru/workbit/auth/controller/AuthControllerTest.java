@@ -18,11 +18,13 @@ import ru.workbit.auth.dto.*;
 import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.BadCredentialsException;
+import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.config.SecurityConfig;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.CaptchaService;
 import ru.workbit.security.service.JWTService;
 import ru.workbit.security.service.RateLimiterService;
 
@@ -65,6 +67,9 @@ class AuthControllerTest {
     @MockitoBean
     RateLimiterService rateLimiterService;
 
+    @MockitoBean
+    CaptchaService captchaService;
+
     // JWTAuthFilter-зависимости: нужны, чтобы SecurityConfig мог создать фильтр
     @MockitoBean
     JWTService jwtService;
@@ -93,7 +98,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 200 при успешном запросе кода")
         void returnsOkOnSuccess() throws Exception {
             // given
-            var request = new RequestCodeRequest(EMAIL, true);
+            var request = new RequestCodeRequest(EMAIL, true, null);
             doNothing().when(authService).requestCode(any());
 
             // when / then
@@ -109,7 +114,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 400, когда email невалиден")
         void returns400WhenEmailInvalid() throws Exception {
             // given
-            var request = new RequestCodeRequest("not-an-email", true);
+            var request = new RequestCodeRequest("not-an-email", true, null);
 
             // when / then
             mvc.perform(post(BASE + "/request-code")
@@ -124,7 +129,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 429, когда превышен лимит запросов")
         void returns429WhenRateLimitExceeded() throws Exception {
             // given
-            var request = new RequestCodeRequest(EMAIL, true);
+            var request = new RequestCodeRequest(EMAIL, true, null);
             doThrow(new TooManyRequestsException("Too many requests")).when(rateLimiterService).check(anyString());
 
             // when / then
@@ -143,7 +148,7 @@ class AuthControllerTest {
         @DisplayName("Возвращает 400, когда согласие на обработку персональных данных не дано")
         void returns400WhenPersonalDataConsentFalse() throws Exception {
             // given
-            var request = new RequestCodeRequest(EMAIL, false);
+            var request = new RequestCodeRequest(EMAIL, false, null);
 
             // when / then
             mvc.perform(post(BASE + "/request-code")
@@ -165,6 +170,24 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(requestJson))
                     .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(authService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 403, когда проверка капчи не пройдена")
+        void returns403WhenCaptchaValidationFails() throws Exception {
+            // given
+            var request = new RequestCodeRequest(EMAIL, true, "invalid-token");
+            doThrow(new ForbiddenException("Captcha validation failed"))
+                    .when(captchaService).validate(anyString(), anyString());
+
+            // when / then
+            mvc.perform(post(BASE + "/request-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errors[0]").value("Captcha validation failed"));
 
             verifyNoInteractions(authService);
         }

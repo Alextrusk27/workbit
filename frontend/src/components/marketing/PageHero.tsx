@@ -15,7 +15,7 @@ export function PageHero({
   actions?: ReactNode
 }) {
   return (
-    <header className="glow-page relative overflow-hidden pt-20">
+    <header className="glow-page relative overflow-hidden pt-10 pb-12 sm:pt-24 sm:pb-20">
       <Container className="relative text-center">
         {badge && <Badge>{badge}</Badge>}
         <h1 className="text-ink mt-6 text-[clamp(32px,4.5vw,48px)] leading-[1.1] font-extrabold tracking-[-0.03em]">

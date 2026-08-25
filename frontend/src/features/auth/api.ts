@@ -7,10 +7,14 @@ export interface UserResponse {
 }
 
 export const authApi = {
-  requestCode: (email: string, personalDataConsent: boolean) =>
+  requestCode: (
+    email: string,
+    personalDataConsent: boolean,
+    captchaToken?: string,
+  ) =>
     apiFetch<void>('/auth/request-code', {
       method: 'POST',
-      body: { email, personalDataConsent },
+      body: { email, personalDataConsent, captchaToken },
     }),
 
   verifyCode: (email: string, code: string) =>

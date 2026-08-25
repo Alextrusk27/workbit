@@ -50,7 +50,7 @@ spring:
         order_inserts: true
         order_updates: true
   mail:
-    host: mail.workbit.ru
+    host: sm44.hosting.reg.ru
     port: 465
     username: ${app.mail.from-mail}
     password: ${MAIL_PASSWORD}

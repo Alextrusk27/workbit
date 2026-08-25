@@ -105,6 +105,47 @@
     --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.35);
   }
 
+  /* Зеркало `.dark`: возвращает светлую палитру поддереву внутри тёмной темы.
+     Нужен странице входа — она всегда светлая, независимо от выбора темы. */
+  .theme-light {
+    color-scheme: light;
+    --color-canvas: #faf9fb;
+    --color-canvas-2: #f3f2f8;
+    --color-card: #ffffff;
+    --color-line: rgba(23, 22, 43, 0.09);
+    --color-line-hover: rgba(99, 102, 241, 0.45);
+    --color-divider: rgba(23, 22, 43, 0.08);
+    --color-glass: rgba(23, 22, 43, 0.04);
+    --color-glass-hover: rgba(23, 22, 43, 0.07);
+    --color-glass-line: rgba(23, 22, 43, 0.18);
+    --color-surface: #f3f2f9;
+    --color-surface-line: rgba(23, 22, 43, 0.06);
+    --color-pop: #ffffff;
+    --color-ink: #17162b;
+    --color-muted: #5b5f73;
+    --color-dim: #8a8ea3;
+    --color-indigo: #6366f1;
+    --color-violet: #8b5cf6;
+    --color-violet-strong: #7c3aed;
+    --color-cyan: #0891b2;
+    --color-star: #f59e0b;
+    --color-star-off: rgba(23, 22, 43, 0.18);
+    --color-ok: #16a34a;
+    --color-danger: #dc2626;
+
+    --grad-brand: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #0891b2);
+    --grad-plan: linear-gradient(
+      180deg,
+      rgba(139, 92, 246, 0.07),
+      var(--color-card)
+    );
+    --nav-bg: rgba(250, 249, 251, 0.8);
+    --hero-glow: 0.12;
+
+    --shadow-chat: 0 24px 64px rgba(23, 22, 43, 0.14);
+    --shadow-pop: 0 16px 48px rgba(23, 22, 43, 0.16);
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -241,6 +282,47 @@
         rgba(139, 92, 246, calc(var(--hero-glow) * 0.8)),
         transparent 65%
       );
+  }
+}
+
+@utility glow-auth {
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        320px 220px at 20% 10%,
+        rgba(99, 102, 241, 0.24),
+        transparent 65%
+      ),
+      radial-gradient(
+        360px 240px at 85% 60%,
+        rgba(139, 92, 246, 0.2),
+        transparent 65%
+      );
+  }
+
+  @media (width >= 64rem) {
+    &::before {
+      background:
+        radial-gradient(
+          600px 420px at 25% 15%,
+          rgba(99, 102, 241, 0.22),
+          transparent 65%
+        ),
+        radial-gradient(
+          700px 480px at 80% 45%,
+          rgba(139, 92, 246, 0.18),
+          transparent 65%
+        ),
+        radial-gradient(
+          500px 400px at 45% 95%,
+          rgba(103, 232, 249, 0.07),
+          transparent 65%
+        );
+    }
   }
 }
 

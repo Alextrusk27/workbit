@@ -25,7 +25,7 @@ export function Checkbox({
         onChange={(e) => onChange(e.target.checked)}
         className="accent-indigo mt-0.5 size-4 shrink-0"
       />
-      <label htmlFor={id} className="text-muted text-[13.5px] leading-snug">
+      <label htmlFor={id} className="text-muted text-[13px] leading-snug">
         {children}
       </label>
     </div>

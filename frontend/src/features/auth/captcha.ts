@@ -3,12 +3,17 @@ const CHALLENGE_HIDDEN_GRACE_MS = 500
 
 const sitekey = import.meta.env.VITE_SMARTCAPTCHA_SITEKEY as string | undefined
 
+/** Капча настроена. Щит SmartCaptcha скрыт (`hideShield`), поэтому уведомление
+ *  об обработке данных показывает сама форма входа. */
+export const captchaEnabled = Boolean(sitekey)
+
 interface SmartCaptcha {
   render: (
     container: HTMLElement,
     options: {
       sitekey: string
       invisible?: boolean
+      hideShield?: boolean
       callback?: (token: string) => void
     },
   ) => string
@@ -75,6 +80,7 @@ function ensureWidget(captcha: SmartCaptcha, key: string): string {
   widgetId = captcha.render(container, {
     sitekey: key,
     invisible: true,
+    hideShield: true,
     callback: (token) => settle({ status: 'fulfilled', value: token }),
   })
   captcha.subscribe(widgetId, 'challenge-hidden', () => {

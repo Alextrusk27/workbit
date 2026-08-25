@@ -13,6 +13,9 @@ public record RequestCodeRequest(
 
         @Schema(description = "Согласие на обработку персональных данных; без него код не выдаётся", example = "true")
         @AssertTrue(message = "Personal data consent is required")
-        boolean personalDataConsent
+        boolean personalDataConsent,
+
+        @Schema(description = "Токен Yandex SmartCaptcha; обязателен, когда проверка капчи включена")
+        String captchaToken
 ) {
 }

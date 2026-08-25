@@ -17,6 +17,10 @@ app:
       stt:
         limit: ${STT_RATE_LIMIT_LIMIT:60}
         window: ${STT_RATE_LIMIT_WINDOW:1h}
+    captcha:
+      enabled: ${CAPTCHA_ENABLED:false}
+      server-key: ${CAPTCHA_SERVER_KEY:}
+      validate-url: https://smartcaptcha.yandexcloud.net/validate
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:https://workbit.ru}
   mail:
@@ -50,7 +54,7 @@ spring:
         order_inserts: true
         order_updates: true
   mail:
-    host: mail.workbit.ru
+    host: sm44.hosting.reg.ru
     port: 465
     username: ${app.mail.from-mail}
     password: ${MAIL_PASSWORD}

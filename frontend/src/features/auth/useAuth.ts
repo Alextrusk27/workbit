@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError } from '@/lib/api'
 import { authApi, type UserResponse } from './api'
+import { getCaptchaToken } from './captcha'
 
 const ME_KEY = ['me'] as const
 
@@ -35,10 +36,21 @@ export function useAuth() {
   }
 }
 
+/** Токен капчи запрашивается внутри мутации: `isPending` накрывает и возможное
+ *  задание капчи, и HTTP; ресенд в CodeForm получает капчу той же дорогой. */
 export function useRequestCode() {
   return useMutation({
-    mutationFn: (vars: { email: string; personalDataConsent: boolean }) =>
-      authApi.requestCode(vars.email, vars.personalDataConsent),
+    mutationFn: async (vars: {
+      email: string
+      personalDataConsent: boolean
+    }) => {
+      const captchaToken = await getCaptchaToken()
+      return authApi.requestCode(
+        vars.email,
+        vars.personalDataConsent,
+        captchaToken,
+      )
+    },
   })
 }
 

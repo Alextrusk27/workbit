@@ -44,13 +44,15 @@
 ## Запросы (DTO)
 
 ```java
-record RequestCodeRequest(@NotBlank @Email String email, @AssertTrue boolean personalDataConsent)
+record RequestCodeRequest(@NotBlank @Email String email, @AssertTrue boolean personalDataConsent, String captchaToken)
 record VerifyCodeRequest(@NotBlank @Email String email, @NotBlank @Pattern("\\d{6}") String code)
 ```
 
 `email` — непустая строка в формате email. `personalDataConsent` — согласие на обработку
 персональных данных (чекбокс формы входа): `false` или отсутствие поля — `400` ещё до
-обращения к сервису. `code` — ровно 6 цифр, как в письме
+обращения к сервису. `captchaToken` — токен Yandex SmartCaptcha; когда проверка капчи
+включена на сервере, отсутствие или невалидность токена — `403` (см. «Поведение»).
+`code` — ровно 6 цифр, как в письме
 (символы вне `0-9` или длина, отличная от 6, — `400` ещё до обращения к сервису).
 
 `/refresh` и `/logout` тела не принимают — refresh-токен берётся из cookie `refresh_token`.
@@ -115,6 +117,14 @@ record UserResponse(String email, Instant created)
   Отдельного эндпоинта у этого механизма нет; для клиента он выглядит как исчезнувшая учётная
   запись: `/request-code` на тот же email не восстановит прежний аккаунт, а заведёт новый,
   никак не связанный с удалённым.
+- **Капча.** `/request-code` защищён Yandex SmartCaptcha от ботов, массово подставляющих
+  чужие адреса. Клиент проходит невидимую проверку и передаёт полученный токен в
+  `captchaToken`; сервер валидирует его запросом к SmartCaptcha (токен одноразовый — на
+  каждый вызов, включая «отправить код ещё раз», нужен свежий). Проверка включается
+  переменной `CAPTCHA_ENABLED` (ключ — `CAPTCHA_SERVER_KEY`); при выключенной капче поле
+  игнорируется. Непройденная проверка или отсутствие токена при включённой капче — `403`
+  с деталью `Captcha validation failed`. Если сам сервис SmartCaptcha недоступен, запрос
+  пропускается без проверки — недоступность капчи не должна останавливать вход.
 - **Лимит частоты.** `/request-code` ограничен по IP — не более 5 запросов за 15 минут
   (настраивается через `RATE_LIMIT_LIMIT` / `RATE_LIMIT_WINDOW`). `/verify-code` — отдельный,
   более широкий бакет: 10 запросов за 15 минут (`VERIFY_CODE_RATE_LIMIT_LIMIT` /
@@ -138,4 +148,5 @@ record UserResponse(String email, Instant created)
 |---|---|
 | `400` | невалидное тело запроса (нарушение ограничений полей, битый JSON) |
 | `401` | код неверен, истёк или исчерпаны попытки (`/verify-code`); refresh-токен отсутствует, недействителен или уже использован (`/refresh`); нет токена или токен недействителен (`/me`, `/delete`) |
+| `403` | проверка капчи не пройдена при включённой SmartCaptcha (`/request-code`, деталь `Captcha validation failed`) |
 | `429` | превышен лимит частоты запросов с одного IP (`/request-code`, `/verify-code`) |

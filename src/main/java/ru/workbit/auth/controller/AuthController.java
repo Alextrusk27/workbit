@@ -22,6 +22,7 @@ import ru.workbit.auth.service.AuthService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.CaptchaService;
 import ru.workbit.security.service.RateLimiterService;
 import ru.workbit.util.ClientIp;
 import ru.workbit.util.annotation.Loggable;
@@ -37,6 +38,7 @@ public class AuthController {
     private final AuthCookieService cookieService;
     private final RateLimiterService rateLimiter;
     private final RateLimitProperties rateLimitProperties;
+    private final CaptchaService captchaService;
 
     @PostMapping("/request-code")
     @Loggable
@@ -45,11 +47,13 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Код отправлен на email"),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Проверка капчи не пройдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> requestCode(@RequestBody @Valid RequestCodeRequest request,
                                                      HttpServletRequest httpRequest) {
         rateLimiter.check("request-code:" + ClientIp.from(httpRequest));
+        captchaService.validate(request.captchaToken(), ClientIp.from(httpRequest));
         authService.requestCode(request);
         return ResponseEntity.ok().build();
     }

@@ -169,9 +169,10 @@ export function HeroChatDemo() {
         <ChatShell
           name="AI-интервьюер"
           status="онлайн"
+          className="grid h-[29rem] grid-rows-[auto_minmax(0,1fr)_auto]"
           bodyRef={bodyRef}
           bodyClassName={cn(
-            'h-85 transition-opacity duration-[400ms]',
+            'min-h-0 transition-opacity duration-[400ms]',
             fading ? 'opacity-0' : 'opacity-100',
           )}
           footer={

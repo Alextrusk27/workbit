@@ -144,7 +144,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true, null));
 
             // then
             verify(userRepository, never()).save(any());
@@ -165,7 +165,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(savedUser)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true, null));
 
             // then
             var userCaptor = ArgumentCaptor.forClass(User.class);
@@ -188,7 +188,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(savedUser)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true, null));
 
             // then
             assertThat(savedUser.getPersonalDataConsentAt()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
@@ -203,7 +203,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true, null));
 
             // then
             assertThat(user.getPersonalDataConsentAt()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
@@ -220,7 +220,7 @@ class AuthServiceTest {
             when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
 
             // when
-            authService.requestCode(new RequestCodeRequest(EMAIL, true));
+            authService.requestCode(new RequestCodeRequest(EMAIL, true, null));
 
             // then
             assertThat(user.getPersonalDataConsentAt()).isEqualTo(consentAt);

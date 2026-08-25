@@ -12,7 +12,11 @@ export function AppLayout() {
         Перейти к содержимому
       </a>
       <Header />
-      <main id="main" tabIndex={-1} className="flex-1 pt-12 pb-16">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="flex-1 pt-10 pb-10 sm:pt-24 sm:pb-16"
+      >
         <Outlet />
       </main>
       <Footer />

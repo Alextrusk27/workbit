@@ -45,7 +45,7 @@ export function PricingPage() {
         вакансии.
       </PageHero>
 
-      <section className="py-16">
+      <section className="py-10 sm:py-16">
         <Container>
           {error && (
             <div className="mx-auto mb-6 max-w-[560px]">

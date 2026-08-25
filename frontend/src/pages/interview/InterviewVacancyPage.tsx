@@ -282,10 +282,10 @@ function HintTip({ text }: { text: string }) {
   return (
     <span
       tabIndex={0}
-      className="group border-line text-dim relative inline-flex size-[15px] cursor-help items-center justify-center rounded-full border text-[10px] font-normal"
+      className="group border-line text-dim relative inline-flex size-[15px] shrink-0 cursor-help items-center justify-center rounded-full border text-[10px] font-normal"
     >
       ?
-      <span className="bg-pop border-line text-ink shadow-pop pointer-events-none invisible absolute bottom-[calc(100%+8px)] left-1/2 z-5 w-max max-w-60 -translate-x-1/2 rounded-lg border px-[11px] py-[7px] text-center text-xs leading-snug font-normal opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100">
+      <span className="bg-pop border-line text-ink shadow-pop pointer-events-none invisible absolute bottom-[calc(100%+8px)] left-1/2 z-5 w-max max-w-60 -translate-x-1/2 rounded-lg border px-[11px] py-[7px] text-center text-xs leading-snug font-normal opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100">
         {text}
       </span>
     </span>
@@ -335,7 +335,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
         </div>
         <div className="grid w-full grid-cols-3 gap-3 sm:flex sm:w-auto sm:flex-wrap sm:gap-x-9 sm:gap-y-4">
           <div className={tileClass}>
-            <p className="text-ink m-0 flex items-center gap-2 text-[17px] font-bold tabular-nums sm:text-[19px]">
+            <p className="text-ink m-0 flex items-center gap-2 text-[17px] leading-[26px] font-bold tabular-nums sm:text-[19px] sm:leading-normal">
               {formatScore(best.avgScore!)}
               <Stars
                 value={Math.round(best.avgScore! * 2) / 2}
@@ -351,7 +351,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           <div className={tileClass}>
             <p
               className={cn(
-                'm-0 text-[17px] font-bold tabular-nums sm:text-[19px]',
+                'm-0 text-[17px] leading-[26px] font-bold tabular-nums sm:text-[19px] sm:leading-normal',
                 !delta && 'text-dim',
                 delta != null && delta > 0 && 'text-ok',
                 delta != null && delta < 0 && 'text-danger',
@@ -368,7 +368,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           </div>
           {best.offerProbability && (
             <div className={tileClass}>
-              <p className="m-0 text-[15px] font-bold sm:text-[19px]">
+              <p className="m-0 text-[15px] leading-[26px] font-bold sm:text-[19px] sm:leading-normal">
                 <OfferValue value={best.offerProbability} />
               </p>
               <p className="text-dim mt-[3px] flex items-center gap-1.5 text-[11px] sm:text-xs">
@@ -380,7 +380,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
         </div>
       </div>
 
-      <div className="mt-[18px] grid grid-cols-[26px_1fr] sm:mt-[22px] sm:grid-cols-[52px_1fr]">
+      <div className="mt-9 grid grid-cols-[26px_1fr] sm:mt-10 sm:grid-cols-[52px_1fr]">
         <div className="relative h-[150px] sm:h-[170px]">
           {Y_AXIS.map((y) => (
             <span

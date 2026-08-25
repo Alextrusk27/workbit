@@ -1,6 +1,15 @@
 @import '@fontsource-variable/inter';
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  size-adjust: 107.4%;
+  ascent-override: 90.2%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+}
+
 @theme {
   --color-canvas: #faf9fb;
   --color-canvas-2: #f3f2f8;
@@ -26,7 +35,8 @@
   --color-ok: #16a34a;
   --color-danger: #dc2626;
 
-  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --font-sans:
+    'Inter Variable', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 10px;

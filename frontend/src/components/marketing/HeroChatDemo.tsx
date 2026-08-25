@@ -169,7 +169,7 @@ export function HeroChatDemo() {
         <ChatShell
           name="AI-интервьюер"
           status="онлайн"
-          className="grid h-[29rem] grid-rows-[auto_minmax(0,1fr)_auto]"
+          className="grid h-[29rem] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]"
           bodyRef={bodyRef}
           bodyClassName={cn(
             'min-h-0 transition-opacity duration-[400ms]',
@@ -189,7 +189,7 @@ export function HeroChatDemo() {
               </span>
               <span
                 className={cn(
-                  'bg-surface flex min-h-9.5 flex-1 items-center overflow-hidden rounded-md border px-3 py-2 text-[13.5px] whitespace-nowrap transition-colors',
+                  'bg-surface block min-h-9.5 min-w-0 flex-1 content-center truncate rounded-md border px-3 py-2 text-[13.5px] transition-colors',
                   recording
                     ? 'border-danger/40 text-danger'
                     : 'border-line text-dim',

@@ -58,9 +58,9 @@ based on real hh.ru job postings, answering by text or voice.
 
 ## 📸 Screenshots
 
-| Home — a live interview demo | Pricing — Start / Pro / Max plans |
+| Home — a live interview demo | Passwordless login — email and a one-time code |
 |---|---|
-| ![Home page](docs/screenshots/home.png) | ![Pricing](docs/screenshots/pricing.png) |
+| ![Home page](docs/screenshots/home.png) | ![Login page](docs/screenshots/login.png) |
 | **AI interview — a chat over a real hh.ru vacancy** | **Interview report — score, offer probability, weakest skill** |
 | ![AI interview session](docs/screenshots/interview-session.png) | ![AI interview report](docs/screenshots/interview-report.png) |
 | **Skills trainer — Q&A with a reference answer on demand** | **Training report — a score and per-answer feedback** |

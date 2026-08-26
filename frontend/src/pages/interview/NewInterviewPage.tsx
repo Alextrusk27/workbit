@@ -10,6 +10,7 @@ import { Field } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import type { VacancyPreview } from '@/features/vacancy/api'
+import { takePendingVacancyUrl } from '@/features/vacancy/pendingVacancy'
 import {
   hhVacancyId,
   isHhVacancyUrl,
@@ -70,7 +71,7 @@ function InterviewForm() {
   const navigate = useNavigate()
   const create = useCreateInterview()
 
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(() => takePendingVacancyUrl())
   const trimmed = url.trim()
   const debouncedUrl = useDebounced(trimmed)
   const validUrl = isHhVacancyUrl(trimmed)

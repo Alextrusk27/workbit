@@ -69,11 +69,11 @@ export function SkillsTrainerPage() {
   return (
     <>
       <PageHero
-        badge="Режим «Тренировка навыка»"
+        badge="Вопросы как на реальном собеседовании"
         title={
           <>
-            Качайте <span className="text-grad">слабые темы</span>, а не всё
-            подряд
+            Подготовка к техническому собеседованию{' '}
+            <span className="text-grad">по одному навыку</span>
           </>
         }
         actions={
@@ -90,9 +90,8 @@ export function SkillsTrainerPage() {
           </>
         }
       >
-        Короткие сессии по одному навыку: Spring Boot, многопоточность, SQL —
-        что угодно. Вопросы подберёт рецензент, разбор придёт в конце
-        тренировки.
+        Короткие сессии: Spring Boot, многопоточность, SQL — что угодно.
+        Вопросы подберёт рецензент, разбор придёт в конце тренировки.
       </PageHero>
 
       <section className="py-10 sm:py-16">

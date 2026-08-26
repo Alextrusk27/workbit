@@ -61,11 +61,11 @@ export function AiInterviewPage() {
   return (
     <>
       <PageHero
-        badge="Режим «Собеседование»"
+        badge="Пробное интервью по ссылке с hh.ru"
         title={
           <>
-            Собеседование, которое{' '}
-            <span className="text-grad">можно переиграть</span>
+            Собеседование с нейросетью{' '}
+            <span className="text-grad">по вашей вакансии</span>
           </>
         }
         actions={

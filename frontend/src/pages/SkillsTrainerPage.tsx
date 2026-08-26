@@ -69,7 +69,6 @@ export function SkillsTrainerPage() {
   return (
     <>
       <PageHero
-        badge="Вопросы как на реальном собеседовании"
         title={
           <>
             Подготовка к техническому собеседованию{' '}
@@ -90,8 +89,11 @@ export function SkillsTrainerPage() {
           </>
         }
       >
-        Короткие сессии: Spring Boot, многопоточность, SQL — что угодно.
-        Вопросы подберёт рецензент, разбор придёт в конце тренировки.
+        <strong className="text-ink font-semibold">
+          Вопросы как на реальном собеседовании
+        </strong>{' '}
+        — короткие сессии: Spring Boot, многопоточность, SQL, что угодно. Разбор
+        придёт в конце тренировки.
       </PageHero>
 
       <section className="py-10 sm:py-16">

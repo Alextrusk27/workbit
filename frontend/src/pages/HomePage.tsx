@@ -5,7 +5,6 @@ import { Container } from '@/components/ui/Container'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ChatBubble } from '@/components/chat/ChatBubble'
-import { Badge } from '@/components/marketing/Badge'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { FeatureCard } from '@/components/marketing/FeatureCard'
 import { HeroChatDemo } from '@/components/marketing/HeroChatDemo'
@@ -78,13 +77,15 @@ export function HomePage() {
       <header className="glow-hero relative overflow-hidden pt-10 pb-12 sm:pt-24 sm:pb-20">
         <Container className="relative grid grid-cols-[minmax(0,1fr)] items-center gap-9 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
           <div>
-            <Badge>Подготовка к собеседованию онлайн</Badge>
-            <h1 className="text-ink mt-6 text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
+            <h1 className="text-ink text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
               Тренажёр собеседований{' '}
               <span className="text-grad">с AI-интервьюером</span>
             </h1>
-            <p className="text-muted mt-5.5 max-w-[46ch] text-lg">
-              Реалистичные вопросы под вашу профессию и уровень, разбор каждого
+            <p className="text-muted mt-5.5 max-w-[48ch] text-lg">
+              <strong className="text-ink font-semibold">
+                Подготовка к собеседованию онлайн:
+              </strong>{' '}
+              реалистичные вопросы под вашу профессию и уровень, разбор каждого
               ответа и вероятность оффера. Готовьтесь до собеседования, а не на
               нём.
             </p>

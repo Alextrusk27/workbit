@@ -61,7 +61,6 @@ export function AiInterviewPage() {
   return (
     <>
       <PageHero
-        badge="Пробное интервью по ссылке с hh.ru"
         title={
           <>
             Собеседование с нейросетью{' '}
@@ -82,8 +81,11 @@ export function AiInterviewPage() {
           </>
         }
       >
-        Полная сессия из вопросов под конкретную вакансию с hh.ru. Отвечаете
-        текстом или голосом, в конце — вердикт и вероятность оффера.
+        <strong className="text-ink font-semibold">
+          Пробное интервью по ссылке с hh.ru:
+        </strong>{' '}
+        полная сессия из вопросов под её требования. Отвечаете текстом или
+        голосом, в конце — вердикт и вероятность оффера.
       </PageHero>
 
       <section className="py-10 sm:py-16">

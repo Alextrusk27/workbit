@@ -15,17 +15,17 @@ import { useAuth } from '@/features/auth/useAuth'
 const steps = [
   {
     n: '1',
-    title: 'Соберите сессию',
+    title: 'Скопируйте ссылку',
     body: 'Вставьте ссылку на вакансию с hh.ru — тренажёр прочитает требования работодателя и соберёт вопросы под них.',
   },
   {
     n: '2',
-    title: 'Отвечайте своими словами',
+    title: 'Отвечайте на вопросы AI-интервьюера',
     body: 'Текстом или голосом. Вопросы приходят по одному, тренажёр ждёт столько, сколько нужно, — и задаёт уточняющие.',
   },
   {
     n: '3',
-    title: 'Получите вердикт',
+    title: 'Получите фидбек',
     body: 'Балл за каждый ответ, правки на полях и итоговая вероятность оффера — низкая, средняя или высокая.',
   },
 ]
@@ -44,7 +44,7 @@ const results = [
   {
     icon: <IconChart />,
     title: 'Вероятность оффера',
-    body: 'Итоговый вердикт по сессии: что дожать до собеседования и каковы шансы сейчас.',
+    body: 'Итоговая оценка по сессии: что дожать до собеседования и каковы шансы сейчас.',
   },
 ]
 
@@ -84,16 +84,15 @@ export function AiInterviewPage() {
         <strong className="text-ink font-semibold">
           Пробное интервью по ссылке с hh.ru:
         </strong>{' '}
-        полная сессия из вопросов под её требования. Отвечаете текстом или
-        голосом, в конце — вердикт и вероятность оффера.
+        полная сессия из вопросов под требования вакансии.
       </PageHero>
 
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Три шага до вердикта">
-              Никаких тестов с вариантами: вопросы приходят по одному, отвечаете
-              своими словами.
+            <SectionHead title="Как проходит интервью">
+              Диалог в чате: вопросы приходят по одному, отвечаете текстом или
+              голосом.
             </SectionHead>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -113,10 +112,7 @@ export function AiInterviewPage() {
           <Reveal>
             <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
               <ChatShell name="AI-интервьюер" status="интервью по вакансии">
-                <ChatBubble
-                  role="bot"
-                  who="Вопрос 7 / 10 · Senior Java, финтех"
-                >
+                <ChatBubble role="bot" who="Вопрос 7 / 10 · Senior Java">
                   Как бы вы спроектировали идемпотентность платёжного API?
                 </ChatBubble>
                 <ChatBubble role="user">
@@ -129,7 +125,7 @@ export function AiInterviewPage() {
                     <span className="text-dim">4 из 5</span>
                   </span>
                   Верная база. Уточните TTL ключей и поведение при конкурентных
-                  повторах — в финтехе спросят.
+                  повторах.
                 </ChatBubble>
               </ChatShell>
 
@@ -161,8 +157,8 @@ export function AiInterviewPage() {
       <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
-            <SectionHead title="Что вы получаете после сессии">
-              Не «правильные ответы», а честная картина вашей готовности.
+            <SectionHead title="Что входит в фидбек">
+              Вы узнаете, насколько готовы к реальному собеседованию.
             </SectionHead>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

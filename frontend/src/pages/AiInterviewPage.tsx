@@ -161,8 +161,8 @@ export function AiInterviewPage() {
           </Reveal>
           <div className="grid gap-10 lg:grid-cols-3 lg:gap-8">
             {steps.map((s, i) => (
-              <Reveal key={s.n} delay={i * 0.05}>
-                <div className="flex items-center gap-3.5">
+              <Reveal key={s.n} delay={i * 0.05} className="max-lg:text-center">
+                <div className="flex items-center gap-3.5 max-lg:justify-center">
                   <span
                     className={cn(
                       'grid size-10 shrink-0 place-items-center rounded-full text-base font-bold',
@@ -213,17 +213,17 @@ export function AiInterviewPage() {
                 </ChatBubble>
               </ChatShell>
 
-              <div>
+              <div className="max-lg:text-center">
                 <h2 className="text-ink text-[clamp(28px,3.6vw,40px)]">
                   Интервью по конкретной вакансии
                 </h2>
-                <p className="text-muted mt-4 max-w-[52ch] text-base">
+                <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
                   Вставьте ссылку на вакансию — тренажёр разберёт требования и
                   соберёт вопросы под обязанности, инструменты и уровень
                   позиции. Вы репетируете именно то собеседование, на которое
                   идёте.
                 </p>
-                <ul className="mt-5 flex flex-col gap-3">
+                <ul className="mt-5 flex flex-col gap-3 text-left">
                   {advantages.map((a) => (
                     <li key={a} className="text-muted flex gap-2.5 text-[15px]">
                       <span aria-hidden className="text-indigo shrink-0">
@@ -243,16 +243,16 @@ export function AiInterviewPage() {
         <Container>
           <Reveal>
             <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
-              <div>
+              <div className="max-lg:text-center">
                 <h2 className="text-ink text-[clamp(28px,3.6vw,40px)]">
                   Что входит в фидбек
                 </h2>
-                <p className="text-muted mt-4 max-w-[52ch] text-base">
+                <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
                   После сессии вы получаете отчёт — как ревью от старшего
                   коллеги: видно, что дожать до собеседования и каковы шансы
                   сейчас.
                 </p>
-                <ul className="mt-5 flex flex-col gap-4">
+                <ul className="mt-5 flex flex-col gap-4 text-left">
                   {results.map((r) => (
                     <li key={r.lead} className="flex gap-3">
                       {r.icon}

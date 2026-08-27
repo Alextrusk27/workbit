@@ -20,7 +20,7 @@ function price(value: string): string {
 export const seoPages: SeoPage[] = [
   {
     path: '/',
-    title: 'Тренажёр собеседований с AI — бесплатный старт | Workbit',
+    title: 'Тренажёр собеседований с AI: бесплатный старт | Workbit',
     description:
       'Тренажёр собеседований с AI: пробное интервью по вакансии с hh.ru и тренировка отдельного навыка. Разбор каждого ответа и честная оценка шансов на оффер.',
     sources: ['frontend/src/pages/HomePage.tsx'],
@@ -50,9 +50,9 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/skills-trainer',
-    title: 'Подготовка к техническому собеседованию онлайн | Workbit',
+    title: 'Тренажёр с вопросами и ответами ИИ для собеседования | Workbit',
     description:
-      'Короткие сессии по одному навыку — Spring Boot, SQL, многопоточность: вопросы подбирает AI, эталонный ответ по кнопке, разбор с оценками в конце.',
+      'Десять вопросов по одному навыку — от разработки до бухгалтерии и права: профессию и уровень выбираете сами. Разбор с оценками и эталонный ответ по кнопке.',
     sources: ['frontend/src/pages/SkillsTrainerPage.tsx'],
   },
   {
@@ -105,28 +105,28 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/privacy',
-    title: 'Политика конфиденциальности — Workbit',
+    title: 'Политика конфиденциальности | Workbit',
     description:
       'Политика конфиденциальности и обработки персональных данных сервиса Workbit.',
     sources: ['docs/privacy-policy.md'],
   },
   {
     path: '/user-agreement',
-    title: 'Пользовательское соглашение — Workbit',
+    title: 'Пользовательское соглашение | Workbit',
     description:
       'Пользовательское соглашение сервиса Workbit: условия использования тренажёра собеседований.',
     sources: ['docs/user-agreement.md'],
   },
   {
     path: '/offer',
-    title: 'Публичная оферта — Workbit',
+    title: 'Публичная оферта | Workbit',
     description: 'Публичная оферта сервиса Workbit: условия оплаты тарифов.',
     sources: ['docs/offer.md'],
   },
 ]
 
 export const notFoundSeo = {
-  title: 'Страница не найдена — Workbit',
+  title: 'Страница не найдена | Workbit',
   description: 'Такой страницы нет или она ещё не готова.',
 }
 

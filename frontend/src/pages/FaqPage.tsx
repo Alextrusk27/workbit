@@ -26,7 +26,8 @@ export function FaqPage() {
       <PageHero
         title={
           <>
-            Частые <span className="text-grad">вопросы</span>
+            Частые вопросы{' '}
+            <span className="text-grad">о тренажёре собеседований</span>
           </>
         }
       >

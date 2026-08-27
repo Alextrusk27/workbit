@@ -19,7 +19,6 @@ import {
 import { useAuth } from '@/features/auth/useAuth'
 import { savePendingVacancyUrl } from '@/features/vacancy/pendingVacancy'
 import { isHhVacancyUrl } from '@/features/vacancy/useVacancy'
-import { cn } from '@/lib/cn'
 
 const steps = [
   {
@@ -97,7 +96,8 @@ export function AiInterviewPage() {
       <PageHero
         title={
           <>
-            Собеседование с нейросетью{' '}
+            Собеседование с нейросетью
+            <br />
             <span className="text-grad">по вашей вакансии</span>
           </>
         }
@@ -159,33 +159,30 @@ export function AiInterviewPage() {
               голосом.
             </SectionHead>
           </Reveal>
-          <div className="grid gap-10 lg:grid-cols-3 lg:gap-8">
-            {steps.map((s, i) => (
-              <Reveal key={s.n} delay={i * 0.05} className="max-lg:text-center">
-                <div className="flex items-center gap-3.5 max-lg:justify-center">
-                  <span
-                    className={cn(
-                      'grid size-10 shrink-0 place-items-center rounded-full text-base font-bold',
-                      i === steps.length - 1
-                        ? 'bg-grad text-white'
-                        : 'border-indigo/25 bg-indigo/12 text-indigo border',
-                    )}
-                  >
-                    {s.n}
-                  </span>
-                  {i < steps.length - 1 && (
-                    <span
-                      aria-hidden
-                      className="hidden h-0.5 flex-1 bg-[linear-gradient(90deg,var(--color-indigo),transparent)] opacity-35 lg:block"
-                    />
-                  )}
-                </div>
-                <h3 className="text-ink mt-4.5 text-lg font-semibold tracking-[-0.01em]">
-                  {s.title}
-                </h3>
-                <p className="text-muted mt-2 text-[15px]">{s.body}</p>
-              </Reveal>
-            ))}
+          <div className="relative">
+            <span
+              aria-hidden
+              className="absolute top-6 right-[16.67%] left-[16.67%] hidden h-0.5 bg-[linear-gradient(90deg,rgba(99,102,241,0.12),rgba(139,92,246,0.55))] lg:block"
+            />
+            <div className="relative grid gap-10 lg:grid-cols-3 lg:gap-8">
+              {steps.map((s, i) => (
+                <Reveal key={s.n} delay={i * 0.05} className="text-center">
+                  <div className="flex justify-center">
+                    <span className="border-indigo/30 bg-pop grid size-12 place-items-center rounded-full border text-[19px] font-extrabold shadow-[0_4px_14px_rgba(99,102,241,0.12)]">
+                      <span className="bg-[image:var(--grad-btn)] bg-clip-text text-transparent">
+                        {s.n}
+                      </span>
+                    </span>
+                  </div>
+                  <h3 className="text-ink mt-4.5 text-[17px] font-semibold tracking-[-0.01em]">
+                    {s.title}
+                  </h3>
+                  <p className="text-muted mx-auto mt-2 max-w-[38ch] text-[14.5px]">
+                    {s.body}
+                  </p>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </Container>
       </section>

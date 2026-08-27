@@ -8,12 +8,17 @@ const columns = [
     links: [
       { label: 'AI-интервью', to: '/ai-interview' },
       { label: 'Тренажёр навыков', to: '/skills-trainer' },
+    ],
+  },
+  {
+    title: 'Помощь',
+    links: [
       { label: 'Тарифы', to: '/pricing' },
       { label: 'FAQ', to: '/faq' },
     ],
   },
   {
-    title: 'Правовое',
+    title: 'Документы',
     links: [
       { label: 'Конфиденциальность', to: '/privacy' },
       { label: 'Соглашение', to: '/user-agreement' },
@@ -25,27 +30,39 @@ const columns = [
 export function Footer() {
   return (
     <footer className="border-divider mt-8 border-t sm:mt-12">
-      <Container className="pt-7 pb-5 sm:pt-9 sm:pb-6">
-        <div className="grid grid-cols-2 gap-6 sm:gap-8 lg:grid-cols-[2fr_1fr_1fr]">
-          <div className="col-span-2 max-w-[34ch] lg:col-span-1">
-            <Logo className="text-[26px] sm:text-[40px]" />
-            <p className="text-dim mt-2.5 text-[13px] sm:mt-3 sm:text-sm">
-              Тренажёр собеседований с AI-рецензентом: вопросы под роль, разбор
-              ответов, вероятность оффера.
+      <Container className="pt-7 pb-5 sm:pb-6">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:gap-x-16">
+          <div className="col-span-2 flex max-w-[36ch] flex-col gap-2.5 sm:col-span-3 lg:col-span-1">
+            <Logo />
+            <p className="text-muted text-[13px]">
+              Тренажёр собеседований с AI-рецензентом под профессию или навык
             </p>
+            <div className="text-dim flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
+              <span>
+                © {new Date().getFullYear()} Workbit. Все права защищены.
+              </span>
+              {import.meta.env.DEV && (
+                <Link
+                  to="/brand"
+                  className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
+                >
+                  Брендбук
+                </Link>
+              )}
+            </div>
           </div>
 
           {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
-              <p className="text-dim mb-2.5 text-xs font-semibold tracking-[0.06em] uppercase sm:mb-3.5 sm:text-[13px]">
+              <p className="text-dim mb-2.5 text-[11px] font-semibold tracking-[0.07em] uppercase">
                 {col.title}
               </p>
-              <ul className="flex flex-col gap-1.5 sm:gap-[7px]">
+              <ul className="flex flex-col gap-[7px]">
                 {col.links.map((l) => (
                   <li key={l.to}>
                     <Link
                       to={l.to}
-                      className="text-muted hover:text-ink text-[13.5px] transition-colors sm:text-sm"
+                      className="text-muted hover:text-ink text-[13.5px] transition-colors"
                     >
                       {l.label}
                     </Link>
@@ -54,18 +71,6 @@ export function Footer() {
               </ul>
             </nav>
           ))}
-        </div>
-
-        <div className="border-divider text-dim mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4.5 text-[13px]">
-          <span>© {new Date().getFullYear()} Workbit. Все права защищены.</span>
-          {import.meta.env.DEV && (
-            <Link
-              to="/brand"
-              className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
-            >
-              Брендбук
-            </Link>
-          )}
         </div>
       </Container>
     </footer>

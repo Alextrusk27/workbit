@@ -86,8 +86,7 @@ export function HomePage() {
                 Подготовка к собеседованию онлайн:
               </strong>{' '}
               реалистичные вопросы под вашу профессию и уровень, разбор каждого
-              ответа и вероятность оффера. Готовьтесь до собеседования, а не на
-              нём.
+              ответа и вероятность оффера.
             </p>
             <div className="mt-8 flex flex-wrap gap-3.5">
               <Link to={startTo} className={buttonClasses()}>
@@ -112,9 +111,9 @@ export function HomePage() {
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Всё как на настоящем интервью">
-              От выбора роли до финального вердикта — полный цикл подготовки в
-              одном тренажёре.
+            <SectionHead title="Симулятор собеседования">
+              Всё как на настоящем интервью: от выбора роли до финального
+              вердикта — полный цикл подготовки.
             </SectionHead>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -132,7 +131,7 @@ export function HomePage() {
       <section id="demo" className="scroll-mt-20 py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Как проходит сессия">
+            <SectionHead title="Тестовое собеседование">
               Три шага — от вопроса до разбора.
             </SectionHead>
           </Reveal>

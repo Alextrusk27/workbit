@@ -89,7 +89,7 @@ const audience = [
   {
     icon: <IconRole />,
     title: 'Любая профессия',
-    body: 'Разработчики, аналитики, бухгалтеры, юристы, маркетологи — подсказки из справочника или своя формулировка.',
+    body: 'Разработчики, аналитики, бухгалтеры, юристы, маркетологи, дизайнеры, менеджеры проектов…',
   },
   {
     icon: <IconClock />,
@@ -336,7 +336,7 @@ export function SkillsTrainerPage() {
         <strong className="text-ink font-semibold">
           Вопросы как на реальном собеседовании
         </strong>{' '}
-        — короткие сессии по десять вопросов.
+        — короткие сессии по десять вопросов
       </PageHero>
 
       <section className="py-10 sm:py-16">
@@ -471,9 +471,9 @@ export function SkillsTrainerPage() {
       <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
-            <SectionHead title="Подойдёт для всех">
-              Тренажёр подготовит актуальные вопросы для любой профессии с
-              подходящим уровнем сложности
+            <SectionHead title="Вопросы на собеседовании">
+              Тренажёр подберёт их для любой профессии — с подходящим уровнем
+              сложности
             </SectionHead>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

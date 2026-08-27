@@ -154,7 +154,7 @@ export function AiInterviewPage() {
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Как проходит интервью">
+            <SectionHead title="Собеседование с ИИ по шагам">
               Диалог в чате: вопросы приходят по одному, отвечаете текстом или
               голосом.
             </SectionHead>
@@ -217,8 +217,8 @@ export function AiInterviewPage() {
                 <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
                   Вставьте ссылку на вакансию — тренажёр разберёт требования и
                   соберёт вопросы под обязанности, инструменты и уровень
-                  позиции. Вы репетируете именно то собеседование, на которое
-                  идёте.
+                  позиции. По сути это мок-интервью: вы репетируете именно то
+                  собеседование, на которое идёте.
                 </p>
                 <ul className="mt-5 flex flex-col gap-3 text-left">
                   {advantages.map((a) => (
@@ -318,7 +318,7 @@ export function AiInterviewPage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Первое интервью — бесплатно"
+              title="Пробное собеседование — бесплатно"
               actions={
                 <div className="flex flex-col items-center">
                   <Link

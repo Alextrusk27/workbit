@@ -283,14 +283,14 @@ function ChatMessages({ item, items }: { item: LiveItem; items: LiveItem[] }) {
         }
         quote={
           item.q.followUp && previousAnswer
-            ? { name: 'Вы', text: previousAnswer }
+            ? { name: 'Ты', text: previousAnswer }
             : undefined
         }
       >
         {item.q.questionText}
       </ChatBubble>
       {item.answer !== null && (
-        <ChatBubble role="user" who="Вы">
+        <ChatBubble role="user" who="Ты">
           {item.answer}
         </ChatBubble>
       )}
@@ -359,11 +359,11 @@ function Composer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled || pending}
-          aria-label="Ваш ответ"
+          aria-label="Твой ответ"
           placeholder={
             disabled
-              ? 'Дождитесь следующего вопроса…'
-              : 'Отвечайте так, как отвечали бы на собеседовании…'
+              ? 'Дождись следующего вопроса…'
+              : 'Отвечай так, как отвечал бы на собеседовании…'
           }
           className="border-line bg-surface text-ink placeholder:text-dim focus:border-indigo focus:ring-indigo/18 max-h-30 min-h-9.5 w-full resize-none rounded-md border px-3 py-2.5 text-[13.5px] transition-colors focus:ring-[3px] focus:outline-none disabled:opacity-60"
         />

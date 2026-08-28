@@ -162,7 +162,7 @@ export function BrandPage() {
           <div>
             <Eyebrow>Inter · текст</Eyebrow>
             <p className="text-ink mt-3 text-lg">
-              Реалистичные вопросы под вашу профессию и уровень, разбор каждого
+              Реалистичные вопросы под твою профессию и уровень, разбор каждого
               ответа и вероятность оффера.
             </p>
             <p className="text-muted mt-2 text-[14.5px]">
@@ -226,7 +226,7 @@ export function BrandPage() {
             конкурентный доступ.
           </p>
           <MarginNote score={4} className="mt-4">
-            Верно про сегменты. Уточните, что в Java 8+ это блокировка на уровне
+            Верно про сегменты. Уточни, что в Java 8+ это блокировка на уровне
             бакета.
           </MarginNote>
         </div>
@@ -237,7 +237,7 @@ export function BrandPage() {
           <ChatBubble role="bot" who="Вопрос 3 / 10">
             Чем отличается HashMap от ConcurrentHashMap?
           </ChatBubble>
-          <ChatBubble role="user" who="Вы">
+          <ChatBubble role="user" who="Ты">
             HashMap не потокобезопасен, а ConcurrentHashMap разрешает
             конкурентный доступ…
           </ChatBubble>
@@ -245,7 +245,7 @@ export function BrandPage() {
             role="bot"
             who="Уточняющий вопрос"
             quote={{
-              name: 'Вы',
+              name: 'Ты',
               text: 'HashMap не потокобезопасен, а ConcurrentHashMap разрешает конкурентный доступ…',
             }}
           >
@@ -276,8 +276,8 @@ export function BrandPage() {
             hint="Шесть цифр, код действует 15 минут"
             defaultValue=""
           />
-          <Alert>Неверный код. Проверьте письмо и повторите ввод.</Alert>
-          <Alert tone="success">Новый код отправлен. Проверьте почту.</Alert>
+          <Alert>Неверный код. Проверь письмо и повтори ввод.</Alert>
+          <Alert tone="success">Новый код отправлен. Проверь почту.</Alert>
         </div>
       </Section>
 

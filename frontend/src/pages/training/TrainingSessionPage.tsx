@@ -299,10 +299,10 @@ function CurrentQuestion({
 
       <div className="mt-5.5">
         <Textarea
-          label="Ваш ответ"
+          label="Твой ответ"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Отвечайте так, как отвечали бы на собеседовании…"
+          placeholder="Отвечай так, как отвечал бы на собеседовании…"
           disabled={pending}
         />
         <DictationHints dictation={dictation} />
@@ -365,7 +365,7 @@ function FinishBar({
           Формируем разбор…
         </p>
         <p className="text-muted mx-auto mt-2.5 max-w-[46ch] text-sm">
-          Рецензент читает ваши ответы и оценивает их. Это может занять
+          Рецензент читает твои ответы и оценивает их. Это может занять
           несколько секунд.
         </p>
       </div>
@@ -379,8 +379,8 @@ function FinishBar({
           {batch <= 0
             ? 'Достигнут потолок вопросов в одной тренировке — её можно завершить.'
             : upsell
-              ? 'Вопросы закончились — завершите тренировку и получите разбор.'
-              : `Вопросы закончились — возьмите ещё ${batch} ${questionsWord(batch)} или завершите тренировку и получите разбор.`}
+              ? 'Вопросы закончились — заверши тренировку и получи разбор.'
+              : `Вопросы закончились — возьми ещё ${batch} ${questionsWord(batch)} или заверши тренировку и получи разбор.`}
         </p>
       )}
       {error && (
@@ -429,7 +429,7 @@ function FinishBar({
           </Button>
         ) : (
           <p className="text-muted text-sm">
-            Ответьте ещё на {remaining} {questionsWord(remaining)}, чтобы
+            Ответь ещё на {remaining} {questionsWord(remaining)}, чтобы
             завершить тренировку.
           </p>
         )}

@@ -301,7 +301,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           Прогресс по вакансии
         </h2>
         <p className="text-dim mt-2 text-[12.5px] italic">
-          Завершите интервью и узнайте оценку и шансы на оффер
+          Заверши интервью и узнай оценку и шансы на оффер
         </p>
       </section>
     )
@@ -537,7 +537,7 @@ function RecommendationsSection({
         Рекомендованные тренировки
       </h2>
       <p className="text-muted mt-1 text-[13.5px]">
-        По отстающим навыкам из ваших интервью
+        По отстающим навыкам из твоих интервью
       </p>
       <ul className="mt-3.5 flex flex-col gap-2.5">
         {detail.recommendedTrainings.map((r) => (

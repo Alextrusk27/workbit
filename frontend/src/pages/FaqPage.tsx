@@ -74,7 +74,7 @@ export function FaqPage() {
                 </button>
               }
             >
-              Не нашли ответ? Напишите нам на{' '}
+              Не нашёл ответ? Напиши нам на{' '}
               <a
                 href={`mailto:${SUPPORT_EMAIL}`}
                 className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"

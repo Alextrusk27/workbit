@@ -95,7 +95,7 @@ export function CodeForm({
         </button>
         {resend.isSuccess && cooldown > 0 && (
           <p className="text-muted mt-1 text-xs">
-            Новый код отправлен. Проверьте почту.
+            Новый код отправлен. Проверь почту.
           </p>
         )}
         {resend.isError && (

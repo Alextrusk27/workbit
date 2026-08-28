@@ -11,7 +11,7 @@ const QUESTION = 'Чем отличается HashMap от ConcurrentHashMap?'
 const ANSWER =
   'HashMap не потокобезопасен, а ConcurrentHashMap разрешает конкурентный доступ и блокирует не всю таблицу, а сегменты…'
 const REVIEW =
-  'Верно про сегменты. Уточните: в Java 8+ это блокировка на уровне бакета.'
+  'Верно про сегменты. Уточни: в Java 8+ это блокировка на уровне бакета.'
 
 const TYPE_QUESTION_MS = 28
 const TYPE_REVIEW_MS = 18
@@ -197,7 +197,7 @@ export function HeroChatDemo() {
               >
                 {recording
                   ? 'Идёт запись голоса…'
-                  : 'Отвечайте текстом или голосом…'}
+                  : 'Отвечай текстом или голосом…'}
               </span>
               <span className="bg-grad grid size-9 shrink-0 place-items-center rounded-full text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)]">
                 <IconSend className="size-4" />
@@ -214,13 +214,13 @@ export function HeroChatDemo() {
           </ChatBubble>
 
           {recording && (
-            <ChatBubble role="user" who="Вы · голосовой ответ">
+            <ChatBubble role="user" who="Ты · голосовой ответ">
               <Wave />
             </ChatBubble>
           )}
 
           {reached(phase, 'answer') && (
-            <ChatBubble role="user" who="Вы · голосовой ответ">
+            <ChatBubble role="user" who="Ты · голосовой ответ">
               {ANSWER}
             </ChatBubble>
           )}

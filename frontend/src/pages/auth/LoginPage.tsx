@@ -31,7 +31,7 @@ export function LoginPage() {
   if (requestCode.isSuccess) {
     return (
       <>
-        <h1 className="text-ink text-[26px] lg:text-[32px]">Введите код</h1>
+        <h1 className="text-ink text-[26px] lg:text-[32px]">Введи код</h1>
         <p className="text-muted mt-3 text-[15px] leading-relaxed">
           Мы отправили код на <span className="text-ink">{email}</span>.
         </p>
@@ -47,7 +47,7 @@ export function LoginPage() {
     <>
       <h1 className="text-ink text-[26px] lg:text-[32px]">Войти</h1>
       <p className="text-muted mt-3 text-[15px] leading-relaxed lg:text-[15.5px]">
-        Введите почту — пришлём код для входа.
+        Введи почту — пришлём код для входа.
       </p>
       <form
         onSubmit={onSubmit}
@@ -86,7 +86,7 @@ export function LoginPage() {
           {requestCode.isPending ? 'Отправляем код…' : 'Получить код'}
         </Button>
         <p className="text-dim text-[13px] leading-relaxed">
-          Нажимая «Получить код», вы принимаете{' '}
+          Нажимая «Получить код», ты принимаешь{' '}
           <Link
             to="/user-agreement"
             target="_blank"

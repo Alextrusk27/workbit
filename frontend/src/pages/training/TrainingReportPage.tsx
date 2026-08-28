@@ -128,7 +128,7 @@ export function TrainingReportPage() {
       <ConfirmDialog
         open={confirming}
         title="Пройти заново?"
-        text="Вопросы останутся те же, а ваши ответы и этот разбор будут стёрты. Действие необратимо."
+        text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты. Действие необратимо."
         confirmLabel="Пройти заново"
         onConfirm={onRestart}
         onClose={() => setConfirming(false)}

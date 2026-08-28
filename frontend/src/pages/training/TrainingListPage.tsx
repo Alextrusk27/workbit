@@ -141,8 +141,8 @@ function EmptyState() {
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
       <h2 className="text-ink text-xl font-bold">Пока нет тренировок</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Запустите первую тренировку — рецензент подберёт вопросы под навык и
-        уровень, а в конце разберёт ваши ответы.
+        Запусти первую тренировку — рецензент подберёт вопросы под навык и
+        уровень, а в конце разберёт твои ответы.
       </p>
       <Link
         to="/app/training/new"
@@ -218,7 +218,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
           <CardScore sessionId={session.id} />
         ) : (
           <p className="text-dim mt-2 text-[12.5px] italic">
-            Завершите тренировку и узнайте оценку
+            Заверши тренировку и узнай оценку
           </p>
         )}
       </div>

@@ -142,5 +142,5 @@ export async function finishWithReportFallback<T>(
 /** Человекочитаемое сообщение для UI: бизнес-ошибку берём с бэка, сетевую — общей фразой. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) return error.message
-  return 'Не удалось связаться с сервером. Проверьте соединение и повторите.'
+  return 'Не удалось связаться с сервером. Проверь соединение и повтори.'
 }

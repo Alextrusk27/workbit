@@ -241,7 +241,7 @@ export function FeedbackWidget({
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Расскажите своими словами (необязательно)…"
+              placeholder="Расскажи своими словами (необязательно)…"
               aria-label={texts.whatsWrong}
               className={cn(
                 'border-line bg-surface text-ink mt-3 min-h-14 w-full rounded-md border px-3.5 py-2.5 text-sm leading-relaxed',

@@ -46,7 +46,7 @@ export function SettingsPage() {
         {user && (
           <span className="flex flex-wrap items-center gap-2.5">
             <span>
-              Вы вошли как <span className="text-ink">{user.email}</span>
+              Ты вошёл как <span className="text-ink">{user.email}</span>
             </span>
             {quota && (
               <span className="border-indigo/40 bg-indigo/12 text-indigo inline-flex rounded-full border px-3 py-0.5 text-[12.5px] font-semibold">
@@ -147,7 +147,7 @@ function LimitCard({
           </span>
         </p>
         <p className="text-dim mt-2.5 text-[12.5px]">
-          Без ограничений на вашем тарифе
+          Без ограничений на твоём тарифе
         </p>
       </div>
     )

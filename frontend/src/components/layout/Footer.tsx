@@ -39,7 +39,8 @@ export function Footer() {
             </p>
             <div className="text-dim flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
               <span>
-                © {new Date().getFullYear()} Workbit. Все права защищены.
+                © {new Date(__BUILD_TS__).getFullYear()} Workbit. Все права
+                защищены.
               </span>
               {import.meta.env.DEV && (
                 <Link

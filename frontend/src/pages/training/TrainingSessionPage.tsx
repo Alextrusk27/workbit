@@ -136,28 +136,24 @@ function SessionRun({ session }: { session: TrainingSession }) {
     })
   }, [items.length])
 
-  const onAnswer = (item: LiveItem, text: string) => {
-    submit.mutate(
-      {
+  const onAnswer = (item: LiveItem, text: string) =>
+    submit
+      .mutateAsync({
         sessionId: session.id,
         questionId: item.q.questionId,
         answerText: text,
-      },
-      {
-        onSuccess: () => {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.q.questionId === item.q.questionId
-                ? { ...it, answer: text }
-                : it,
-            ),
-          )
-          setAnsweredMain((c) => c + 1)
-          loadNext()
-        },
-      },
-    )
-  }
+      })
+      .then(() => {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.q.questionId === item.q.questionId
+              ? { ...it, answer: text }
+              : it,
+          ),
+        )
+        setAnsweredMain((c) => c + 1)
+        loadNext()
+      })
 
   const onFinish = () => {
     finish.mutate(session.id, {
@@ -273,7 +269,7 @@ function CurrentQuestion({
   question: TrainingQuestion
   pending: boolean
   error: string | null
-  onSubmit: (text: string) => void
+  onSubmit: (text: string) => void | Promise<unknown>
 }) {
   const { text, setText, dictation, recording, canSend, send, toggleMic } =
     useDictatedAnswer(onSubmit, { disabled: false, pending })

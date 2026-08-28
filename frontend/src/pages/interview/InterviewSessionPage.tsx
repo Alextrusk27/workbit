@@ -149,26 +149,23 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
   const onSend = (text: string) => {
     if (!current) return
-    submit.mutate(
-      {
+    return submit
+      .mutateAsync({
         sessionId: session.id,
         questionId: current.q.questionId,
         answerText: text,
-      },
-      {
-        onSuccess: () => {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.q.questionId === current.q.questionId
-                ? { ...it, answer: text }
-                : it,
-            ),
-          )
-          if (!current.q.followUp) setAnswered((c) => c + 1)
-          loadNext()
-        },
-      },
-    )
+      })
+      .then(() => {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.q.questionId === current.q.questionId
+              ? { ...it, answer: text }
+              : it,
+          ),
+        )
+        if (!current.q.followUp) setAnswered((c) => c + 1)
+        loadNext()
+      })
   }
 
   const finishing = loadState === 'done'
@@ -305,7 +302,7 @@ function Composer({
 }: {
   disabled: boolean
   pending: boolean
-  onSend: (text: string) => void
+  onSend: (text: string) => void | Promise<unknown>
 }) {
   const {
     text,

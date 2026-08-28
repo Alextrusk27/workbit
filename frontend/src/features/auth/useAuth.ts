@@ -25,7 +25,7 @@ export function useAuth() {
   const query = useQuery<UserResponse | null>({
     queryKey: ME_KEY,
     queryFn: fetchMe,
-    retry: false,
+    retry: 1,
     staleTime: 60_000,
   })
 
@@ -33,6 +33,8 @@ export function useAuth() {
     user: query.data ?? null,
     isAuthenticated: !!query.data,
     isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
   }
 }
 
@@ -59,7 +61,10 @@ export function useVerifyCode() {
   return useMutation({
     mutationFn: (vars: { email: string; code: string }) =>
       authApi.verifyCode(vars.email, vars.code),
-    onSuccess: () => refreshMe(qc),
+    onSuccess: () =>
+      refreshMe(qc).catch(() => {
+        void qc.invalidateQueries({ queryKey: ME_KEY })
+      }),
   })
 }
 

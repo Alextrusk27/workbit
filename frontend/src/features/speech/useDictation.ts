@@ -47,6 +47,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
 
   const socketRef = useRef<WebSocket | null>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
+  const startingRef = useRef(false)
+  const generation = useRef(0)
   const pendingFinal = useRef('')
   const startedAt = useRef(0)
   const lastVoice = useRef(0)
@@ -68,6 +70,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
   }, [])
 
   const finish = useCallback(() => {
+    generation.current += 1
+    startingRef.current = false
     stopTicker()
     releaseMic()
     const socket = socketRef.current
@@ -101,7 +105,9 @@ export function useDictation(onText: (text: string) => void): Dictation {
   }, [finish, stopTicker])
 
   const start = useCallback(() => {
-    if (socketRef.current) return
+    if (socketRef.current || startingRef.current) return
+    startingRef.current = true
+    const gen = generation.current
     setError(null)
     setNotice(null)
     setState('starting')
@@ -112,6 +118,11 @@ export function useDictation(onText: (text: string) => void): Dictation {
       if (socket?.readyState === WebSocket.OPEN) socket.send(pcm)
     })
       .then((recorder) => {
+        if (gen !== generation.current) {
+          void recorder.stop()
+          return
+        }
+        startingRef.current = false
         recorderRef.current = recorder
         const socket = new WebSocket(dictationUrl())
         socketRef.current = socket
@@ -156,12 +167,16 @@ export function useDictation(onText: (text: string) => void): Dictation {
         }
       })
       .catch((micError: unknown) => {
+        if (gen !== generation.current) return
+        startingRef.current = false
         setState('idle')
         setError(micErrorMessage(micError))
       })
   }, [releaseMic, startTicker, stopTicker])
 
   const cancel = useCallback(() => {
+    generation.current += 1
+    startingRef.current = false
     stopTicker()
     releaseMic()
     pendingFinal.current = ''
@@ -181,9 +196,19 @@ export function useDictation(onText: (text: string) => void): Dictation {
 
   useEffect(
     () => () => {
+      generation.current += 1
       if (ticker.current !== null) clearInterval(ticker.current)
-      void recorderRef.current?.stop()
-      socketRef.current?.close()
+      const recorder = recorderRef.current
+      recorderRef.current = null
+      void recorder?.stop()
+      const socket = socketRef.current
+      socketRef.current = null
+      if (socket) {
+        socket.onmessage = null
+        socket.onclose = null
+        socket.onerror = null
+        socket.close()
+      }
     },
     [],
   )

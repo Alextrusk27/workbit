@@ -19,6 +19,7 @@ import { PLAN_LABELS } from '@/features/billing/labels'
 import { useQuota, useUsage } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { formatDate, formatDay } from '@/lib/dates'
 import { trainingsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -26,14 +27,6 @@ const DELETE_WARNING =
   'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. Все ' +
   'неиспользованные лимиты тарифа сгорают без возврата. Восстановить их ' +
   'будет нельзя.'
-
-function formatExpiry(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
 
 export function SettingsPage() {
   usePageTitle('Аккаунт')
@@ -52,7 +45,7 @@ export function SettingsPage() {
               <span className="border-indigo/40 bg-indigo/12 text-indigo inline-flex rounded-full border px-3 py-0.5 text-[12.5px] font-semibold">
                 {PLAN_LABELS[quota.plan]}
                 {quota.planExpiresAt &&
-                  ` · до ${formatExpiry(quota.planExpiresAt)}`}
+                  ` · до ${formatDate(quota.planExpiresAt)}`}
               </span>
             )}
           </span>
@@ -92,7 +85,7 @@ function PlanSection() {
           {quota.planExpiresAt && (
             <span className="text-muted font-normal">
               {' '}
-              · действует до {formatExpiry(quota.planExpiresAt)}
+              · действует до {formatDate(quota.planExpiresAt)}
             </span>
           )}
         </p>
@@ -214,16 +207,11 @@ function deltaText(row: HistoryRow): string {
 }
 
 function formatEventDate(iso: string): string {
-  const date = new Date(iso)
-  const day = date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  })
-  const time = date.toLocaleTimeString('ru-RU', {
+  const time = new Date(iso).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
   })
-  return `${day}, ${time}`
+  return `${formatDay(iso)}, ${time}`
 }
 
 const HISTORY_PREVIEW = 5

@@ -27,6 +27,7 @@ import {
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 
 export function InterviewSessionPage() {
   usePageTitle('Интервью')
@@ -323,15 +324,7 @@ function Composer({
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
   }, [text])
 
-  useEffect(() => {
-    if (!text.trim()) return
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [text])
+  useUnsavedAnswerGuard(text)
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

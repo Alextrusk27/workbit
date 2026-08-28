@@ -1,4 +1,4 @@
-import { ApiRequestError, getErrorMessage } from '@/lib/api'
+import { apiErrorDetail, getErrorMessage } from '@/lib/api'
 
 /** Детали training-ошибок с бэка (ApiError.errors[0]). Стабильный контракт для UI. */
 const TRAINING_DETAIL = {
@@ -9,13 +9,6 @@ const TRAINING_DETAIL = {
   QUOTA_EXHAUSTED: 'Training quota exhausted',
   PAID_PLAN_REQUIRED: 'Paid plan required',
 } as const
-
-function trainingDetail(error: unknown): string | null {
-  if (error instanceof ApiRequestError) {
-    return error.body?.errors?.[0] ?? error.body?.message ?? null
-  }
-  return null
-}
 
 const RU_MESSAGE: Record<string, string> = {
   [TRAINING_DETAIL.SKILL_NOT_RECOGNIZED]:
@@ -34,7 +27,7 @@ const RU_MESSAGE: Record<string, string> = {
 
 /** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст. */
 export function trainingErrorMessage(error: unknown): string {
-  const detail = trainingDetail(error)
+  const detail = apiErrorDetail(error)
   if (detail && RU_MESSAGE[detail]) return RU_MESSAGE[detail]
   return getErrorMessage(error)
 }

@@ -19,6 +19,7 @@ import { useInterviewVacancies } from '@/features/interview/useInterview'
 import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 type StatusFilter = 'ALL' | 'PENDING' | 'COMPLETED'
@@ -40,14 +41,6 @@ const OFFER_INLINE_CLASS = {
   mid: 'text-indigo',
   high: 'text-ok',
 } as const
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
 
 function formatScore(score: number): string {
   return score.toFixed(1).replace('.', ',')

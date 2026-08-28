@@ -29,6 +29,7 @@ import {
 import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { formatDate, formatDay, formatDayShort } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const OFFER_INLINE_CLASS = {
@@ -44,28 +45,6 @@ const Y_AXIS = [
   { top: '75%', label: '★★', short: '2' },
   { top: '100%', label: '★', short: '★' },
 ]
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  })
-}
-
-function formatDayShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
-}
 
 function formatScore(score: number): string {
   return score.toFixed(1).replace('.', ',')

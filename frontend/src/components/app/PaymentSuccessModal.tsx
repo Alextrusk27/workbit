@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import type { UsageEvent, UsageTarget } from '@/features/billing/api'
 import { PLAN_LABELS } from '@/features/billing/labels'
 import { useQuota, useUsage } from '@/features/billing/useBilling'
+import { formatDate } from '@/lib/dates'
 import { motionTokens } from '@/lib/motion'
 
 const TARGET_LABELS: Record<UsageTarget, string> = {
@@ -138,13 +139,7 @@ export function PaymentSuccessModal({
                   {PLAN_LABELS[quota.plan]}
                 </span>
                 {quota.planExpiresAt &&
-                  ` активен до ${new Date(
-                    quota.planExpiresAt,
-                  ).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}`}
+                  ` активен до ${formatDate(quota.planExpiresAt)}`}
               </p>
             )}
             {!pending && credits.length > 0 && (

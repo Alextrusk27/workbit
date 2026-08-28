@@ -25,6 +25,7 @@ import {
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 import { QuestionEntry, ReferenceAnswer } from './reportParts'
 
 export function TrainingSessionPage() {
@@ -274,15 +275,7 @@ function CurrentQuestion({
   const { text, setText, dictation, recording, canSend, send, toggleMic } =
     useDictatedAnswer(onSubmit, { disabled: false, pending })
 
-  useEffect(() => {
-    if (!text.trim()) return
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [text])
+  useUnsavedAnswerGuard(text)
 
   return (
     <div>

@@ -1,4 +1,4 @@
-import { ApiRequestError, getErrorMessage } from '@/lib/api'
+import { apiErrorDetail, getErrorMessage } from '@/lib/api'
 import { CaptchaError } from './captcha'
 
 /** Детали auth-ошибок с бэка (ApiError.errors[0]). Стабильный контракт для UI. */
@@ -9,13 +9,6 @@ const AUTH_DETAIL = {
   TOO_MANY_REQUESTS: 'Too many requests',
   CAPTCHA_FAILED: 'Captcha validation failed',
 } as const
-
-function authDetail(error: unknown): string | null {
-  if (error instanceof ApiRequestError) {
-    return error.body?.errors?.[0] ?? error.body?.message ?? null
-  }
-  return null
-}
 
 const RU_MESSAGE: Record<string, string> = {
   [AUTH_DETAIL.INVALID_CODE]: 'Неверный код. Проверь письмо и повтори ввод.',
@@ -37,7 +30,7 @@ const CAPTCHA_MESSAGE: Record<CaptchaError['kind'], string> = {
 /** Русское сообщение auth-ошибки: известные случаи маппим, иначе — общий текст. */
 export function authErrorMessage(error: unknown): string {
   if (error instanceof CaptchaError) return CAPTCHA_MESSAGE[error.kind]
-  const detail = authDetail(error)
+  const detail = apiErrorDetail(error)
   if (detail && RU_MESSAGE[detail]) return RU_MESSAGE[detail]
   return getErrorMessage(error)
 }

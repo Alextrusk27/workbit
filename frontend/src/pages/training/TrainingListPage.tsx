@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import type { SessionStatus, TrainingSession } from '@/features/training/api'
+import { formatDate } from '@/lib/dates'
 import { trainingErrorMessage } from '@/features/training/errors'
 import {
   sessionHeadline,
@@ -36,14 +37,6 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'IN_PROGRESS', label: STATUS_LABELS.IN_PROGRESS },
   { key: 'COMPLETED', label: STATUS_LABELS.COMPLETED },
 ]
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
 
 export function TrainingListPage() {
   usePageTitle('Тренажёр')

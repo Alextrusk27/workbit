@@ -12,6 +12,7 @@ import {
   usePayment,
   useQuota,
 } from '@/features/billing/useBilling'
+import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -46,11 +47,7 @@ function PlanLine() {
   if (!data) return null
 
   const until = data.planExpiresAt
-    ? ` до ${new Date(data.planExpiresAt).toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })}`
+    ? ` до ${formatDate(data.planExpiresAt)}`
     : ''
 
   return (

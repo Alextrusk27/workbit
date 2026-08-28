@@ -1,5 +1,6 @@
 const SCRIPT_URL = 'https://smartcaptcha.yandexcloud.net/captcha.js'
 const CHALLENGE_HIDDEN_GRACE_MS = 500
+const TOKEN_TIMEOUT_MS = 90_000
 
 const sitekey = import.meta.env.VITE_SMARTCAPTCHA_SITEKEY as string | undefined
 
@@ -94,6 +95,9 @@ function ensureWidget(captcha: SmartCaptcha, key: string): string {
   captcha.subscribe(widgetId, 'network-error', () =>
     settle({ status: 'rejected', reason: new CaptchaError('unavailable') }),
   )
+  captcha.subscribe(widgetId, 'token-expired', () =>
+    settle({ status: 'rejected', reason: new CaptchaError('unavailable') }),
+  )
   return widgetId
 }
 
@@ -111,7 +115,17 @@ export async function getCaptchaToken(): Promise<string | undefined> {
   const id = ensureWidget(captcha, sitekey)
   try {
     return await new Promise<string>((resolve, reject) => {
+      settle({ status: 'rejected', reason: new CaptchaError('cancelled') })
+      const timer = window.setTimeout(
+        () =>
+          settle({
+            status: 'rejected',
+            reason: new CaptchaError('unavailable'),
+          }),
+        TOKEN_TIMEOUT_MS,
+      )
       settleToken = (result) => {
+        clearTimeout(timer)
         if (result.status === 'fulfilled') resolve(result.value)
         else reject(result.reason as Error)
       }

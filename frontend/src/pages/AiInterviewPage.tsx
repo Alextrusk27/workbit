@@ -5,53 +5,58 @@ import { Stars } from '@/components/ui/Stars'
 import { ChatBubble } from '@/components/chat/ChatBubble'
 import { ChatShell } from '@/components/chat/ChatShell'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
-import { FeatureCard } from '@/components/marketing/FeatureCard'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
 import { IconChart, IconPencil, IconStar } from '@/components/marketing/icons'
 import { useAuth } from '@/features/auth/useAuth'
+import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 
 const steps = [
   {
     n: '1',
-    title: 'Соберите сессию',
-    body: 'Вставьте ссылку на вакансию с hh.ru — тренажёр прочитает требования работодателя и соберёт вопросы под них.',
+    title: 'Скопируй ссылку',
+    body: 'Вставь ссылку на вакансию с hh.ru — тренажёр прочитает требования работодателя и соберёт вопросы под них.',
   },
   {
     n: '2',
-    title: 'Отвечайте своими словами',
+    title: 'Отвечай на вопросы AI-интервьюера',
     body: 'Текстом или голосом. Вопросы приходят по одному, тренажёр ждёт столько, сколько нужно, — и задаёт уточняющие.',
   },
   {
     n: '3',
-    title: 'Получите вердикт',
+    title: 'Получи фидбек',
     body: 'Балл за каждый ответ, правки на полях и итоговая вероятность оффера — низкая, средняя или высокая.',
   },
 ]
 
 const results = [
   {
-    icon: <IconStar />,
-    title: 'Балл за каждый ответ',
-    body: 'Звёзды от 1 до 5 в отчёте — слабые места видно сразу после сессии.',
+    icon: <IconStar className="text-star mt-0.5 size-[18px] shrink-0" />,
+    lead: 'Балл за каждый ответ.',
+    body: 'Звёзды от 1 до 5 — слабые места видно сразу после сессии.',
   },
   {
-    icon: <IconPencil />,
-    title: 'Правки на полях',
-    body: 'Рецензент отмечает сильное и пишет, что уточнить, — как редактор в вашем тексте.',
+    icon: <IconPencil className="text-indigo mt-0.5 size-[18px] shrink-0" />,
+    lead: 'Правки на полях.',
+    body: 'Рецензент отмечает сильное и пишет, что уточнить, — как редактор в твоём тексте.',
   },
   {
-    icon: <IconChart />,
-    title: 'Вероятность оффера',
-    body: 'Итоговый вердикт по сессии: что дожать до собеседования и каковы шансы сейчас.',
+    icon: <IconChart className="text-cyan mt-0.5 size-[18px] shrink-0" />,
+    lead: 'Вероятность оффера.',
+    body: 'Итоговая оценка по сессии: низкая, средняя или высокая.',
   },
 ]
 
 const advantages = [
-  'Вопросы по технологиям из вакансии, а не «в среднем по профессии»',
-  'Голосовые ответы — тренируете речь, а не только знания',
+  'Вопросы по требованиям из вакансии, а не «в среднем по профессии»',
+  'Голосовые ответы — тренируешь речь, а не только знания',
   'Сессию можно прервать и продолжить с того же вопроса',
+]
+
+const reportScores = [
+  { title: 'Вопрос 6 · Расхождения в акте сверки', score: 3 },
+  { title: 'Вопрос 7 · НДС с полученного аванса', score: 4 },
 ]
 
 export function AiInterviewPage() {
@@ -61,47 +66,66 @@ export function AiInterviewPage() {
   return (
     <>
       <PageHero
-        badge="Режим «Собеседование»"
         title={
           <>
-            Собеседование, которое{' '}
-            <span className="text-grad">можно переиграть</span>
+            Собеседование с нейросетью
+            <br />
+            <span className="text-grad">по твоей вакансии</span>
           </>
         }
         actions={
-          <>
-            <Link to={startTo} className={buttonClasses()}>
-              Пройти пробное интервью
-            </Link>
-            <Link
-              to="/pricing"
-              className={buttonClasses({ variant: 'secondary' })}
-            >
-              Смотреть тарифы
-            </Link>
-          </>
+          <div className="w-full">
+            <VacancyUrlForm />
+            <p className="text-dim mt-4 text-[13.5px]">
+              Первое интервью бесплатно ·{' '}
+              <Link
+                to="/pricing"
+                className="text-indigo hover:text-violet transition-colors"
+              >
+                Смотреть тарифы
+              </Link>
+            </p>
+          </div>
         }
       >
-        Полная сессия из вопросов под конкретную вакансию с hh.ru. Отвечаете
-        текстом или голосом, в конце — вердикт и вероятность оффера.
+        <strong className="text-ink font-semibold">
+          Пробное интервью по ссылке с hh.ru:
+        </strong>{' '}
+        полная сессия из вопросов под требования вакансии.
       </PageHero>
 
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Три шага до вердикта">
-              Никаких тестов с вариантами: вопросы приходят по одному, отвечаете
-              своими словами.
+            <SectionHead title="Собеседование с ИИ по шагам">
+              Диалог в чате: вопросы приходят по одному, отвечаешь текстом или
+              голосом.
             </SectionHead>
           </Reveal>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {steps.map((s, i) => (
-              <Reveal key={s.n} delay={i * 0.05}>
-                <FeatureCard icon={s.n} title={s.title}>
-                  {s.body}
-                </FeatureCard>
-              </Reveal>
-            ))}
+          <div className="relative">
+            <span
+              aria-hidden
+              className="absolute top-6 right-[16.67%] left-[16.67%] hidden h-0.5 bg-[linear-gradient(90deg,rgba(99,102,241,0.12),rgba(139,92,246,0.55))] lg:block"
+            />
+            <div className="relative grid gap-10 lg:grid-cols-3 lg:gap-8">
+              {steps.map((s, i) => (
+                <Reveal key={s.n} delay={i * 0.05} className="text-center">
+                  <div className="flex justify-center">
+                    <span className="border-indigo/30 bg-pop grid size-12 place-items-center rounded-full border text-[19px] font-extrabold shadow-[0_4px_14px_rgba(99,102,241,0.12)]">
+                      <span className="bg-[image:var(--grad-btn)] bg-clip-text text-transparent">
+                        {s.n}
+                      </span>
+                    </span>
+                  </div>
+                  <h3 className="text-ink mt-4.5 text-[17px] font-semibold tracking-[-0.01em]">
+                    {s.title}
+                  </h3>
+                  <p className="text-muted mx-auto mt-2 max-w-[38ch] text-[14.5px]">
+                    {s.body}
+                  </p>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </Container>
       </section>
@@ -111,36 +135,35 @@ export function AiInterviewPage() {
           <Reveal>
             <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
               <ChatShell name="AI-интервьюер" status="интервью по вакансии">
-                <ChatBubble
-                  role="bot"
-                  who="Вопрос 7 / 10 · Senior Java, финтех"
-                >
-                  Как бы вы спроектировали идемпотентность платёжного API?
+                <ChatBubble role="bot" who="Вопрос 7 / 10 · Электрик">
+                  На объекте регулярно выбивает автомат на одной линии. Как
+                  будешь искать причину?
                 </ChatBubble>
                 <ChatBubble role="user">
-                  Ключ идемпотентности от клиента, храним результат первой
-                  обработки и отдаём его на повторы…
+                  Сначала уточню, при какой нагрузке срабатывает, потом отключу
+                  линию и померю сопротивление изоляции по участкам…
                 </ChatBubble>
                 <ChatBubble role="bot" who="Разбор в отчёте">
-                  <span className="mb-1.5 flex items-center gap-2 text-[13px]">
+                  <span className="mb-1.5 flex items-center gap-2 text-[13.5px]">
                     <Stars value={4} />
                     <span className="text-dim">4 из 5</span>
                   </span>
-                  Верная база. Уточните TTL ключей и поведение при конкурентных
-                  повторах — в финтехе спросят.
+                  Верная последовательность. Уточни, как отличишь перегрузку от
+                  утечки на землю.
                 </ChatBubble>
               </ChatShell>
 
-              <div>
+              <div className="max-lg:text-center">
                 <h2 className="text-ink text-[clamp(28px,3.6vw,40px)]">
                   Интервью по конкретной вакансии
                 </h2>
-                <p className="text-muted mt-4 max-w-[52ch] text-base">
-                  Вставьте ссылку на вакансию — тренажёр разберёт требования и
-                  соберёт вопросы под стек, домен и уровень позиции. Вы
-                  репетируете именно то собеседование, на которое идёте.
+                <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
+                  Вставь ссылку на вакансию — тренажёр разберёт требования и
+                  соберёт вопросы под обязанности, инструменты и уровень
+                  позиции. По сути это мок-интервью: ты репетируешь именно то
+                  собеседование, на которое идёшь.
                 </p>
-                <ul className="mt-5 flex flex-col gap-3">
+                <ul className="mt-5 flex flex-col gap-3 text-left">
                   {advantages.map((a) => (
                     <li key={a} className="text-muted flex gap-2.5 text-[15px]">
                       <span aria-hidden className="text-indigo shrink-0">
@@ -159,19 +182,78 @@ export function AiInterviewPage() {
       <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
-            <SectionHead title="Что вы получаете после сессии">
-              Не «правильные ответы», а честная картина вашей готовности.
-            </SectionHead>
+            <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+              <div className="max-lg:text-center">
+                <h2 className="text-ink text-[clamp(28px,3.6vw,40px)]">
+                  Что входит в фидбек
+                </h2>
+                <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
+                  После сессии ты получаешь отчёт — как ревью от старшего
+                  коллеги: видно, что дожать до собеседования и каковы шансы
+                  сейчас.
+                </p>
+                <ul className="mt-5 flex flex-col gap-4 text-left">
+                  {results.map((r) => (
+                    <li key={r.lead} className="flex gap-3">
+                      {r.icon}
+                      <span className="text-muted text-[15px]">
+                        <strong className="text-ink font-semibold">
+                          {r.lead}
+                        </strong>{' '}
+                        {r.body}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="border-line bg-card shadow-chat overflow-hidden rounded-2xl border">
+                <div className="border-divider bg-glass border-b px-5 py-3.5">
+                  <p className="text-ink text-[15px] font-semibold">
+                    Отчёт по интервью
+                  </p>
+                  <p className="text-dim text-xs">
+                    Бухгалтер · 10 вопросов · 42 минуты
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3.5 px-5 pt-4.5 pb-5">
+                  {reportScores.map((r) => (
+                    <div
+                      key={r.title}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <span className="text-ink text-[13.5px]">{r.title}</span>
+                      <Stars value={r.score} className="text-[13.5px]" />
+                    </div>
+                  ))}
+                  <div className="bg-surface rounded-md px-3.5 py-2.5">
+                    <span className="text-dim mb-1 block text-xs font-semibold tracking-[0.05em] uppercase">
+                      Правка на полях
+                    </span>
+                    <span className="text-ink text-[13.5px] leading-normal">
+                      Хорошо про счёт-фактуру на аванс. Уточни срок её
+                      выставления и когда НДС принимают к вычету.
+                    </span>
+                  </div>
+                  <div className="border-divider border-t pt-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-ink text-[13.5px] font-semibold">
+                        Вероятность оффера
+                      </span>
+                      <span className="bg-indigo/12 text-indigo inline-flex h-5.5 items-center rounded-full px-2.5 text-xs font-semibold">
+                        средняя
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex gap-1">
+                      <span className="bg-grad h-1.5 flex-1 rounded-full" />
+                      <span className="bg-grad h-1.5 flex-1 rounded-full" />
+                      <span className="bg-line h-1.5 flex-1 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </Reveal>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((r, i) => (
-              <Reveal key={r.title} delay={i * 0.05}>
-                <FeatureCard icon={r.icon} title={r.title}>
-                  {r.body}
-                </FeatureCard>
-              </Reveal>
-            ))}
-          </div>
         </Container>
       </section>
 
@@ -179,22 +261,28 @@ export function AiInterviewPage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Первое интервью — бесплатно"
+              title="Пробное собеседование — бесплатно"
               actions={
-                <>
-                  <Link to={startTo} className={buttonClasses()}>
+                <div className="flex flex-col items-center">
+                  <Link
+                    to={startTo}
+                    className={buttonClasses({ className: 'px-7' })}
+                  >
                     Начать интервью
                   </Link>
-                  <Link
-                    to="/skills-trainer"
-                    className={buttonClasses({ variant: 'secondary' })}
-                  >
-                    А для отдельных тем — тренажёр
-                  </Link>
-                </>
+                  <p className="text-dim mt-4 text-[13.5px]">
+                    А для отдельных тем —{' '}
+                    <Link
+                      to="/skills-trainer"
+                      className="text-indigo hover:text-violet transition-colors"
+                    >
+                      тренажёр навыков →
+                    </Link>
+                  </p>
+                </div>
               }
             >
-              3 тренировки и пробное AI-интервью бесплатно. Карта не нужна.
+              3 тренировки и пробное AI-интервью бесплатно.
             </CtaPanel>
           </Reveal>
         </Container>

@@ -10,6 +10,7 @@ import { Field } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import type { VacancyPreview } from '@/features/vacancy/api'
+import { takePendingVacancyUrl } from '@/features/vacancy/pendingVacancy'
 import {
   hhVacancyId,
   isHhVacancyUrl,
@@ -56,8 +57,8 @@ function UnfinishedInterviewNotice({ to }: { to: string }) {
         По этой вакансии уже есть незавершённое интервью
       </p>
       <p className="text-muted mt-1.5 text-[13.5px]">
-        Новое можно начать, когда закончите текущее — вопросы уже готовы,
-        продолжите с того места, где остановились.
+        Новое можно начать, когда закончишь текущее — вопросы уже готовы,
+        продолжишь с того места, где остановился.
       </p>
       <Link to={to} className={buttonClasses({ className: 'mt-4' })}>
         Продолжить интервью
@@ -70,7 +71,7 @@ function InterviewForm() {
   const navigate = useNavigate()
   const create = useCreateInterview()
 
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(() => takePendingVacancyUrl())
   const trimmed = url.trim()
   const debouncedUrl = useDebounced(trimmed)
   const validUrl = isHhVacancyUrl(trimmed)
@@ -142,7 +143,7 @@ function InterviewForm() {
 
       {trimmed !== '' && !validUrl && (
         <p className="text-dim text-[12.5px]">
-          Вставьте прямую ссылку на вакансию hh.ru вида
+          Вставь прямую ссылку на вакансию hh.ru вида
           https://hh.ru/vacancy/123456.
         </p>
       )}
@@ -194,8 +195,8 @@ export function NewInterviewPage() {
         eyebrow="Новое интервью"
         title="Интервью под вакансию"
       >
-        Вставьте ссылку на вакансию с hh.ru. Рецензент подберёт вопросы под её
-        требования, а в конце разберёт ваши ответы и оценит шансы на оффер.
+        Вставь ссылку на вакансию с hh.ru. Рецензент подберёт вопросы под её
+        требования, а в конце разберёт твои ответы и оценит шансы на оффер.
       </AppPageHeader>
 
       <InterviewForm />

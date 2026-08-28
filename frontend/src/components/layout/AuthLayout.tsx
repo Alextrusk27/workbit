@@ -2,7 +2,7 @@ import { Link, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 
 const BENEFITS = [
-  'Реалистичные ИИ-интервью по вашей вакансии',
+  'Реалистичные ИИ-интервью по твоей вакансии',
   'Тренажёр навыков с обратной связью',
   'Подробный отчёт после каждой сессии',
 ]
@@ -27,8 +27,8 @@ export function AuthLayout() {
             Подготовка к собеседованиям с ИИ
           </h2>
           <p className="text-muted mt-4 text-base leading-relaxed">
-            Репетируйте интервью по своей вакансии и получайте разбор ответов
-            после каждой сессии.
+            Репетируй интервью по своей вакансии и получай разбор ответов после
+            каждой сессии.
           </p>
           <ul className="mt-8 flex flex-col gap-4">
             {BENEFITS.map((benefit) => (

@@ -214,7 +214,7 @@ function ConfirmPanel({
       recognized: result.skillRecognized,
       suggestions: result.skillSuggestions,
       onPick: onPickSkill,
-      unknown: `Не удалось распознать навык «${skill}». С таким навыком тренировка не запустится — уточните формулировку или выберите вариант.`,
+      unknown: `Не удалось распознать навык «${skill}». С таким навыком тренировка не запустится — уточни формулировку или выбери вариант.`,
     },
     {
       key: 'profession',
@@ -223,13 +223,13 @@ function ConfirmPanel({
       recognized: result.professionRecognized,
       suggestions: result.professionSuggestions,
       onPick: onPickProfession,
-      unknown: `Не удалось распознать профессию «${profession}». С такой профессией тренировка не запустится — уточните формулировку или выберите вариант.`,
+      unknown: `Не удалось распознать профессию «${profession}». С такой профессией тренировка не запустится — уточни формулировку или выбери вариант.`,
     },
   ].filter((row) => row.value.trim() !== '')
 
   return (
     <div className="border-line bg-glass rounded-xl border p-5">
-      <p className="text-ink text-sm font-semibold">Проверьте ввод</p>
+      <p className="text-ink text-sm font-semibold">Проверь ввод</p>
 
       <div className="mt-4 space-y-5">
         {rows.map((row) => (
@@ -420,11 +420,11 @@ export function NewTrainingPage() {
       <AppPageHeader
         back={{ to: '/app/training', label: 'Тренажёр' }}
         eyebrow="Новая тренировка навыка"
-        title="Соберём тренировку под вас"
+        title="Соберём тренировку под тебя"
       >
-        Тренировка — это прокачка одного навыка. Укажите навык, профессию, в
-        контексте которой он нужен, и выберите уровень сложности. Вопросы
-        подберёт рецензент, а разбор придёт в конце.
+        Тренировка — это прокачка одного навыка. Укажи навык, профессию, в
+        контексте которой он нужен, и выбери уровень сложности. Вопросы подберёт
+        рецензент, а разбор придёт в конце.
       </AppPageHeader>
 
       {isLoading && <p className="text-muted mt-10 text-sm">Загрузка…</p>}
@@ -432,7 +432,7 @@ export function NewTrainingPage() {
       {(isError || (!isLoading && !options)) && (
         <div className="mt-10 max-w-160">
           <Alert>
-            Не удалось загрузить параметры тренировки. Обновите страницу.
+            Не удалось загрузить параметры тренировки. Обнови страницу.
           </Alert>
         </div>
       )}

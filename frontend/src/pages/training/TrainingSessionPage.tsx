@@ -25,6 +25,7 @@ import {
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 import { QuestionEntry, ReferenceAnswer } from './reportParts'
 
 export function TrainingSessionPage() {
@@ -136,28 +137,24 @@ function SessionRun({ session }: { session: TrainingSession }) {
     })
   }, [items.length])
 
-  const onAnswer = (item: LiveItem, text: string) => {
-    submit.mutate(
-      {
+  const onAnswer = (item: LiveItem, text: string) =>
+    submit
+      .mutateAsync({
         sessionId: session.id,
         questionId: item.q.questionId,
         answerText: text,
-      },
-      {
-        onSuccess: () => {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.q.questionId === item.q.questionId
-                ? { ...it, answer: text }
-                : it,
-            ),
-          )
-          setAnsweredMain((c) => c + 1)
-          loadNext()
-        },
-      },
-    )
-  }
+      })
+      .then(() => {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.q.questionId === item.q.questionId
+              ? { ...it, answer: text }
+              : it,
+          ),
+        )
+        setAnsweredMain((c) => c + 1)
+        loadNext()
+      })
 
   const onFinish = () => {
     finish.mutate(session.id, {
@@ -273,20 +270,12 @@ function CurrentQuestion({
   question: TrainingQuestion
   pending: boolean
   error: string | null
-  onSubmit: (text: string) => void
+  onSubmit: (text: string) => void | Promise<unknown>
 }) {
   const { text, setText, dictation, recording, canSend, send, toggleMic } =
     useDictatedAnswer(onSubmit, { disabled: false, pending })
 
-  useEffect(() => {
-    if (!text.trim()) return
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [text])
+  useUnsavedAnswerGuard(text)
 
   return (
     <div>
@@ -299,10 +288,10 @@ function CurrentQuestion({
 
       <div className="mt-5.5">
         <Textarea
-          label="Ваш ответ"
+          label="Твой ответ"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Отвечайте так, как отвечали бы на собеседовании…"
+          placeholder="Отвечай так, как отвечал бы на собеседовании…"
           disabled={pending}
         />
         <DictationHints dictation={dictation} />
@@ -365,7 +354,7 @@ function FinishBar({
           Формируем разбор…
         </p>
         <p className="text-muted mx-auto mt-2.5 max-w-[46ch] text-sm">
-          Рецензент читает ваши ответы и оценивает их. Это может занять
+          Рецензент читает твои ответы и оценивает их. Это может занять
           несколько секунд.
         </p>
       </div>
@@ -379,8 +368,8 @@ function FinishBar({
           {batch <= 0
             ? 'Достигнут потолок вопросов в одной тренировке — её можно завершить.'
             : upsell
-              ? 'Вопросы закончились — завершите тренировку и получите разбор.'
-              : `Вопросы закончились — возьмите ещё ${batch} ${questionsWord(batch)} или завершите тренировку и получите разбор.`}
+              ? 'Вопросы закончились — заверши тренировку и получи разбор.'
+              : `Вопросы закончились — возьми ещё ${batch} ${questionsWord(batch)} или заверши тренировку и получи разбор.`}
         </p>
       )}
       {error && (
@@ -429,7 +418,7 @@ function FinishBar({
           </Button>
         ) : (
           <p className="text-muted text-sm">
-            Ответьте ещё на {remaining} {questionsWord(remaining)}, чтобы
+            Ответь ещё на {remaining} {questionsWord(remaining)}, чтобы
             завершить тренировку.
           </p>
         )}

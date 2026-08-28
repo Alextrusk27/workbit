@@ -19,7 +19,7 @@ export function ErrorPage() {
         Что-то пошло не так
       </h1>
       <p className="text-muted mx-auto mt-4 max-w-md">
-        Обновите страницу или вернитесь на главную.
+        Обнови страницу или вернись на главную.
       </p>
       <div className="mt-8">
         <a href="/" className={buttonClasses()}>

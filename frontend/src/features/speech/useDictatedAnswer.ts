@@ -13,7 +13,7 @@ export interface DictatedAnswer {
 }
 
 export function useDictatedAnswer(
-  onSubmit: (text: string) => void,
+  onSubmit: (text: string) => void | Promise<unknown>,
   { disabled, pending }: { disabled: boolean; pending: boolean },
 ): DictatedAnswer {
   const [text, setText] = useState('')
@@ -29,8 +29,9 @@ export function useDictatedAnswer(
 
   const submit = useCallback(
     (value: string) => {
-      onSubmit(value)
-      setText('')
+      void Promise.resolve(onSubmit(value))
+        .then(() => setText((prev) => (prev.trim() === value ? '' : prev)))
+        .catch(() => {})
     },
     [onSubmit],
   )

@@ -166,8 +166,8 @@ export function ReportSummary({
           {overallFeedback}
         </p>
         <p className="text-dim mt-4 text-xs">
-          Разбор сгенерирован ИИ и может содержать ошибки. Относитесь к оценкам
-          и рекомендациям как к ориентиру.
+          Разбор сгенерирован ИИ и может содержать ошибки. Относись к оценкам и
+          рекомендациям как к ориентиру.
         </p>
         <FeedbackWidget
           className="border-divider mt-[18px] border-t pt-3.5"

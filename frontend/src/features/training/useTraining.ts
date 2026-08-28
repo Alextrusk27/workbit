@@ -50,6 +50,7 @@ export function useReport(sessionId: string, enabled = true) {
     queryKey: keys.report(sessionId),
     queryFn: () => trainingApi.getReport(sessionId),
     enabled,
+    staleTime: Infinity,
   })
 }
 
@@ -155,6 +156,10 @@ export function useDeleteSession() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (sessionId: string) => trainingApi.deleteSession(sessionId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
+    onSuccess: (_data, sessionId) => {
+      qc.removeQueries({ queryKey: keys.session(sessionId) })
+      qc.removeQueries({ queryKey: keys.report(sessionId) })
+      qc.invalidateQueries({ queryKey: keys.sessions })
+    },
   })
 }

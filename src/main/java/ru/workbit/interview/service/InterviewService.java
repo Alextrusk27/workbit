@@ -53,8 +53,6 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 @RequiredArgsConstructor
 public class InterviewService {
 
-    public static final int MAX_FOLLOW_UPS_PER_QUESTION = 2;
-
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
     private final InterviewUserFeedbackRepository interviewUserFeedbackRepository;
@@ -117,29 +115,21 @@ public class InterviewService {
         }
 
         InterviewQuestion answered = lastAnswered.get();
-        UUID caseMainId = answered.isFollowUp() ? answered.getParentQuestionId() : answered.getId();
-        List<InterviewQuestion> caseFollowUps = interviewQuestionRepository
-                .findAllByParentQuestionIdOrderByOrderIndex(caseMainId);
+        boolean caseAlreadyClarified = answered.isFollowUp() || !interviewQuestionRepository
+                .findAllByParentQuestionIdOrderByOrderIndex(answered.getId()).isEmpty();
 
-        if (caseFollowUps.size() >= MAX_FOLLOW_UPS_PER_QUESTION) {
+        if (caseAlreadyClarified) {
             interviewWriter.markFollowUpChecked(answered.getId());
             return Optional.empty();
         }
-
-        InterviewQuestion caseMain = answered.isFollowUp()
-                ? interviewQuestionRepository.findById(caseMainId)
-                        .orElseThrow(() -> new NotFoundException("Question not found"))
-                : answered;
 
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
         LlmInterviewFollowUpDecision decision = llmService.decideInterviewFollowUp(
                 vacancy.experience(), new LlmInterviewFollowUpRequest(
                 vacancy.name(),
-                caseMain.getText(),
-                caseMain.getAnswerText(),
-                caseFollowUps.stream()
-                        .map(q -> new LlmInterviewFollowUp(q.getText(), q.getAnswerText()))
-                        .toList()));
+                answered.getText(),
+                answered.getAnswerText(),
+                List.of()));
 
         if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
             interviewWriter.markFollowUpChecked(answered.getId());
@@ -147,7 +137,7 @@ public class InterviewService {
         }
 
         try {
-            return Optional.of(interviewWriter.saveFollowUp(answered.getId(), caseMainId, decision.question()));
+            return Optional.of(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()));
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent request already created a follow-up for interview session {}", session.getId());
             return interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())

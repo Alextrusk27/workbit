@@ -6,6 +6,7 @@ import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ChatBubble } from '@/components/chat/ChatBubble'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
+import { FaqList } from '@/components/marketing/FaqList'
 import { FeatureCard } from '@/components/marketing/FeatureCard'
 import { HeroChatDemo } from '@/components/marketing/HeroChatDemo'
 import { Reveal } from '@/components/marketing/Reveal'
@@ -19,6 +20,7 @@ import {
   IconRole,
   IconStar,
 } from '@/components/marketing/icons'
+import { faq } from '@/content/faq'
 import { plans, promoActive } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
@@ -26,23 +28,23 @@ import { cn } from '@/lib/cn'
 const features = [
   {
     icon: <IconRole className="size-5" />,
-    title: 'Вопросы под профессию',
-    body: 'Навык, профессия и уровень — вопросы подстраиваются под цель.',
+    title: 'Вопросы под вакансию',
+    body: 'Список вопросов генерируется на основе содержания вакансии.',
   },
   {
     icon: <IconPencil className="size-5" />,
     title: 'Правки на полях',
-    body: 'Рецензент отмечает сильное и указывает, что уточнить.',
+    body: 'ИИ отмечает сильные и слабые стороны твоих ответов.',
   },
   {
     icon: <IconChart className="size-5" />,
     title: 'Вероятность оффера',
-    body: 'Итоговый фидбэк и оценка шансов — низкая, средняя, высокая.',
+    body: 'На основе твоих ответов нейросеть даст прогноз вероятности получения оффера.',
   },
   {
     icon: <IconClock className="size-5" />,
     title: 'История сессий',
-    body: 'Все интервью сохраняются — следи за прогрессом.',
+    body: 'Отслеживай прогресс в целом по вакансии в личном кабинете.',
   },
 ]
 
@@ -73,9 +75,22 @@ const chartLine = progressPoints
   .join(' ')
 const chartArea = `${chartLine} L940 160 L60 160 Z`
 
+const professions = [
+  'Маркетинг',
+  'Разработка',
+  'Продажи',
+  'Аналитика',
+  'Финансы',
+  'HR',
+  'Дизайн',
+  'Поддержка',
+]
+
+const homeFaq = faq.filter((item) => item.home)
+
 const trainerSteps = [
-  { label: 'Навык', value: 'Медиапланирование' },
-  { label: 'Профессия', value: 'Интернет-маркетолог' },
+  { label: 'Навык', value: 'Работа с возражениями' },
+  { label: 'Профессия', value: 'Менеджер по продажам' },
   { label: 'Уровень', value: 'Средний' },
 ]
 
@@ -129,20 +144,16 @@ export function HomePage() {
               <span className="text-grad">с AI-интервьюером</span>
             </h1>
             <p className="text-muted mt-5.5 max-w-[48ch] text-lg">
-              <strong className="text-ink font-semibold">
-                Подготовка к собеседованию онлайн:
-              </strong>{' '}
-              реалистичные вопросы под твою профессию и уровень, разбор каждого
-              ответа и вероятность оффера.
+              Подготовка к собеседованию онлайн: пройди тестовое интервью по
+              выбранной вакансии с hh.ru. Подберём вероятные вопросы по
+              требованиям работодателя и оценим твои ответы. Стань ближе к
+              получению оффера!
             </p>
             <div className="mt-8">
               <Link to={startTo} className={buttonClasses()}>
                 Начать интервью — бесплатно
               </Link>
             </div>
-            <p className="text-dim mt-4.5 text-[13.5px]">
-              1 интервью и 3 тренировки — бесплатно
-            </p>
           </div>
 
           <HeroChatDemo />
@@ -153,8 +164,8 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title="Симулятор собеседования">
-              Всё как на настоящем интервью: от выбора профессии до финального
-              вердикта — полный цикл подготовки.
+              Попробуй свои силы в пробном собеседовании по любой вакансии с
+              hh.ru.
             </SectionHead>
           </Reveal>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-2 lg:grid-cols-12">
@@ -221,6 +232,20 @@ export function HomePage() {
               </Reveal>
             ))}
           </div>
+          <Reveal className="mt-7 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-muted mr-1 text-[13.5px]">
+              Подойдёт для любой профессии:
+            </span>
+            {professions.map((p) => (
+              <span
+                key={p}
+                className="border-line text-muted rounded-full border px-3 py-1 text-[13px]"
+              >
+                {p}
+              </span>
+            ))}
+            <span className="text-dim text-[13.5px]">и другие</span>
+          </Reveal>
         </Container>
       </section>
 
@@ -228,8 +253,8 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title="Тестовое собеседование">
-              Отвечай на вопросы AI-интервьюера в диалоговом окне в свободной
-              форме.
+              Отвечай на вопросы AI-интервьюера по вакансии в диалоговом окне в
+              свободной форме.
             </SectionHead>
           </Reveal>
 
@@ -447,8 +472,9 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title="Тарифы">
+              Без автоплатежей.
               {promoActive &&
-                'До 1 октября к покупке — до 5 интервью в подарок.'}
+                ' До 1 октября к покупке — до 5 интервью в подарок.'}
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -465,19 +491,47 @@ export function HomePage() {
         </Container>
       </section>
 
+      <section className="py-10 sm:py-16">
+        <Container>
+          <Reveal>
+            <SectionHead title="Частые вопросы">
+              Коротко о формате, оценке ответов и оплате.{' '}
+              <Link
+                to="/faq"
+                className="text-indigo hover:text-violet transition-colors"
+              >
+                Все вопросы →
+              </Link>
+            </SectionHead>
+          </Reveal>
+          <FaqList items={homeFaq} />
+        </Container>
+      </section>
+
       <section className="pb-10 sm:pb-16">
         <Container>
           <Reveal>
             <CtaPanel
-              title="Следующее собеседование — уже не первое"
+              title="Пройди бесплатное тестовое собеседование сейчас"
               actions={
-                <Link to={startTo} className={buttonClasses()}>
-                  Начать бесплатно
-                </Link>
+                <>
+                  <Link to={startTo} className={buttonClasses()}>
+                    Пройти первое интервью бесплатно
+                  </Link>
+                  <Link
+                    to="/skills-trainer"
+                    className={buttonClasses({ variant: 'secondary' })}
+                  >
+                    Попробовать тренажёр навыков
+                  </Link>
+                  <p className="text-dim basis-full text-[13.5px]">
+                    Доступно сразу после входа по email — без анкеты, без карты
+                  </p>
+                </>
               }
             >
-              Проведи пробное интервью сегодня и приходи на настоящее
-              подготовленным.
+              Вставь ссылку на вакансию с hh.ru — получи вопросы под требования
+              работодателя и разбор каждого ответа.
             </CtaPanel>
           </Reveal>
         </Container>

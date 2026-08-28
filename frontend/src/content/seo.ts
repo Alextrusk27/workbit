@@ -23,7 +23,7 @@ export const seoPages: SeoPage[] = [
     title: 'Тренажёр собеседований с AI: бесплатный старт | Workbit',
     description:
       'Тренажёр собеседований с AI: пробное интервью по вакансии с hh.ru и тренировка отдельного навыка. Разбор каждого ответа и честная оценка шансов на оффер.',
-    sources: ['frontend/src/pages/HomePage.tsx'],
+    sources: ['frontend/src/pages/HomePage.tsx', 'frontend/src/content/faq.ts'],
     jsonLd: () => [
       {
         '@context': 'https://schema.org',

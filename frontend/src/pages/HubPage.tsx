@@ -85,6 +85,8 @@ export function HubPage() {
     paid ? sessionStorage.getItem(PAYMENT_ID_KEY) : null,
   )
   const { data: payment } = usePayment(paymentId)
+  const paymentFailed = payment?.status === 'FAILED'
+  const showFailed = failed || paymentFailed
 
   useEffect(() => {
     if (!paid && !failed) return
@@ -92,6 +94,12 @@ export function HubPage() {
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     navigate('/app', { replace: true })
   }, [paid, failed, navigate, qc])
+
+  useEffect(() => {
+    if (!paymentFailed) return
+    sessionStorage.removeItem(PAYMENT_ID_KEY)
+    setPaymentOpen(false)
+  }, [paymentFailed])
 
   useEffect(() => {
     if (payment?.status !== 'PAID') return
@@ -107,7 +115,7 @@ export function HubPage() {
         оффер. Тренажёр прокачивает один навык под твою профессию и уровень.
       </AppPageHeader>
 
-      {failed && (
+      {showFailed && (
         <div className="mt-8 max-w-[560px]">
           <Alert>
             Оплата не прошла, деньги не списаны. Попробуй ещё раз на{' '}
@@ -139,7 +147,7 @@ export function HubPage() {
 
       <PlanLine />
 
-      {paid && (
+      {paid && !paymentFailed && (
         <PaymentSuccessModal
           open={paymentOpen}
           pending={!!paymentId && payment?.status !== 'PAID'}

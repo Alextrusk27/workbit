@@ -20,10 +20,10 @@ function price(value: string): string {
 export const seoPages: SeoPage[] = [
   {
     path: '/',
-    title: 'Workbit — тренажёр собеседований с AI',
+    title: 'Тренажёр собеседований с AI: бесплатный старт | Workbit',
     description:
-      'Тренажёр собеседований с AI: интервью по вакансии с hh.ru и тренировка отдельного навыка, разбор каждого ответа и честная оценка — как на настоящем интервью.',
-    sources: ['frontend/src/pages/HomePage.tsx'],
+      'Тренажёр собеседований с AI: пробное интервью по вакансии с hh.ru и тренировка отдельного навыка. Разбор каждого ответа и честная оценка шансов на оффер.',
+    sources: ['frontend/src/pages/HomePage.tsx', 'frontend/src/content/faq.ts'],
     jsonLd: () => [
       {
         '@context': 'https://schema.org',
@@ -43,23 +43,23 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/ai-interview',
-    title: 'AI-интервью — Workbit',
+    title: 'Собеседование с нейросетью по вакансии с hh.ru | Workbit',
     description:
-      'Собеседование, которое можно переиграть: полная сессия из вопросов под конкретную вакансию с hh.ru. Отвечаете текстом или голосом, в конце — вердикт и вероятность оффера.',
+      'Пробное интервью по ссылке с hh.ru: полная сессия из вопросов под требования вакансии, ответы текстом или голосом, фидбек с оценками в конце.',
     sources: ['frontend/src/pages/AiInterviewPage.tsx'],
   },
   {
     path: '/skills-trainer',
-    title: 'Тренажёр навыков — Workbit',
+    title: 'Тренажёр с вопросами и ответами ИИ для собеседования | Workbit',
     description:
-      'Короткие сессии по одному навыку: Spring Boot, многопоточность, SQL — что угодно. Вопросы подберёт AI-рецензент, разбор с оценками придёт в конце тренировки.',
+      'Подготовка к техническому собеседованию и не только: десять вопросов по навыку — от разработки до бухгалтерии и права. Разбор с оценками и эталонный ответ по кнопке.',
     sources: ['frontend/src/pages/SkillsTrainerPage.tsx'],
   },
   {
     path: '/faq',
-    title: 'Частые вопросы — Workbit',
+    title: 'Частые вопросы о тренажёре собеседований | Workbit',
     description:
-      'Частые вопросы о Workbit: коротко о формате AI-интервью, профессиях, оценке ответов и тарифах.',
+      'Как работает AI-интервью, по каким профессиям есть вопросы, как ИИ оценивает ответы и что входит в тарифы — короткие ответы на частые вопросы.',
     sources: ['frontend/src/pages/FaqPage.tsx', 'frontend/src/content/faq.ts'],
     jsonLd: () => [
       {
@@ -75,10 +75,12 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/pricing',
-    title: 'Тарифы — Workbit',
-    description: `Тарифы Workbit: ${plans
+    title: 'Сколько стоит подготовка к собеседованию | Workbit',
+    description: `${plans
       .map((p) => `${p.name} — ${p.period ? `${p.price} в месяц` : p.price}`)
-      .join(', ')}. Разовый платёж на 30 дней, без автосписаний.`,
+      .join(
+        ', ',
+      )} — тарифы тренажёра собеседований. Разовый платёж на 30 дней, без автосписаний и привязки карты.`,
     sources: [
       'frontend/src/pages/PricingPage.tsx',
       'frontend/src/content/plans.ts',
@@ -103,28 +105,28 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/privacy',
-    title: 'Политика конфиденциальности — Workbit',
+    title: 'Политика конфиденциальности | Workbit',
     description:
       'Политика конфиденциальности и обработки персональных данных сервиса Workbit.',
     sources: ['docs/privacy-policy.md'],
   },
   {
     path: '/user-agreement',
-    title: 'Пользовательское соглашение — Workbit',
+    title: 'Пользовательское соглашение | Workbit',
     description:
       'Пользовательское соглашение сервиса Workbit: условия использования тренажёра собеседований.',
     sources: ['docs/user-agreement.md'],
   },
   {
     path: '/offer',
-    title: 'Публичная оферта — Workbit',
+    title: 'Публичная оферта | Workbit',
     description: 'Публичная оферта сервиса Workbit: условия оплаты тарифов.',
     sources: ['docs/offer.md'],
   },
 ]
 
 export const notFoundSeo = {
-  title: 'Страница не найдена — Workbit',
+  title: 'Страница не найдена | Workbit',
   description: 'Такой страницы нет или она ещё не готова.',
 }
 

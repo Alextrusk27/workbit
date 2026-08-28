@@ -28,12 +28,19 @@ export function useCreatePayment() {
   return useMutation({ mutationFn: billingApi.createPayment })
 }
 
+const PAYMENT_POLL_INTERVAL_MS = 2000
+const PAYMENT_POLL_MAX_ATTEMPTS = 150
+
 export function usePayment(id: string | null) {
   return useQuery({
     queryKey: billingKeys.payment(id ?? ''),
     queryFn: () => billingApi.payment(id!),
     enabled: !!id,
-    refetchInterval: (query) =>
-      query.state.data && query.state.data.status !== 'PENDING' ? false : 2000,
+    refetchInterval: (query) => {
+      if (query.state.data && query.state.data.status !== 'PENDING')
+        return false
+      if (query.state.dataUpdateCount >= PAYMENT_POLL_MAX_ATTEMPTS) return false
+      return PAYMENT_POLL_INTERVAL_MS
+    },
   })
 }

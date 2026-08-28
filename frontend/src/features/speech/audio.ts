@@ -23,31 +23,31 @@ export async function startMicRecorder(
   try {
     if (context.state === 'suspended') await context.resume()
     await context.audioWorklet.addModule(workletUrl)
+
+    const source = context.createMediaStreamSource(stream)
+    const encoder = new AudioWorkletNode(context, 'pcm-encoder')
+    encoder.port.onmessage = (event: MessageEvent<ArrayBuffer>) =>
+      onFrame(event.data)
+
+    const mute = context.createGain()
+    mute.gain.value = 0
+    source.connect(encoder)
+    encoder.connect(mute)
+    mute.connect(context.destination)
+
+    return {
+      stop: async () => {
+        encoder.port.onmessage = null
+        source.disconnect()
+        encoder.disconnect()
+        mute.disconnect()
+        stream.getTracks().forEach((track) => track.stop())
+        await context.close()
+      },
+    }
   } catch (error) {
     stream.getTracks().forEach((track) => track.stop())
     await context.close()
     throw error
-  }
-
-  const source = context.createMediaStreamSource(stream)
-  const encoder = new AudioWorkletNode(context, 'pcm-encoder')
-  encoder.port.onmessage = (event: MessageEvent<ArrayBuffer>) =>
-    onFrame(event.data)
-
-  const mute = context.createGain()
-  mute.gain.value = 0
-  source.connect(encoder)
-  encoder.connect(mute)
-  mute.connect(context.destination)
-
-  return {
-    stop: async () => {
-      encoder.port.onmessage = null
-      source.disconnect()
-      encoder.disconnect()
-      mute.disconnect()
-      stream.getTracks().forEach((track) => track.stop())
-      await context.close()
-    },
   }
 }

@@ -27,6 +27,7 @@ import {
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 
 export function InterviewSessionPage() {
   usePageTitle('Интервью')
@@ -149,26 +150,23 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
   const onSend = (text: string) => {
     if (!current) return
-    submit.mutate(
-      {
+    return submit
+      .mutateAsync({
         sessionId: session.id,
         questionId: current.q.questionId,
         answerText: text,
-      },
-      {
-        onSuccess: () => {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.q.questionId === current.q.questionId
-                ? { ...it, answer: text }
-                : it,
-            ),
-          )
-          if (!current.q.followUp) setAnswered((c) => c + 1)
-          loadNext()
-        },
-      },
-    )
+      })
+      .then(() => {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.q.questionId === current.q.questionId
+              ? { ...it, answer: text }
+              : it,
+          ),
+        )
+        if (!current.q.followUp) setAnswered((c) => c + 1)
+        loadNext()
+      })
   }
 
   const finishing = loadState === 'done'
@@ -283,14 +281,14 @@ function ChatMessages({ item, items }: { item: LiveItem; items: LiveItem[] }) {
         }
         quote={
           item.q.followUp && previousAnswer
-            ? { name: 'Вы', text: previousAnswer }
+            ? { name: 'Ты', text: previousAnswer }
             : undefined
         }
       >
         {item.q.questionText}
       </ChatBubble>
       {item.answer !== null && (
-        <ChatBubble role="user" who="Вы">
+        <ChatBubble role="user" who="Ты">
           {item.answer}
         </ChatBubble>
       )}
@@ -305,7 +303,7 @@ function Composer({
 }: {
   disabled: boolean
   pending: boolean
-  onSend: (text: string) => void
+  onSend: (text: string) => void | Promise<unknown>
 }) {
   const {
     text,
@@ -326,15 +324,7 @@ function Composer({
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
   }, [text])
 
-  useEffect(() => {
-    if (!text.trim()) return
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [text])
+  useUnsavedAnswerGuard(text)
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -359,11 +349,11 @@ function Composer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled || pending}
-          aria-label="Ваш ответ"
+          aria-label="Твой ответ"
           placeholder={
             disabled
-              ? 'Дождитесь следующего вопроса…'
-              : 'Отвечайте так, как отвечали бы на собеседовании…'
+              ? 'Дождись следующего вопроса…'
+              : 'Отвечай так, как отвечал бы на собеседовании…'
           }
           className="border-line bg-surface text-ink placeholder:text-dim focus:border-indigo focus:ring-indigo/18 max-h-30 min-h-9.5 w-full resize-none rounded-md border px-3 py-2.5 text-[13.5px] transition-colors focus:ring-[3px] focus:outline-none disabled:opacity-60"
         />

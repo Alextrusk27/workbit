@@ -2,7 +2,7 @@
  *  запросы идут с `credentials: 'include'`, вручную заголовок Authorization не ставим.
  *  На 401 (кроме публичных auth-ручек) один раз пробуем silent refresh и повторяем. */
 
-const BASE_URL: string =
+export const BASE_URL: string =
   import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1'
 
 /** Публичные auth-ручки: для них refresh на 401 не имеет смысла (401 = неверный
@@ -142,5 +142,13 @@ export async function finishWithReportFallback<T>(
 /** Человекочитаемое сообщение для UI: бизнес-ошибку берём с бэка, сетевую — общей фразой. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) return error.message
-  return 'Не удалось связаться с сервером. Проверьте соединение и повторите.'
+  return 'Не удалось связаться с сервером. Проверь соединение и повтори.'
+}
+
+/** Деталь ошибки с бэка (ApiError.errors[0], фолбэк — message) для маппинга в русский текст. */
+export function apiErrorDetail(error: unknown): string | null {
+  if (error instanceof ApiRequestError) {
+    return error.body?.errors?.[0] ?? error.body?.message ?? null
+  }
+  return null
 }

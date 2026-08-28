@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Field } from '@/components/ui/Field'
 import { CodeForm } from '@/components/auth/CodeForm'
+import { captchaEnabled } from '@/features/auth/captcha'
 import { authErrorMessage } from '@/features/auth/errors'
 import { useRequestCode } from '@/features/auth/useAuth'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -30,10 +31,9 @@ export function LoginPage() {
   if (requestCode.isSuccess) {
     return (
       <>
-        <h1 className="text-ink text-[28px]">Введите код</h1>
-        <p className="text-muted mt-3 text-sm leading-relaxed">
-          Мы отправили код на <span className="text-ink">{email}</span>. Код
-          действует 15 минут.
+        <h1 className="text-ink text-[26px] lg:text-[32px]">Введи код</h1>
+        <p className="text-muted mt-3 text-[15px] leading-relaxed">
+          Мы отправили код на <span className="text-ink">{email}</span>.
         </p>
         <CodeForm
           email={email}
@@ -45,17 +45,21 @@ export function LoginPage() {
 
   return (
     <>
-      <h1 className="text-ink text-[28px]">Вход</h1>
-      <p className="text-muted mt-2 text-sm">
-        Введите почту — пришлём код для входа. Отдельная регистрация не нужна.
+      <h1 className="text-ink text-[26px] lg:text-[32px]">Войти</h1>
+      <p className="text-muted mt-3 text-[15px] leading-relaxed lg:text-[15.5px]">
+        Введи почту — пришлём код для входа.
       </p>
-
-      <form onSubmit={onSubmit} className="mt-8 space-y-5">
+      <form
+        onSubmit={onSubmit}
+        className="mt-7 space-y-5 lg:mt-8.5 lg:space-y-5.5"
+      >
         {requestCode.isError && (
           <Alert>{authErrorMessage(requestCode.error)}</Alert>
         )}
         <Field
+          className="[&>input]:text-base [&>label]:text-sm"
           label="Email"
+          placeholder="you@example.com"
           type="email"
           autoComplete="email"
           required
@@ -81,19 +85,39 @@ export function LoginPage() {
         >
           {requestCode.isPending ? 'Отправляем код…' : 'Получить код'}
         </Button>
-        <p className="text-dim text-[12.5px] leading-relaxed">
-          Нажимая «Получить код», вы принимаете{' '}
+        <p className="text-dim text-[13px] leading-relaxed">
+          Нажимая «Получить код», ты принимаешь{' '}
           <Link
             to="/user-agreement"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted hover:text-ink underline underline-offset-2"
+            className="text-muted hover:text-ink whitespace-nowrap underline underline-offset-2"
           >
             Пользовательское соглашение
           </Link>
           .
         </p>
+        {captchaEnabled && (
+          <p className="text-dim text-[13px] leading-relaxed">
+            Сайт защищён Yandex SmartCaptcha в соответствии с{' '}
+            <a
+              href="https://yandex.ru/legal/smartcaptcha_notice/ru/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted hover:text-ink whitespace-nowrap underline underline-offset-2"
+            >
+              Политикой обработки данных
+            </a>
+            .
+          </p>
+        )}
       </form>
+
+      <div className="border-divider mt-6.5 border-t pt-4.5 lg:hidden">
+        <p className="text-dim text-[13px]">
+          Впервые здесь? Аккаунт создастся автоматически.
+        </p>
+      </div>
     </>
   )
 }

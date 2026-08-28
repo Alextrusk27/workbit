@@ -19,6 +19,7 @@ import { useInterviewVacancies } from '@/features/interview/useInterview'
 import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 type StatusFilter = 'ALL' | 'PENDING' | 'COMPLETED'
@@ -40,14 +41,6 @@ const OFFER_INLINE_CLASS = {
   mid: 'text-indigo',
   high: 'text-ok',
 } as const
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
 
 function formatScore(score: number): string {
   return score.toFixed(1).replace('.', ',')
@@ -144,8 +137,8 @@ function EmptyState() {
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
       <h2 className="text-ink text-xl font-bold">Пока нет интервью</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Вставьте ссылку на вакансию с hh.ru — рецензент подберёт вопросы под
-        неё, а в конце разберёт ответы и оценит шансы на оффер.
+        Вставь ссылку на вакансию с hh.ru — рецензент подберёт вопросы под неё,
+        а в конце разберёт ответы и оценит шансы на оффер.
       </p>
       <Link
         to="/app/interview/new"
@@ -242,7 +235,7 @@ function VacancyCard({ vacancy }: { vacancy: InterviewVacancy }) {
         <VacancyLine vacancy={vacancy} />
         {vacancy.bestScore == null && (
           <p className="text-dim mt-2 text-[12.5px] italic">
-            Завершите интервью и узнайте оценку и шансы на оффер
+            Заверши интервью и узнай оценку и шансы на оффер
           </p>
         )}
       </div>

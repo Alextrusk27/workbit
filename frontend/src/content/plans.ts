@@ -19,7 +19,8 @@ export interface Plan {
 }
 
 /** Акция «интервью в подарок» — по 30 сентября 2026 включительно. */
-export const promoActive = Date.now() < Date.parse('2026-10-01T00:00:00+03:00')
+export const promoActive =
+  __BUILD_TS__ < Date.parse('2026-10-01T00:00:00+03:00')
 
 export const plans: Plan[] = [
   {

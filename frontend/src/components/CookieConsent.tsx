@@ -44,7 +44,7 @@ export function CookieConsent() {
         >
           <p className="text-muted min-w-70 flex-1 text-[13.5px] leading-relaxed">
             Мы используем cookie, чтобы сайт работал и вход сохранялся.
-            Продолжая, вы соглашаетесь с этим — подробности в{' '}
+            Продолжая, ты соглашаешься с этим — подробности в{' '}
             <Link
               to="/privacy"
               className="text-indigo hover:text-violet underline underline-offset-2"

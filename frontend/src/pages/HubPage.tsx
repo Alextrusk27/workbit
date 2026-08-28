@@ -12,6 +12,7 @@ import {
   usePayment,
   useQuota,
 } from '@/features/billing/useBilling'
+import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -46,11 +47,7 @@ function PlanLine() {
   if (!data) return null
 
   const until = data.planExpiresAt
-    ? ` до ${new Date(data.planExpiresAt).toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })}`
+    ? ` до ${formatDate(data.planExpiresAt)}`
     : ''
 
   return (
@@ -88,6 +85,8 @@ export function HubPage() {
     paid ? sessionStorage.getItem(PAYMENT_ID_KEY) : null,
   )
   const { data: payment } = usePayment(paymentId)
+  const paymentFailed = payment?.status === 'FAILED'
+  const showFailed = failed || paymentFailed
 
   useEffect(() => {
     if (!paid && !failed) return
@@ -95,6 +94,12 @@ export function HubPage() {
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     navigate('/app', { replace: true })
   }, [paid, failed, navigate, qc])
+
+  useEffect(() => {
+    if (!paymentFailed) return
+    sessionStorage.removeItem(PAYMENT_ID_KEY)
+    setPaymentOpen(false)
+  }, [paymentFailed])
 
   useEffect(() => {
     if (payment?.status !== 'PAID') return
@@ -107,13 +112,13 @@ export function HubPage() {
     <Container>
       <AppPageHeader eyebrow="Рабочий стол" title="С чего начнём?">
         Интервью готовит к конкретной вакансии с hh.ru и оценивает шансы на
-        оффер. Тренажёр прокачивает один навык под вашу профессию и уровень.
+        оффер. Тренажёр прокачивает один навык под твою профессию и уровень.
       </AppPageHeader>
 
-      {failed && (
+      {showFailed && (
         <div className="mt-8 max-w-[560px]">
           <Alert>
-            Оплата не прошла, деньги не списаны. Попробуйте ещё раз на{' '}
+            Оплата не прошла, деньги не списаны. Попробуй ещё раз на{' '}
             <Link
               to="/pricing"
               className="underline underline-offset-2 transition-colors"
@@ -136,13 +141,13 @@ export function HubPage() {
           to="/app/training"
           eyebrow="Тренажёр"
           title="Тренировка навыка"
-          description="Один навык за сессию: вопросы под навык, профессию и уровень сложности. Отвечайте по одному, разбор с оценками придёт в конце."
+          description="Один навык за сессию: вопросы под навык, профессию и уровень сложности. Отвечай по одному, разбор с оценками придёт в конце."
         />
       </div>
 
       <PlanLine />
 
-      {paid && (
+      {paid && !paymentFailed && (
         <PaymentSuccessModal
           open={paymentOpen}
           pending={!!paymentId && payment?.status !== 'PAID'}

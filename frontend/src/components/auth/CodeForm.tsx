@@ -60,15 +60,17 @@ export function CodeForm({
 
   return (
     <>
-      <form onSubmit={onSubmit} className="mt-8 space-y-5">
+      <form onSubmit={onSubmit} className="mt-8.5 space-y-5.5">
         {verify.isError && <Alert>{authErrorMessage(verify.error)}</Alert>}
         <Field
+          className="[&>input]:text-base [&>label]:text-sm"
           label="Код из письма"
           inputMode="numeric"
           autoComplete="one-time-code"
           maxLength={6}
           pattern="\d{6}"
           required
+          style={{ letterSpacing: '0.2em' }}
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
@@ -87,13 +89,13 @@ export function CodeForm({
           type="button"
           onClick={onResend}
           disabled={cooldown > 0 || resend.isPending}
-          className="text-indigo hover:text-violet text-sm transition-colors disabled:opacity-60"
+          className="text-indigo hover:text-violet py-2 text-sm transition-colors disabled:opacity-60 lg:py-0"
         >
           {resendLabel}
         </button>
         {resend.isSuccess && cooldown > 0 && (
           <p className="text-muted mt-1 text-xs">
-            Новый код отправлен. Проверьте почту.
+            Новый код отправлен. Проверь почту.
           </p>
         )}
         {resend.isError && (

@@ -29,6 +29,7 @@ import {
 import { useVacancyStatus } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { formatDate, formatDay, formatDayShort } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const OFFER_INLINE_CLASS = {
@@ -44,28 +45,6 @@ const Y_AXIS = [
   { top: '75%', label: '★★', short: '2' },
   { top: '100%', label: '★', short: '★' },
 ]
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  })
-}
-
-function formatDayShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
-}
 
 function formatScore(score: number): string {
   return score.toFixed(1).replace('.', ',')
@@ -301,7 +280,7 @@ function ProgressSection({ detail }: { detail: InterviewVacancyDetail }) {
           Прогресс по вакансии
         </h2>
         <p className="text-dim mt-2 text-[12.5px] italic">
-          Завершите интервью и узнайте оценку и шансы на оффер
+          Заверши интервью и узнай оценку и шансы на оффер
         </p>
       </section>
     )
@@ -537,7 +516,7 @@ function RecommendationsSection({
         Рекомендованные тренировки
       </h2>
       <p className="text-muted mt-1 text-[13.5px]">
-        По отстающим навыкам из ваших интервью
+        По отстающим навыкам из твоих интервью
       </p>
       <ul className="mt-3.5 flex flex-col gap-2.5">
         {detail.recommendedTrainings.map((r) => (

@@ -25,7 +25,7 @@ based on real hh.ru job postings, answering by text or voice.
 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
-![GitVerse](https://img.shields.io/badge/GitVerse-CI-1C64F2)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
 ![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
@@ -58,9 +58,9 @@ based on real hh.ru job postings, answering by text or voice.
 
 ## 📸 Screenshots
 
-| Home — a live interview demo | Pricing — Start / Pro / Max plans |
+| Home — a live interview demo | Passwordless login — email and a one-time code |
 |---|---|
-| ![Home page](docs/screenshots/home.png) | ![Pricing](docs/screenshots/pricing.png) |
+| ![Home page](docs/screenshots/home.png) | ![Login page](docs/screenshots/login.png) |
 | **AI interview — a chat over a real hh.ru vacancy** | **Interview report — score, offer probability, weakest skill** |
 | ![AI interview session](docs/screenshots/interview-session.png) | ![AI interview report](docs/screenshots/interview-report.png) |
 | **Skills trainer — Q&A with a reference answer on demand** | **Training report — a score and per-answer feedback** |
@@ -103,7 +103,7 @@ based on real hh.ru job postings, answering by text or voice.
 | Persistence | Testcontainers (postgres:16) + `@DataJpaTest` on the Flyway-migrated schema |
 | Email | GreenMail — real SMTP delivery and assertions on the HTML body of the email |
 | E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate on top of Testcontainers |
-| Coverage | JaCoCo — 87% lines, 75% branches (per-domain breakdown in [Tests](#-tests)) |
+| Coverage | JaCoCo — 87% lines, 76% branches (per-domain breakdown in [Tests](#-tests)) |
 
 ### Infrastructure
 
@@ -111,7 +111,7 @@ based on real hh.ru job postings, answering by text or voice.
 |---|---|
 | Containers | Docker, multi-service Compose (postgres + backend + caddy) |
 | Proxy | Caddy — TLS, reverse proxy for `/api`, SPA static files |
-| CI/CD | GitVerse CI: tests on PRs, release pipeline from `master` (kaniko image build → Yandex Container Registry, VM rollout) |
+| CI/CD | GitHub Actions: tests on PRs, release pipeline from `master` (image build → Yandex Container Registry, VM rollout with rollback), weekly security scan, nightly database backup, canary checks |
 | Hosting | Yandex Cloud (VM, Container Registry), dedicated disk for PostgreSQL data |
 
 ## 🔌 Integrations
@@ -180,7 +180,7 @@ src/                  backend (Maven, ru.workbit:workbit)
   main/proto/                    SpeechKit STT contract
 frontend/             SPA (React + Vite)
 docs/                 REST contract descriptions and legal documents
-.gitverse/workflows/  CI and deploy pipelines (GitVerse)
+.github/workflows/    CI, deploy, security scan, backups, canary (GitHub Actions)
 Dockerfile            backend image
 docker-compose.yml    local development (postgres)
 compose.prod.yml      production: postgres + backend + caddy
@@ -223,7 +223,7 @@ Requirements: JDK 25, Node.js 22+, Docker.
 
 Frontend: `npm run lint`, `npm test` (Vitest) and `npm run build`.
 
-Coverage — JaCoCo on `./mvnw verify`: 87% lines, 75% branches (generated SpeechKit gRPC stubs are excluded from the report):
+Coverage — JaCoCo on `./mvnw verify`: 87% lines, 76% branches (generated SpeechKit gRPC stubs are excluded from the report):
 
 <details>
 <summary>Per-domain breakdown</summary>
@@ -235,7 +235,7 @@ Coverage — JaCoCo on `./mvnw verify`: 87% lines, 75% branches (generated Speec
 | `interview` | `██████████` | 98% |
 | `auth` | `██████████` | 97% |
 | `training` | `██████████` | 97% |
-| `security` | `█████████░` | 93% |
+| `security` | `█████████░` | 94% |
 | `util` | `█████████░` | 92% |
 | `llm` | `█████████░` | 91% |
 | `exception` | `████████░░` | 78% |
@@ -249,8 +249,11 @@ The weakly covered `vacancy` and `speech` are thin wrappers around external APIs
 
 ## ⚙️ CI/CD
 
-- **CI** ([`.gitverse/workflows/ci.yml`](.gitverse/workflows/ci.yml)) — on PRs to `develop` and `master`: unit tests (`./mvnw test`), frontend lint and build.
-- **Deploy** ([`.gitverse/workflows/deploy.yml`](.gitverse/workflows/deploy.yml)) — on push to `master`: unit tests, backend image build with kaniko and push to Yandex Container Registry, rollout to the VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy; TLS and frontend static files served by Caddy) with automatic rollback and smoke tests. The weekly security scan (Trivy, npm audit) is still pending its port from the GitHub Actions era.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — on PRs to `develop` and `master`: `mvn verify` (unit tests plus Testcontainers integration tests), a backend image build without a push, frontend lint, tests and build.
+- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — on push to `master`: tests, then in parallel the backend image goes to Yandex Container Registry and the frontend bundle is built, then the rollout to the VM over SSH ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy; TLS and frontend static files served by Caddy). The rollout renders `.env` from SOPS-encrypted secrets, dumps the database beforehand, waits for the new container to become healthy and rolls back to the previous image if the backend smoke fails (`/api/v1/auth/me` must answer 401); the frontend is rsynced and checked for a canonical link, JSON-LD and an honest 404. Afterwards a separate job runs an authenticated smoke with a live LLM call, and the release job tags the version and publishes GitHub release notes.
+- **Security scan** ([`security.yml`](.github/workflows/security.yml)) — weekly: Trivy over the repository dependencies and over the built backend image (CRITICAL/HIGH, fixable only), plus `npm audit` for the frontend.
+- **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — nightly `pg_dump -Fc` on the VM with a 14-day rotation.
+- **Canary** ([`canary.yml`](.github/workflows/canary.yml)) — every three hours: the home page and `/api/v1/auth/me` (401 expected), with retries; once a day the same authenticated smoke with a live LLM call.
 
 ## 📚 Documentation
 

@@ -1,7 +1,12 @@
 const SCRIPT_URL = 'https://smartcaptcha.yandexcloud.net/captcha.js'
 const CHALLENGE_HIDDEN_GRACE_MS = 500
+const TOKEN_TIMEOUT_MS = 90_000
 
 const sitekey = import.meta.env.VITE_SMARTCAPTCHA_SITEKEY as string | undefined
+
+/** Капча настроена. Щит SmartCaptcha скрыт (`hideShield`), поэтому уведомление
+ *  об обработке данных показывает сама форма входа. */
+export const captchaEnabled = Boolean(sitekey)
 
 interface SmartCaptcha {
   render: (
@@ -9,6 +14,7 @@ interface SmartCaptcha {
     options: {
       sitekey: string
       invisible?: boolean
+      hideShield?: boolean
       callback?: (token: string) => void
     },
   ) => string
@@ -75,6 +81,7 @@ function ensureWidget(captcha: SmartCaptcha, key: string): string {
   widgetId = captcha.render(container, {
     sitekey: key,
     invisible: true,
+    hideShield: true,
     callback: (token) => settle({ status: 'fulfilled', value: token }),
   })
   captcha.subscribe(widgetId, 'challenge-hidden', () => {
@@ -86,6 +93,9 @@ function ensureWidget(captcha: SmartCaptcha, key: string): string {
     }, CHALLENGE_HIDDEN_GRACE_MS)
   })
   captcha.subscribe(widgetId, 'network-error', () =>
+    settle({ status: 'rejected', reason: new CaptchaError('unavailable') }),
+  )
+  captcha.subscribe(widgetId, 'token-expired', () =>
     settle({ status: 'rejected', reason: new CaptchaError('unavailable') }),
   )
   return widgetId
@@ -105,7 +115,17 @@ export async function getCaptchaToken(): Promise<string | undefined> {
   const id = ensureWidget(captcha, sitekey)
   try {
     return await new Promise<string>((resolve, reject) => {
+      settle({ status: 'rejected', reason: new CaptchaError('cancelled') })
+      const timer = window.setTimeout(
+        () =>
+          settle({
+            status: 'rejected',
+            reason: new CaptchaError('unavailable'),
+          }),
+        TOKEN_TIMEOUT_MS,
+      )
       settleToken = (result) => {
+        clearTimeout(timer)
         if (result.status === 'fulfilled') resolve(result.value)
         else reject(result.reason as Error)
       }

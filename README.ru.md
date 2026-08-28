@@ -25,7 +25,7 @@
 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
-![GitVerse](https://img.shields.io/badge/GitVerse-CI-1C64F2)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
 ![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
@@ -103,7 +103,7 @@
 | Персистентность | Testcontainers (postgres:16) + `@DataJpaTest` на схеме из миграций Flyway |
 | Почта | GreenMail — реальная SMTP-доставка и проверка HTML-тела письма |
 | E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate поверх Testcontainers |
-| Покрытие | JaCoCo — 87% строк, 75% веток (разбивка по доменам — в [Тестах](#-тесты)) |
+| Покрытие | JaCoCo — 87% строк, 76% веток (разбивка по доменам — в [Тестах](#-тесты)) |
 
 ### Инфраструктура
 
@@ -111,7 +111,7 @@
 |---|---|
 | Контейнеры | Docker, многосервисный Compose (postgres + backend + caddy) |
 | Прокси | Caddy — TLS, reverse proxy `/api`, статика SPA |
-| CI/CD | GitVerse CI: тесты на PR, релизный пайплайн с `master` (сборка образа kaniko → Yandex Container Registry, выкладка на VM) |
+| CI/CD | GitHub Actions: тесты на PR, релизный пайплайн с `master` (сборка образа → Yandex Container Registry, выкладка на VM с автооткатом), еженедельный security-скан, ночной бэкап БД, canary-проверки |
 | Хостинг | Yandex Cloud (VM, Container Registry), отдельный диск под данные PostgreSQL |
 
 ## 🔌 Интеграции
@@ -180,7 +180,7 @@ src/                  бэкенд (Maven, ru.workbit:workbit)
   main/proto/                    контракт SpeechKit STT
 frontend/             SPA (React + Vite)
 docs/                 описания REST-контрактов и юридические документы
-.gitverse/workflows/  CI- и deploy-пайплайны (GitVerse)
+.github/workflows/    CI, деплой, security-скан, бэкапы, canary (GitHub Actions)
 Dockerfile            образ бэкенда
 docker-compose.yml    локальная разработка (postgres)
 compose.prod.yml      прод: postgres + backend + caddy
@@ -223,7 +223,7 @@ Caddyfile             конфиг reverse proxy
 
 Фронтенд: `npm run lint`, `npm test` (Vitest) и `npm run build`.
 
-Покрытие — JaCoCo на `./mvnw verify`: 87% строк, 75% веток (сгенерированные gRPC-стабы SpeechKit из отчёта исключены):
+Покрытие — JaCoCo на `./mvnw verify`: 87% строк, 76% веток (сгенерированные gRPC-стабы SpeechKit из отчёта исключены):
 
 <details>
 <summary>Разбивка по доменам</summary>
@@ -235,7 +235,7 @@ Caddyfile             конфиг reverse proxy
 | `interview` | `██████████` | 98% |
 | `auth` | `██████████` | 97% |
 | `training` | `██████████` | 97% |
-| `security` | `█████████░` | 93% |
+| `security` | `█████████░` | 94% |
 | `util` | `█████████░` | 92% |
 | `llm` | `█████████░` | 91% |
 | `exception` | `████████░░` | 78% |
@@ -249,8 +249,11 @@ Caddyfile             конфиг reverse proxy
 
 ## ⚙️ CI/CD
 
-- **CI** ([`.gitverse/workflows/ci.yml`](.gitverse/workflows/ci.yml)) — на PR в `develop` и `master`: юнит-тесты (`./mvnw test`), линт и сборка фронтенда.
-- **Deploy** ([`.gitverse/workflows/deploy.yml`](.gitverse/workflows/deploy.yml)) — на push в `master`: юнит-тесты, сборка образа бэкенда через kaniko с публикацией в Yandex Container Registry, выкладка на VM ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy, TLS и статика фронтенда — через Caddy) с автооткатом и smoke-тестами. Еженедельный security-скан (Trivy, npm audit) ещё ждёт переноса с эпохи GitHub Actions.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — на PR в `develop` и `master`: `mvn verify` (юнит-тесты и интеграционные на Testcontainers), сборка образа бэкенда без публикации, линт, тесты и сборка фронтенда.
+- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — на push в `master`: тесты, затем параллельно образ бэкенда уходит в Yandex Container Registry и собирается бандл фронтенда, следом выкладка на VM по SSH ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy, TLS и статика фронтенда — через Caddy). Выкладка рендерит `.env` из зашифрованных SOPS-секретов, снимает дамп БД перед обновлением, ждёт, пока новый контейнер станет healthy, и откатывается на предыдущий образ, если не прошёл smoke бэкенда (`/api/v1/auth/me` должен ответить 401); статика фронтенда заливается rsync'ом и проверяется на canonical, JSON-LD и честный 404. Дальше отдельная джоба гоняет авторизованный smoke с живым вызовом LLM, а релизная — проставляет тег версии и публикует release notes.
+- **Security scan** ([`security.yml`](.github/workflows/security.yml)) — еженедельно: Trivy по зависимостям репозитория и по собранному образу бэкенда (CRITICAL/HIGH, только исправимые) плюс `npm audit` для фронтенда.
+- **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — ночной `pg_dump -Fc` на VM с ротацией за 14 дней.
+- **Canary** ([`canary.yml`](.github/workflows/canary.yml)) — каждые три часа: главная страница и `/api/v1/auth/me` (ожидается 401), с повторами; раз в сутки — тот же авторизованный smoke с живым вызовом LLM.
 
 ## 📚 Документация
 

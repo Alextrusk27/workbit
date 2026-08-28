@@ -7,21 +7,50 @@ import { IconMic, IconSend } from '@/components/marketing/icons'
 import { motionConfig } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
-const QUESTION = 'Чем отличается HashMap от ConcurrentHashMap?'
-const ANSWER =
-  'HashMap не потокобезопасен, а ConcurrentHashMap разрешает конкурентный доступ и блокирует не всю таблицу, а сегменты…'
-const REVIEW =
-  'Верно про сегменты. Уточни: в Java 8+ это блокировка на уровне бакета.'
+interface Scenario {
+  role: string
+  question: string
+  answer: string
+  review: string
+  score: number
+}
 
-const TYPE_QUESTION_MS = 28
-const TYPE_REVIEW_MS = 18
+/** Сценарии крутятся по кругу — по одному на цикл анимации. */
+const SCENARIOS: Scenario[] = [
+  {
+    role: 'Интернет-маркетолог',
+    question: 'Как поймёшь, что рекламная кампания окупается?',
+    answer:
+      'Считаю ROMI: доход от кампании минус расходы, делённые на расходы. Ещё смотрю CAC и LTV, чтобы видеть окупаемость на дистанции…',
+    review:
+      'Хорошо, что связал ROMI с LTV. Уточни, как учтёшь отложенные конверсии.',
+    score: 4,
+  },
+  {
+    role: 'Бухгалтер',
+    question: 'Чем отличается счёт 60 от счёта 62?',
+    answer:
+      '60 — расчёты с поставщиками и подрядчиками, 62 — с покупателями и заказчиками. По 60 обычно кредиторка, по 62 — дебиторка…',
+    review:
+      'Верно. Добавь про авансы: выданные и полученные идут на отдельных субсчетах.',
+    score: 5,
+  },
+  {
+    role: 'Python-разработчик',
+    question: 'Чем list отличается от tuple?',
+    answer:
+      'List можно менять, tuple — нет. Tuple пишется в круглых скобках, list — в квадратных… Больше отличий, наверное, не назову.',
+    review:
+      'База верная, но этого мало. Добавь: tuple хешируем и может быть ключом словаря, а ещё компактнее в памяти.',
+    score: 3,
+  },
+]
 
 const PHASES = [
-  'ask',
+  'switch',
   'question',
   'recording',
   'answer',
-  'reviewing',
   'review',
 ] as const
 type Phase = (typeof PHASES)[number]
@@ -52,23 +81,23 @@ function Wave() {
   )
 }
 
-/** Живая витрина продукта в герое: вопрос печатается, кандидат отвечает
- *  голосом, рецензент разбирает ответ. Цикл повторяется — гаснет и снова
- *  наполняется только лента сообщений. При reduced-motion и на слабых
- *  устройствах показывается финальный кадр без анимации.
+/** Живая витрина продукта в герое: интервьюер задаёт вопрос, кандидат
+ *  отвечает голосом, рецензент разбирает ответ. Цикл повторяется — лента
+ *  гаснет, на смене диалога по центру мигают точки, затем лента наполняется
+ *  снова. При reduced-motion и на слабых устройствах показывается финальный
+ *  кадр без анимации.
  *
- *  Сообщения появляются без входной анимации — как в макете, иначе смена
- *  пузыря записи на текст ответа выглядит прыжком. Текст печатается прямо в
- *  DOM через ref: setState на каждый символ давал сорок ререндеров в секунду. */
+ *  Сообщения появляются целиком с анимацией `msg-in`; пузырь записи и текст
+ *  ответа — один элемент, содержимое меняется на месте, иначе смена выглядит
+ *  прыжком. */
 export function HeroChatDemo() {
   const animated = motionConfig.shouldAnimate({ essential: true })
-  const [phase, setPhase] = useState<Phase>(animated ? 'ask' : 'review')
+  const [phase, setPhase] = useState<Phase>(animated ? 'switch' : 'review')
+  const [scene, setScene] = useState(0)
   const [fading, setFading] = useState(false)
   const [visible, setVisible] = useState(true)
   const rootRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const questionRef = useRef<HTMLSpanElement>(null)
-  const reviewRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     if (!animated) return
@@ -96,24 +125,6 @@ export function HeroChatDemo() {
       if (body) body.scrollTop = body.scrollHeight
     }
 
-    const type = async (
-      target: React.RefObject<HTMLSpanElement | null>,
-      text: string,
-      pace: number,
-    ) => {
-      await painted()
-      const el = target.current
-      if (!el || cancelled) return
-      el.classList.add('caret-type')
-      for (let i = 1; i <= text.length; i += 1) {
-        if (cancelled) return
-        el.textContent = text.slice(0, i)
-        scrollBottom()
-        await sleep(pace)
-      }
-      el.classList.remove('caret-type')
-    }
-
     const step = async (next: Phase, wait: number) => {
       if (cancelled) return
       setPhase(next)
@@ -123,26 +134,18 @@ export function HeroChatDemo() {
     }
 
     const run = async () => {
+      let i = 0
       while (!cancelled) {
         setFading(false)
-        setPhase('ask')
-        if (questionRef.current) questionRef.current.textContent = ''
-        if (reviewRef.current) reviewRef.current.textContent = ''
-        await sleep(1100)
-        if (cancelled) return
+        setPhase('switch')
+        setScene(i % SCENARIOS.length)
+        i += 1
+        await sleep(1400)
 
-        setPhase('question')
-        await type(questionRef, QUESTION, TYPE_QUESTION_MS)
-        await sleep(800)
-
+        await step('question', 1800)
         await step('recording', 3900)
-        await step('answer', 700)
-        await step('reviewing', 1200)
-
-        if (cancelled) return
-        setPhase('review')
-        await type(reviewRef, REVIEW, TYPE_REVIEW_MS)
-        await sleep(4500)
+        await step('answer', 900)
+        await step('review', 4500)
 
         if (cancelled) return
         setFading(true)
@@ -157,13 +160,14 @@ export function HeroChatDemo() {
   }, [animated, visible])
 
   const recording = phase === 'recording'
+  const current = SCENARIOS[scene]
 
   return (
     <div
       ref={rootRef}
       role="img"
       className="overflow-anchor-none"
-      aria-label="Пример интервью: вопрос про HashMap, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой 4 из 5"
+      aria-label="Пример интервью: вопросы для интернет-маркетолога, бухгалтера и Python-разработчика, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой"
     >
       <div aria-hidden>
         <ChatShell
@@ -205,39 +209,39 @@ export function HeroChatDemo() {
             </>
           }
         >
-          <ChatBubble role="bot" who="Вопрос 3 / 10">
-            {phase === 'ask' ? (
+          {phase === 'switch' && (
+            <div className="text-dim my-auto flex justify-center">
               <TypingDots />
-            ) : (
-              <span ref={questionRef}>{animated ? '' : QUESTION}</span>
-            )}
-          </ChatBubble>
+            </div>
+          )}
 
-          {recording && (
-            <ChatBubble role="user" who="Ты · голосовой ответ">
-              <Wave />
+          {reached(phase, 'question') && (
+            <ChatBubble
+              role="bot"
+              who={`Вопрос 3 / 10 · ${current.role}`}
+              className="msg-in"
+            >
+              {current.question}
             </ChatBubble>
           )}
 
-          {reached(phase, 'answer') && (
-            <ChatBubble role="user" who="Ты · голосовой ответ">
-              {ANSWER}
+          {reached(phase, 'recording') && (
+            <ChatBubble
+              role="user"
+              who="Ты · голосовой ответ"
+              className="msg-in"
+            >
+              {recording ? <Wave /> : current.answer}
             </ChatBubble>
           )}
 
-          {reached(phase, 'reviewing') && (
-            <ChatBubble role="bot" who="Разбор в отчёте">
-              {phase === 'reviewing' ? (
-                <TypingDots />
-              ) : (
-                <>
-                  <span className="mb-1.5 flex items-center gap-2 text-[13px]">
-                    <Stars value={4} />
-                    <span className="text-dim">4 из 5</span>
-                  </span>
-                  <span ref={reviewRef}>{animated ? '' : REVIEW}</span>
-                </>
-              )}
+          {reached(phase, 'review') && (
+            <ChatBubble role="bot" who="Разбор в отчёте" className="msg-in">
+              <span className="mb-1.5 flex items-center gap-2 text-[13px]">
+                <Stars value={current.score} />
+                <span className="text-dim">{current.score} из 5</span>
+              </span>
+              {current.review}
             </ChatBubble>
           )}
         </ChatShell>

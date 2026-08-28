@@ -326,20 +326,6 @@
   }
 }
 
-@utility caret-type {
-  &::after {
-    content: '▍';
-    margin-left: 1px;
-    animation: caret-blink 0.8s steps(1) infinite;
-  }
-}
-
-@keyframes caret-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 /* Эквалайзер голосовой записи: 12 полосок с разной фазой — на CSS, чтобы
    бесконечная анимация шла на композиторе и не дёргала React-дерево. */
 @utility wave-bar {
@@ -361,6 +347,24 @@
 
 @utility mic-pulse {
   animation: mic-pulse 1.4s infinite;
+}
+
+/* Появление сообщения в чат-демо: как в мессенджерах — снизу вверх с
+   проявлением. Разовая, поэтому на CSS вместе с остальными кейфреймами демо;
+   числа — токены motion: slow / smooth / distance.md / scale.subtle. */
+@utility msg-in {
+  animation: msg-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes mic-pulse {

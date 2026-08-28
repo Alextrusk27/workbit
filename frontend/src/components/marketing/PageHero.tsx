@@ -8,7 +8,7 @@ export function PageHero({
   actions,
 }: {
   title: ReactNode
-  children: ReactNode
+  children?: ReactNode
   actions?: ReactNode
 }) {
   return (
@@ -17,9 +17,11 @@ export function PageHero({
         <h1 className="text-ink text-[clamp(32px,4.5vw,48px)] leading-[1.1] font-extrabold tracking-[-0.03em]">
           {title}
         </h1>
-        <p className="text-muted mx-auto mt-4 max-w-[56ch] text-[17px]">
-          {children}
-        </p>
+        {children && (
+          <p className="text-muted mx-auto mt-4 max-w-[56ch] text-[17px]">
+            {children}
+          </p>
+        )}
         {actions && (
           <div className="mt-8 flex flex-wrap justify-center gap-3.5">
             {actions}

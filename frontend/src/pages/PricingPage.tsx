@@ -7,7 +7,6 @@ import { PlanCard } from '@/components/ui/PlanCard'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import { SectionHead } from '@/components/marketing/SectionHead'
 import { plans, promoActive } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
@@ -41,10 +40,7 @@ export function PricingPage() {
             <span className="text-grad">подготовка к собеседованию</span>
           </>
         }
-      >
-        Начни бесплатно, чтобы понять формат. Переходи на Про, когда готовишься
-        всерьёз, — больше интервью, глубокие тренировки и динамика по вакансии.
-      </PageHero>
+      />
 
       <section className="py-10 sm:py-16">
         <Container>
@@ -86,19 +82,6 @@ export function PricingPage() {
             </Link>
             .
           </p>
-        </Container>
-      </section>
-
-      <section className="pb-10 sm:pb-16">
-        <Container>
-          <Reveal>
-            <SectionHead title="Тренажёр собеседований бесплатно">
-              Старт доступен сразу после регистрации: банковская карта не нужна,
-              автосписаний нет, а разовые бесплатные лимиты не сгорают со
-              временем. Когда их перестанет хватать, Про даст 10 интервью и 20
-              тренировок в месяц.
-            </SectionHead>
-          </Reveal>
         </Container>
       </section>
 

@@ -8,6 +8,7 @@ import { PLAN_LABELS } from '@/features/billing/labels'
 import { useQuota, useUsage } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
 import { motionTokens } from '@/lib/motion'
+import { useModalA11y } from '@/lib/useModalA11y'
 
 const TARGET_LABELS: Record<UsageTarget, string> = {
   INTERVIEW: 'AI-интервью',
@@ -84,6 +85,7 @@ export function PaymentSuccessModal({
   const { user } = useAuth()
   const { data: quota } = useQuota()
   const { data: usage } = useUsage()
+  const panelRef = useModalA11y(open)
 
   useEffect(() => {
     if (!open) return
@@ -117,6 +119,7 @@ export function PaymentSuccessModal({
               duration: motionTokens.duration.fast,
               ease: motionTokens.easing.smooth,
             }}
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label={pending ? 'Проверяем оплату' : 'Оплата прошла'}
@@ -172,7 +175,7 @@ export function PaymentSuccessModal({
                 Чек отправили на {user.email}
               </p>
             )}
-            <Button className="mt-5 w-full" onClick={onClose}>
+            <Button autoFocus className="mt-5 w-full" onClick={onClose}>
               Продолжить
             </Button>
           </motion.div>

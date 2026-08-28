@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
+import { useModalA11y } from '@/lib/useModalA11y'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -23,6 +24,8 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  const panelRef = useModalA11y(open)
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -53,6 +56,7 @@ export function ConfirmDialog({
               duration: motionTokens.duration.fast,
               ease: motionTokens.easing.smooth,
             }}
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label={title}

@@ -1,6 +1,4 @@
-import type { FormEvent } from 'react'
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { Stars } from '@/components/ui/Stars'
@@ -10,30 +8,24 @@ import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
-import {
-  IconChart,
-  IconLink,
-  IconPencil,
-  IconStar,
-} from '@/components/marketing/icons'
+import { IconChart, IconPencil, IconStar } from '@/components/marketing/icons'
 import { useAuth } from '@/features/auth/useAuth'
-import { savePendingVacancyUrl } from '@/features/vacancy/pendingVacancy'
-import { isHhVacancyUrl } from '@/features/vacancy/useVacancy'
+import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 
 const steps = [
   {
     n: '1',
-    title: 'Скопируйте ссылку',
-    body: 'Вставьте ссылку на вакансию с hh.ru — тренажёр прочитает требования работодателя и соберёт вопросы под них.',
+    title: 'Скопируй ссылку',
+    body: 'Вставь ссылку на вакансию с hh.ru — тренажёр прочитает требования работодателя и соберёт вопросы под них.',
   },
   {
     n: '2',
-    title: 'Отвечайте на вопросы AI-интервьюера',
+    title: 'Отвечай на вопросы AI-интервьюера',
     body: 'Текстом или голосом. Вопросы приходят по одному, тренажёр ждёт столько, сколько нужно, — и задаёт уточняющие.',
   },
   {
     n: '3',
-    title: 'Получите фидбек',
+    title: 'Получи фидбек',
     body: 'Балл за каждый ответ, правки на полях и итоговая вероятность оффера — низкая, средняя или высокая.',
   },
 ]
@@ -47,7 +39,7 @@ const results = [
   {
     icon: <IconPencil className="text-indigo mt-0.5 size-[18px] shrink-0" />,
     lead: 'Правки на полях.',
-    body: 'Рецензент отмечает сильное и пишет, что уточнить, — как редактор в вашем тексте.',
+    body: 'Рецензент отмечает сильное и пишет, что уточнить, — как редактор в твоём тексте.',
   },
   {
     icon: <IconChart className="text-cyan mt-0.5 size-[18px] shrink-0" />,
@@ -58,7 +50,7 @@ const results = [
 
 const advantages = [
   'Вопросы по требованиям из вакансии, а не «в среднем по профессии»',
-  'Голосовые ответы — тренируете речь, а не только знания',
+  'Голосовые ответы — тренируешь речь, а не только знания',
   'Сессию можно прервать и продолжить с того же вопроса',
 ]
 
@@ -69,27 +61,7 @@ const reportScores = [
 
 export function AiInterviewPage() {
   const { isAuthenticated } = useAuth()
-  const navigate = useNavigate()
   const startTo = isAuthenticated ? '/app/interview/new' : '/login'
-
-  const [url, setUrl] = useState('')
-  const [showHint, setShowHint] = useState(false)
-
-  const onUrlChange = (value: string) => {
-    setUrl(value)
-    if (showHint) setShowHint(false)
-  }
-
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    const trimmed = url.trim()
-    if (trimmed !== '' && !isHhVacancyUrl(trimmed)) {
-      setShowHint(true)
-      return
-    }
-    if (trimmed !== '') savePendingVacancyUrl(trimmed)
-    navigate(startTo, { state: { from: { pathname: '/app/interview/new' } } })
-  }
 
   return (
     <>
@@ -98,41 +70,12 @@ export function AiInterviewPage() {
           <>
             Собеседование с нейросетью
             <br />
-            <span className="text-grad">по вашей вакансии</span>
+            <span className="text-grad">по твоей вакансии</span>
           </>
         }
         actions={
           <div className="w-full">
-            <form
-              noValidate
-              onSubmit={onSubmit}
-              className="border-line bg-card shadow-pop mx-auto flex max-w-160 flex-col gap-2.5 rounded-[14px] border p-2 sm:flex-row sm:items-center sm:pl-4.5"
-            >
-              <span className="flex min-w-0 items-center gap-2.5 px-2.5 pt-1.5 sm:flex-1 sm:px-0 sm:pt-0">
-                <IconLink className="text-dim size-[18px] shrink-0" />
-                <input
-                  type="url"
-                  inputMode="url"
-                  autoComplete="off"
-                  placeholder="https://hh.ru/vacancy/123456"
-                  aria-label="Ссылка на вакансию hh.ru"
-                  aria-invalid={showHint || undefined}
-                  aria-describedby={showHint ? 'hero-vacancy-hint' : undefined}
-                  value={url}
-                  onChange={(e) => onUrlChange(e.target.value)}
-                  className="placeholder:text-dim text-ink w-full min-w-0 bg-transparent text-left text-[15px] outline-none"
-                />
-              </span>
-              <button type="submit" className={buttonClasses()}>
-                Пройти пробное интервью
-              </button>
-            </form>
-            {showHint && (
-              <p id="hero-vacancy-hint" className="text-dim mt-3 text-[12.5px]">
-                Вставьте прямую ссылку на вакансию hh.ru вида
-                https://hh.ru/vacancy/123456.
-              </p>
-            )}
+            <VacancyUrlForm />
             <p className="text-dim mt-4 text-[13.5px]">
               Первое интервью бесплатно ·{' '}
               <Link
@@ -155,7 +98,7 @@ export function AiInterviewPage() {
         <Container>
           <Reveal>
             <SectionHead title="Собеседование с ИИ по шагам">
-              Диалог в чате: вопросы приходят по одному, отвечаете текстом или
+              Диалог в чате: вопросы приходят по одному, отвечаешь текстом или
               голосом.
             </SectionHead>
           </Reveal>
@@ -194,7 +137,7 @@ export function AiInterviewPage() {
               <ChatShell name="AI-интервьюер" status="интервью по вакансии">
                 <ChatBubble role="bot" who="Вопрос 7 / 10 · Электрик">
                   На объекте регулярно выбивает автомат на одной линии. Как
-                  будете искать причину?
+                  будешь искать причину?
                 </ChatBubble>
                 <ChatBubble role="user">
                   Сначала уточню, при какой нагрузке срабатывает, потом отключу
@@ -205,8 +148,8 @@ export function AiInterviewPage() {
                     <Stars value={4} />
                     <span className="text-dim">4 из 5</span>
                   </span>
-                  Верная последовательность. Уточните, как отличите перегрузку
-                  от утечки на землю.
+                  Верная последовательность. Уточни, как отличишь перегрузку от
+                  утечки на землю.
                 </ChatBubble>
               </ChatShell>
 
@@ -215,10 +158,10 @@ export function AiInterviewPage() {
                   Интервью по конкретной вакансии
                 </h2>
                 <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
-                  Вставьте ссылку на вакансию — тренажёр разберёт требования и
+                  Вставь ссылку на вакансию — тренажёр разберёт требования и
                   соберёт вопросы под обязанности, инструменты и уровень
-                  позиции. По сути это мок-интервью: вы репетируете именно то
-                  собеседование, на которое идёте.
+                  позиции. По сути это мок-интервью: ты репетируешь именно то
+                  собеседование, на которое идёшь.
                 </p>
                 <ul className="mt-5 flex flex-col gap-3 text-left">
                   {advantages.map((a) => (
@@ -245,7 +188,7 @@ export function AiInterviewPage() {
                   Что входит в фидбек
                 </h2>
                 <p className="text-muted mt-4 max-w-[52ch] text-base max-lg:mx-auto">
-                  После сессии вы получаете отчёт — как ревью от старшего
+                  После сессии ты получаешь отчёт — как ревью от старшего
                   коллеги: видно, что дожать до собеседования и каковы шансы
                   сейчас.
                 </p>
@@ -288,7 +231,7 @@ export function AiInterviewPage() {
                       Правка на полях
                     </span>
                     <span className="text-ink text-[13.5px] leading-normal">
-                      Хорошо про счёт-фактуру на аванс. Уточните срок её
+                      Хорошо про счёт-фактуру на аванс. Уточни срок её
                       выставления и когда НДС принимают к вычету.
                     </span>
                   </div>

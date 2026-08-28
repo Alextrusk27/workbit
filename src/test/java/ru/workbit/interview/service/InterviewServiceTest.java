@@ -582,73 +582,36 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Последний ответ - на follow-up: caseMainId и текст решения берутся из основного вопроса-родителя")
-        void usesParentQuestionWhenLastAnsweredIsFollowUp() {
+        @DisplayName("Последний ответ - на follow-up: кейс уже уточнён, follow-up помечается проверенным, возвращается основной вопрос")
+        void marksCheckedAndFallsToMainWhenLastAnsweredIsFollowUp() {
             // given
             when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(activeSession()));
             when(interviewQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
 
             UUID mainId = UUID.randomUUID();
-            InterviewQuestion mainQuestion = aQuestion(mainId, null, 3, false, true,
-                    "Расскажите про SOLID", "Мой ответ про SOLID");
             InterviewQuestion answeredFollowUp = aQuestion(UUID.randomUUID(), mainId, 1, true, true,
                     "А это как связано с DI?", "Через инверсию контроля");
             when(interviewQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
                     .thenReturn(Optional.of(answeredFollowUp));
-            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(mainId))
-                    .thenReturn(List.of(answeredFollowUp));
-            when(interviewQuestionRepository.findById(mainId)).thenReturn(Optional.of(mainQuestion));
 
-            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
-            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
-
-            LlmInterviewFollowUpDecision decision = new LlmInterviewFollowUpDecision(true, "Ещё один уточняющий");
-            when(llmService.decideInterviewFollowUp(eq(vacancy.experience()), any())).thenReturn(decision);
-
-            InterviewQuestionResponse followUpResponse = mock(InterviewQuestionResponse.class);
-            when(interviewWriter.saveFollowUp(answeredFollowUp.getId(), mainId, decision.question()))
-                    .thenReturn(followUpResponse);
+            InterviewQuestion main = aQuestion(UUID.randomUUID(), null, 4, false, false, "Основной вопрос", null);
+            when(interviewQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(main));
+            InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
+            when(interviewQuestionMapper.toDto(main)).thenReturn(expected);
 
             // when
             InterviewQuestionResponse result = interviewService.nextQuestion(sessionId, userId);
 
             // then
-            assertThat(result).isEqualTo(followUpResponse);
-            verify(interviewQuestionRepository).findById(mainId);
-
-            ArgumentCaptor<LlmInterviewFollowUpRequest> captor = ArgumentCaptor.forClass(LlmInterviewFollowUpRequest.class);
-            verify(llmService).decideInterviewFollowUp(eq(vacancy.experience()), captor.capture());
-            assertThat(captor.getValue()).isEqualTo(new LlmInterviewFollowUpRequest(
-                    vacancy.name(), mainQuestion.getText(), mainQuestion.getAnswerText(),
-                    List.of(new LlmInterviewFollowUp(answeredFollowUp.getText(), answeredFollowUp.getAnswerText()))));
+            assertThat(result).isEqualTo(expected);
+            verify(interviewWriter).markFollowUpChecked(answeredFollowUp.getId());
+            verify(interviewQuestionRepository, never()).findAllByParentQuestionIdOrderByOrderIndex(any());
+            verifyNoInteractions(vacancyService, llmService);
         }
 
         @Test
-        @DisplayName("Последний ответ - на follow-up, но основной вопрос-родитель не найден - NotFoundException")
-        void throwsNotFoundWhenCaseMainMissingForFollowUpBranch() {
-            // given
-            when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(activeSession()));
-            when(interviewQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
-
-            UUID mainId = UUID.randomUUID();
-            InterviewQuestion answeredFollowUp = aQuestion(UUID.randomUUID(), mainId, 1, true, true,
-                    "А это как связано с DI?", "Через инверсию контроля");
-            when(interviewQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId))
-                    .thenReturn(Optional.of(answeredFollowUp));
-            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(mainId))
-                    .thenReturn(List.of(answeredFollowUp));
-            when(interviewQuestionRepository.findById(mainId)).thenReturn(Optional.empty());
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Question not found");
-            verifyNoInteractions(vacancyService, llmService, interviewWriter);
-        }
-
-        @Test
-        @DisplayName("Лимит уточнений по кейсу исчерпан - follow-up помечается проверенным, возвращается основной вопрос")
-        void marksCheckedAndFallsToMainWhenFollowUpLimitReached() {
+        @DisplayName("У кейса уже есть уточнение - follow-up помечается проверенным, возвращается основной вопрос")
+        void marksCheckedAndFallsToMainWhenCaseAlreadyHasFollowUp() {
             // given
             when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(activeSession()));
             when(interviewQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
@@ -657,8 +620,7 @@ class InterviewServiceTest {
                     "Расскажите про SOLID", "Мой ответ про SOLID");
             when(interviewQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
             when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId())).thenReturn(List.of(
-                    aQuestion(UUID.randomUUID(), answered.getId(), 1, true, true, "Уточнение 1", "Ответ 1"),
-                    aQuestion(UUID.randomUUID(), answered.getId(), 2, true, true, "Уточнение 2", "Ответ 2")));
+                    aQuestion(UUID.randomUUID(), answered.getId(), 1, true, true, "Уточнение 1", "Ответ 1")));
 
             InterviewQuestion main = aQuestion(UUID.randomUUID(), null, 4, false, false, "Основной вопрос", null);
             when(interviewQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(main));

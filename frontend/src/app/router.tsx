@@ -6,26 +6,20 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { RedirectIfAuthed } from '@/features/auth/RedirectIfAuthed'
 import { ErrorPage } from '@/pages/ErrorPage'
-import { BrandPage } from '@/pages/BrandPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
-import { HubPage } from '@/pages/HubPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { TrainingListPage } from '@/pages/training/TrainingListPage'
-import { NewTrainingPage } from '@/pages/training/NewTrainingPage'
-import { TrainingSessionPage } from '@/pages/training/TrainingSessionPage'
-import { TrainingReportPage } from '@/pages/training/TrainingReportPage'
-import { InterviewListPage } from '@/pages/interview/InterviewListPage'
-import { NewInterviewPage } from '@/pages/interview/NewInterviewPage'
-import { InterviewVacancyPage } from '@/pages/interview/InterviewVacancyPage'
-import { InterviewSessionPage } from '@/pages/interview/InterviewSessionPage'
-import { InterviewReportPage } from '@/pages/interview/InterviewReportPage'
 
 export const router = createBrowserRouter([
   {
     element: <RootLayout />,
     children: [
       marketingRoute,
-      { path: 'brand', element: <BrandPage />, errorElement: <ErrorPage /> },
+      {
+        path: 'brand',
+        errorElement: <ErrorPage />,
+        lazy: async () => ({
+          Component: (await import('@/pages/BrandPage')).BrandPage,
+        }),
+      },
       {
         element: <AuthLayout />,
         errorElement: <ErrorPage />,
@@ -45,7 +39,12 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <HubPage /> },
+              {
+                index: true,
+                lazy: async () => ({
+                  Component: (await import('@/pages/HubPage')).HubPage,
+                }),
+              },
               {
                 path: 'billing/success',
                 element: <Navigate to="/app?payment=ok" replace />,
@@ -54,30 +53,82 @@ export const router = createBrowserRouter([
                 path: 'billing/fail',
                 element: <Navigate to="/app?payment=fail" replace />,
               },
-              { path: 'settings', element: <SettingsPage /> },
-              { path: 'training', element: <TrainingListPage /> },
-              { path: 'training/new', element: <NewTrainingPage /> },
+              {
+                path: 'settings',
+                lazy: async () => ({
+                  Component: (await import('@/pages/SettingsPage'))
+                    .SettingsPage,
+                }),
+              },
+              {
+                path: 'training',
+                lazy: async () => ({
+                  Component: (await import('@/pages/training/TrainingListPage'))
+                    .TrainingListPage,
+                }),
+              },
+              {
+                path: 'training/new',
+                lazy: async () => ({
+                  Component: (await import('@/pages/training/NewTrainingPage'))
+                    .NewTrainingPage,
+                }),
+              },
               {
                 path: 'training/:sessionId',
-                element: <TrainingSessionPage />,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/training/TrainingSessionPage')
+                  ).TrainingSessionPage,
+                }),
               },
               {
                 path: 'training/:sessionId/report',
-                element: <TrainingReportPage />,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/training/TrainingReportPage')
+                  ).TrainingReportPage,
+                }),
               },
-              { path: 'interview', element: <InterviewListPage /> },
-              { path: 'interview/new', element: <NewInterviewPage /> },
+              {
+                path: 'interview',
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/interview/InterviewListPage')
+                  ).InterviewListPage,
+                }),
+              },
+              {
+                path: 'interview/new',
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/interview/NewInterviewPage')
+                  ).NewInterviewPage,
+                }),
+              },
               {
                 path: 'interview/vacancy/:vacancyId',
-                element: <InterviewVacancyPage />,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/interview/InterviewVacancyPage')
+                  ).InterviewVacancyPage,
+                }),
               },
               {
                 path: 'interview/:sessionId',
-                element: <InterviewSessionPage />,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/interview/InterviewSessionPage')
+                  ).InterviewSessionPage,
+                }),
               },
               {
                 path: 'interview/:sessionId/report',
-                element: <InterviewReportPage />,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/pages/interview/InterviewReportPage')
+                  ).InterviewReportPage,
+                }),
               },
             ],
           },

@@ -13,8 +13,6 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
 
     long countBySessionIdAndFollowUpFalseAndAnsweredTrue(UUID sessionId);
 
-    long countByParentQuestionId(UUID parentQuestionId);
-
     @Query("""
             SELECT q FROM InterviewQuestion q
             JOIN FETCH q.session

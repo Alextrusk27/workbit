@@ -39,6 +39,7 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 public class InterviewWriter {
 
     static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
+    static final int FOLLOW_UP_ORDER_INDEX = 1;
     static final double MIN_REVIEWED_ANSWERS_RATIO = 0.5;
     private static final int MAX_WEAKEST_SKILL_LENGTH = 100;
 
@@ -70,30 +71,32 @@ public class InterviewWriter {
     }
 
     @Transactional
-    public InterviewQuestionResponse saveFollowUp(UUID answeredQuestionId, UUID caseMainId, String text) {
+    public Optional<InterviewQuestionResponse> saveFollowUp(UUID answeredQuestionId, String text) {
         InterviewQuestion answered = interviewQuestionRepository.findWithSessionById(answeredQuestionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
         InterviewSession session = answered.getSession();
         checkSessionNotCompleted(session);
-        answered.setFollowUpChecked(true);
 
-        Optional<InterviewQuestion> pending = interviewQuestionRepository
-                .findNextUnansweredFollowUp(session.getId());
-        if (pending.isPresent()) {
-            log.warn("Interview session {} already has an unanswered follow-up, discarding the generated one",
-                    session.getId());
-            return interviewQuestionMapper.toDto(pending.get());
+        if (answered.isFollowUpChecked()) {
+            log.warn("Interview session {} already decided on a follow-up for this case, "
+                    + "discarding the generated one", session.getId());
+            return interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredQuestionId)
+                    .stream()
+                    .filter(q -> !q.isAnswered())
+                    .findFirst()
+                    .map(interviewQuestionMapper::toDto);
         }
+        answered.setFollowUpChecked(true);
 
         InterviewQuestion followUp = interviewQuestionRepository.save(InterviewQuestion.builder()
                 .session(session)
-                .parentQuestionId(caseMainId)
+                .parentQuestionId(answeredQuestionId)
                 .text(text)
-                .orderIndex((int) interviewQuestionRepository.countByParentQuestionId(caseMainId) + 1)
+                .orderIndex(FOLLOW_UP_ORDER_INDEX)
                 .followUp(true)
                 .build());
 
-        return interviewQuestionMapper.toDto(followUp);
+        return Optional.of(interviewQuestionMapper.toDto(followUp));
     }
 
     @Transactional
@@ -111,7 +114,7 @@ public class InterviewWriter {
         List<InterviewQuestion> mains = cases.stream().map(List::getFirst).toList();
         double avgScore = calculateAvgScore(mains);
 
-        session.getQuestions().removeIf(q -> !q.isAnswered() || q.isFollowUp());
+        session.getQuestions().removeIf(q -> !q.isAnswered());
         session.setReport(InterviewReport.builder()
                 .session(session)
                 .avgScore(avgScore)

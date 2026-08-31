@@ -312,6 +312,97 @@ class InterviewControllerTest {
     }
 
     // -------------------------------------------------------------------------
+    // GET /sessions/{sessionId}/questions
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("AnsweredQuestions")
+    class AnsweredQuestions {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком отвеченных вопросов, включая уточняющий с ответом")
+        void returns200WithAnsweredQuestions() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            var mainQuestionId = UUID.randomUUID();
+            var followUpId = UUID.randomUUID();
+            var main = new InterviewQuestionResponse(
+                    mainQuestionId, 1, "Расскажите про индексы в PostgreSQL", false,
+                    "Использую B-tree индексы", null, null);
+            var followUp = new InterviewQuestionResponse(
+                    followUpId, 1, "А как насчёт составных индексов?", true,
+                    "Тоже использую, когда фильтрую по нескольким полям", null, null);
+            when(interviewService.getAnsweredQuestions(sessionId, USER_ID)).thenReturn(List.of(main, followUp));
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].questionId").value(mainQuestionId.toString()))
+                    .andExpect(jsonPath("$[0].followUp").value(false))
+                    .andExpect(jsonPath("$[0].answerText").value("Использую B-tree индексы"))
+                    .andExpect(jsonPath("$[1].questionId").value(followUpId.toString()))
+                    .andExpect(jsonPath("$[1].followUp").value(true))
+                    .andExpect(jsonPath("$[1].answerText").value("Тоже использую, когда фильтрую по нескольким полям"))
+                    .andExpect(jsonPath("$[2]").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 с пустым массивом, когда вопросов ещё нет")
+        void returns200WithEmptyArray() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            when(interviewService.getAnsweredQuestions(sessionId, USER_ID)).thenReturn(List.of());
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$").isEmpty());
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда сессия не найдена")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            when(interviewService.getAnsweredQuestions(sessionId, USER_ID))
+                    .thenThrow(new NotFoundException("Session not found"));
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Session not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда sessionId не является UUID")
+        void returns400WhenSessionIdNotUuid() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/sessions/not-a-uuid/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(interviewService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(interviewService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // POST /sessions/{sessionId}/questions/next
     // -------------------------------------------------------------------------
 

@@ -152,6 +152,21 @@ public class TrainingController {
         return ResponseEntity.ok(trainingService.get(sessionId, userDetails.getId()));
     }
 
+    @GetMapping("/sessions/{sessionId}/questions")
+    @Loggable(logArgs = true)
+    @Operation(summary = "История отвеченных вопросов", description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя, по порядку. Нужна, чтобы при возврате в незавершённую тренировку показать все прошлые вопросы и ответы. Оценки и разбор появляются в этих полях только после завершения тренировки.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "История возвращена"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<@NotNull TrainingQuestionResponse>> answeredQuestions(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(trainingService.getAnsweredQuestions(sessionId, userDetails.getId()));
+    }
+
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
     @Operation(summary = "Получить следующий вопрос", description = "Возвращает первый неотвеченный вопрос сессии. Вызов идемпотентен: повторный запрос возвращает тот же вопрос, пока на него не ответили.")

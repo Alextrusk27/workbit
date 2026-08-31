@@ -84,7 +84,6 @@ function SessionRun({ session }: { session: InterviewSession }) {
     'loading' | 'idle' | 'done' | 'error'
   >('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
-  const resumed = session.answeredCount > 0
 
   const submit = useSubmitInterviewAnswer()
   const finish = useFinishInterview()
@@ -92,6 +91,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
   const startedRef = useRef(false)
   const finishStartedRef = useRef(false)
   const inFlight = useRef(false)
+  const historyLoaded = useRef(session.answeredCount === 0)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   const loadNext = useCallback(async () => {
@@ -100,6 +100,11 @@ function SessionRun({ session }: { session: InterviewSession }) {
     setLoadState('loading')
     setLoadError(null)
     try {
+      if (!historyLoaded.current) {
+        const past = await interviewApi.answeredQuestions(session.id)
+        setItems(past.map((q) => ({ q, answer: q.answerText })))
+        historyLoaded.current = true
+      }
       const q = await interviewApi.nextQuestion(session.id)
       setItems((prev) =>
         prev.some((it) => it.q.questionId === q.questionId)
@@ -192,12 +197,6 @@ function SessionRun({ session }: { session: InterviewSession }) {
       </div>
       <p className="text-muted mt-1.5 text-sm">{sessionSubtitle(session)}</p>
 
-      {resumed && (
-        <p className="text-dim mt-4 text-xs">
-          Прошлые ответы этой сессии появятся в разборе после завершения.
-        </p>
-      )}
-
       <ChatShell
         className="mt-6"
         name="AI-интервьюер"
@@ -232,8 +231,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
       </ChatShell>
 
       <p className="text-dim mt-3 text-[12.5px]">
-        Оценок по ходу нет — весь разбор придёт в конце. Enter — отправить,
-        Shift+Enter — новая строка.
+        Enter — отправить · Shift+Enter — перенос
       </p>
 
       {submit.isError && (

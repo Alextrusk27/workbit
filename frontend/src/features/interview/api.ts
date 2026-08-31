@@ -112,6 +112,9 @@ export const interviewApi = {
   getSession: (sessionId: string) =>
     apiFetch<InterviewSession>(`${BASE}/sessions/${sessionId}`),
 
+  answeredQuestions: (sessionId: string) =>
+    apiFetch<InterviewQuestion[]>(`${BASE}/sessions/${sessionId}/questions`),
+
   nextQuestion: (sessionId: string) =>
     apiFetch<InterviewQuestion>(
       `${BASE}/sessions/${sessionId}/questions/next`,

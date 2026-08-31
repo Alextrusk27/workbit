@@ -349,6 +349,33 @@
   animation: mic-pulse 1.4s infinite;
 }
 
+/* Индикаторы строки подсказок диктовки — точка «идёт запись» и кольцо
+   расшифровки: бесконечные повторы, поэтому CSS-кейфреймы, как эквалайзер
+   и пульс микрофона. */
+@utility dot-blink {
+  animation: dot-blink 1.2s ease-in-out infinite;
+}
+
+@utility dot-spin {
+  animation: dot-spin 0.8s linear infinite;
+}
+
+@keyframes dot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dot-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* Появление сообщения в чат-демо: как в мессенджерах — снизу вверх с
    проявлением. Разовая, поэтому на CSS вместе с остальными кейфреймами демо;
    числа — токены motion: slow / smooth / distance.md / scale.subtle. */

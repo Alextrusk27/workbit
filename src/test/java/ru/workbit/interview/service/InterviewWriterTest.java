@@ -175,66 +175,84 @@ class InterviewWriterTest {
     class SaveFollowUp {
 
         @Test
-        @DisplayName("Нормальный путь - сохраняет follow-up с orderIndex = countByParentQuestionId + 1, проставляет followUpChecked отвеченному")
-        void savesNewFollowUpWithNextOrderIndex() {
+        @DisplayName("Нормальный путь - сохраняет уточнение к отвеченному вопросу с orderIndex 1, проставляет ему followUpChecked")
+        void savesNewFollowUp() {
             // given
             UUID answeredId = UUID.randomUUID();
-            UUID caseMainId = UUID.randomUUID();
             InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
             InterviewQuestion answered = InterviewQuestion.builder()
                     .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(false).build();
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
-            when(interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())).thenReturn(Optional.empty());
-            when(interviewQuestionRepository.countByParentQuestionId(caseMainId)).thenReturn(2L);
             when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
             InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
-                    UUID.randomUUID(), 3, "Новое уточнение", true, null, null, null);
+                    UUID.randomUUID(), 1, "Новое уточнение", true, null, null, null);
             when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(expectedResponse);
 
             // when
-            InterviewQuestionResponse result = interviewWriter.saveFollowUp(answeredId, caseMainId, "Новое уточнение");
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Новое уточнение");
 
             // then
-            assertThat(result).isEqualTo(expectedResponse);
+            assertThat(result).contains(expectedResponse);
             assertThat(answered.isFollowUpChecked()).isTrue();
 
             ArgumentCaptor<InterviewQuestion> captor = ArgumentCaptor.forClass(InterviewQuestion.class);
             verify(interviewQuestionRepository).save(captor.capture());
             InterviewQuestion saved = captor.getValue();
-            assertThat(saved.getOrderIndex()).isEqualTo(3);
-            assertThat(saved.getParentQuestionId()).isEqualTo(caseMainId);
+            assertThat(saved.getOrderIndex()).isEqualTo(1);
+            assertThat(saved.getParentQuestionId()).isEqualTo(answeredId);
             assertThat(saved.getText()).isEqualTo("Новое уточнение");
             assertThat(saved.isFollowUp()).isTrue();
             assertThat(saved.getSession()).isSameAs(session);
         }
 
         @Test
-        @DisplayName("Гонка - findNextUnansweredFollowUp уже нашёл ожидающий follow-up - возвращает его, новый не сохраняется")
+        @DisplayName("Решение по кейсу уже принято, уточнение ждёт ответа - возвращается оно, новое не сохраняется")
         void returnsExistingPendingFollowUpInsteadOfSavingNew() {
             // given
             UUID answeredId = UUID.randomUUID();
-            UUID caseMainId = UUID.randomUUID();
             InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
             InterviewQuestion answered = InterviewQuestion.builder()
-                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(false).build();
+                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(true).build();
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             InterviewQuestion pendingFollowUp = InterviewQuestion.builder()
-                    .id(UUID.randomUUID()).text("Уже создано").orderIndex(1).followUp(true).build();
-            when(interviewQuestionRepository.findNextUnansweredFollowUp(session.getId()))
-                    .thenReturn(Optional.of(pendingFollowUp));
+                    .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Уже создано")
+                    .orderIndex(1).followUp(true).answered(false).build();
+            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredId))
+                    .thenReturn(List.of(pendingFollowUp));
 
             InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
                     pendingFollowUp.getId(), 1, "Уже создано", true, null, null, null);
             when(interviewQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
 
             // when
-            InterviewQuestionResponse result = interviewWriter.saveFollowUp(answeredId, caseMainId, "Новый вопрос");
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Новый вопрос");
 
             // then
-            assertThat(result).isEqualTo(expectedResponse);
-            assertThat(answered.isFollowUpChecked()).isTrue();
+            assertThat(result).contains(expectedResponse);
+            verify(interviewQuestionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Зависший запрос: решение по кейсу принято и уточнение уже отвечено - второе уточнение не создаётся")
+        void doesNotSaveSecondFollowUpWhenCaseAlreadyClarified() {
+            // given
+            UUID answeredId = UUID.randomUUID();
+            InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
+            InterviewQuestion answered = InterviewQuestion.builder()
+                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(true).build();
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredId))
+                    .thenReturn(List.of(InterviewQuestion.builder()
+                            .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Уточнение")
+                            .orderIndex(1).followUp(true).answered(true).build()));
+
+            // when
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Второе уточнение");
+
+            // then
+            assertThat(result).isEmpty();
             verify(interviewQuestionRepository, never()).save(any());
         }
 
@@ -246,7 +264,7 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, UUID.randomUUID(), "Уточнение"))
+            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, "Уточнение"))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Question not found");
         }
@@ -263,7 +281,7 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             // when / then
-            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, UUID.randomUUID(), "Уточнение"))
+            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, "Уточнение"))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
             verify(interviewQuestionRepository, never()).save(any());
@@ -329,9 +347,9 @@ class InterviewWriterTest {
 
         @Test
         @DisplayName("Отвеченные вопросы содержат уточнения и неотвеченный основной - "
-                + "removeIf убирает уточнения и неотвеченные из session.getQuestions(), "
-                + "в отчёт и в avgScore идут только основные")
-        void removesFollowUpsAndUnansweredQuestionsKeepingOnlyAnsweredMainsInReport() {
+                + "removeIf убирает из session.getQuestions() только неотвеченные, отвеченное "
+                + "уточнение остаётся в БД, а в отчёт и в avgScore идут лишь основные")
+        void removesUnansweredQuestionsKeepingAnsweredFollowUpsOutOfReport() {
             // given
             UUID sessionId = UUID.randomUUID();
             InterviewQuestion main1 = answeredMain(1);
@@ -364,7 +382,7 @@ class InterviewWriterTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            assertThat(session.getQuestions()).containsExactly(main1, main2);
+            assertThat(session.getQuestions()).containsExactly(main1, followUpOfMain1, main2);
             assertThat(session.getReport().getAvgScore()).isEqualTo(4.5);
 
             @SuppressWarnings("unchecked")

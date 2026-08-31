@@ -25,18 +25,17 @@ const TICK_MS = 1000
 const NORMAL_CLOSURES = [1000, 1005]
 
 const MIC_ERRORS: Record<string, string> = {
-  NotAllowedError:
-    'Доступ к микрофону запрещён. Разреши его в настройках браузера.',
-  NotFoundError: 'Микрофон не найден. Подключи его и попробуй снова.',
-  NotReadableError: 'Микрофон занят другим приложением.',
+  NotAllowedError: 'Микрофон запрещён — разреши в браузере',
+  NotFoundError: 'Микрофон не найден',
+  NotReadableError: 'Микрофон занят другим приложением',
 }
 
 function micErrorMessage(error: unknown): string {
   if (error instanceof UnsupportedBrowserError) {
-    return 'Браузер не поддерживает запись с микрофона. Ответь текстом.'
+    return 'Запись не поддерживается — ответь текстом'
   }
   const name = error instanceof DOMException ? error.name : ''
-  return MIC_ERRORS[name] ?? 'Не удалось включить микрофон. Ответь текстом.'
+  return MIC_ERRORS[name] ?? 'Микрофон не включился — ответь текстом'
 }
 
 export function useDictation(onText: (text: string) => void): Dictation {
@@ -89,17 +88,17 @@ export function useDictation(onText: (text: string) => void): Dictation {
     ticker.current = window.setInterval(() => {
       const now = Date.now()
       if (now - startedAt.current >= MAX_ANSWER_MS) {
-        setNotice('Прошло четыре минуты — запись остановлена.')
+        setNotice('4 минуты — запись остановлена')
         finish()
         return
       }
       const silence = now - lastVoice.current
       if (silence >= SILENCE_STOP_MS) {
-        setNotice('Ничего не слышно — запись остановлена.')
+        setNotice('Тишина — запись остановлена')
         finish()
       } else if (silence >= SILENCE_WARNING_MS) {
         const left = Math.ceil((SILENCE_STOP_MS - silence) / 1000)
-        setNotice(`Не слышу тебя. Остановлю запись через ${left} с.`)
+        setNotice(`Не слышу — остановлю через ${left} с`)
       }
     }, TICK_MS)
   }, [finish, stopTicker])

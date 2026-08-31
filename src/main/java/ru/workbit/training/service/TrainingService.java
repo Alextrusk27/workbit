@@ -169,6 +169,16 @@ public class TrainingService {
                 });
     }
 
+    public List<TrainingQuestionResponse> getAnsweredQuestions(UUID sessionId, UUID userId) {
+        TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
+                .filter(s -> s.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+
+        return answeredSorted(session).stream()
+                .map(trainingQuestionMapper::toDto)
+                .toList();
+    }
+
     /**
      * Следующая пачка вопросов в ту же сессию — альтернатива разбору, когда вопросы кончились.
      * Банк отдаёт только не виденное пользователем, недостающее пишет LLM с оглядкой на уже

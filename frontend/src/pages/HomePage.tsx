@@ -318,10 +318,12 @@ export function HomePage() {
                   <div className={statTile}>
                     <p className="text-ink m-0 flex items-center gap-2 text-[17px] leading-[26px] font-bold tabular-nums sm:text-[19px] sm:leading-normal">
                       4,2
-                      <Stars value={4} className="text-xs" />
+                      <Stars value={4} className="text-xs max-sm:hidden" />
+                      <span className="text-star text-xs sm:hidden">★</span>
                     </p>
                     <p className="text-dim mt-[3px] text-[11px] sm:text-xs">
-                      Лучшая оценка
+                      <span className="sm:hidden">Лучшая</span>
+                      <span className="max-sm:hidden">Лучшая оценка</span>
                     </p>
                   </div>
                   <div className={statTile}>
@@ -454,10 +456,10 @@ export function HomePage() {
                     className="border-surface-line bg-surface flex items-center gap-3 rounded-xl border px-4 py-[13px]"
                   >
                     <StepBadge n={String(i + 1)} className="size-6 text-xs" />
-                    <span className="text-ink text-sm font-semibold">
+                    <span className="text-ink shrink-0 text-sm font-semibold">
                       {s.label}
                     </span>
-                    <span className="text-muted ml-auto text-[13.5px]">
+                    <span className="text-muted ml-auto min-w-0 text-right text-[13.5px]">
                       {s.value}
                     </span>
                   </div>

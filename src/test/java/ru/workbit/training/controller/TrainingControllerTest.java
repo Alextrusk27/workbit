@@ -27,6 +27,7 @@ import ru.workbit.training.dto.NormalizeInputRequest;
 import ru.workbit.training.dto.NormalizeInputResponse;
 import ru.workbit.training.dto.ReferenceAnswerResponse;
 import ru.workbit.training.dto.TrainingOptionsResponse;
+import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingSession;
 import ru.workbit.training.model.TrainingUserFeedback;
@@ -644,6 +645,88 @@ class TrainingControllerTest {
             mvc.perform(post(BASE + "/normalize")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(trainingService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /sessions/{sessionId}/questions
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("AnsweredQuestions")
+    class AnsweredQuestions {
+
+        @Test
+        @DisplayName("Возвращает 200 со списком отвеченных вопросов")
+        void returns200WithAnsweredQuestions() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            var questionId = UUID.randomUUID();
+            var question = new TrainingQuestionResponse(
+                    questionId, 1, "Что такое индекс в PostgreSQL?", "Структура для ускорения поиска", null, null);
+            when(trainingService.getAnsweredQuestions(sessionId, USER_ID)).thenReturn(List.of(question));
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].questionId").value(questionId.toString()))
+                    .andExpect(jsonPath("$[0].answerText").value("Структура для ускорения поиска"))
+                    .andExpect(jsonPath("$[1]").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 с пустым массивом, когда вопросов ещё нет")
+        void returns200WithEmptyArray() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            when(trainingService.getAnsweredQuestions(sessionId, USER_ID)).thenReturn(List.of());
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$").isEmpty());
+        }
+
+        @Test
+        @DisplayName("Возвращает 404, когда сессия не найдена")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+            when(trainingService.getAnsweredQuestions(sessionId, USER_ID))
+                    .thenThrow(new NotFoundException("Session not found"));
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Session not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда sessionId не является UUID")
+        void returns400WhenSessionIdNotUuid() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/sessions/not-a-uuid/questions")
+                            .with(user(principal())))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(trainingService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401, когда нет аутентификации")
+        void returns401WithoutAuthentication() throws Exception {
+            // given
+            var sessionId = UUID.randomUUID();
+
+            // when / then
+            mvc.perform(get(BASE + "/sessions/" + sessionId + "/questions"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(trainingService);

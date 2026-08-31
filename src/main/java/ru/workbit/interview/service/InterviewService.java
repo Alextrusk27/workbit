@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
+import static ru.workbit.interview.service.InterviewSessions.answeredMainSorted;
 import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
 import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
 import static ru.workbit.interview.service.InterviewSessions.groupCases;
@@ -107,6 +108,17 @@ public class InterviewService {
                 });
     }
 
+    public List<InterviewQuestionResponse> getAnsweredQuestions(UUID sessionId, UUID userId) {
+        InterviewSession session = interviewSessionRepository.findWithQuestionsById(sessionId)
+                .filter(s -> s.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+
+        return groupCases(answeredSorted(session)).stream()
+                .flatMap(List::stream)
+                .map(interviewQuestionMapper::toDto)
+                .toList();
+    }
+
     private Optional<InterviewQuestionResponse> askFollowUp(InterviewSession session) {
         Optional<InterviewQuestion> lastAnswered = interviewQuestionRepository
                 .findLastAnsweredWithoutFollowUpCheck(session.getId());
@@ -137,7 +149,7 @@ public class InterviewService {
         }
 
         try {
-            return Optional.of(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()));
+            return interviewWriter.saveFollowUp(answered.getId(), decision.question());
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent request already created a follow-up for interview session {}", session.getId());
             return interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())
@@ -217,7 +229,7 @@ public class InterviewService {
             throw new NotFoundException("Report not found");
         }
 
-        return interviewReportMapper.toResponse(report, session, answeredSorted(session));
+        return interviewReportMapper.toResponse(report, session, answeredMainSorted(session));
     }
 
     private static LlmInterviewQuestionsRequest toQuestionsRequest(VacancyData vacancyData) {

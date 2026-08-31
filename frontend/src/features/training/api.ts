@@ -121,6 +121,9 @@ export const trainingApi = {
   getSession: (sessionId: string) =>
     apiFetch<TrainingSession>(`${BASE}/sessions/${sessionId}`),
 
+  answeredQuestions: (sessionId: string) =>
+    apiFetch<TrainingQuestion[]>(`${BASE}/sessions/${sessionId}/questions`),
+
   nextQuestion: (sessionId: string) =>
     apiFetch<TrainingQuestion>(`${BASE}/sessions/${sessionId}/questions/next`, {
       method: 'POST',

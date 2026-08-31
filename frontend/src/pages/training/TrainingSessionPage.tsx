@@ -85,7 +85,6 @@ function SessionRun({ session }: { session: TrainingSession }) {
     'loading' | 'idle' | 'cap' | 'error'
   >('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
-  const resumed = session.answeredCount > 0
 
   const submit = useSubmitAnswer()
   const finish = useFinishSession()
@@ -93,6 +92,7 @@ function SessionRun({ session }: { session: TrainingSession }) {
 
   const startedRef = useRef(false)
   const inFlight = useRef(false)
+  const historyLoaded = useRef(session.answeredCount === 0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const loadNext = useCallback(async () => {
@@ -101,6 +101,11 @@ function SessionRun({ session }: { session: TrainingSession }) {
     setLoadState('loading')
     setLoadError(null)
     try {
+      if (!historyLoaded.current) {
+        const past = await trainingApi.answeredQuestions(session.id)
+        setItems(past.map((q) => ({ q, answer: q.answerText })))
+        historyLoaded.current = true
+      }
       const q = await trainingApi.nextQuestion(session.id)
       setItems((prev) =>
         prev.some((it) => it.q.questionId === q.questionId)
@@ -187,12 +192,6 @@ function SessionRun({ session }: { session: TrainingSession }) {
         </p>
       </div>
       <p className="text-muted mt-1.5 text-sm">{sessionSubtitle(session)}</p>
-
-      {resumed && (
-        <p className="text-dim mt-4 text-xs">
-          Прошлые ответы этой сессии появятся в разборе после завершения.
-        </p>
-      )}
 
       <ol className="mt-9">
         {items.map((item) => (
@@ -312,10 +311,6 @@ function CurrentQuestion({
             onClick={toggleMic}
           />
         </div>
-        <p className="text-dim mt-3 text-[12.5px]">
-          Оценок по ходу нет — весь разбор придёт в конце, при завершении
-          тренировки.
-        </p>
       </div>
     </div>
   )

@@ -25,6 +25,12 @@ final class InterviewSessions {
                 .toList();
     }
 
+    static List<InterviewQuestion> answeredMainSorted(InterviewSession session) {
+        return answeredSorted(session).stream()
+                .filter(q -> !q.isFollowUp())
+                .toList();
+    }
+
     static List<List<InterviewQuestion>> groupCases(List<InterviewQuestion> answered) {
         Map<UUID, List<InterviewQuestion>> followUpsByParent = answered.stream()
                 .filter(InterviewQuestion::isFollowUp)

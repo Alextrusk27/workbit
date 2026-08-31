@@ -231,7 +231,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
       </ChatShell>
 
       <p className="text-dim mt-3 text-[12.5px]">
-        Enter — отправить, Shift+Enter — новая строка.
+        Enter — отправить · Shift+Enter — перенос
       </p>
 
       {submit.isError && (

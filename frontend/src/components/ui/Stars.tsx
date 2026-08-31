@@ -45,7 +45,7 @@ export function Stars({
       role="img"
       aria-label={`Оценка ${String(rounded).replace('.', ',')} из ${max}`}
       className={cn(
-        'text-star relative inline-flex align-middle leading-none',
+        'text-star relative inline-flex shrink-0 align-middle leading-none',
         className,
       )}
     >

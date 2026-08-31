@@ -563,8 +563,8 @@ class InterviewServiceTest {
             when(llmService.decideInterviewFollowUp(eq(vacancy.experience()), any())).thenReturn(decision);
 
             InterviewQuestionResponse followUpResponse = mock(InterviewQuestionResponse.class);
-            when(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()))
-                    .thenReturn(followUpResponse);
+            when(interviewWriter.saveFollowUp(answered.getId(), decision.question()))
+                    .thenReturn(Optional.of(followUpResponse));
 
             // when
             InterviewQuestionResponse result = interviewService.nextQuestion(sessionId, userId);
@@ -579,6 +579,36 @@ class InterviewServiceTest {
 
             verify(interviewWriter, never()).markFollowUpChecked(any());
             verify(interviewQuestionRepository, never()).findNextUnansweredMain(any());
+        }
+
+        @Test
+        @DisplayName("Writer отказался сохранять уточнение (кейс уточнён параллельным запросом) - возвращается основной вопрос")
+        void returnsMainQuestionWhenWriterDiscardsGeneratedFollowUp() {
+            // given
+            when(interviewSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(activeSession()));
+            when(interviewQuestionRepository.findNextUnansweredFollowUp(sessionId)).thenReturn(Optional.empty());
+
+            InterviewQuestion answered = aQuestion(UUID.randomUUID(), null, 3, false, true,
+                    "Расскажите про SOLID", "Мой ответ про SOLID");
+            when(interviewQuestionRepository.findLastAnsweredWithoutFollowUpCheck(sessionId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answered.getId())).thenReturn(List.of());
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+            LlmInterviewFollowUpDecision decision = new LlmInterviewFollowUpDecision(true, "Сгенерированный follow-up");
+            when(llmService.decideInterviewFollowUp(eq(vacancy.experience()), any())).thenReturn(decision);
+            when(interviewWriter.saveFollowUp(answered.getId(), decision.question())).thenReturn(Optional.empty());
+
+            InterviewQuestion main = aQuestion(UUID.randomUUID(), null, 4, false, false, "Основной вопрос", null);
+            when(interviewQuestionRepository.findNextUnansweredMain(sessionId)).thenReturn(Optional.of(main));
+            InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
+            when(interviewQuestionMapper.toDto(main)).thenReturn(expected);
+
+            // when
+            InterviewQuestionResponse result = interviewService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expected);
         }
 
         @Test
@@ -665,7 +695,7 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expected);
             verify(interviewWriter).markFollowUpChecked(answered.getId());
-            verify(interviewWriter, never()).saveFollowUp(any(), any(), any());
+            verify(interviewWriter, never()).saveFollowUp(any(), any());
         }
 
         @Test
@@ -687,7 +717,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
             LlmInterviewFollowUpDecision decision = new LlmInterviewFollowUpDecision(true, "Новый уточняющий");
             when(llmService.decideInterviewFollowUp(eq(vacancy.experience()), any())).thenReturn(decision);
-            when(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()))
+            when(interviewWriter.saveFollowUp(answered.getId(), decision.question()))
                     .thenThrow(new DataIntegrityViolationException("duplicate follow-up"));
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -718,7 +748,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
             LlmInterviewFollowUpDecision decision = new LlmInterviewFollowUpDecision(true, "Новый уточняющий");
             when(llmService.decideInterviewFollowUp(eq(vacancy.experience()), any())).thenReturn(decision);
-            when(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()))
+            when(interviewWriter.saveFollowUp(answered.getId(), decision.question()))
                     .thenThrow(new DataIntegrityViolationException("duplicate follow-up"));
 
             InterviewQuestion main = aQuestion(UUID.randomUUID(), null, 4, false, false, "Основной вопрос", null);

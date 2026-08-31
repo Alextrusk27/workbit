@@ -137,7 +137,7 @@ public class InterviewService {
         }
 
         try {
-            return Optional.of(interviewWriter.saveFollowUp(answered.getId(), answered.getId(), decision.question()));
+            return interviewWriter.saveFollowUp(answered.getId(), decision.question());
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent request already created a follow-up for interview session {}", session.getId());
             return interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())

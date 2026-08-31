@@ -114,7 +114,7 @@ public class InterviewWriter {
         List<InterviewQuestion> mains = cases.stream().map(List::getFirst).toList();
         double avgScore = calculateAvgScore(mains);
 
-        session.getQuestions().removeIf(q -> !q.isAnswered() || q.isFollowUp());
+        session.getQuestions().removeIf(q -> !q.isAnswered());
         session.setReport(InterviewReport.builder()
                 .session(session)
                 .avgScore(avgScore)

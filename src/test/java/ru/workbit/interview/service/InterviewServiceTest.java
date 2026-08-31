@@ -782,6 +782,93 @@ class InterviewServiceTest {
     }
 
     @Nested
+    @DisplayName("GetAnsweredQuestions")
+    class GetAnsweredQuestions {
+
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID userId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Возвращает историю кейсами: основной вопрос и сразу его отвеченное уточнение, порядок по orderIndex, неотвеченные не попадают")
+        void returnsAnsweredCasesOrderedByOrderIndexRegardlessOfStorageOrder() {
+            // given
+            InterviewQuestion mainA = aQuestion(UUID.randomUUID(), null, 1, false, true,
+                    "Основной вопрос A", "Ответ A");
+            InterviewQuestion followUpA = aQuestion(UUID.randomUUID(), mainA.getId(), 1, true, true,
+                    "Уточнение к A", "Ответ на уточнение A");
+            InterviewQuestion mainB = aQuestion(UUID.randomUUID(), null, 2, false, true,
+                    "Основной вопрос B", "Ответ B");
+            InterviewQuestion unanswered = aQuestion(UUID.randomUUID(), null, 3, false, false,
+                    "Неотвеченный основной вопрос", null);
+
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    UUID.randomUUID(), 3);
+            session.setQuestions(List.of(mainB, unanswered, followUpA, mainA));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            InterviewQuestionResponse mainAResponse = mock(InterviewQuestionResponse.class);
+            InterviewQuestionResponse followUpAResponse = mock(InterviewQuestionResponse.class);
+            InterviewQuestionResponse mainBResponse = mock(InterviewQuestionResponse.class);
+            when(interviewQuestionMapper.toDto(mainA)).thenReturn(mainAResponse);
+            when(interviewQuestionMapper.toDto(followUpA)).thenReturn(followUpAResponse);
+            when(interviewQuestionMapper.toDto(mainB)).thenReturn(mainBResponse);
+
+            // when
+            List<InterviewQuestionResponse> result = interviewService.getAnsweredQuestions(sessionId, userId);
+
+            // then
+            assertThat(result).containsExactly(mainAResponse, followUpAResponse, mainBResponse);
+        }
+
+        @Test
+        @DisplayName("Нет ни одного отвеченного вопроса - пустой список")
+        void returnsEmptyListWhenNothingAnswered() {
+            // given
+            InterviewQuestion unanswered = aQuestion(UUID.randomUUID(), null, 1, false, false,
+                    "Неотвеченный вопрос", null);
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 1);
+            session.setQuestions(List.of(unanswered));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when
+            List<InterviewQuestionResponse> result = interviewService.getAnsweredQuestions(sessionId, userId);
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(interviewQuestionMapper);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.getAnsweredQuestions(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(interviewQuestionMapper);
+        }
+
+        @Test
+        @DisplayName("Сессия принадлежит другому пользователю - NotFoundException")
+        void throwsWhenSessionOwnedByAnotherUser() {
+            // given
+            InterviewSession session = aSession(sessionId, UUID.randomUUID(), InterviewSession.Status.IN_PROGRESS,
+                    UUID.randomUUID(), 3);
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.getAnsweredQuestions(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(interviewQuestionMapper);
+        }
+    }
+
+    @Nested
     @DisplayName("SubmitAnswer")
     class SubmitAnswer {
 
@@ -1332,15 +1419,17 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Отчёт сформирован - маппится только с отвеченными вопросами, отсортированными по orderIndex")
-        void returnsMappedReportWithAnsweredQuestionsOnly() {
+        @DisplayName("Отчёт сформирован - маппится только с отвеченными основными вопросами по orderIndex, уточнения в отчёт не идут")
+        void returnsMappedReportWithAnsweredMainQuestionsOnly() {
             // given
             InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.COMPLETED,
                     UUID.randomUUID(), 2);
             InterviewQuestion answeredSecond = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
             InterviewQuestion answeredFirst = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion answeredFollowUp = aQuestion(UUID.randomUUID(), answeredFirst.getId(), 1, true, true,
+                    "Уточнение к вопросу 1", "Ответ на уточнение");
             InterviewQuestion unanswered = aQuestion(UUID.randomUUID(), null, 3, false, false, "Вопрос 3", null);
-            session.setQuestions(List.of(answeredSecond, answeredFirst, unanswered));
+            session.setQuestions(List.of(answeredSecond, answeredFirst, answeredFollowUp, unanswered));
             InterviewReport report = InterviewReport.builder()
                     .id(UUID.randomUUID())
                     .avgScore(4.0)

@@ -347,9 +347,9 @@ class InterviewWriterTest {
 
         @Test
         @DisplayName("Отвеченные вопросы содержат уточнения и неотвеченный основной - "
-                + "removeIf убирает уточнения и неотвеченные из session.getQuestions(), "
-                + "в отчёт и в avgScore идут только основные")
-        void removesFollowUpsAndUnansweredQuestionsKeepingOnlyAnsweredMainsInReport() {
+                + "removeIf убирает из session.getQuestions() только неотвеченные, отвеченное "
+                + "уточнение остаётся в БД, а в отчёт и в avgScore идут лишь основные")
+        void removesUnansweredQuestionsKeepingAnsweredFollowUpsOutOfReport() {
             // given
             UUID sessionId = UUID.randomUUID();
             InterviewQuestion main1 = answeredMain(1);
@@ -382,7 +382,7 @@ class InterviewWriterTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            assertThat(session.getQuestions()).containsExactly(main1, main2);
+            assertThat(session.getQuestions()).containsExactly(main1, followUpOfMain1, main2);
             assertThat(session.getReport().getAvgScore()).isEqualTo(4.5);
 
             @SuppressWarnings("unchecked")

@@ -1279,6 +1279,84 @@ class TrainingServiceTest {
     }
 
     @Nested
+    @DisplayName("GetAnsweredQuestions")
+    class GetAnsweredQuestions {
+
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID userId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Возвращает только отвеченные вопросы по orderIndex, даже если в сессии лежат не по порядку")
+        void returnsAnsweredQuestionsOrderedByOrderIndexRegardlessOfStorageOrder() {
+            // given
+            TrainingQuestion q1 = aQuestion(1);
+            TrainingQuestion q2 = aQuestion(2);
+            TrainingQuestion unanswered = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).text("Вопрос 3").orderIndex(3).answered(false).build();
+
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(q2, unanswered, q1));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            TrainingQuestionResponse q1Response = mock(TrainingQuestionResponse.class);
+            TrainingQuestionResponse q2Response = mock(TrainingQuestionResponse.class);
+            when(trainingQuestionMapper.toDto(q1)).thenReturn(q1Response);
+            when(trainingQuestionMapper.toDto(q2)).thenReturn(q2Response);
+
+            // when
+            List<TrainingQuestionResponse> result = trainingService.getAnsweredQuestions(sessionId, userId);
+
+            // then
+            assertThat(result).containsExactly(q1Response, q2Response);
+        }
+
+        @Test
+        @DisplayName("Нет ни одного отвеченного вопроса - пустой список")
+        void returnsEmptyListWhenNothingAnswered() {
+            // given
+            TrainingQuestion unanswered = TrainingQuestion.builder()
+                    .id(UUID.randomUUID()).text("Вопрос 1").orderIndex(1).answered(false).build();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            session.setQuestions(List.of(unanswered));
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when
+            List<TrainingQuestionResponse> result = trainingService.getAnsweredQuestions(sessionId, userId);
+
+            // then
+            assertThat(result).isEmpty();
+            verifyNoInteractions(trainingQuestionMapper);
+        }
+
+        @Test
+        @DisplayName("Сессия не найдена - NotFoundException")
+        void throwsWhenSessionNotFound() {
+            // given
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getAnsweredQuestions(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(trainingQuestionMapper);
+        }
+
+        @Test
+        @DisplayName("Сессия принадлежит другому пользователю - NotFoundException")
+        void throwsWhenSessionOwnedByAnotherUser() {
+            // given
+            TrainingSession session = aSession(sessionId, UUID.randomUUID(), PROFESSION);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getAnsweredQuestions(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Session not found");
+            verifyNoInteractions(trainingQuestionMapper);
+        }
+    }
+
+    @Nested
     @DisplayName("AddQuestions")
     class AddQuestions {
 

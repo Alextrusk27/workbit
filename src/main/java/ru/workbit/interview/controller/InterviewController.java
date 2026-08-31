@@ -78,6 +78,21 @@ public class InterviewController {
         return ResponseEntity.ok(interviewService.get(sessionId, userDetails.getId()));
     }
 
+    @GetMapping("/sessions/{sessionId}/questions")
+    @Loggable(logArgs = true)
+    @Operation(summary = "История отвеченных вопросов", description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя - основные и уточняющие, в порядке беседы (основной вопрос, затем его уточнение). Нужна, чтобы при возврате в незавершённое интервью показать всю прошлую переписку. Оценки и разбор появляются в этих полях только после завершения интервью.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "История возвращена"),
+            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<@NotNull List<@NotNull InterviewQuestionResponse>> answeredQuestions(
+            @PathVariable UUID sessionId,
+            @Parameter(hidden = true) @Sensitive @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(interviewService.getAnsweredQuestions(sessionId, userDetails.getId()));
+    }
+
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
     @Operation(summary = "Получить следующий вопрос", description = "Возвращает очередной неотвеченный основной вопрос (вопросы генерируются заранее при создании сессии) либо уточняющий вопрос (followUp: true), который LLM формирует по последнему ответу при необходимости. Уточняющие не входят в счётчик основных вопросов, на один основной — не больше одного. Когда все вопросы отвечены, возвращает 409.")

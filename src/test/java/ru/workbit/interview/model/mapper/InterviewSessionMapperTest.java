@@ -85,7 +85,9 @@ class InterviewSessionMapperTest {
                     "Python-разработчик",
                     "ООО Лютик",
                     "https://hh.ru/vacancy/654321",
-                    "От 3 до 6 лет"
+                    "От 3 до 6 лет",
+                    List.of("Python", "Django"),
+                    "Описание вакансии"
             );
 
             // when

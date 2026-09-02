@@ -1,12 +1,10 @@
-package ru.workbit.vacancy.dto;
+package ru.workbit.llm.dto;
 
 import java.util.List;
 
-public record VacancySnapshotView(
-        String sourceId,
+public record LlmInterviewVacancy(
         String name,
         String employer,
-        String url,
         String experience,
         List<String> keySkills,
         String description

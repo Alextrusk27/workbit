@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.dto.*;
 import ru.workbit.training.model.TrainingSession;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +35,9 @@ class LlmServiceTest {
 
     @Mock
     LlmClient llm;
+
+    @Mock
+    InterviewerClient interviewer;
 
     @InjectMocks
     LlmService llmService;
@@ -119,52 +124,53 @@ class LlmServiceTest {
     }
 
     @Nested
-    @DisplayName("GenerateInterviewQuestions")
-    class GenerateInterviewQuestions {
+    @DisplayName("PlanInterview")
+    class PlanInterview {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-question-generator-{суффикс} по грейду опыта")
-        void routesByExperienceGrade(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов interviewer.plan с той же вакансией и возвращает результат как есть")
+        void delegatesToInterviewer() {
             // given
-            var request = new LlmInterviewQuestionsRequest(
-                    "Java-разработчик", "ООО Ромашка", List.of("Java"), "Описание", 5, 10);
-            var expected = new LlmInterviewQuestions(List.of("Что такое JVM?"));
-            when(llm.call(anyString(), eq(request), eq(LlmInterviewQuestions.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var expected = new LlmInterviewPlan(8, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+            when(interviewer.plan(vacancy)).thenReturn(expected);
 
             // when
-            var result = llmService.generateInterviewQuestions(experience, request);
+            var result = llmService.planInterview(vacancy);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmInterviewQuestions.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-question-generator-" + expectedSuffix);
+            verify(interviewer).plan(vacancy);
+            verifyNoInteractions(llm);
         }
     }
 
     @Nested
-    @DisplayName("DecideInterviewFollowUp")
-    class DecideInterviewFollowUp {
+    @DisplayName("NextInterviewStep")
+    class NextInterviewStep {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-follow-up-{суффикс} по грейду опыта")
-        void routesByExperienceGrade(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов interviewer.next с теми же аргументами и возвращает результат как есть")
+        void delegatesToInterviewer() {
             // given
-            var request = new LlmInterviewFollowUpRequest(
-                    "Java-разработчик", "Что такое JVM?", "Виртуальная машина", List.of());
-            var expected = new LlmInterviewFollowUpDecision(false, null);
-            when(llm.call(anyString(), eq(request), eq(LlmInterviewFollowUpDecision.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var plan = new LlmInterviewPlan(8, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+            var history = List.of(new LlmInterviewTurn(
+                    "Виртуальная машина Java",
+                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java core", "Что такое JVM?")));
+            var lastAnswer = "Компилирует байткод в машинный код";
+            var expected = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java core", "А что такое JIT?");
+            when(interviewer.next(vacancy, plan, history, lastAnswer)).thenReturn(expected);
 
             // when
-            var result = llmService.decideInterviewFollowUp(experience, request);
+            var result = llmService.nextInterviewStep(vacancy, plan, history, lastAnswer);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmInterviewFollowUpDecision.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-follow-up-" + expectedSuffix);
+            verify(interviewer).next(vacancy, plan, history, lastAnswer);
+            verifyNoInteractions(llm);
         }
     }
 

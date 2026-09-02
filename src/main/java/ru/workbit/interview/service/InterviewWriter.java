@@ -18,6 +18,7 @@ import ru.workbit.interview.model.mapper.InterviewReportMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswerReview;
+import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.service.VacancyService;
@@ -27,7 +28,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.IntStream;
 
 import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
 import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
@@ -39,9 +39,9 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 public class InterviewWriter {
 
     static final int MIN_OVERALL_FEEDBACK_LENGTH = 10;
-    static final int FOLLOW_UP_ORDER_INDEX = 1;
     static final double MIN_REVIEWED_ANSWERS_RATIO = 0.5;
     private static final int MAX_WEAKEST_SKILL_LENGTH = 100;
+    private static final int FIRST_QUESTION_ORDER_INDEX = 1;
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -53,50 +53,69 @@ public class InterviewWriter {
     private final InterviewReportMapper interviewReportMapper;
 
     @Transactional
-    public InterviewSession createSession(VacancyData vacancyData, UUID userId, List<String> questions) {
+    public InterviewSession createSession(VacancyData vacancyData, UUID userId, LlmInterviewPlan plan) {
         quotaService.debitInterview(userId, "Интервью — " + vacancyData.name());
 
         UUID vacancySnapshotId = vacancyService.saveSnapshot(vacancyData);
-        InterviewSession session = saveNewSession(userId, questions, vacancySnapshotId);
-        attachQuestions(questions, session);
+        InterviewSession session = saveNewSession(userId, plan, vacancySnapshotId);
+        attachFirstQuestion(plan, session);
 
         return session;
     }
 
+    /**
+     * Сохраняет очередной вопрос беседы: {@code MAIN} со следующим порядковым номером либо ребёнка
+     * текущего основного вопроса. Отвеченный вопрос помечается проверенным - по нему модель уже сходила.
+     */
     @Transactional
-    public void markFollowUpChecked(UUID questionId) {
-        interviewQuestionRepository.findById(questionId)
-                .orElseThrow(() -> new NotFoundException("Question not found"))
-                .setFollowUpChecked(true);
-    }
-
-    @Transactional
-    public Optional<InterviewQuestionResponse> saveFollowUp(UUID answeredQuestionId, String text) {
+    public Optional<InterviewQuestionResponse> saveStep(UUID answeredQuestionId, InterviewQuestion.Kind kind,
+                                                        String text, String topic) {
         InterviewQuestion answered = interviewQuestionRepository.findWithSessionById(answeredQuestionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
         InterviewSession session = answered.getSession();
         checkSessionNotCompleted(session);
 
         if (answered.isFollowUpChecked()) {
-            log.warn("Interview session {} already decided on a follow-up for this case, "
+            log.warn("Interview session {} already got the next question from a parallel request, "
                     + "discarding the generated one", session.getId());
-            return interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredQuestionId)
-                    .stream()
-                    .filter(q -> !q.isAnswered())
-                    .findFirst()
+            return interviewQuestionRepository.findNextUnanswered(session.getId())
                     .map(interviewQuestionMapper::toDto);
         }
         answered.setFollowUpChecked(true);
 
-        InterviewQuestion followUp = interviewQuestionRepository.save(InterviewQuestion.builder()
+        UUID parentQuestionId = kind == InterviewQuestion.Kind.MAIN ? null : caseIdOf(answered);
+        InterviewQuestion question = interviewQuestionRepository.save(InterviewQuestion.builder()
                 .session(session)
-                .parentQuestionId(answeredQuestionId)
+                .parentQuestionId(parentQuestionId)
                 .text(text)
-                .orderIndex(FOLLOW_UP_ORDER_INDEX)
-                .followUp(true)
+                .topic(topic)
+                .kind(kind)
+                .orderIndex(nextOrderIndex(session.getId(), parentQuestionId))
+                .followUp(parentQuestionId != null)
                 .build());
 
-        return Optional.of(interviewQuestionMapper.toDto(followUp));
+        return Optional.of(interviewQuestionMapper.toDto(question));
+    }
+
+    /**
+     * Завершает опрос: очередной вопрос не задаётся, а число основных вопросов сессии подрезается до
+     * фактически отвеченных - иначе досрочный конец беседы не дал бы собрать отчёт.
+     */
+    @Transactional
+    public void closeQuestioning(UUID answeredQuestionId) {
+        InterviewQuestion answered = interviewQuestionRepository.findWithSessionById(answeredQuestionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+        answered.setFollowUpChecked(true);
+
+        InterviewSession session = answered.getSession();
+        int answeredMain = (int) interviewQuestionRepository
+                .countBySessionIdAndFollowUpFalseAndAnsweredTrue(session.getId());
+
+        if (answeredMain > 0 && answeredMain < session.getTotalQuestions()) {
+            log.info("Interview session {} ends after {} of {} main questions",
+                    session.getId(), answeredMain, session.getTotalQuestions());
+            session.setTotalQuestions(answeredMain);
+        }
     }
 
     @Transactional
@@ -131,26 +150,33 @@ public class InterviewWriter {
         return interviewReportMapper.toResponse(session.getReport(), session, mains);
     }
 
-    private InterviewSession saveNewSession(UUID userId, List<String> questions, UUID vacancySnapshotId) {
+    private int nextOrderIndex(UUID sessionId, UUID parentQuestionId) {
+        return parentQuestionId == null
+                ? (int) interviewQuestionRepository.countBySessionIdAndKind(sessionId, InterviewQuestion.Kind.MAIN) + 1
+                : interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(parentQuestionId).size() + 1;
+    }
+
+    private InterviewSession saveNewSession(UUID userId, LlmInterviewPlan plan, UUID vacancySnapshotId) {
         return interviewSessionRepository.save(
                 InterviewSession.builder()
                         .userId(userId)
-                        .totalQuestions(questions.size())
+                        .totalQuestions(plan.questionCount())
+                        .planTopics(plan.topics())
                         .vacancySnapshotId(vacancySnapshotId)
                         .build()
         );
     }
 
-    private void attachQuestions(List<String> questions, InterviewSession session) {
-        session.setQuestions(
-                IntStream.range(0, questions.size())
-                        .mapToObj(i -> InterviewQuestion.builder()
-                                .session(session)
-                                .text(questions.get(i))
-                                .orderIndex(i + 1)
-                                .build())
-                        .toList()
-        );
+    private void attachFirstQuestion(LlmInterviewPlan plan, InterviewSession session) {
+        session.setQuestions(List.of(
+                InterviewQuestion.builder()
+                        .session(session)
+                        .text(plan.question())
+                        .topic(plan.topic())
+                        .kind(InterviewQuestion.Kind.MAIN)
+                        .orderIndex(FIRST_QUESTION_ORDER_INDEX)
+                        .build()
+        ));
     }
 
     private void saveFeedbacks(List<List<InterviewQuestion>> cases, List<LlmInterviewAnswerReview> reviews) {
@@ -212,6 +238,12 @@ public class InterviewWriter {
                             sessionId, llmReport.offerProbability());
                     return new LlmException("Interview report has no usable offer probability");
                 });
+    }
+
+    private static UUID caseIdOf(InterviewQuestion answered) {
+        return answered.getKind() == InterviewQuestion.Kind.MAIN
+                ? answered.getId()
+                : answered.getParentQuestionId();
     }
 
     private static boolean isPersistableFeedback(Integer score, String text) {

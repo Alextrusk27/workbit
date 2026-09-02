@@ -68,7 +68,8 @@ class InterviewVacancyServiceTest {
     }
 
     private static VacancySnapshotView aView(String sourceId, String name) {
-        return new VacancySnapshotView(sourceId, name, "Работодатель", "https://hh.ru/vacancy/" + sourceId, "Опыт");
+        return new VacancySnapshotView(sourceId, name, "Работодатель", "https://hh.ru/vacancy/" + sourceId, "Опыт",
+                List.of("Навык"), "Описание вакансии");
     }
 
     @Nested

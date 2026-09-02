@@ -32,6 +32,14 @@ public class InterviewQuestion {
     @Column(nullable = false, updatable = false)
     private String text;
 
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(nullable = false, updatable = false)
+    private Kind kind = Kind.MAIN;
+
+    @Column(updatable = false)
+    private String topic;
+
     @Column(nullable = false, updatable = false)
     private int orderIndex;
 
@@ -51,4 +59,8 @@ public class InterviewQuestion {
 
     @Column
     private Instant answeredAt;
+
+    public enum Kind {
+        MAIN, FOLLOW_UP, CLARIFICATION, REDIRECT
+    }
 }

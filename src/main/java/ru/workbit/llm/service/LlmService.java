@@ -2,16 +2,19 @@ package ru.workbit.llm.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.dto.*;
 import ru.workbit.util.annotation.Loggable;
 
+import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class LlmService {
     private final LlmClient llm;
+    private final InterviewerClient interviewer;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
@@ -29,13 +32,14 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewQuestions generateInterviewQuestions(String experience, LlmInterviewQuestionsRequest request) {
-        return llm.call("interview-question-generator-" + experienceGrade(experience), request, LlmInterviewQuestions.class);
+    public LlmInterviewPlan planInterview(LlmInterviewVacancy vacancy) {
+        return interviewer.plan(vacancy);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewFollowUpDecision decideInterviewFollowUp(String experience, LlmInterviewFollowUpRequest request) {
-        return llm.call("interview-follow-up-" + experienceGrade(experience), request, LlmInterviewFollowUpDecision.class);
+    public LlmInterviewStep nextInterviewStep(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
+                                              List<LlmInterviewTurn> history, String lastAnswer) {
+        return interviewer.next(vacancy, plan, history, lastAnswer);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

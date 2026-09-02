@@ -13,6 +13,8 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
 
     long countBySessionIdAndFollowUpFalseAndAnsweredTrue(UUID sessionId);
 
+    long countBySessionIdAndKind(UUID sessionId, InterviewQuestion.Kind kind);
+
     @Query("""
             SELECT q FROM InterviewQuestion q
             JOIN FETCH q.session
@@ -22,27 +24,11 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
 
     @Query("""
             SELECT q FROM InterviewQuestion q
-            WHERE q.session.id = :sessionId AND q.answered = false AND q.followUp = true
-            ORDER BY q.orderIndex
+            WHERE q.session.id = :sessionId AND q.answered = false
+            ORDER BY q.followUp DESC, q.orderIndex DESC
             LIMIT 1
             """)
-    Optional<InterviewQuestion> findNextUnansweredFollowUp(UUID sessionId);
-
-    @Query("""
-            SELECT q FROM InterviewQuestion q
-            WHERE q.session.id = :sessionId AND q.answered = false AND q.followUp = false
-            ORDER BY q.orderIndex
-            LIMIT 1
-            """)
-    Optional<InterviewQuestion> findNextUnansweredMain(UUID sessionId);
-
-    @Query("""
-            SELECT q FROM InterviewQuestion q
-            WHERE q.session.id = :sessionId AND q.answered = true AND q.followUpChecked = false
-            ORDER BY q.answeredAt DESC
-            LIMIT 1
-            """)
-    Optional<InterviewQuestion> findLastAnsweredWithoutFollowUpCheck(UUID sessionId);
+    Optional<InterviewQuestion> findNextUnanswered(UUID sessionId);
 
     List<InterviewQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
 }

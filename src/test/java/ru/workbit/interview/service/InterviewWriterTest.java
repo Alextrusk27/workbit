@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +26,7 @@ import ru.workbit.interview.model.mapper.InterviewReportMapper;
 import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswerReview;
+import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.model.VacancySnapshot;
@@ -39,6 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -72,125 +76,112 @@ class InterviewWriterTest {
     @DisplayName("CreateSession")
     class CreateSession {
 
+        private static final LlmInterviewPlan PLAN = new LlmInterviewPlan(
+                7, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+
         @Test
-        @DisplayName("Сохраняет снапшот вакансии, сессию и основные вопросы с orderIndex 1..N")
-        void savesSnapshotSessionAndQuestionsInOrder() {
+        @DisplayName("Сохраняет снапшот вакансии, сессию из плана и единственный первый вопрос с kind MAIN")
+        void savesSnapshotSessionAndFirstQuestion() {
             // given
             UUID userId = UUID.randomUUID();
             UUID vacancySnapshotId = UUID.randomUUID();
-            List<String> questions = List.of("Вопрос 1", "Вопрос 2", "Вопрос 3");
             when(vacancyService.saveSnapshot(VACANCY_DATA)).thenReturn(vacancySnapshotId);
             when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // when
-            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId, questions);
+            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId, PLAN);
 
             // then
             assertThat(result.getUserId()).isEqualTo(userId);
             assertThat(result.getVacancySnapshotId()).isEqualTo(vacancySnapshotId);
-            assertThat(result.getTotalQuestions()).isEqualTo(3);
+            assertThat(result.getTotalQuestions()).isEqualTo(7);
+            assertThat(result.getPlanTopics()).containsExactly("Java core", "Spring");
 
-            List<InterviewQuestion> savedQuestions = result.getQuestions();
-            assertThat(savedQuestions).hasSize(3);
-            for (int i = 0; i < 3; i++) {
-                InterviewQuestion question = savedQuestions.get(i);
-                assertThat(question.getText()).isEqualTo(questions.get(i));
-                assertThat(question.getOrderIndex()).isEqualTo(i + 1);
-                assertThat(question.isFollowUp()).isFalse();
-                assertThat(question.getSession()).isSameAs(result);
-            }
+            assertThat(result.getQuestions()).hasSize(1);
+            InterviewQuestion first = result.getQuestions().getFirst();
+            assertThat(first.getText()).isEqualTo("Что такое JVM?");
+            assertThat(first.getTopic()).isEqualTo("Java core");
+            assertThat(first.getKind()).isEqualTo(InterviewQuestion.Kind.MAIN);
+            assertThat(first.getOrderIndex()).isEqualTo(1);
+            assertThat(first.isFollowUp()).isFalse();
+            assertThat(first.getSession()).isSameAs(result);
 
             verify(interviewSessionRepository).save(result);
-            verify(quotaService).debitInterview(userId, "Интервью — " + VACANCY_DATA.name());
         }
 
         @Test
-        @DisplayName("Пустой список вопросов - сохраняет сессию с totalQuestions=0 и пустым списком вопросов")
-        void emptyQuestionsSavesSessionWithEmptyList() {
-            // given
-            UUID userId = UUID.randomUUID();
-            UUID vacancySnapshotId = UUID.randomUUID();
-            when(vacancyService.saveSnapshot(VACANCY_DATA)).thenReturn(vacancySnapshotId);
-            when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
-
-            // when
-            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId, List.of());
-
-            // then
-            assertThat(result.getTotalQuestions()).isZero();
-            assertThat(result.getQuestions()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Списывает интервью с label «Интервью — {название вакансии}»")
-        void debitsInterviewWithFormattedLabel() {
+        @DisplayName("Списывает интервью с label «Интервью — {название вакансии}» до сохранения снапшота и сессии")
+        void debitsInterviewBeforeSaving() {
             // given
             UUID userId = UUID.randomUUID();
             when(vacancyService.saveSnapshot(VACANCY_DATA)).thenReturn(UUID.randomUUID());
             when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // when
-            interviewWriter.createSession(VACANCY_DATA, userId, List.of("Вопрос 1"));
+            interviewWriter.createSession(VACANCY_DATA, userId, PLAN);
 
             // then
-            verify(quotaService).debitInterview(userId, "Интервью — Java-разработчик");
+            InOrder order = inOrder(quotaService, vacancyService, interviewSessionRepository);
+            order.verify(quotaService).debitInterview(userId, "Интервью — Java-разработчик");
+            order.verify(vacancyService).saveSnapshot(VACANCY_DATA);
+            order.verify(interviewSessionRepository).save(any(InterviewSession.class));
         }
-    }
-
-    @Nested
-    @DisplayName("MarkFollowUpChecked")
-    class MarkFollowUpChecked {
 
         @Test
-        @DisplayName("Вопрос найден - проставляет followUpChecked=true")
-        void setsFollowUpCheckedFlag() {
+        @DisplayName("План без тем - сессия создаётся, planTopics остаётся null")
+        void savesSessionWithoutPlanTopics() {
             // given
-            UUID questionId = UUID.randomUUID();
-            InterviewQuestion question = InterviewQuestion.builder().id(questionId).followUpChecked(false).build();
-            when(interviewQuestionRepository.findById(questionId)).thenReturn(Optional.of(question));
+            UUID userId = UUID.randomUUID();
+            when(vacancyService.saveSnapshot(VACANCY_DATA)).thenReturn(UUID.randomUUID());
+            when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // when
-            interviewWriter.markFollowUpChecked(questionId);
+            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId,
+                    new LlmInterviewPlan(5, null, null, "Первый вопрос"));
 
             // then
-            assertThat(question.isFollowUpChecked()).isTrue();
-        }
-
-        @Test
-        @DisplayName("Вопрос не найден - NotFoundException")
-        void throwsWhenQuestionNotFound() {
-            // given
-            UUID questionId = UUID.randomUUID();
-            when(interviewQuestionRepository.findById(questionId)).thenReturn(Optional.empty());
-
-            // when / then
-            assertThatThrownBy(() -> interviewWriter.markFollowUpChecked(questionId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessage("Question not found");
+            assertThat(result.getPlanTopics()).isNull();
+            assertThat(result.getTotalQuestions()).isEqualTo(5);
+            assertThat(result.getQuestions().getFirst().getTopic()).isNull();
         }
     }
 
     @Nested
-    @DisplayName("SaveFollowUp")
-    class SaveFollowUp {
+    @DisplayName("SaveStep")
+    class SaveStep {
+
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID answeredId = UUID.randomUUID();
+
+        private InterviewSession activeSession() {
+            return InterviewSession.builder().id(sessionId).totalQuestions(5).build();
+        }
+
+        private InterviewQuestion answeredMain(InterviewSession session) {
+            return InterviewQuestion.builder()
+                    .id(answeredId).session(session).text("Основной вопрос").orderIndex(2)
+                    .kind(InterviewQuestion.Kind.MAIN).answered(true).followUpChecked(false).build();
+        }
 
         @Test
-        @DisplayName("Нормальный путь - сохраняет уточнение к отвеченному вопросу с orderIndex 1, проставляет ему followUpChecked")
-        void savesNewFollowUp() {
+        @DisplayName("kind MAIN - новый основной вопрос без родителя, orderIndex по числу основных, "
+                + "отвеченный помечается проверенным")
+        void savesMainQuestion() {
             // given
-            UUID answeredId = UUID.randomUUID();
-            InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
-            InterviewQuestion answered = InterviewQuestion.builder()
-                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(false).build();
+            InterviewSession session = activeSession();
+            InterviewQuestion answered = answeredMain(session);
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndKind(sessionId, InterviewQuestion.Kind.MAIN))
+                    .thenReturn(2L);
             when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
             InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
-                    UUID.randomUUID(), 1, "Новое уточнение", true, null, null, null);
+                    UUID.randomUUID(), 3, "Следующий основной", false, null, null, null);
             when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(expectedResponse);
 
             // when
-            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Новое уточнение");
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.MAIN, "Следующий основной", "Spring");
 
             // then
             assertThat(result).contains(expectedResponse);
@@ -199,35 +190,97 @@ class InterviewWriterTest {
             ArgumentCaptor<InterviewQuestion> captor = ArgumentCaptor.forClass(InterviewQuestion.class);
             verify(interviewQuestionRepository).save(captor.capture());
             InterviewQuestion saved = captor.getValue();
-            assertThat(saved.getOrderIndex()).isEqualTo(1);
-            assertThat(saved.getParentQuestionId()).isEqualTo(answeredId);
-            assertThat(saved.getText()).isEqualTo("Новое уточнение");
-            assertThat(saved.isFollowUp()).isTrue();
+            assertThat(saved.getParentQuestionId()).isNull();
+            assertThat(saved.getKind()).isEqualTo(InterviewQuestion.Kind.MAIN);
+            assertThat(saved.getTopic()).isEqualTo("Spring");
+            assertThat(saved.getOrderIndex()).isEqualTo(3);
+            assertThat(saved.isFollowUp()).isFalse();
             assertThat(saved.getSession()).isSameAs(session);
         }
 
         @Test
-        @DisplayName("Решение по кейсу уже принято, уточнение ждёт ответа - возвращается оно, новое не сохраняется")
-        void returnsExistingPendingFollowUpInsteadOfSavingNew() {
+        @DisplayName("Ответ дан на основной вопрос - уточнение становится его ребёнком, orderIndex по числу детей кейса")
+        void savesChildOfAnsweredMain() {
             // given
-            UUID answeredId = UUID.randomUUID();
-            InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
-            InterviewQuestion answered = InterviewQuestion.builder()
-                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(true).build();
+            InterviewSession session = activeSession();
+            InterviewQuestion answered = answeredMain(session);
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
-
-            InterviewQuestion pendingFollowUp = InterviewQuestion.builder()
-                    .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Уже создано")
-                    .orderIndex(1).followUp(true).answered(false).build();
             when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredId))
-                    .thenReturn(List.of(pendingFollowUp));
+                    .thenReturn(List.of(InterviewQuestion.builder()
+                            .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Переспрос")
+                            .kind(InterviewQuestion.Kind.CLARIFICATION).orderIndex(1).followUp(true).build()));
+            when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
             InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
-                    pendingFollowUp.getId(), 1, "Уже создано", true, null, null, null);
-            when(interviewQuestionMapper.toDto(pendingFollowUp)).thenReturn(expectedResponse);
+                    UUID.randomUUID(), 2, "А как это работает под нагрузкой?", true, null, null, null);
+            when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(expectedResponse);
 
             // when
-            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Новый вопрос");
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.FOLLOW_UP, "А как это работает под нагрузкой?", "Spring");
+
+            // then
+            assertThat(result).contains(expectedResponse);
+
+            ArgumentCaptor<InterviewQuestion> captor = ArgumentCaptor.forClass(InterviewQuestion.class);
+            verify(interviewQuestionRepository).save(captor.capture());
+            InterviewQuestion saved = captor.getValue();
+            assertThat(saved.getParentQuestionId()).isEqualTo(answeredId);
+            assertThat(saved.getKind()).isEqualTo(InterviewQuestion.Kind.FOLLOW_UP);
+            assertThat(saved.getOrderIndex()).isEqualTo(2);
+            assertThat(saved.isFollowUp()).isTrue();
+            verify(interviewQuestionRepository, never()).countBySessionIdAndKind(any(), any());
+        }
+
+        @Test
+        @DisplayName("Ответ дан на уточнение - новый ребёнок вешается на тот же основной вопрос, а не на уточнение")
+        void savesChildOfSameCaseWhenAnsweredIsChild() {
+            // given
+            UUID mainId = UUID.randomUUID();
+            InterviewSession session = activeSession();
+            InterviewQuestion answeredChild = InterviewQuestion.builder()
+                    .id(answeredId).session(session).parentQuestionId(mainId).text("Переспрос")
+                    .kind(InterviewQuestion.Kind.CLARIFICATION).orderIndex(1).followUp(true)
+                    .answered(true).followUpChecked(false).build();
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answeredChild));
+            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(mainId))
+                    .thenReturn(List.of(answeredChild));
+            when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(mock(InterviewQuestionResponse.class));
+
+            // when
+            interviewWriter.saveStep(answeredId, InterviewQuestion.Kind.REDIRECT, "Вернёмся к вопросу", "Spring");
+
+            // then
+            ArgumentCaptor<InterviewQuestion> captor = ArgumentCaptor.forClass(InterviewQuestion.class);
+            verify(interviewQuestionRepository).save(captor.capture());
+            InterviewQuestion saved = captor.getValue();
+            assertThat(saved.getParentQuestionId()).isEqualTo(mainId);
+            assertThat(saved.getKind()).isEqualTo(InterviewQuestion.Kind.REDIRECT);
+            assertThat(saved.getOrderIndex()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("По ответу уже сходил параллельный запрос - возвращается созданный им вопрос, новый не сохраняется")
+        void returnsQuestionOfParallelRequestInsteadOfSavingNew() {
+            // given
+            InterviewSession session = activeSession();
+            InterviewQuestion answered = answeredMain(session);
+            answered.setFollowUpChecked(true);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+
+            InterviewQuestion pending = InterviewQuestion.builder()
+                    .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Уже задано")
+                    .kind(InterviewQuestion.Kind.FOLLOW_UP).orderIndex(1).followUp(true).answered(false).build();
+            when(interviewQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(pending));
+
+            InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
+                    pending.getId(), 1, "Уже задано", true, null, null, null);
+            when(interviewQuestionMapper.toDto(pending)).thenReturn(expectedResponse);
+
+            // when
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.FOLLOW_UP, "Новое уточнение", "Spring");
 
             // then
             assertThat(result).contains(expectedResponse);
@@ -235,56 +288,130 @@ class InterviewWriterTest {
         }
 
         @Test
-        @DisplayName("Зависший запрос: решение по кейсу принято и уточнение уже отвечено - второе уточнение не создаётся")
-        void doesNotSaveSecondFollowUpWhenCaseAlreadyClarified() {
+        @DisplayName("По ответу уже сходил параллельный запрос, но неотвеченного вопроса нет - пусто, новый не сохраняется")
+        void returnsEmptyWhenAlreadyCheckedAndNothingPending() {
             // given
-            UUID answeredId = UUID.randomUUID();
-            InterviewSession session = InterviewSession.builder().id(UUID.randomUUID()).build();
-            InterviewQuestion answered = InterviewQuestion.builder()
-                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).followUpChecked(true).build();
+            InterviewSession session = activeSession();
+            InterviewQuestion answered = answeredMain(session);
+            answered.setFollowUpChecked(true);
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
-            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredId))
-                    .thenReturn(List.of(InterviewQuestion.builder()
-                            .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Уточнение")
-                            .orderIndex(1).followUp(true).answered(true).build()));
+            when(interviewQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.empty());
 
             // when
-            Optional<InterviewQuestionResponse> result = interviewWriter.saveFollowUp(answeredId, "Второе уточнение");
+            Optional<InterviewQuestionResponse> result = interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.MAIN, "Следующий основной", "Spring");
 
             // then
             assertThat(result).isEmpty();
             verify(interviewQuestionRepository, never()).save(any());
+            verifyNoInteractions(interviewQuestionMapper);
         }
 
         @Test
         @DisplayName("Отвеченный вопрос не найден - NotFoundException")
         void throwsWhenAnsweredQuestionNotFound() {
             // given
-            UUID answeredId = UUID.randomUUID();
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, "Уточнение"))
+            assertThatThrownBy(() -> interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.MAIN, "Вопрос", "Тема"))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Question not found");
+            verify(interviewQuestionRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("Сессия уже завершена - ConflictException")
+        @DisplayName("Сессия уже завершена - ConflictException, вопрос не сохраняется")
         void throwsWhenSessionCompleted() {
             // given
-            UUID answeredId = UUID.randomUUID();
             InterviewSession session = InterviewSession.builder()
-                    .id(UUID.randomUUID()).status(InterviewSession.Status.COMPLETED).build();
-            InterviewQuestion answered = InterviewQuestion.builder()
-                    .id(answeredId).session(session).text("Вопрос").orderIndex(1).build();
+                    .id(sessionId).status(InterviewSession.Status.COMPLETED).build();
+            InterviewQuestion answered = answeredMain(session);
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
 
             // when / then
-            assertThatThrownBy(() -> interviewWriter.saveFollowUp(answeredId, "Уточнение"))
+            assertThatThrownBy(() -> interviewWriter.saveStep(
+                    answeredId, InterviewQuestion.Kind.MAIN, "Вопрос", "Тема"))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
             verify(interviewQuestionRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("CloseQuestioning")
+    class CloseQuestioning {
+
+        private final UUID sessionId = UUID.randomUUID();
+        private final UUID answeredId = UUID.randomUUID();
+
+        private InterviewQuestion answeredIn(InterviewSession session) {
+            return InterviewQuestion.builder()
+                    .id(answeredId).session(session).text("Вопрос").orderIndex(3)
+                    .kind(InterviewQuestion.Kind.MAIN).answered(true).followUpChecked(false).build();
+        }
+
+        @Test
+        @DisplayName("Досрочный конец беседы - помечает ответ проверенным и подрезает totalQuestions до отвеченных основных")
+        void trimsTotalQuestionsOnEarlyFinish() {
+            // given
+            InterviewSession session = InterviewSession.builder().id(sessionId).totalQuestions(8).build();
+            InterviewQuestion answered = answeredIn(session);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(3L);
+
+            // when
+            interviewWriter.closeQuestioning(answeredId);
+
+            // then
+            assertThat(answered.isFollowUpChecked()).isTrue();
+            assertThat(session.getTotalQuestions()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("Отвечены все основные вопросы плана - totalQuestions не меняется")
+        void keepsTotalQuestionsWhenAllMainAnswered() {
+            // given
+            InterviewSession session = InterviewSession.builder().id(sessionId).totalQuestions(5).build();
+            InterviewQuestion answered = answeredIn(session);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(5L);
+
+            // when
+            interviewWriter.closeQuestioning(answeredId);
+
+            // then
+            assertThat(answered.isFollowUpChecked()).isTrue();
+            assertThat(session.getTotalQuestions()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("Ни одного отвеченного основного - totalQuestions не обнуляется")
+        void keepsTotalQuestionsWhenNoMainAnswered() {
+            // given
+            InterviewSession session = InterviewSession.builder().id(sessionId).totalQuestions(5).build();
+            InterviewQuestion answered = answeredIn(session);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(0L);
+
+            // when
+            interviewWriter.closeQuestioning(answeredId);
+
+            // then
+            assertThat(session.getTotalQuestions()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("Отвеченный вопрос не найден - NotFoundException")
+        void throwsWhenAnsweredQuestionNotFound() {
+            // given
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> interviewWriter.closeQuestioning(answeredId))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
         }
     }
 

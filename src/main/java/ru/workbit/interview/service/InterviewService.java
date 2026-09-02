@@ -27,18 +27,20 @@ import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.interview.repository.InterviewUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
-import ru.workbit.llm.dto.LlmInterviewFollowUpDecision;
-import ru.workbit.llm.dto.LlmInterviewFollowUpRequest;
-import ru.workbit.llm.dto.LlmInterviewQuestions;
-import ru.workbit.llm.dto.LlmInterviewQuestionsRequest;
+import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.llm.dto.LlmInterviewReportRequest;
+import ru.workbit.llm.dto.LlmInterviewStep;
+import ru.workbit.llm.dto.LlmInterviewStepKind;
+import ru.workbit.llm.dto.LlmInterviewTurn;
+import ru.workbit.llm.dto.LlmInterviewVacancy;
 import ru.workbit.llm.service.LlmService;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +55,8 @@ import static ru.workbit.interview.service.InterviewSessions.groupCases;
 @Slf4j
 @RequiredArgsConstructor
 public class InterviewService {
+
+    private static final int MAX_REDIRECTS = 3;
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -73,9 +77,9 @@ public class InterviewService {
 
         quotaService.checkInterviewAvailable(userId);
 
-        List<String> questions = generateQuestions(vacancyData);
+        LlmInterviewPlan plan = requestPlan(vacancyData);
 
-        InterviewSession session = interviewWriter.createSession(vacancyData, userId, questions);
+        InterviewSession session = interviewWriter.createSession(vacancyData, userId, plan);
         return interviewSessionMapper.toResponse(session, vacancyData, 0);
     }
 
@@ -89,19 +93,14 @@ public class InterviewService {
     }
 
     public InterviewQuestionResponse nextQuestion(UUID sessionId, UUID userId) {
-        InterviewSession session = interviewSessionRepository.findByIdAndUserId(sessionId, userId)
+        InterviewSession session = interviewSessionRepository.findWithQuestionsById(sessionId)
+                .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
 
-        Optional<InterviewQuestion> pendingFollowUp = interviewQuestionRepository
-                .findNextUnansweredFollowUp(sessionId);
-        if (pendingFollowUp.isPresent()) {
-            return interviewQuestionMapper.toDto(pendingFollowUp.get());
-        }
-
-        return askFollowUp(session)
-                .or(() -> interviewQuestionRepository.findNextUnansweredMain(sessionId)
-                        .map(interviewQuestionMapper::toDto))
+        return unanswered(session)
+                .map(interviewQuestionMapper::toDto)
+                .or(() -> askNextStep(session))
                 .orElseThrow(() -> {
                     log.warn("Interview session {} has no unanswered questions left", sessionId);
                     return new ConflictException("No questions left");
@@ -117,44 +116,6 @@ public class InterviewService {
                 .flatMap(List::stream)
                 .map(interviewQuestionMapper::toDto)
                 .toList();
-    }
-
-    private Optional<InterviewQuestionResponse> askFollowUp(InterviewSession session) {
-        Optional<InterviewQuestion> lastAnswered = interviewQuestionRepository
-                .findLastAnsweredWithoutFollowUpCheck(session.getId());
-        if (lastAnswered.isEmpty()) {
-            return Optional.empty();
-        }
-
-        InterviewQuestion answered = lastAnswered.get();
-        boolean caseAlreadyClarified = answered.isFollowUp() || !interviewQuestionRepository
-                .findAllByParentQuestionIdOrderByOrderIndex(answered.getId()).isEmpty();
-
-        if (caseAlreadyClarified) {
-            interviewWriter.markFollowUpChecked(answered.getId());
-            return Optional.empty();
-        }
-
-        VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
-        LlmInterviewFollowUpDecision decision = llmService.decideInterviewFollowUp(
-                vacancy.experience(), new LlmInterviewFollowUpRequest(
-                vacancy.name(),
-                answered.getText(),
-                answered.getAnswerText(),
-                List.of()));
-
-        if (!decision.askFollowUp() || decision.question() == null || decision.question().isBlank()) {
-            interviewWriter.markFollowUpChecked(answered.getId());
-            return Optional.empty();
-        }
-
-        try {
-            return interviewWriter.saveFollowUp(answered.getId(), decision.question());
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Concurrent request already created a follow-up for interview session {}", session.getId());
-            return interviewQuestionRepository.findNextUnansweredFollowUp(session.getId())
-                    .map(interviewQuestionMapper::toDto);
-        }
     }
 
     @Transactional
@@ -232,17 +193,6 @@ public class InterviewService {
         return interviewReportMapper.toResponse(report, session, answeredMainSorted(session));
     }
 
-    private static LlmInterviewQuestionsRequest toQuestionsRequest(VacancyData vacancyData) {
-        return new LlmInterviewQuestionsRequest(
-                vacancyData.name(),
-                vacancyData.employer(),
-                vacancyData.keySkills(),
-                vacancyData.description(),
-                LlmInterviewQuestionsRequest.MIN_COUNT,
-                LlmInterviewQuestionsRequest.MAX_COUNT
-        );
-    }
-
     private void checkNoUnfinishedInterview(VacancyData vacancyData, UUID userId) {
         List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
         if (!snapshotIds.isEmpty() && interviewSessionRepository
@@ -253,29 +203,141 @@ public class InterviewService {
         }
     }
 
-    private List<String> generateQuestions(VacancyData vacancyData) {
-        LlmInterviewQuestionsRequest request = toQuestionsRequest(vacancyData);
-        List<String> questions = usableQuestions(
-                llmService.generateInterviewQuestions(vacancyData.experience(), request));
-        if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
-            log.warn("LLM returned only {} usable interview questions, {} required, retrying [url={}]",
-                    questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
-            questions = usableQuestions(
-                    llmService.generateInterviewQuestions(vacancyData.experience(), request));
+    /**
+     * План собеседования с одним повторным вызовом на ответ без первого вопроса. Число основных
+     * вопросов выбирает модель, код обрезает его в допустимый коридор.
+     */
+    private LlmInterviewPlan requestPlan(VacancyData vacancyData) {
+        LlmInterviewVacancy vacancy = new LlmInterviewVacancy(vacancyData.name(), vacancyData.employer(),
+                vacancyData.experience(), vacancyData.keySkills(), vacancyData.description());
+
+        LlmInterviewPlan plan = llmService.planInterview(vacancy);
+        if (!isUsablePlan(plan)) {
+            log.warn("LLM returned an interview plan without the first question, retrying [url={}]",
+                    vacancyData.url());
+            plan = llmService.planInterview(vacancy);
         }
-        if (questions.size() < LlmInterviewQuestionsRequest.MIN_COUNT) {
-            log.error("LLM returned only {} usable interview questions after retry, {} required [url={}]",
-                    questions.size(), LlmInterviewQuestionsRequest.MIN_COUNT, vacancyData.url());
-            throw new LlmException("Not enough questions for an interview session");
+        if (!isUsablePlan(plan)) {
+            log.error("LLM returned an interview plan without the first question after retry [url={}]",
+                    vacancyData.url());
+            throw new LlmException("Interview plan has no first question");
         }
-        return questions;
+
+        return new LlmInterviewPlan(
+                Math.clamp(plan.questionCount(), LlmInterviewPlan.MIN_COUNT, LlmInterviewPlan.MAX_COUNT),
+                plan.topics(),
+                plan.topic(),
+                plan.question());
     }
 
-    private static List<String> usableQuestions(LlmInterviewQuestions llmQuestions) {
-        return llmQuestions.questions() == null ? List.of() : llmQuestions.questions().stream()
-                .filter(q -> q != null && !q.isBlank())
-                .limit(LlmInterviewQuestionsRequest.MAX_COUNT)
+    private static boolean isUsablePlan(LlmInterviewPlan plan) {
+        return plan.question() != null && !plan.question().isBlank();
+    }
+
+    private static Optional<InterviewQuestion> unanswered(InterviewSession session) {
+        return session.getQuestions().stream()
+                .filter(q -> !q.isAnswered())
+                .max(Comparator.<InterviewQuestion, Boolean>comparing(InterviewQuestion::isFollowUp)
+                        .thenComparingInt(InterviewQuestion::getOrderIndex));
+    }
+
+    /**
+     * Очередной ход беседы: модель получает вакансию, план и всю историю и возвращает следующую реплику.
+     * Что с ней делать, решает код: не больше одного уточнения на основной вопрос (второе идёт как
+     * новый основной), основной сверх плана и третий возврат к теме завершают интервью.
+     */
+    private Optional<InterviewQuestionResponse> askNextStep(InterviewSession session) {
+        List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
+        if (cases.isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<InterviewQuestion> dialog = cases.stream().flatMap(List::stream).toList();
+        InterviewQuestion answered = dialog.getLast();
+        if (answered.isFollowUpChecked()) {
+            return Optional.empty();
+        }
+
+        LlmInterviewStep step = requestStep(session, dialog, cases.size());
+        InterviewQuestion.Kind kind = resolveKind(step.kind(), cases.getLast());
+
+        if (isFinalStep(kind, session.getTotalQuestions(), cases.size(), redirects(dialog))) {
+            interviewWriter.closeQuestioning(answered.getId());
+            return Optional.empty();
+        }
+
+        try {
+            return interviewWriter.saveStep(answered.getId(), kind, step.question(), step.topic());
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent request already asked the next question in interview session {}", session.getId());
+            return interviewQuestionRepository.findNextUnanswered(session.getId())
+                    .map(interviewQuestionMapper::toDto);
+        }
+    }
+
+    /**
+     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой вопрос допустим только у
+     * {@code MAIN}, когда основные исчерпаны, - это сигнал конца беседы.
+     */
+    private LlmInterviewStep requestStep(InterviewSession session, List<InterviewQuestion> dialog, int mainAsked) {
+        VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
+        LlmInterviewVacancy llmVacancy = new LlmInterviewVacancy(vacancy.name(), vacancy.employer(),
+                vacancy.experience(), vacancy.keySkills(), vacancy.description());
+        LlmInterviewPlan plan = new LlmInterviewPlan(session.getTotalQuestions(), session.getPlanTopics(),
+                dialog.getFirst().getTopic(), dialog.getFirst().getText());
+        List<LlmInterviewTurn> history = IntStream.range(0, dialog.size() - 1)
+                .mapToObj(i -> new LlmInterviewTurn(dialog.get(i).getAnswerText(), toStep(dialog.get(i + 1))))
                 .toList();
+        String lastAnswer = dialog.getLast().getAnswerText();
+
+        LlmInterviewStep step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
+        if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
+            return step;
+        }
+
+        log.warn("LLM returned degenerate interview step for session {}, retrying once", session.getId());
+        step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
+        if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
+            return step;
+        }
+
+        log.error("LLM returned degenerate interview step for session {} after retry", session.getId());
+        throw new LlmException("Interview step has no question");
+    }
+
+    private static LlmInterviewStep toStep(InterviewQuestion question) {
+        return new LlmInterviewStep(
+                LlmInterviewStepKind.valueOf(question.getKind().name()),
+                question.getTopic(),
+                question.getText());
+    }
+
+    private static boolean isUsableStep(LlmInterviewStep step, int mainAsked, int totalQuestions) {
+        if (step.kind() == null) {
+            return false;
+        }
+        return step.question() != null && !step.question().isBlank()
+                || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
+    }
+
+    private static InterviewQuestion.Kind resolveKind(LlmInterviewStepKind kind, List<InterviewQuestion> currentCase) {
+        return switch (kind) {
+            case MAIN -> InterviewQuestion.Kind.MAIN;
+            case FOLLOW_UP -> currentCase.stream().anyMatch(q -> q.getKind() == InterviewQuestion.Kind.FOLLOW_UP)
+                    ? InterviewQuestion.Kind.MAIN
+                    : InterviewQuestion.Kind.FOLLOW_UP;
+            case CLARIFICATION -> InterviewQuestion.Kind.CLARIFICATION;
+            case REDIRECT -> InterviewQuestion.Kind.REDIRECT;
+        };
+    }
+
+    private static int redirects(List<InterviewQuestion> dialog) {
+        return (int) dialog.stream().filter(q -> q.getKind() == InterviewQuestion.Kind.REDIRECT).count();
+    }
+
+    private static boolean isFinalStep(InterviewQuestion.Kind kind, int totalQuestions, int mainAsked, int redirects) {
+        return kind == InterviewQuestion.Kind.MAIN && mainAsked >= totalQuestions
+                || kind == InterviewQuestion.Kind.REDIRECT && redirects >= MAX_REDIRECTS - 1;
     }
 
     private void checkAllQuestionsAnswered(InterviewSession session, List<InterviewQuestion> answered) {

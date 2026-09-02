@@ -2,7 +2,9 @@ package ru.workbit.interview.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +35,10 @@ public class InterviewSession {
 
     @Column(name = "total_questions", nullable = false)
     private int totalQuestions;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "plan_topics", columnDefinition = "text[]")
+    private List<String> planTopics;
 
     @Builder.Default
     @Column(nullable = false, updatable = false)

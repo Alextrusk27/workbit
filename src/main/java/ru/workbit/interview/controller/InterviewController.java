@@ -44,7 +44,7 @@ public class InterviewController {
 
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Создать сессию интервью", description = "По ссылке на вакансию hh.ru загружает её данные, генерирует через LLM набор вопросов под вакансию и создаёт сессию интервью. Первый вопрос запрашивается отдельным вызовом.")
+    @Operation(summary = "Создать сессию интервью", description = "По ссылке на вакансию hh.ru загружает её данные, просит LLM составить план собеседования - сколько основных вопросов задать и какие темы закрыть - и создаёт сессию с первым вопросом. Остальные вопросы рождаются по ходу беседы, каждый следующий запрашивается отдельным вызовом.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
@@ -95,12 +95,12 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Получить следующий вопрос", description = "Возвращает очередной неотвеченный основной вопрос (вопросы генерируются заранее при создании сессии) либо уточняющий вопрос (followUp: true), который LLM формирует по последнему ответу при необходимости. Уточняющие не входят в счётчик основных вопросов, на один основной — не больше одного. Когда все вопросы отвечены, возвращает 409.")
+    @Operation(summary = "Получить следующий вопрос", description = "Возвращает уже заданный неотвеченный вопрос, а если такого нет - просит LLM продолжить беседу по последнему ответу: новый основной вопрос либо уточнение (followUp: true) - развитие темы, пояснение непонятого вопроса или возврат к теме после реплики не по делу. Уточняющие не входят в счётчик основных вопросов, развитие темы - не больше одного на основной вопрос. Когда беседа окончена, возвращает 409 - дальше идти за отчётом.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопрос возвращён"),
             @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Неотвеченных вопросов не осталось или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Беседа окончена, вопросов больше не будет, или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewQuestionResponse> nextQuestion(

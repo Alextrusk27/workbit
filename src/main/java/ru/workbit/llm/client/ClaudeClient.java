@@ -26,9 +26,10 @@ import java.util.List;
 
 /**
  * Обвязка над AnthropicClient для многоходовой беседы со structured output.
- * Промпт агента идёт первым блоком первого user-сообщения, а не в system, с меткой кэша;
- * вторая метка ставится на последнюю реплику пользователя,
- * чтобы префикс «промпт + история» читался из кэша на каждом ходе.
+ * Промпт агента идёт первым блоком первого user-сообщения, а не в system, вводная - вторым;
+ * метки кэша стоят на обоих, потому что между ходами эти блоки неизменны: промпт общий для всех
+ * бесед, вводная - для одной. Дальнейшие реплики метку не несут - подвижная метка на последней
+ * реплике давала промах кэша через ход.
  */
 @Slf4j
 @Component
@@ -87,15 +88,9 @@ public class ClaudeClient {
 
         messages.add(MessageParam.builder()
                 .role(MessageParam.Role.USER)
-                .contentOfBlockParams(List.of(
-                        cached(prompt),
-                        dialog.isEmpty() ? cached(opening) : ContentBlockParam.ofText(opening)))
+                .contentOfBlockParams(List.of(cached(prompt), cached(opening)))
                 .build());
-
-        if (!dialog.isEmpty()) {
-            messages.addAll(dialog.subList(0, dialog.size() - 1));
-            messages.add(withCache(dialog.getLast()));
-        }
+        messages.addAll(dialog);
 
         return MessageCreateParams.builder()
                 .model(props.model())
@@ -114,16 +109,6 @@ public class ClaudeClient {
                 .cacheControl(CACHE_1H)
                 .build()
         );
-    }
-
-    private static MessageParam withCache(MessageParam last) {
-        String text = last.content().string()
-                .orElseThrow(() -> new IllegalArgumentException("Last dialog message must be plain text"));
-
-        return MessageParam.builder()
-                .role(last.role())
-                .contentOfBlockParams(List.of(cached(text)))
-                .build();
     }
 
     private void logUsage(Usage usage) {

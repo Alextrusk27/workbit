@@ -101,10 +101,7 @@ public class InterviewService {
         return unanswered(session)
                 .map(interviewQuestionMapper::toDto)
                 .or(() -> askNextStep(session))
-                .orElseThrow(() -> {
-                    log.warn("Interview session {} has no unanswered questions left", sessionId);
-                    return new ConflictException("No questions left");
-                });
+                .orElseThrow(() -> new ConflictException("No questions left"));
     }
 
     public List<InterviewQuestionResponse> getAnsweredQuestions(UUID sessionId, UUID userId) {

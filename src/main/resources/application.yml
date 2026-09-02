@@ -111,7 +111,7 @@ llm:
     base-url: ${ANTHROPIC_BASE_URL}
     auth-token: ${ANTHROPIC_AUTH_TOKEN}
     model: claude-opus-5
-    effort: high
+    effort: medium
 
 speech:
   yandex:

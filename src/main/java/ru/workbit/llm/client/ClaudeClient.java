@@ -1,13 +1,16 @@
 package ru.workbit.llm.client;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.errors.AnthropicException;
 import com.anthropic.errors.AnthropicInvalidDataException;
 import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.helpers.MessageAccumulator;
 import com.anthropic.models.messages.CacheControlEphemeral;
 import com.anthropic.models.messages.ContentBlockParam;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
+import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
@@ -23,6 +26,9 @@ import ru.workbit.llm.config.AnthropicProperties;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Обвязка над AnthropicClient для вызовов со structured output.
@@ -32,7 +38,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class ClaudeClient {
-    private static final long MAX_TOKENS = 16_000L;
+    private static final long MAX_TOKENS = 32_000L;
     private static final CacheControlEphemeral CACHE_1H = CacheControlEphemeral.builder()
                     .ttl(CacheControlEphemeral.Ttl.TTL_1H).build();
 
@@ -62,8 +68,10 @@ public class ClaudeClient {
     }
 
     /**
-     * Одноходовой вызов. Метка кэша стоит только на промпте: вводная уникальна для вызова, из кэша
-     * повторно не читается, а запись в кэш с TTL 1h стоит дороже обычного входа.
+     * Одноходовой вызов, стриминговый. Метка кэша стоит только на промпте: вводная уникальна для
+     * вызова, из кэша повторно не читается, а запись в кэш с TTL 1h стоит дороже обычного входа.
+     * Стриминг здесь не ради частичного вывода, а против обрыва: отчёт по длинному интервью
+     * генерируется больше минуты, а молчащее соединение с провайдером режет NAT.
      *
      * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
      * @param task         вводная с данными задачи
@@ -75,14 +83,53 @@ public class ClaudeClient {
                 .contentOfBlockParams(List.of(cached(prompt), plain(task)))
                 .build();
 
-        return send(List.of(message), responseType);
+        return sendStreaming(List.of(message), responseType);
     }
 
     private <T> T send(List<MessageParam> messages, Class<T> responseType) {
-        StructuredMessage<T> response;
+        StructuredMessageCreateParams<T> params = buildParams(messages, responseType);
+        StructuredMessage<T> response = call(() -> client.messages().create(params));
 
+        logUsage(response.usage());
+        return result(response, response.stopReason().orElse(null));
+    }
+
+    /**
+     * provod шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
+     * {@link MessageAccumulator} читает это поле через {@code getRequired} и падает. Поэтому
+     * событие без разбираемого usage идёт мимо аккумулятора, а {@code stop_reason} берётся прямо
+     * из него; когда провайдер починит формат, событие снова пойдёт в аккумулятор и выходные
+     * токены появятся в логе сами.
+     */
+    private <T> T sendStreaming(List<MessageParam> messages, Class<T> responseType) {
+        StructuredMessageCreateParams<T> params = buildParams(messages, responseType);
+        MessageAccumulator accumulator = MessageAccumulator.create();
+        AtomicReference<StopReason> stop = new AtomicReference<>();
+        AtomicInteger outputChars = new AtomicInteger();
+
+        StructuredMessage<T> response = call(() -> {
+            try (StreamResponse<RawMessageStreamEvent> stream = client.messages().createStreaming(params)) {
+                stream.stream().forEach(event -> {
+                    if (event.isMessageDelta() && event.asMessageDelta()._usage().asKnown().isEmpty()) {
+                        event.asMessageDelta().delta().stopReason().ifPresent(stop::set);
+                        return;
+                    }
+                    event.contentBlockDelta()
+                            .flatMap(block -> block.delta().text())
+                            .ifPresent(text -> outputChars.addAndGet(text.text().length()));
+                    accumulator.accumulate(event);
+                });
+            }
+            return accumulator.message(responseType);
+        });
+
+        logStreamUsage(response.usage(), outputChars.get());
+        return result(response, stop.get() != null ? stop.get() : response.stopReason().orElse(null));
+    }
+
+    private <T> StructuredMessage<T> call(Supplier<StructuredMessage<T>> request) {
         try {
-            response = client.messages().create(buildParams(messages, responseType));
+            return request.get();
 
         } catch (AnthropicInvalidDataException e) {
             log.error("Claude response is not parseable [model={}]", props.model(), e);
@@ -97,10 +144,9 @@ public class ClaudeClient {
             log.error("Claude call failed [model={}]", props.model(), e);
             throw new LlmException("LLM call failed", e);
         }
+    }
 
-        logUsage(response.usage());
-        StopReason stop = response.stopReason().orElse(null);
-
+    private <T> T result(StructuredMessage<T> response, StopReason stop) {
         if (StopReason.REFUSAL.equals(stop) || StopReason.MAX_TOKENS.equals(stop)) {
             log.error("Claude stopped abnormally [model={}, stopReason={}, details={}]",
                     props.model(), stop, response.stopDetails().orElse(null));
@@ -144,6 +190,18 @@ public class ClaudeClient {
     private void logUsage(Usage usage) {
         log.info("Claude usage [model={}]: input={}, output={}, cacheRead={}, cacheCreation={}",
                 props.model(), usage.inputTokens(), usage.outputTokens(),
+                usage.cacheReadInputTokens().orElse(0L), usage.cacheCreationInputTokens().orElse(0L));
+    }
+
+    /**
+     * Выходных токенов при стриминге нет: в {@code message_start} вместо них заглушка, а
+     * {@code message_delta} с настоящим значением провайдер не шлёт. Вместо них - длина ответа
+     * в символах, чтобы цифру нельзя было прочесть как токены; расход выхода меряет батарея
+     * нестриминговым прогоном.
+     */
+    private void logStreamUsage(Usage usage, int outputChars) {
+        log.info("Claude usage [model={}]: input={}, outputChars={}, cacheRead={}, cacheCreation={}",
+                props.model(), usage.inputTokens(), outputChars,
                 usage.cacheReadInputTokens().orElse(0L), usage.cacheCreationInputTokens().orElse(0L));
     }
 }

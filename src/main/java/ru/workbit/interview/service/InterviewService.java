@@ -292,13 +292,15 @@ public class InterviewService {
             return step;
         }
 
-        log.warn("LLM returned degenerate interview step for session {}, retrying once", session.getId());
+        log.warn("LLM returned degenerate interview step for session {}, retrying once [kind={}, blankQuestion={}, mainAsked={}/{}]",
+                session.getId(), step.kind(), isBlank(step.question()), mainAsked, session.getTotalQuestions());
         step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
         if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
             return step;
         }
 
-        log.error("LLM returned degenerate interview step for session {} after retry", session.getId());
+        log.error("LLM returned degenerate interview step for session {} after retry [kind={}, blankQuestion={}, mainAsked={}/{}]",
+                session.getId(), step.kind(), isBlank(step.question()), mainAsked, session.getTotalQuestions());
         throw new LlmException("Interview step has no question");
     }
 
@@ -313,8 +315,12 @@ public class InterviewService {
         if (step.kind() == null) {
             return false;
         }
-        return step.question() != null && !step.question().isBlank()
+        return !isBlank(step.question())
                 || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
+    }
+
+    private static boolean isBlank(String question) {
+        return question == null || question.isBlank();
     }
 
     private static InterviewQuestion.Kind resolveKind(LlmInterviewStepKind kind, List<InterviewQuestion> currentCase) {

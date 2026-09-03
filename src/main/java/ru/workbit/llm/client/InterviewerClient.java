@@ -43,6 +43,7 @@ public class InterviewerClient {
                              @Value("classpath:llm/interviewer.txt") Resource promptResource) {
         this.claude = claude;
         this.objectMapper = objectMapper;
+
         try {
             this.prompt = promptResource.getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {

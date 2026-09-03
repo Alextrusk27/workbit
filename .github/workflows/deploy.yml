@@ -171,6 +171,9 @@ jobs:
           }
           docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
             || rollback "new backend did not become healthy"
+          running=$(docker inspect -f '{{.Config.Image}}' backend 2>/dev/null || true)
+          [ "$running" = "$image" ] \
+            || rollback "backend runs '$running' instead of '$image'"
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile </dev/null
           code=""
           for i in $(seq 1 30); do
@@ -221,6 +224,12 @@ jobs:
         run: |
           html=$(curl -sf https://workbit.ru/) || { echo "index.html is not served"; exit 1; }
           echo "$html" | grep -q 'id="root"' || { echo "served HTML has no app root"; exit 1; }
+          expected=$(bash .github/scripts/version.sh get)
+          expected="${expected%-SNAPSHOT}"
+          served=$(echo "$html" | sed -n 's|.*<meta name="app-version" content="\([^"]*\)".*|\1|p')
+          [ "$served" = "$expected" ] \
+            || { echo "frontend serves version '$served', expected '$expected'"; exit 1; }
+          echo "frontend version $served"
           asset=$(echo "$html" | grep -o '/assets/[^"]*\.js' | head -1)
           [ -n "$asset" ] || { echo "no js bundle referenced in index.html"; exit 1; }
           ctype=$(curl -s -o /dev/null -w '%{content_type}' "https://workbit.ru$asset")

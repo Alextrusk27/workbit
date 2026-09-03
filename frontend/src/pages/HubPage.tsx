@@ -5,7 +5,7 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
-import { PLAN_LABELS } from '@/features/billing/labels'
+import { PLAN_LABELS, productPrice } from '@/features/billing/labels'
 import {
   PAYMENT_ID_KEY,
   billingKeys,
@@ -13,6 +13,7 @@ import {
   useQuota,
 } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
+import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 function SectionCard({
@@ -104,9 +105,14 @@ export function HubPage() {
   useEffect(() => {
     if (payment?.status !== 'PAID') return
     sessionStorage.removeItem(PAYMENT_ID_KEY)
+    const price = productPrice(payment.product)
+    reachGoal(
+      'payment_success',
+      price !== undefined ? { order_price: price, currency: 'RUB' } : undefined,
+    )
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     qc.invalidateQueries({ queryKey: billingKeys.usage })
-  }, [payment?.status, qc])
+  }, [payment?.status, payment?.product, qc])
 
   return (
     <Container>

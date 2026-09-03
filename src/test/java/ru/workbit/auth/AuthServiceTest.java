@@ -252,10 +252,29 @@ class AuthServiceTest {
             // then
             verify(loginCodeService).consume(user, RAW_CODE);
             assertThat(user.isEmailVerified()).isTrue();
-            assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
-            assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
+            assertThat(result.newUser()).isTrue();
+            assertThat(result.tokens().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(result.tokens().refreshToken()).isEqualTo(REFRESH_TOKEN);
             assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
             assertThat(user.getDeletionWarnedAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("Возвращает newUser=false при повторном входе подтверждённого пользователя")
+        void returnsNewUserFalseForVerifiedUser() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
+            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
+
+            // when
+            var result = authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE));
+
+            // then
+            verify(loginCodeService).consume(user, RAW_CODE);
+            assertThat(result.newUser()).isFalse();
+            assertThat(user.isEmailVerified()).isTrue();
         }
 
         @Test

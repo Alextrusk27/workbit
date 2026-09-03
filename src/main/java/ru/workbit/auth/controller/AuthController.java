@@ -61,18 +61,19 @@ public class AuthController {
     @PostMapping("/verify-code")
     @Loggable
     @Operation(summary = "Вход по коду",
-            description = "Проверяет код из письма и выдаёт токены в HttpOnly-cookie access_token и refresh_token. Успешный ввод кода подтверждает email.")
+            description = "Проверяет код из письма и выдаёт токены в HttpOnly-cookie access_token и refresh_token. Успешный ввод кода подтверждает email. В теле ответа newUser — признак первой авторизации (регистрации).")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Токены выданы в cookie access_token и refresh_token"),
+            @ApiResponse(responseCode = "200", description = "Токены выданы в cookie access_token и refresh_token", content = @Content(schema = @Schema(implementation = VerifyCodeResponse.class))),
             @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Код неверен, истёк или исчерпаны попытки", content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "429", description = "Слишком много запросов с этого IP", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> verifyCode(@RequestBody @Valid VerifyCodeRequest request,
-                                                    HttpServletRequest httpRequest) {
+    public ResponseEntity<@NotNull VerifyCodeResponse> verifyCode(@RequestBody @Valid VerifyCodeRequest request,
+                                                                  HttpServletRequest httpRequest) {
         rateLimiter.check("verify-code:" + ClientIp.from(httpRequest), rateLimitProperties.verifyCode());
-        var tokens = authService.verifyCode(request);
-        return withAuthCookies(ResponseEntity.ok(), tokens).build();
+        var result = authService.verifyCode(request);
+        return withAuthCookies(ResponseEntity.ok(), result.tokens())
+                .body(new VerifyCodeResponse(result.newUser()));
     }
 
     @PostMapping("/refresh")

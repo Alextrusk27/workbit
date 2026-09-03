@@ -51,15 +51,20 @@ public class AuthService {
     }
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
-    public TokenResponse verifyCode(VerifyCodeRequest request) {
+    public VerifyCodeResult verifyCode(VerifyCodeRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid code"));
         loginCodeService.consume(user, request.code());
 
+        boolean newUser = !user.isEmailVerified();
         user.setEmailVerified(true);
         TokenResponse tokens = issueTokens(user);
-        log.info("Login success uid={}", user.getId());
-        return tokens;
+        log.info("Login success uid={} newUser={}", user.getId(), newUser);
+        return new VerifyCodeResult(tokens, newUser);
+    }
+
+    /** Результат входа по коду: токены для cookie и признак первой авторизации (регистрации). */
+    public record VerifyCodeResult(TokenResponse tokens, boolean newUser) {
     }
 
     @Transactional

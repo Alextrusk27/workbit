@@ -206,14 +206,15 @@ class AuthControllerTest {
         void returnsTokensOnSuccess() throws Exception {
             // given
             var request = new VerifyCodeRequest(EMAIL, CODE);
-            when(authService.verifyCode(request)).thenReturn(tokenResponse());
+            when(authService.verifyCode(request))
+                    .thenReturn(new AuthService.VerifyCodeResult(tokenResponse(), true));
 
             // when
             var result = mvc.perform(post(BASE + "/verify-code")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").doesNotExist())
+                    .andExpect(jsonPath("$.newUser").value(true))
                     .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
                     .andExpect(cookie().httpOnly(AuthCookieService.ACCESS_COOKIE_NAME, true))
                     .andExpect(cookie().secure(AuthCookieService.ACCESS_COOKIE_NAME, true))

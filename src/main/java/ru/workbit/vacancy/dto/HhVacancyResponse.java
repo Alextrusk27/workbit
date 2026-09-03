@@ -1,7 +1,6 @@
 package ru.workbit.vacancy.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 
 public record HhVacancyResponse(

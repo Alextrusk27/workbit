@@ -1,5 +1,14 @@
 package ru.workbit.interview.service;
 
+import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
+import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
+import static ru.workbit.interview.service.InterviewSessions.groupCases;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,16 +31,6 @@ import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.service.VacancyService;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-
-import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
-import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
-import static ru.workbit.interview.service.InterviewSessions.groupCases;
 
 @Component
 @Slf4j
@@ -124,7 +123,7 @@ public class InterviewWriter {
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
         checkOverallFeedback(sessionId, llmReport.overallFeedback());
-        InterviewReport.OfferProbability offerProbability = parseOfferProbability(sessionId, llmReport);
+        final InterviewReport.OfferProbability offerProbability = parseOfferProbability(sessionId, llmReport);
 
         List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
         saveFeedbacks(cases, llmReport.answers() != null ? llmReport.answers() : List.of());

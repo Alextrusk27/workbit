@@ -1,5 +1,6 @@
 package ru.workbit.vacancy.model.mapper;
 
+import java.util.Locale;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import ru.workbit.vacancy.dto.HhVacancyResponse;
@@ -8,15 +9,14 @@ import ru.workbit.vacancy.dto.VacancyPreviewResponse;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.model.VacancySnapshot;
 
-import java.util.Locale;
-
 @Mapper(componentModel = "spring")
 public interface VacancyMapper {
 
     @Mapping(target = "employer", source = "response.employer.name")
     @Mapping(target = "experience", source = "response.experience.name")
     @Mapping(target = "description", source = "description")
-    VacancyData toVacancyData(HhVacancyResponse response, VacancySnapshot.Source source, String sourceId, String url, String description);
+    VacancyData toVacancyData(HhVacancyResponse response, VacancySnapshot.Source source, String sourceId,
+            String url, String description);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "fetchedAt", ignore = true)

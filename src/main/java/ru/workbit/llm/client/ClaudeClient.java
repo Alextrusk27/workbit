@@ -18,17 +18,16 @@ import com.anthropic.models.messages.StructuredOutputConfig;
 import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Usage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-import ru.workbit.exception.LlmException;
-import ru.workbit.llm.config.AnthropicProperties;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import ru.workbit.exception.LlmException;
+import ru.workbit.llm.config.AnthropicProperties;
 
 /**
  * Обвязка над AnthropicClient для вызовов со structured output.
@@ -95,7 +94,7 @@ public class ClaudeClient {
     }
 
     /**
-     * provod шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
+     * Обходной путь: provod шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
      * {@link MessageAccumulator} читает это поле через {@code getRequired} и падает. Поэтому
      * событие без разбираемого usage идёт мимо аккумулятора, а {@code stop_reason} берётся прямо
      * из него; когда провайдер починит формат, событие снова пойдёт в аккумулятор и выходные

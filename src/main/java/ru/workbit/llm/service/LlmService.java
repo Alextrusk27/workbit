@@ -1,15 +1,27 @@
 package ru.workbit.llm.service;
 
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.ReviewerClient;
-import ru.workbit.llm.dto.*;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewPlan;
+import ru.workbit.llm.dto.LlmInterviewReport;
+import ru.workbit.llm.dto.LlmInterviewStep;
+import ru.workbit.llm.dto.LlmInterviewTurn;
+import ru.workbit.llm.dto.LlmInterviewVacancy;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
+import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.util.annotation.Loggable;
-
-import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor

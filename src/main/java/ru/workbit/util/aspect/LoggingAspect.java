@@ -1,5 +1,8 @@
 package ru.workbit.util.aspect;
 
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.Signature;
@@ -10,10 +13,6 @@ import org.springframework.stereotype.Component;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
-
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
 
 @Aspect
 @Slf4j

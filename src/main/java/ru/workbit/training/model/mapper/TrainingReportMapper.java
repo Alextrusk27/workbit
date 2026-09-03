@@ -1,13 +1,12 @@
 package ru.workbit.training.model.mapper;
 
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
-
-import java.util.List;
 
 @Mapper(componentModel = "spring", uses = TrainingQuestionMapper.class)
 public interface TrainingReportMapper {

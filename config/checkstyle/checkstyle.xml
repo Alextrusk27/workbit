@@ -23,6 +23,10 @@
     - abbreviations up to 4 capitals allowed (JWT, JPA, ...)
     - MissingJavadocMethod / MissingJavadocType removed (javadoc not mandatory;
       existing javadoc is still validated)
+    - TextBlockGoogleStyleFormatting removed (text blocks hold LLM prompts/JSON verbatim)
+    - in src/test relaxed: LineLength (long @DisplayName/stub lines), GoogleMethodName
+      (fixture factories aUser(), aLoginCode()), BoxComments (section separators),
+      VariableDeclarationUsageDistance (fixtures declared in "given", asserted in "then")
 -->
 <module name="Checker">
 
@@ -44,6 +48,16 @@
     <property name="file" value="${org.checkstyle.google.suppressionfilter.config}"
            default="checkstyle-suppressions.xml" />
     <property name="optional" value="true"/>
+  </module>
+
+  <!-- Test sources: relaxed rules, see the header comment above -->
+  <module name="SuppressionSingleFilter">
+    <property name="files" value="[\\/]src[\\/]test[\\/]"/>
+    <property name="checks" value="LineLength|GoogleMethodName|VariableDeclarationUsageDistance"/>
+  </module>
+  <module name="SuppressionSingleFilter">
+    <property name="files" value="[\\/]src[\\/]test[\\/]"/>
+    <property name="id" value="BoxComments"/>
   </module>
 
   <!-- https://checkstyle.org/filters/suppresswithnearbytextfilter.html -->
@@ -227,7 +241,6 @@
     <module name="FallThrough"/>
     <module name="UpperEll"/>
     <module name="ModifierOrder"/>
-    <module name="TextBlockGoogleStyleFormatting"/>
     <module name="EmptyLineSeparator">
       <property name="tokens"
                value="PACKAGE_DEF, IMPORT, STATIC_IMPORT, CLASS_DEF, INTERFACE_DEF, ENUM_DEF,

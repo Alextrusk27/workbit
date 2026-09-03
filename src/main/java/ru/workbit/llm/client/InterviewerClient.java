@@ -1,6 +1,10 @@
 package ru.workbit.llm.client;
 
 import com.anthropic.models.messages.MessageParam;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -11,11 +15,6 @@ import ru.workbit.llm.dto.LlmInterviewStepKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import tools.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Протокол агента «интервьюер» поверх {@link ClaudeClient}: промпт из ресурса, вводная с
@@ -56,6 +55,8 @@ public class InterviewerClient {
     }
 
     /**
+     * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы.
+     *
      * @param plan       план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
      * @param history    завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
      * @param lastAnswer новый ответ кандидата, на который модель ещё не отвечала

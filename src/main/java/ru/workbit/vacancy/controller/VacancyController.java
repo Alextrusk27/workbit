@@ -28,14 +28,29 @@ public class VacancyController {
 
     @GetMapping("/preview")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Предпросмотр вакансии", description = "По ссылке на вакансию hh.ru возвращает краткую сводку: название, работодателя, зарплату и требуемый опыт.")
+    @Operation(
+            summary = "Предпросмотр вакансии",
+            description = "По ссылке на вакансию hh.ru возвращает краткую сводку: название, работодателя, зарплату и "
+            + "требуемый опыт.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Сводка по вакансии"),
-            @ApiResponse(responseCode = "400", description = "Отсутствует параметр url или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Вакансия не найдена или в архиве", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "hh.ru недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Отсутствует параметр url или ссылка не является вакансией hh.ru",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Нет токена или токен недействителен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Вакансия не найдена или в архиве",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "hh.ru недоступен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public VacancyPreviewResponse preview(
             @Parameter(description = "Ссылка на вакансию hh.ru", example = "https://hh.ru/vacancy/123456")
@@ -45,13 +60,25 @@ public class VacancyController {
 
     @GetMapping("/status")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Текущий статус вакансии", description = "Проверяет по ссылке, доступна ли вакансия на hh.ru: активна, в архиве или удалена. Результат кешируется на сервере на 30 минут.")
+    @Operation(
+            summary = "Текущий статус вакансии",
+            description = "Проверяет по ссылке, доступна ли вакансия на hh.ru: активна, в архиве или удалена. "
+            + "Результат кешируется на сервере на 30 минут.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Статус вакансии"),
-            @ApiResponse(responseCode = "400", description = "Отсутствует параметр url или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Нет токена или токен недействителен", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "hh.ru недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Отсутствует параметр url или ссылка не является вакансией hh.ru",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Нет токена или токен недействителен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "hh.ru недоступен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public VacancyStatusResponse status(
             @Parameter(description = "Ссылка на вакансию hh.ru", example = "https://hh.ru/vacancy/123456")

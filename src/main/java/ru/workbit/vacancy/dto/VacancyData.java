@@ -1,8 +1,7 @@
 package ru.workbit.vacancy.dto;
 
-import ru.workbit.vacancy.model.VacancySnapshot;
-
 import java.util.List;
+import ru.workbit.vacancy.model.VacancySnapshot;
 
 public record VacancyData(
         VacancySnapshot.Source source,

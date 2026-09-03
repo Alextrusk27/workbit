@@ -1,5 +1,16 @@
 package ru.workbit.interview.service;
 
+import static ru.workbit.interview.service.InterviewSessions.answeredMainSorted;
+import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
+import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
+import static ru.workbit.interview.service.InterviewSessions.groupCases;
+
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,18 +48,6 @@ import ru.workbit.llm.service.LlmService;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
-
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.IntStream;
-
-import static ru.workbit.interview.service.InterviewSessions.answeredMainSorted;
-import static ru.workbit.interview.service.InterviewSessions.answeredSorted;
-import static ru.workbit.interview.service.InterviewSessions.checkSessionNotCompleted;
-import static ru.workbit.interview.service.InterviewSessions.groupCases;
 
 @Service
 @Slf4j
@@ -295,8 +294,8 @@ public class InterviewService {
             return step;
         }
 
-        log.warn("LLM returned degenerate interview step for session {}, retrying once " +
-                        "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
+        log.warn("LLM returned degenerate interview step for session {}, retrying once "
+                        + "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
                 isBlank(step.question()), mainAsked, session.getTotalQuestions());
 
         step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
@@ -304,8 +303,8 @@ public class InterviewService {
             return step;
         }
 
-        log.error("LLM returned degenerate interview step for session {} after retry " +
-                        "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
+        log.error("LLM returned degenerate interview step for session {} after retry "
+                        + "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
                 isBlank(step.question()), mainAsked, session.getTotalQuestions());
 
         throw new LlmException("Interview step has no question");

@@ -1,5 +1,10 @@
 package ru.workbit.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,12 +27,6 @@ import ru.workbit.auth.repository.LoginCodeJPARepository;
 import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.service.JWTService;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate

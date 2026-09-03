@@ -1,12 +1,11 @@
 package ru.workbit.training.service;
 
+import java.util.Comparator;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
-
-import java.util.Comparator;
-import java.util.List;
 
 @Slf4j
 final class TrainingSessions {

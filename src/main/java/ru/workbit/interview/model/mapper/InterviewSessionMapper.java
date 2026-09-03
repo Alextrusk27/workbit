@@ -24,5 +24,6 @@ public interface InterviewSessionMapper {
     @Mapping(target = "vacancyUrl", source = "vacancy.url")
     @Mapping(target = "experience", source = "vacancy.experience")
     @Mapping(target = "answeredCount", source = "answeredCount")
-    InterviewSessionResponse toResponse(InterviewSession interviewSession, VacancySnapshotView vacancy, int answeredCount);
+    InterviewSessionResponse toResponse(InterviewSession interviewSession, VacancySnapshotView vacancy,
+            int answeredCount);
 }

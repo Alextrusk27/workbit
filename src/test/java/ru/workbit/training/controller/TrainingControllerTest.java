@@ -1,47 +1,5 @@
 package ru.workbit.training.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import ru.workbit.security.service.UserDetailsServiceImpl;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.mockito.ArgumentCaptor;
-import ru.workbit.exception.ConflictException;
-import ru.workbit.exception.ForbiddenException;
-import ru.workbit.exception.LlmException;
-import ru.workbit.exception.NotFoundException;
-import ru.workbit.exception.PaymentRequiredException;
-import ru.workbit.exception.TooManyRequestsException;
-import ru.workbit.exception.UnprocessableEntityException;
-import ru.workbit.exception.controller.ExceptionController;
-import ru.workbit.training.dto.CreateSessionRequest;
-import ru.workbit.training.dto.FeedbackRequest;
-import ru.workbit.training.dto.NormalizeInputRequest;
-import ru.workbit.training.dto.NormalizeInputResponse;
-import ru.workbit.training.dto.ReferenceAnswerResponse;
-import ru.workbit.training.dto.TrainingOptionsResponse;
-import ru.workbit.training.dto.TrainingQuestionResponse;
-import ru.workbit.training.dto.TrainingSessionResponse;
-import ru.workbit.training.model.TrainingSession;
-import ru.workbit.training.model.TrainingUserFeedback;
-import ru.workbit.training.service.TrainingService;
-import ru.workbit.security.config.RateLimitProperties;
-import ru.workbit.security.config.SecurityConfig;
-import ru.workbit.security.model.CustomUserDetails;
-import ru.workbit.security.service.JWTService;
-import ru.workbit.security.service.RateLimiterService;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -57,6 +15,47 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
+import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.exception.UnprocessableEntityException;
+import ru.workbit.exception.controller.ExceptionController;
+import ru.workbit.security.config.RateLimitProperties;
+import ru.workbit.security.config.SecurityConfig;
+import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.JWTService;
+import ru.workbit.security.service.RateLimiterService;
+import ru.workbit.security.service.UserDetailsServiceImpl;
+import ru.workbit.training.dto.CreateSessionRequest;
+import ru.workbit.training.dto.FeedbackRequest;
+import ru.workbit.training.dto.NormalizeInputRequest;
+import ru.workbit.training.dto.NormalizeInputResponse;
+import ru.workbit.training.dto.ReferenceAnswerResponse;
+import ru.workbit.training.dto.TrainingOptionsResponse;
+import ru.workbit.training.dto.TrainingQuestionResponse;
+import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
+import ru.workbit.training.service.TrainingService;
 
 @WebMvcTest(TrainingController.class)
 @Import({SecurityConfig.class, ExceptionController.class})

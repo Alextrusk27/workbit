@@ -1,11 +1,10 @@
 package ru.workbit.training.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.training.model.TrainingSession;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import ru.workbit.training.model.TrainingSession;
 
 public record TrainingReportResponse(
         @Schema(description = "Идентификатор отчёта")

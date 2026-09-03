@@ -1,10 +1,9 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.InterviewSession;
-
 import java.time.Instant;
 import java.util.UUID;
+import ru.workbit.interview.model.InterviewSession;
 
 public record InterviewSessionResponse(
         @Schema(description = "Идентификатор сессии")
@@ -28,7 +27,9 @@ public record InterviewSessionResponse(
         @Schema(description = "Статус сессии")
         InterviewSession.Status status,
 
-        @Schema(description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)", example = "3")
+        @Schema(
+                description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)",
+                example = "3")
         int answeredCount,
 
         @Schema(description = "Общее количество основных вопросов интервью", example = "10")

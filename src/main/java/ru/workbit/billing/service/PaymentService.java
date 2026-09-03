@@ -1,5 +1,8 @@
 package ru.workbit.billing.service;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -9,10 +12,6 @@ import ru.workbit.billing.dto.PaymentStatusResponse;
 import ru.workbit.billing.model.Payment;
 import ru.workbit.billing.repository.PaymentRepository;
 import ru.workbit.exception.NotFoundException;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor

@@ -84,7 +84,8 @@ public class SpeechKitSttClient {
                                         .setSampleRateHertz(SAMPLE_RATE_HERTZ)
                                         .setAudioChannelCount(CHANNEL_COUNT)))
                         .setTextNormalization(Stt.TextNormalizationOptions.newBuilder()
-                                .setTextNormalization(Stt.TextNormalizationOptions.TextNormalization.TEXT_NORMALIZATION_ENABLED))
+                                .setTextNormalization(
+                                        Stt.TextNormalizationOptions.TextNormalization.TEXT_NORMALIZATION_ENABLED))
                         .setLanguageRestriction(Stt.LanguageRestrictionOptions.newBuilder()
                                 .setRestrictionType(Stt.LanguageRestrictionOptions.LanguageRestrictionType.WHITELIST)
                                 .addLanguageCode(LANGUAGE))

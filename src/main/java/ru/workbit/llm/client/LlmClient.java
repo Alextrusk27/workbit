@@ -8,6 +8,9 @@ import com.openai.errors.OpenAIServiceException;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponsePrompt;
 import com.openai.models.responses.StructuredResponseCreateParams;
+import java.util.Collection;
+import java.util.Map;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,10 +18,6 @@ import ru.workbit.exception.LlmException;
 import ru.workbit.llm.config.YandexAiProperties;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.Collection;
-import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Общая обвязка над OpenAIClient: сборка structured-параметров из request-DTO,
@@ -65,7 +64,8 @@ public class LlmClient {
             try {
                 return callOnce(agentKey, request, responseType);
             } catch (OpenAIInvalidDataException second) {
-                log.error("{}: LLM response is not parseable after retry [agent={}, promptId={}] — check the agent model in Studio",
+                log.error("{}: LLM response is not parseable after retry [agent={}, promptId={}] — check the agent "
+                        + "model in Studio",
                         MODEL_DEGRADED, agentKey, props.agents().get(agentKey), second);
                 throw new LlmException("LLM response is not parseable", second);
             }

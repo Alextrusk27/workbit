@@ -29,6 +29,7 @@ public class EmailService {
         try {
             sendLoginCodeMail(event.email(), event.code());
         } catch (EmailSendException ignored) {
+            // intentionally ignored: email failure is non-critical here
         }
     }
 
@@ -37,6 +38,7 @@ public class EmailService {
         try {
             sendAccountDeletionWarningMail(event.email());
         } catch (EmailSendException ignored) {
+            // intentionally ignored: email failure is non-critical here
         }
     }
 

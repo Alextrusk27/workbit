@@ -1,13 +1,12 @@
 package ru.workbit.interview.repository;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.interview.model.InterviewQuestion;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 public interface InterviewQuestionRepository extends JpaRepository<@NotNull InterviewQuestion, @NotNull UUID> {
 

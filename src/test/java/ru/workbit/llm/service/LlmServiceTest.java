@@ -5,21 +5,19 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
+import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.*;
 import ru.workbit.training.model.TrainingSession;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,20 +37,11 @@ class LlmServiceTest {
     @Mock
     InterviewerClient interviewer;
 
+    @Mock
+    ReviewerClient reviewer;
+
     @InjectMocks
     LlmService llmService;
-
-    private static Stream<Arguments> experienceGrades() {
-        return Stream.of(
-                Arguments.of("Нет опыта", "exp0"),
-                Arguments.of("От 1 года до 3 лет", "exp1"),
-                Arguments.of("От 3 до 6 лет", "exp3"),
-                Arguments.of("Более 6 лет", "exp6"),
-                Arguments.of("", "exp1"),
-                Arguments.of(null, "exp1"),
-                Arguments.of("Неизвестная категория опыта", "exp1")
-        );
-    }
 
     @Nested
     @DisplayName("GenerateTrainingQuestions")
@@ -178,25 +167,25 @@ class LlmServiceTest {
     @DisplayName("CreateInterviewReport")
     class CreateInterviewReport {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-reviewer-{суффикс} по грейду опыта и шлёт запрос одной переменной JSON_STRING")
-        void routesByExperienceGradeAndWrapsRequestAsJsonString(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов reviewer.review с теми же аргументами и возвращает результат как есть")
+        void delegatesToReviewer() {
             // given
-            var request = new LlmInterviewReportRequest("Java-разработчик", experience, List.of());
-            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы", null);
-            when(llm.call(anyString(), any(), eq(LlmInterviewReport.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var answers = List.of(new LlmInterviewAnswer(
+                    1, "Java core", "Что такое JVM?", "Виртуальная машина Java", List.of()));
+            var expected = new LlmInterviewReport(
+                    List.of(), LlmOfferProbability.HIGH, "Хорошо", "Подтянуть алгоритмы", null);
+            when(reviewer.review(vacancy, answers)).thenReturn(expected);
 
             // when
-            var result = llmService.createInterviewReport(experience, request);
+            var result = llmService.createInterviewReport(vacancy, answers);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            ArgumentCaptor<Object> requestCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(llm).call(agentKeyCaptor.capture(), requestCaptor.capture(), eq(LlmInterviewReport.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-reviewer-" + expectedSuffix);
-            assertThat(requestCaptor.getValue()).isEqualTo(Map.of("JSON_STRING", request));
+            verify(reviewer).review(vacancy, answers);
+            verifyNoInteractions(llm);
         }
     }
 

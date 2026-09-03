@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
+import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.*;
 import ru.workbit.util.annotation.Loggable;
 
@@ -15,6 +16,7 @@ import java.util.Map;
 public class LlmService {
     private final LlmClient llm;
     private final InterviewerClient interviewer;
+    private final ReviewerClient reviewer;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
@@ -43,22 +45,12 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewReport createInterviewReport(String experience, LlmInterviewReportRequest request) {
-        return llm.call("interview-reviewer-" + experienceGrade(experience), Map.of("JSON_STRING", request), LlmInterviewReport.class);
+    public LlmInterviewReport createInterviewReport(LlmInterviewVacancy vacancy, List<LlmInterviewAnswer> answers) {
+        return reviewer.review(vacancy, answers);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
         return llm.call("input-normalizer", request, LlmInputNormalization.class);
-    }
-
-    private static String experienceGrade(String experience) {
-        return switch (experience == null ? "" : experience) {
-            case "Нет опыта" -> "exp0";
-            case "От 1 года до 3 лет" -> "exp1";
-            case "От 3 до 6 лет" -> "exp3";
-            case "Более 6 лет" -> "exp6";
-            default -> "exp1";
-        };
     }
 }

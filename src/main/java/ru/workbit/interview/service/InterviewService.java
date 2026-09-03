@@ -29,7 +29,6 @@ import ru.workbit.llm.dto.LlmInterviewAnswer;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
 import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
-import ru.workbit.llm.dto.LlmInterviewReportRequest;
 import ru.workbit.llm.dto.LlmInterviewStep;
 import ru.workbit.llm.dto.LlmInterviewStepKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
@@ -278,13 +277,17 @@ public class InterviewService {
      */
     private LlmInterviewStep requestStep(InterviewSession session, List<InterviewQuestion> dialog, int mainAsked) {
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
+
         LlmInterviewVacancy llmVacancy = new LlmInterviewVacancy(vacancy.name(), vacancy.employer(),
                 vacancy.experience(), vacancy.keySkills(), vacancy.description());
+
         LlmInterviewPlan plan = new LlmInterviewPlan(session.getTotalQuestions(), session.getPlanTopics(),
                 dialog.getFirst().getTopic(), dialog.getFirst().getText());
+
         List<LlmInterviewTurn> history = IntStream.range(0, dialog.size() - 1)
                 .mapToObj(i -> new LlmInterviewTurn(dialog.get(i).getAnswerText(), toStep(dialog.get(i + 1))))
                 .toList();
+
         String lastAnswer = dialog.getLast().getAnswerText();
 
         LlmInterviewStep step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
@@ -292,15 +295,19 @@ public class InterviewService {
             return step;
         }
 
-        log.warn("LLM returned degenerate interview step for session {}, retrying once [kind={}, blankQuestion={}, mainAsked={}/{}]",
-                session.getId(), step.kind(), isBlank(step.question()), mainAsked, session.getTotalQuestions());
+        log.warn("LLM returned degenerate interview step for session {}, retrying once " +
+                        "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
+                isBlank(step.question()), mainAsked, session.getTotalQuestions());
+
         step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
         if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
             return step;
         }
 
-        log.error("LLM returned degenerate interview step for session {} after retry [kind={}, blankQuestion={}, mainAsked={}/{}]",
-                session.getId(), step.kind(), isBlank(step.question()), mainAsked, session.getTotalQuestions());
+        log.error("LLM returned degenerate interview step for session {} after retry " +
+                        "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
+                isBlank(step.question()), mainAsked, session.getTotalQuestions());
+
         throw new LlmException("Interview step has no question");
     }
 
@@ -315,6 +322,8 @@ public class InterviewService {
         if (step.kind() == null) {
             return false;
         }
+
+
         return !isBlank(step.question())
                 || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
     }
@@ -353,31 +362,32 @@ public class InterviewService {
     }
 
     /**
-     * Запрос отчёта с одним повторным вызовом на вырожденный ответ-заглушку: Studio изредка отдаёт
-     * шаблон схемы вместо отчёта ("string" в полях, один answer) — тот же класс сбоя, что и у
-     * генератора вопросов в {@link #generateQuestions}. Итоговую валидацию делает completeReport.
+     * Запрос отчёта с одним повторным вызовом на вырожденный ответ: пустой итог или разборы не на
+     * все кейсы. Итоговую валидацию делает completeReport.
      */
     private LlmInterviewReport requestReport(UUID sessionId, VacancySnapshotView vacancy,
                                              List<List<InterviewQuestion>> cases) {
-        LlmInterviewReportRequest request = new LlmInterviewReportRequest(
-                vacancy.name(),
-                vacancy.experience(),
-                IntStream.range(0, cases.size())
-                        .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
-                        .toList());
-        LlmInterviewReport report = llmService.createInterviewReport(vacancy.experience(), request);
+
+        LlmInterviewVacancy llmVacancy = new LlmInterviewVacancy(vacancy.name(), vacancy.employer(),
+                vacancy.experience(), vacancy.keySkills(), vacancy.description());
+
+        List<LlmInterviewAnswer> answers = IntStream.range(0, cases.size())
+                .mapToObj(i -> toLlmAnswer(i + 1, cases.get(i)))
+                .toList();
+
+        LlmInterviewReport report = llmService.createInterviewReport(llmVacancy, answers);
         if (isUsableReport(report, cases.size())) {
             return report;
         }
         log.warn("LLM returned degenerate interview report for session {}, retrying once", sessionId);
-        return llmService.createInterviewReport(vacancy.experience(), request);
+        return llmService.createInterviewReport(llmVacancy, answers);
     }
 
     private static boolean isUsableReport(LlmInterviewReport report, int casesCount) {
         return report.overallFeedback() != null
                 && !report.overallFeedback().isBlank()
                 && report.overallFeedback().length() >= InterviewWriter.MIN_OVERALL_FEEDBACK_LENGTH
-                && InterviewReport.OfferProbability.fromString(report.offerProbability()).isPresent()
+                && report.offerProbability() != null
                 && report.answers() != null
                 && report.answers().size() >= casesCount * InterviewWriter.MIN_REVIEWED_ANSWERS_RATIO;
     }
@@ -385,11 +395,15 @@ public class InterviewService {
     private static LlmInterviewAnswer toLlmAnswer(int index, List<InterviewQuestion> interviewCase) {
         return new LlmInterviewAnswer(
                 index,
+                interviewCase.getFirst().getTopic(),
                 interviewCase.getFirst().getText(),
                 interviewCase.getFirst().getAnswerText(),
                 interviewCase.stream()
                         .skip(1)
-                        .map(q -> new LlmInterviewFollowUp(q.getText(), q.getAnswerText()))
+                        .map(q -> new LlmInterviewFollowUp(
+                                LlmInterviewStepKind.valueOf(q.getKind().name()),
+                                q.getText(),
+                                q.getAnswerText()))
                         .toList());
     }
 

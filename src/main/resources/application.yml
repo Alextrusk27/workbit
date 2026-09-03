@@ -102,10 +102,6 @@ llm:
       training-question-generator-senior: ${TQG_SENIOR}
       training-reviewer: ${TRAINING_REVIEWER}
       training-reference-answer: ${TRAINING_REFERENCE_ANSWER}
-      interview-reviewer-exp0: ${IRV_EXP0}
-      interview-reviewer-exp1: ${IRV_EXP1}
-      interview-reviewer-exp3: ${IRV_EXP3}
-      interview-reviewer-exp6: ${IRV_EXP6}
       input-normalizer: ${INPUT_NORMALIZER}
   anthropic:
     base-url: ${ANTHROPIC_BASE_URL}

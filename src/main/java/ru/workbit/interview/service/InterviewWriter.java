@@ -232,12 +232,12 @@ public class InterviewWriter {
     }
 
     private InterviewReport.OfferProbability parseOfferProbability(UUID sessionId, LlmInterviewReport llmReport) {
-        return InterviewReport.OfferProbability.fromString(llmReport.offerProbability())
-                .orElseThrow(() -> {
-                    log.error("Cannot finish interview session {}: LLM returned invalid offer probability '{}'",
-                            sessionId, llmReport.offerProbability());
-                    return new LlmException("Interview report has no usable offer probability");
-                });
+        if (llmReport.offerProbability() == null) {
+            log.error("Cannot finish interview session {}: LLM returned no offer probability", sessionId);
+            throw new LlmException("Interview report has no usable offer probability");
+        }
+
+        return InterviewReport.OfferProbability.valueOf(llmReport.offerProbability().name());
     }
 
     private static UUID caseIdOf(InterviewQuestion answered) {

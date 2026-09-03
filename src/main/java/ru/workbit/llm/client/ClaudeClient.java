@@ -25,11 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Обвязка над AnthropicClient для многоходовой беседы со structured output.
- * Промпт агента идёт первым блоком первого user-сообщения, а не в system, вводная - вторым;
- * метки кэша стоят на обоих, потому что между ходами эти блоки неизменны: промпт общий для всех
- * бесед, вводная - для одной. Дальнейшие реплики метку не несут - подвижная метка на последней
- * реплике давала промах кэша через ход.
+ * Обвязка над AnthropicClient для вызовов со structured output.
+ * Промпт агента идёт первым блоком первого user-сообщения, а не в system, вводная - вторым.
  */
 @Slf4j
 @Component
@@ -43,6 +40,9 @@ public class ClaudeClient {
     private final AnthropicProperties props;
 
     /**
+     * Многоходовая беседа. Метки кэша стоят на промпте и на вводной, потому что между ходами эти
+     * блоки неизменны: промпт общий для всех бесед, вводная - для одной.
+     *
      * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
      * @param opening      первая реплика пользователя (вводная задачи)
      * @param dialog       дальнейшие реплики по очереди assistant/user: пустой на первом ходе,
@@ -50,17 +50,49 @@ public class ClaudeClient {
      * @param responseType record со схемой ответа на этом ходе
      */
     public <T> T converse(String prompt, String opening, List<MessageParam> dialog, Class<T> responseType) {
+        List<MessageParam> messages = new ArrayList<>(dialog.size() + 1);
+
+        messages.add(MessageParam.builder()
+                .role(MessageParam.Role.USER)
+                .contentOfBlockParams(List.of(cached(prompt), cached(opening)))
+                .build());
+        messages.addAll(dialog);
+
+        return send(messages, responseType);
+    }
+
+    /**
+     * Одноходовой вызов. Метка кэша стоит только на промпте: вводная уникальна для вызова, из кэша
+     * повторно не читается, а запись в кэш с TTL 1h стоит дороже обычного входа.
+     *
+     * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
+     * @param task         вводная с данными задачи
+     * @param responseType record со схемой ответа
+     */
+    public <T> T ask(String prompt, String task, Class<T> responseType) {
+        MessageParam message = MessageParam.builder()
+                .role(MessageParam.Role.USER)
+                .contentOfBlockParams(List.of(cached(prompt), plain(task)))
+                .build();
+
+        return send(List.of(message), responseType);
+    }
+
+    private <T> T send(List<MessageParam> messages, Class<T> responseType) {
         StructuredMessage<T> response;
 
         try {
-            response = client.messages().create(buildParams(prompt, opening, dialog, responseType));
+            response = client.messages().create(buildParams(messages, responseType));
+
         } catch (AnthropicInvalidDataException e) {
             log.error("Claude response is not parseable [model={}]", props.model(), e);
             throw new LlmException("LLM response is not parseable", e);
+
         } catch (AnthropicServiceException e) {
             log.error("Claude call failed [model={}]: status={}, type={}, body={}",
                     props.model(), e.statusCode(), e.errorType().orElse(null), e.body());
             throw new LlmException("LLM call failed with status %d".formatted(e.statusCode()), e);
+
         } catch (AnthropicException e) {
             log.error("Claude call failed [model={}]", props.model(), e);
             throw new LlmException("LLM call failed", e);
@@ -82,16 +114,7 @@ public class ClaudeClient {
                 .orElseThrow(() -> new LlmException("Model not response"));
     }
 
-    private <T> StructuredMessageCreateParams<T> buildParams(String prompt, String opening,
-                                                             List<MessageParam> dialog, Class<T> responseType) {
-        List<MessageParam> messages = new ArrayList<>(dialog.size() + 1);
-
-        messages.add(MessageParam.builder()
-                .role(MessageParam.Role.USER)
-                .contentOfBlockParams(List.of(cached(prompt), cached(opening)))
-                .build());
-        messages.addAll(dialog);
-
+    private <T> StructuredMessageCreateParams<T> buildParams(List<MessageParam> messages, Class<T> responseType) {
         return MessageCreateParams.builder()
                 .model(props.model())
                 .maxTokens(MAX_TOKENS)
@@ -107,6 +130,13 @@ public class ClaudeClient {
         return ContentBlockParam.ofText(TextBlockParam.builder()
                 .text(text)
                 .cacheControl(CACHE_1H)
+                .build()
+        );
+    }
+
+    private static ContentBlockParam plain(String text) {
+        return ContentBlockParam.ofText(TextBlockParam.builder()
+                .text(text)
                 .build()
         );
     }

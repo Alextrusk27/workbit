@@ -38,11 +38,11 @@ import ru.workbit.llm.dto.LlmInterviewAnswerReview;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
 import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
-import ru.workbit.llm.dto.LlmInterviewReportRequest;
 import ru.workbit.llm.dto.LlmInterviewStep;
 import ru.workbit.llm.dto.LlmInterviewStepKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
+import ru.workbit.llm.dto.LlmOfferProbability;
 import ru.workbit.llm.service.LlmService;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
@@ -113,6 +113,8 @@ class InterviewServiceTest {
                 .parentQuestionId(parentQuestionId)
                 .orderIndex(orderIndex)
                 .followUp(followUp)
+                .kind(followUp ? InterviewQuestion.Kind.FOLLOW_UP : InterviewQuestion.Kind.MAIN)
+                .topic("Тема " + orderIndex)
                 .answered(answered)
                 .text(text)
                 .answerText(answerText)
@@ -1354,8 +1356,8 @@ class InterviewServiceTest {
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
                             new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
-                    "Средняя", "Итоговый фидбэк по интервью", null, null);
-            when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any())).thenReturn(llmReport);
 
             InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
             when(interviewWriter.completeReport(sessionId, llmReport)).thenReturn(expectedResponse);
@@ -1366,13 +1368,13 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
 
-            ArgumentCaptor<LlmInterviewReportRequest> captor = ArgumentCaptor.forClass(LlmInterviewReportRequest.class);
-            verify(llmService, times(1)).createInterviewReport(eq(vacancy.experience()), captor.capture());
-            assertThat(captor.getValue()).isEqualTo(new LlmInterviewReportRequest(
-                    vacancy.name(), vacancy.experience(), List.of(
-                            new LlmInterviewAnswer(1, main1.getText(), main1.getAnswerText(),
-                                    List.of(new LlmInterviewFollowUp(followUp1.getText(), followUp1.getAnswerText()))),
-                            new LlmInterviewAnswer(2, main2.getText(), main2.getAnswerText(), List.of()))));
+            LlmInterviewVacancy expectedVacancy = new LlmInterviewVacancy(vacancy.name(), vacancy.employer(),
+                    vacancy.experience(), vacancy.keySkills(), vacancy.description());
+            verify(llmService, times(1)).createInterviewReport(expectedVacancy, List.of(
+                    new LlmInterviewAnswer(1, main1.getTopic(), main1.getText(), main1.getAnswerText(),
+                            List.of(new LlmInterviewFollowUp(LlmInterviewStepKind.FOLLOW_UP,
+                                    followUp1.getText(), followUp1.getAnswerText()))),
+                    new LlmInterviewAnswer(2, main2.getTopic(), main2.getText(), main2.getAnswerText(), List.of())));
         }
 
         @Test
@@ -1388,8 +1390,8 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хороший ответ", 4)),
-                    "Средняя", "Итоговый фидбэк по интервью", null, null);
-            when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(llmReport);
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any())).thenReturn(llmReport);
             when(interviewWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("already completed"));
 
@@ -1400,8 +1402,8 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Первый ответ LLM - вырожденный шаблон-заглушка - ретрай возвращает пригодный отчёт, LLM вызван дважды с одинаковым request")
-        void retriesReportWhenFirstResponseIsDegenerateTemplate() {
+        @DisplayName("Первый ответ LLM вырожденный - ретрай возвращает пригодный отчёт, LLM вызван дважды с теми же аргументами")
+        void retriesReportWhenFirstResponseIsDegenerate() {
             // given
             InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
                     vacancySnapshotId, 2);
@@ -1414,12 +1416,13 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewReport degenerateReport = new LlmInterviewReport(
-                    List.of(new LlmInterviewAnswerReview(1, "string", 3)), "string", "string", null, null);
+                    List.of(new LlmInterviewAnswerReview(1, "Разбор", 3)),
+                    LlmOfferProbability.MEDIUM, "коротко", null, null);
             LlmInterviewReport usableReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
                             new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
-                    "Средняя", "Итоговый фидбэк по интервью", null, null);
-            when(llmService.createInterviewReport(eq(vacancy.experience()), any()))
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any()))
                     .thenReturn(degenerateReport, usableReport);
 
             InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
@@ -1431,10 +1434,12 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
 
-            ArgumentCaptor<LlmInterviewReportRequest> captor = ArgumentCaptor.forClass(LlmInterviewReportRequest.class);
-            verify(llmService, times(2)).createInterviewReport(eq(vacancy.experience()), captor.capture());
-            assertThat(captor.getAllValues()).hasSize(2);
-            assertThat(captor.getAllValues().get(0)).isEqualTo(captor.getAllValues().get(1));
+            ArgumentCaptor<LlmInterviewVacancy> vacancyCaptor = ArgumentCaptor.forClass(LlmInterviewVacancy.class);
+            ArgumentCaptor<List<LlmInterviewAnswer>> answersCaptor = ArgumentCaptor.captor();
+            verify(llmService, times(2)).createInterviewReport(vacancyCaptor.capture(), answersCaptor.capture());
+            assertThat(vacancyCaptor.getAllValues()).hasSize(2);
+            assertThat(vacancyCaptor.getAllValues().get(0)).isEqualTo(vacancyCaptor.getAllValues().get(1));
+            assertThat(answersCaptor.getAllValues().get(0)).isEqualTo(answersCaptor.getAllValues().get(1));
             verify(interviewWriter).completeReport(sessionId, usableReport);
         }
 
@@ -1455,8 +1460,8 @@ class InterviewServiceTest {
             LlmInterviewReport usableReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
                             new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
-                    "Средняя", "Итоговый фидбэк по интервью", null, null);
-            when(llmService.createInterviewReport(eq(vacancy.experience()), any())).thenReturn(usableReport);
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any())).thenReturn(usableReport);
 
             InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
             when(interviewWriter.completeReport(sessionId, usableReport)).thenReturn(expectedResponse);
@@ -1466,7 +1471,7 @@ class InterviewServiceTest {
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(llmService, times(1)).createInterviewReport(eq(vacancy.experience()), any());
+            verify(llmService, times(1)).createInterviewReport(any(), any());
             verify(interviewWriter).completeReport(sessionId, usableReport);
         }
 
@@ -1484,9 +1489,11 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewReport firstDegenerate = new LlmInterviewReport(List.of(), "string", "string", null, null);
-            LlmInterviewReport secondDegenerate = new LlmInterviewReport(List.of(), "string", "string2", null, null);
-            when(llmService.createInterviewReport(eq(vacancy.experience()), any()))
+            LlmInterviewReport firstDegenerate = new LlmInterviewReport(
+                    List.of(), LlmOfferProbability.MEDIUM, "коротко", null, null);
+            LlmInterviewReport secondDegenerate = new LlmInterviewReport(
+                    List.of(), LlmOfferProbability.MEDIUM, "тоже коротко", null, null);
+            when(llmService.createInterviewReport(any(), any()))
                     .thenReturn(firstDegenerate, secondDegenerate);
             when(interviewWriter.completeReport(sessionId, secondDegenerate))
                     .thenThrow(new LlmException("Interview report has no usable overall feedback"));
@@ -1494,7 +1501,7 @@ class InterviewServiceTest {
             // when / then
             assertThatThrownBy(() -> interviewService.createReport(sessionId, userId))
                     .isInstanceOf(LlmException.class);
-            verify(llmService, times(2)).createInterviewReport(eq(vacancy.experience()), any());
+            verify(llmService, times(2)).createInterviewReport(any(), any());
             verify(interviewWriter).completeReport(sessionId, secondDegenerate);
         }
     }

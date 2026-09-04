@@ -45,23 +45,34 @@ public class ClaudeClient {
     private final AnthropicProperties props;
 
     /**
-     * Многоходовая беседа. Метки кэша стоят на промпте и на вводной, потому что между ходами эти
-     * блоки неизменны: промпт общий для всех бесед, вводная - для одной.
+     * Многоходовая беседа. Метки кэша стоят на промпте, вводной и новой реплике пользователя: первые
+     * два блока неизменны между ходами, а подвижная метка на хвосте истории оставляет вне кэша только
+     * прирост с прошлого хода - без неё вся переписка досылалась бы каждый ход по цене обычного входа.
+     * Схема ответа входит в кэшируемый префикс, поэтому на всех ходах беседы она должна быть одна.
      *
      * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
      * @param opening      первая реплика пользователя (вводная задачи)
-     * @param dialog       дальнейшие реплики по очереди assistant/user: пустой на первом ходе,
-     *                     иначе последней идёт текстовая user-реплика
-     * @param responseType record со схемой ответа на этом ходе
+     * @param dialog       завершённые реплики по очереди assistant/user, пустой на первом ходе
+     * @param lastUser     новая реплика пользователя, на которую отвечает модель; null на первом ходе
+     * @param responseType record со схемой ответа, общий для всех ходов беседы
      */
-    public <T> T converse(String prompt, String opening, List<MessageParam> dialog, Class<T> responseType) {
-        List<MessageParam> messages = new ArrayList<>(dialog.size() + 1);
+    public <T> T converse(String prompt, String opening, List<MessageParam> dialog, String lastUser,
+                          Class<T> responseType) {
+
+        List<MessageParam> messages = new ArrayList<>(dialog.size() + 2);
 
         messages.add(MessageParam.builder()
                 .role(MessageParam.Role.USER)
                 .contentOfBlockParams(List.of(cached(prompt), cached(opening)))
                 .build());
         messages.addAll(dialog);
+
+        if (lastUser != null) {
+            messages.add(MessageParam.builder()
+                    .role(MessageParam.Role.USER)
+                    .contentOfBlockParams(List.of(cached(lastUser)))
+                    .build());
+        }
 
         return send(messages, responseType);
     }

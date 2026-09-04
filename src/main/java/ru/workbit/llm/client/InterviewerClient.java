@@ -10,6 +10,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import ru.workbit.exception.LlmException;
 import ru.workbit.llm.dto.LlmInterviewPlan;
+import ru.workbit.llm.dto.LlmInterviewReply;
 import ru.workbit.llm.dto.LlmInterviewStep;
 import ru.workbit.llm.dto.LlmInterviewStepKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
@@ -51,7 +52,14 @@ public class InterviewerClient {
     }
 
     public LlmInterviewPlan plan(LlmInterviewVacancy vacancy) {
-        return claude.converse(prompt, opening(vacancy), List.of(), LlmInterviewPlan.class);
+        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy), List.of(), null,
+                LlmInterviewReply.class);
+
+        return new LlmInterviewPlan(
+                reply.questionCount() == null ? 0 : reply.questionCount(),
+                reply.topics(),
+                reply.topic(),
+                reply.question());
     }
 
     /**
@@ -64,7 +72,7 @@ public class InterviewerClient {
     public LlmInterviewStep next(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
                                  List<LlmInterviewTurn> history, String lastAnswer) {
 
-        List<MessageParam> dialog = new ArrayList<>(history.size() * 2 + 2);
+        List<MessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
         dialog.add(assistant(plan));
         int total = plan.questionCount();
         int asked = 1;
@@ -78,8 +86,10 @@ public class InterviewerClient {
             }
         }
 
-        dialog.add(user(candidateReply(lastAnswer, asked, total)));
-        return claude.converse(prompt, opening(vacancy), dialog, LlmInterviewStep.class);
+        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy), dialog,
+                candidateReply(lastAnswer, asked, total), LlmInterviewReply.class);
+
+        return new LlmInterviewStep(reply.kind(), reply.topic(), reply.question());
     }
 
     private String opening(LlmInterviewVacancy vacancy) {

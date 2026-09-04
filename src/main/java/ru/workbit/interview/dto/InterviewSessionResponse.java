@@ -39,6 +39,12 @@ public record InterviewSessionResponse(
         Instant created,
 
         @Schema(description = "Момент завершения сессии, null пока сессия не завершена")
-        Instant completedAt
+        Instant completedAt,
+
+        @Schema(
+                description = "Прощальная реплика интервьюера, если он оборвал беседу сам; "
+                        + "null, пока беседа идёт или закончилась штатно",
+                example = "Похоже, сегодня разговор не складывается. Давайте на этом остановимся.")
+        String closingRemark
 ) {
 }

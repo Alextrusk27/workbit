@@ -54,7 +54,7 @@ import ru.workbit.vacancy.service.VacancyService;
 @RequiredArgsConstructor
 public class InterviewService {
 
-    private static final int MAX_REDIRECTS = 3;
+    private static final int MAX_QUESTIONS_PER_CASE = 6;
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -239,7 +239,8 @@ public class InterviewService {
     /**
      * Очередной ход беседы: модель получает вакансию, план и всю историю и возвращает следующую реплику.
      * Что с ней делать, решает код: не больше одного уточнения на основной вопрос (второе идёт как
-     * новый основной), основной сверх плана и третий возврат к теме завершают интервью.
+     * новый основной), основной сверх плана завершает интервью. Оборвать беседу решает модель
+     * ({@code END}); код лишь страхует от бесконечного топтания на одном вопросе.
      */
     private Optional<InterviewQuestionResponse> askNextStep(InterviewSession session) {
         List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
@@ -253,11 +254,22 @@ public class InterviewService {
             return Optional.empty();
         }
 
-        LlmInterviewStep step = requestStep(session, dialog, cases.size());
-        InterviewQuestion.Kind kind = resolveKind(step.kind(), cases.getLast());
+        if (cases.getLast().size() >= MAX_QUESTIONS_PER_CASE) {
+            log.warn("Interview session {} got {} replies on one question, closing questioning",
+                    session.getId(), cases.getLast().size());
+            interviewWriter.closeQuestioning(answered.getId(), null);
+            return Optional.empty();
+        }
 
-        if (isFinalStep(kind, session.getTotalQuestions(), cases.size(), redirects(dialog))) {
-            interviewWriter.closeQuestioning(answered.getId());
+        LlmInterviewStep step = requestStep(session, dialog, cases.size());
+        if (step.kind() == LlmInterviewStepKind.END) {
+            interviewWriter.closeQuestioning(answered.getId(), step.question());
+            return Optional.empty();
+        }
+
+        InterviewQuestion.Kind kind = resolveKind(step.kind(), cases.getLast());
+        if (isFinalStep(kind, session.getTotalQuestions(), cases.size())) {
+            interviewWriter.closeQuestioning(answered.getId(), null);
             return Optional.empty();
         }
 
@@ -271,8 +283,8 @@ public class InterviewService {
     }
 
     /**
-     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой вопрос допустим только у
-     * {@code MAIN}, когда основные исчерпаны, - это сигнал конца беседы.
+     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой вопрос допустим у
+     * {@code MAIN}, когда основные исчерпаны, и у {@code END} - в обоих случаях беседа кончилась.
      */
     private LlmInterviewStep requestStep(InterviewSession session, List<InterviewQuestion> dialog, int mainAsked) {
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
@@ -324,6 +336,7 @@ public class InterviewService {
 
 
         return !isBlank(step.question())
+                || step.kind() == LlmInterviewStepKind.END
                 || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
     }
 
@@ -339,16 +352,12 @@ public class InterviewService {
                     : InterviewQuestion.Kind.FOLLOW_UP;
             case CLARIFICATION -> InterviewQuestion.Kind.CLARIFICATION;
             case REDIRECT -> InterviewQuestion.Kind.REDIRECT;
+            case END -> throw new IllegalStateException("END is handled before kind resolution");
         };
     }
 
-    private static int redirects(List<InterviewQuestion> dialog) {
-        return (int) dialog.stream().filter(q -> q.getKind() == InterviewQuestion.Kind.REDIRECT).count();
-    }
-
-    private static boolean isFinalStep(InterviewQuestion.Kind kind, int totalQuestions, int mainAsked, int redirects) {
-        return kind == InterviewQuestion.Kind.MAIN && mainAsked >= totalQuestions
-                || kind == InterviewQuestion.Kind.REDIRECT && redirects >= MAX_REDIRECTS - 1;
+    private static boolean isFinalStep(InterviewQuestion.Kind kind, int totalQuestions, int mainAsked) {
+        return kind == InterviewQuestion.Kind.MAIN && mainAsked >= totalQuestions;
     }
 
     private void checkAllQuestionsAnswered(InterviewSession session, List<InterviewQuestion> answered) {

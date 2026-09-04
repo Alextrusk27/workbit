@@ -18,6 +18,7 @@ export interface InterviewSession {
   totalQuestions: number
   created: string
   completedAt: string | null
+  closingRemark: string | null
 }
 
 export interface InterviewQuestion {

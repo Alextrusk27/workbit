@@ -59,6 +59,9 @@ public class InterviewSession {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "closing_remark")
+    private String closingRemark;
+
     @OneToMany(mappedBy = "session", orphanRemoval = true, cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<InterviewQuestion> questions;
 

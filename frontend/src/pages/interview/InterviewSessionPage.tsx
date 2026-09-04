@@ -84,6 +84,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
     'loading' | 'idle' | 'done' | 'error'
   >('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [closingRemark, setClosingRemark] = useState<string | null>(null)
 
   const submit = useSubmitInterviewAnswer()
   const finish = useFinishInterview()
@@ -114,6 +115,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
       setLoadState('idle')
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
+        const fresh = await interviewApi.getSession(session.id).catch(() => null)
+        setClosingRemark(fresh?.closingRemark ?? null)
         setLoadState('done')
       } else {
         setLoadState('error')
@@ -224,8 +227,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
         {finishing && !finish.isError && (
           <ChatBubble role="bot" who="Интервью завершено">
             <Spinner className="mr-2.5" />
-            Спасибо, это был последний вопрос. Формирую разбор: оценки по
-            каждому ответу, правки и вероятность оффера…
+            {closingRemark ?? 'Спасибо, это был последний вопрос.'} Формирую
+            разбор: оценки по каждому ответу, правки и вероятность оффера…
           </ChatBubble>
         )}
       </ChatShell>

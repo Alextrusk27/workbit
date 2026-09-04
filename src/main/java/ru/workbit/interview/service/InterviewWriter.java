@@ -83,6 +83,7 @@ public class InterviewWriter {
         answered.setFollowUpChecked(true);
 
         UUID parentQuestionId = kind == InterviewQuestion.Kind.MAIN ? null : caseIdOf(answered);
+
         InterviewQuestion question = interviewQuestionRepository.save(InterviewQuestion.builder()
                 .session(session)
                 .parentQuestionId(parentQuestionId)
@@ -98,15 +99,20 @@ public class InterviewWriter {
 
     /**
      * Завершает опрос: очередной вопрос не задаётся, а число основных вопросов сессии подрезается до
-     * фактически отвеченных - иначе досрочный конец беседы не дал бы собрать отчёт.
+     * фактически отвеченных - иначе досрочный конец беседы не дал бы собрать отчёт. Прощальную реплику
+     * интервьюера, если беседу оборвал он, кандидат увидит в сессии.
      */
     @Transactional
-    public void closeQuestioning(UUID answeredQuestionId) {
+    public void closeQuestioning(UUID answeredQuestionId, String closingRemark) {
         InterviewQuestion answered = interviewQuestionRepository.findWithSessionById(answeredQuestionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
         answered.setFollowUpChecked(true);
 
         InterviewSession session = answered.getSession();
+        if (closingRemark != null && !closingRemark.isBlank()) {
+            session.setClosingRemark(closingRemark.trim());
+        }
+
         int answeredMain = (int) interviewQuestionRepository
                 .countBySessionIdAndFollowUpFalseAndAnsweredTrue(session.getId());
 

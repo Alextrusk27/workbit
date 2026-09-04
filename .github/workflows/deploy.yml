@@ -138,6 +138,14 @@ jobs:
             sops -d "$f" >> .env.tmp
             echo >> .env.tmp
           done
+          rm -rf prompts.tmp
+          mkdir -m 755 prompts.tmp
+          for f in secrets/prod/prompts/*.txt; do
+            sops -d "$f" > "prompts.tmp/${f##*/}"
+          done
+          chmod 644 prompts.tmp/*.txt
+          rm -rf prompts
+          mv prompts.tmp prompts
           token=$(curl -s -H 'Metadata-Flavor: Google' \
             'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
             | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)

@@ -39,7 +39,7 @@ public class InterviewerClient {
     private final String prompt;
 
     public InterviewerClient(ClaudeClient claude, ObjectMapper objectMapper,
-                             @Value("classpath:llm/interviewer.txt") Resource promptResource) {
+                             @Value("${llm.prompts-dir}/interviewer.txt") Resource promptResource) {
         this.claude = claude;
         this.objectMapper = objectMapper;
 

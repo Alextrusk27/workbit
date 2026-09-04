@@ -91,6 +91,7 @@ management:
         include: health, info
 
 llm:
+  prompts-dir: ${LLM_PROMPTS_DIR:classpath:llm}
   yandex-ai:
     folder: ${YANDEX_FOLDER_ID}
     api-key: ${YANDEX_API_KEY}

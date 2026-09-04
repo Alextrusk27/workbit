@@ -94,7 +94,7 @@ public class ClaudeClient {
     }
 
     /**
-     * Обходной путь: provod шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
+     * Обходной путь: провайдер шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
      * {@link MessageAccumulator} читает это поле через {@code getRequired} и падает. Поэтому
      * событие без разбираемого usage идёт мимо аккумулятора, а {@code stop_reason} берётся прямо
      * из него; когда провайдер починит формат, событие снова пойдёт в аккумулятор и выходные

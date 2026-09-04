@@ -30,7 +30,7 @@ public class ReviewerClient {
     private final String prompt;
 
     public ReviewerClient(ClaudeClient claude, ObjectMapper objectMapper,
-                          @Value("classpath:llm/interview-reviewer.txt") Resource promptResource) {
+                          @Value("${llm.prompts-dir}/interview-reviewer.txt") Resource promptResource) {
         this.claude = claude;
         this.objectMapper = objectMapper;
 

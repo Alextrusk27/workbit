@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 .kotlin
 *.env
+src/main/resources/llm/
 
 ### IntelliJ IDEA ###
 .idea/

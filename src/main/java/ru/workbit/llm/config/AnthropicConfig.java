@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(AnthropicProperties.class)
 public class AnthropicConfig {
     private static final Duration TIMEOUT = Duration.ofMinutes(3);
+    private static final int MAX_RETRIES = 4;
 
     @Bean
     public AnthropicClient anthropicClient(AnthropicProperties props) {
@@ -18,6 +19,7 @@ public class AnthropicConfig {
                 .baseUrl(props.baseUrl())
                 .authToken(props.authToken())
                 .timeout(TIMEOUT)
+                .maxRetries(MAX_RETRIES)
                 .build();
     }
 }

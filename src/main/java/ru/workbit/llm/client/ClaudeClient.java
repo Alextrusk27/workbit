@@ -23,11 +23,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.workbit.exception.LlmException;
 import ru.workbit.llm.config.AnthropicProperties;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Обвязка над AnthropicClient для вызовов со structured output.
@@ -40,9 +42,11 @@ public class ClaudeClient {
     private static final long MAX_TOKENS = 32_000L;
     private static final CacheControlEphemeral CACHE_1H = CacheControlEphemeral.builder()
                     .ttl(CacheControlEphemeral.Ttl.TTL_1H).build();
+    private static final Pattern JSON_FENCE = Pattern.compile("^\\s*```(?:json)?\\s*|\\s*```\\s*$");
 
     private final AnthropicClient client;
     private final AnthropicProperties props;
+    private final ObjectMapper objectMapper;
 
     /**
      * Многоходовая беседа. Метки кэша стоят на промпте, блоках вводной и новой реплике пользователя:
@@ -106,7 +110,7 @@ public class ClaudeClient {
         StructuredMessage<T> response = call(() -> client.messages().create(params));
 
         logUsage(response.usage());
-        return result(response, response.stopReason().orElse(null));
+        return result(response, response.stopReason().orElse(null), responseType);
     }
 
     /**
@@ -139,7 +143,7 @@ public class ClaudeClient {
         });
 
         logStreamUsage(response.usage(), outputChars.get());
-        return result(response, stop.get() != null ? stop.get() : response.stopReason().orElse(null));
+        return result(response, stop.get() != null ? stop.get() : response.stopReason().orElse(null), responseType);
     }
 
     private <T> StructuredMessage<T> call(Supplier<StructuredMessage<T>> request) {
@@ -161,18 +165,49 @@ public class ClaudeClient {
         }
     }
 
-    private <T> T result(StructuredMessage<T> response, StopReason stop) {
+    private <T> T result(StructuredMessage<T> response, StopReason stop, Class<T> responseType) {
         if (StopReason.REFUSAL.equals(stop) || StopReason.MAX_TOKENS.equals(stop)) {
             log.error("Claude stopped abnormally [model={}, stopReason={}, details={}]",
                     props.model(), stop, response.stopDetails().orElse(null));
             throw new LlmException("LLM stopped with reason " + stop);
         }
 
-        return response.content().stream()
-                .flatMap(block -> block.text().stream())
-                .map(StructuredTextBlock::text)
+        StructuredTextBlock<T> block = response.content().stream()
+                .flatMap(content -> content.text().stream())
                 .findFirst()
                 .orElseThrow(() -> new LlmException("Model not response"));
+
+        try {
+            return block.text();
+        } catch (AnthropicInvalidDataException e) {
+            return parseRawText(block, responseType, e);
+        }
+    }
+
+    /**
+     * Ответ по схеме, который SDK не разобрал: реселлер отдаёт structured output не как грамматику, а
+     * обычным текстом, и модель иногда оборачивает JSON в markdown-ограду. Снимаем ограду и разбираем
+     * сами - вызов уже оплачен, а у отчёта по интервью он длится минуту.
+     */
+    private <T> T parseRawText(StructuredTextBlock<T> block, Class<T> responseType,
+                               AnthropicInvalidDataException cause) {
+
+        String raw = block.rawTextBlock().text();
+        String json = JSON_FENCE.matcher(raw).replaceAll("");
+
+        if (json.equals(raw)) {
+            log.error("Claude response is not parseable [model={}]", props.model(), cause);
+            throw new LlmException("LLM response is not parseable", cause);
+        }
+
+        log.warn("Claude wrapped the structured response in a markdown fence [model={}], unwrapping",
+                props.model());
+        try {
+            return objectMapper.readValue(json, responseType);
+        } catch (RuntimeException e) {
+            log.error("Claude response is not parseable even unwrapped [model={}]", props.model(), e);
+            throw new LlmException("LLM response is not parseable", e);
+        }
     }
 
     private <T> StructuredMessageCreateParams<T> buildParams(List<MessageParam> messages, Class<T> responseType) {

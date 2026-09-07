@@ -57,6 +57,14 @@ public class InterviewSession {
     @Column(name = "plan_topics", columnDefinition = "jsonb")
     private String planTopics;
 
+    /**
+     * Основные вопросы прошлых интервью этого пользователя по этой вакансии - готовым блоком для
+     * модели: он уходит в кэшируемый префикс запроса и потому должен быть одним и тем же на всех
+     * ходах, а не пересчитываться заново. null, когда прошлых интервью не было.
+     */
+    @Column(name = "asked_before")
+    private String askedBefore;
+
     @Builder.Default
     @Column(nullable = false, updatable = false)
     private Instant created = Instant.now();

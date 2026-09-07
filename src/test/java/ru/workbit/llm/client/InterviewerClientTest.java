@@ -2,6 +2,7 @@ package ru.workbit.llm.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -38,12 +39,16 @@ import tools.jackson.databind.ObjectMapper;
 class InterviewerClientTest {
 
     private static final String PROMPT = "Промпт интервьюера";
+    private static final String ASKED_BEFORE = "Уже задавалось:\n- Что такое интерфейс?";
 
     @Mock
     ClaudeClient claude;
 
     @Captor
     ArgumentCaptor<List<MessageParam>> dialogCaptor;
+
+    @Captor
+    ArgumentCaptor<List<String>> openingCaptor;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -91,17 +96,16 @@ class InterviewerClientTest {
             when(claude.converse(any(), any(), any(), any(), eq(LlmInterviewReply.class))).thenReturn(reply);
 
             // when
-            LlmInterviewPlan plan = interviewerClient.plan(vacancy);
+            LlmInterviewPlan plan = interviewerClient.plan(vacancy, null);
 
             // then
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-            ArgumentCaptor<String> openingCaptor = ArgumentCaptor.forClass(String.class);
             ArgumentCaptor<String> lastUserCaptor = ArgumentCaptor.forClass(String.class);
             verify(claude).converse(promptCaptor.capture(), openingCaptor.capture(), dialogCaptor.capture(),
                     lastUserCaptor.capture(), eq(LlmInterviewReply.class));
 
             assertThat(promptCaptor.getValue()).isEqualTo(PROMPT);
-            assertThat(openingCaptor.getValue())
+            assertThat(openingCaptor.getValue()).singleElement(STRING)
                     .contains(objectMapper.writeValueAsString(vacancy))
                     .contains("Вопросов: от %d до %d.".formatted(
                             LlmInterviewPlan.MIN_COUNT, LlmInterviewPlan.MAX_COUNT));
@@ -120,10 +124,26 @@ class InterviewerClientTest {
             when(claude.converse(any(), any(), any(), any(), eq(LlmInterviewReply.class))).thenReturn(reply);
 
             // when
-            LlmInterviewPlan plan = interviewerClient.plan(aVacancy());
+            LlmInterviewPlan plan = interviewerClient.plan(aVacancy(), null);
 
             // then
             assertThat(plan.questionCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("Вопросы прошлых интервью уходят отдельным блоком вводной, следом за вакансией")
+        void sendsAskedBeforeAsSecondOpeningBlock() {
+            // given
+            LlmInterviewReply reply = new LlmInterviewReply(LlmInterviewStepKind.MAIN, 7, planTopics(),
+                    "SOLID", "Расскажите про SOLID");
+            when(claude.converse(any(), any(), any(), any(), eq(LlmInterviewReply.class))).thenReturn(reply);
+
+            // when
+            interviewerClient.plan(aVacancy(), ASKED_BEFORE);
+
+            // then
+            verify(claude).converse(any(), openingCaptor.capture(), any(), any(), eq(LlmInterviewReply.class));
+            assertThat(openingCaptor.getValue()).hasSize(2).last(STRING).isEqualTo(ASKED_BEFORE);
         }
 
         @Test
@@ -144,7 +164,7 @@ class InterviewerClientTest {
         private static final String STEP_TOPIC = "SQL";
 
         private LlmInterviewStep next(LlmInterviewPlan plan, List<LlmInterviewTurn> history, String lastAnswer) {
-            return interviewerClient.next(aVacancy(), plan, history, lastAnswer);
+            return interviewerClient.next(aVacancy(), plan, history, lastAnswer, null);
         }
 
         private void stubReply() {
@@ -211,6 +231,21 @@ class InterviewerClientTest {
             assertThat(contentOf(secondDialog, 0)).isEqualTo(contentOf(firstDialog, 0));
             assertThat(contentOf(secondDialog, 1)).isEqualTo(contentOf(firstDialog, 1));
             assertThat(contentOf(secondDialog, 3)).isEqualTo(lastUserCaptor.getAllValues().getFirst());
+        }
+
+        @Test
+        @DisplayName("Блок с прошлыми вопросами повторяется на каждом ходе - вводная между ходами не меняется")
+        void keepsAskedBeforeInOpeningOnEveryTurn() {
+            // given
+            LlmInterviewPlan plan = aPlan(5, planTopics());
+            stubReply();
+
+            // when
+            interviewerClient.next(aVacancy(), plan, List.of(), "Ответ 1", ASKED_BEFORE);
+
+            // then
+            verify(claude).converse(any(), openingCaptor.capture(), any(), any(), eq(LlmInterviewReply.class));
+            assertThat(openingCaptor.getValue()).hasSize(2).last(STRING).isEqualTo(ASKED_BEFORE);
         }
 
         @Test

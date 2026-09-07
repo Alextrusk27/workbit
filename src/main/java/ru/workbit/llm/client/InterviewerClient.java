@@ -23,7 +23,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Протокол агента «интервьюер» поверх {@link ClaudeClient}: промпт из ресурса, вводная с
- * вакансией и сборка диалога из плана и обменов «ответ кандидата - реплика модели».
+ * вакансией и уже заданными в прошлых интервью вопросами, сборка диалога из плана и обменов
+ * «ответ кандидата - реплика модели».
  * К каждому ответу кандидата код дописывает счётчики заданных основных вопросов - общий и по
  * теме текущего вопроса, чтобы модель не считала их по истории и не теряла темы плана. Сборка
  * должна быть байт в байт одинаковой между ходами, иначе кэш промпта промахивается.
@@ -56,8 +57,13 @@ public class InterviewerClient {
         }
     }
 
-    public LlmInterviewPlan plan(LlmInterviewVacancy vacancy) {
-        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy), List.of(), null,
+    /**
+     * Просит у модели план собеседования и первый вопрос.
+     *
+     * @param askedBefore блок с вопросами прошлых интервью по этой вакансии; null, когда их не было
+     */
+    public LlmInterviewPlan plan(LlmInterviewVacancy vacancy, String askedBefore) {
+        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy, askedBefore), List.of(), null,
                 LlmInterviewReply.class);
 
         return new LlmInterviewPlan(
@@ -70,12 +76,13 @@ public class InterviewerClient {
     /**
      * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы.
      *
-     * @param plan       план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
-     * @param history    завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
-     * @param lastAnswer новый ответ кандидата, на который модель ещё не отвечала
+     * @param plan        план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
+     * @param history     завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
+     * @param lastAnswer  новый ответ кандидата, на который модель ещё не отвечала
+     * @param askedBefore тот же блок, что ушёл в {@link #plan}: вводная между ходами не меняется
      */
     public LlmInterviewStep next(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
-                                 List<LlmInterviewTurn> history, String lastAnswer) {
+                                 List<LlmInterviewTurn> history, String lastAnswer, String askedBefore) {
 
         List<MessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
         dialog.add(assistant(plan));
@@ -98,7 +105,7 @@ public class InterviewerClient {
             }
         }
 
-        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy), dialog,
+        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy, askedBefore), dialog,
                 candidateReply(lastAnswer, asked, total,
                         topicCounter(planned, askedByTopic, topic, asked, total)),
                 LlmInterviewReply.class);
@@ -106,12 +113,20 @@ public class InterviewerClient {
         return new LlmInterviewStep(reply.kind(), reply.topic(), reply.question());
     }
 
-    private String opening(LlmInterviewVacancy vacancy) {
-        return OPENING.formatted(
+    /**
+     * Вводная блоками: вакансия и, если прошлые интервью были, вопросы из них. Отдельным блоком,
+     * а не приклейкой к вакансии, чтобы кэш вакансии переживал смену списка от сессии к сессии.
+     */
+    private List<String> opening(LlmInterviewVacancy vacancy, String askedBefore) {
+        String vacancyBlock = OPENING.formatted(
                 objectMapper.writeValueAsString(vacancy),
                 LlmInterviewPlan.MIN_COUNT,
                 LlmInterviewPlan.MAX_COUNT
         );
+
+        return askedBefore == null || askedBefore.isBlank()
+                ? List.of(vacancyBlock)
+                : List.of(vacancyBlock, askedBefore);
     }
 
     private static String candidateReply(String answer, int asked, int total, String topicCounter) {

@@ -26,6 +26,7 @@ import {
 } from '@/features/interview/useInterview'
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
+import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 
@@ -115,7 +116,9 @@ function SessionRun({ session }: { session: InterviewSession }) {
       setLoadState('idle')
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
-        const fresh = await interviewApi.getSession(session.id).catch(() => null)
+        const fresh = await interviewApi
+          .getSession(session.id)
+          .catch(() => null)
         setClosingRemark(fresh?.closingRemark ?? null)
         setLoadState('done')
       } else {
@@ -214,6 +217,12 @@ function SessionRun({ session }: { session: InterviewSession }) {
           />
         }
       >
+        <ChatBubble role="bot">
+          Проведём профессиональную часть собеседования:{' '}
+          {session.totalQuestions} {questionsWord(session.totalQuestions)}. По
+          ходу я не комментирую ответы — разбор будет после.
+        </ChatBubble>
+
         {items.map((item) => (
           <ChatMessages key={item.q.questionId} item={item} items={items} />
         ))}

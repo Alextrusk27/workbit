@@ -6,3 +6,6 @@ ALTER TABLE interview.session
 
 ALTER TABLE interview.session
     ADD COLUMN plan_topics JSONB;
+
+ALTER TABLE interview.session
+    ADD COLUMN asked_before TEXT;

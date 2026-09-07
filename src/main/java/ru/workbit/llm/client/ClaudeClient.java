@@ -45,25 +45,30 @@ public class ClaudeClient {
     private final AnthropicProperties props;
 
     /**
-     * Многоходовая беседа. Метки кэша стоят на промпте, вводной и новой реплике пользователя: первые
-     * два блока неизменны между ходами, а подвижная метка на хвосте истории оставляет вне кэша только
+     * Многоходовая беседа. Метки кэша стоят на промпте, блоках вводной и новой реплике пользователя:
+     * вводная неизменна между ходами, а подвижная метка на хвосте истории оставляет вне кэша только
      * прирост с прошлого хода - без неё вся переписка досылалась бы каждый ход по цене обычного входа.
+     * Провайдер держит не больше четырёх меток на запрос, поэтому блоков вводной - не больше двух.
      * Схема ответа входит в кэшируемый префикс, поэтому на всех ходах беседы она должна быть одна.
      *
      * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
-     * @param opening      первая реплика пользователя (вводная задачи)
+     * @param opening      первая реплика пользователя (вводная задачи) блоками, каждый кэшируется отдельно
      * @param dialog       завершённые реплики по очереди assistant/user, пустой на первом ходе
      * @param lastUser     новая реплика пользователя, на которую отвечает модель; null на первом ходе
      * @param responseType record со схемой ответа, общий для всех ходов беседы
      */
-    public <T> T converse(String prompt, String opening, List<MessageParam> dialog, String lastUser,
+    public <T> T converse(String prompt, List<String> opening, List<MessageParam> dialog, String lastUser,
                           Class<T> responseType) {
 
         List<MessageParam> messages = new ArrayList<>(dialog.size() + 2);
+        List<ContentBlockParam> openingBlocks = new ArrayList<>(opening.size() + 1);
+
+        openingBlocks.add(cached(prompt));
+        opening.forEach(block -> openingBlocks.add(cached(block)));
 
         messages.add(MessageParam.builder()
                 .role(MessageParam.Role.USER)
-                .contentOfBlockParams(List.of(cached(prompt), cached(opening)))
+                .contentOfBlockParams(openingBlocks)
                 .build());
         messages.addAll(dialog);
 

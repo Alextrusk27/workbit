@@ -46,14 +46,15 @@ public class LlmService {
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewPlan planInterview(LlmInterviewVacancy vacancy) {
-        return interviewer.plan(vacancy);
+    public LlmInterviewPlan planInterview(LlmInterviewVacancy vacancy, String askedBefore) {
+        return interviewer.plan(vacancy, askedBefore);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInterviewStep nextInterviewStep(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
-                                              List<LlmInterviewTurn> history, String lastAnswer) {
-        return interviewer.next(vacancy, plan, history, lastAnswer);
+                                              List<LlmInterviewTurn> history, String lastAnswer,
+                                              String askedBefore) {
+        return interviewer.next(vacancy, plan, history, lastAnswer, askedBefore);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

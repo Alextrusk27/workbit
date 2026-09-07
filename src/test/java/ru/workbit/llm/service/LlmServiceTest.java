@@ -47,6 +47,8 @@ import ru.workbit.training.model.TrainingSession;
 @DisplayName("LlmServiceTest")
 class LlmServiceTest {
 
+    private static final String ASKED_BEFORE = "Уже задавалось:\n- Что такое JVM?";
+
     @Mock
     LlmClient llm;
 
@@ -142,14 +144,14 @@ class LlmServiceTest {
                     List.of(new LlmInterviewTopic("Java core", 5, LlmInterviewTopicKind.CORE),
                             new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
                     "Java core", "Что такое JVM?");
-            when(interviewer.plan(vacancy)).thenReturn(expected);
+            when(interviewer.plan(vacancy, ASKED_BEFORE)).thenReturn(expected);
 
             // when
-            var result = llmService.planInterview(vacancy);
+            var result = llmService.planInterview(vacancy, ASKED_BEFORE);
 
             // then
             assertThat(result).isEqualTo(expected);
-            verify(interviewer).plan(vacancy);
+            verify(interviewer).plan(vacancy, ASKED_BEFORE);
             verifyNoInteractions(llm);
         }
     }
@@ -173,14 +175,14 @@ class LlmServiceTest {
                     new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java core", "Что такое JVM?")));
             var lastAnswer = "Компилирует байткод в машинный код";
             var expected = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java core", "А что такое JIT?");
-            when(interviewer.next(vacancy, plan, history, lastAnswer)).thenReturn(expected);
+            when(interviewer.next(vacancy, plan, history, lastAnswer, ASKED_BEFORE)).thenReturn(expected);
 
             // when
-            var result = llmService.nextInterviewStep(vacancy, plan, history, lastAnswer);
+            var result = llmService.nextInterviewStep(vacancy, plan, history, lastAnswer, ASKED_BEFORE);
 
             // then
             assertThat(result).isEqualTo(expected);
-            verify(interviewer).next(vacancy, plan, history, lastAnswer);
+            verify(interviewer).next(vacancy, plan, history, lastAnswer, ASKED_BEFORE);
             verifyNoInteractions(llm);
         }
     }

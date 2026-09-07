@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -76,6 +77,11 @@ import tools.jackson.databind.json.JsonMapper;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("InterviewServiceTest")
 class InterviewServiceTest {
+
+    private static final String ASKED_BEFORE_BLOCK = """
+            Уже задавалось:
+            - Что такое интерфейс?
+            - Чем HashMap отличается от TreeMap?""";
 
     @Mock
     InterviewSessionRepository interviewSessionRepository;
@@ -167,11 +173,11 @@ class InterviewServiceTest {
                     List.of(aTopic("SOLID", 5, LlmInterviewTopicKind.CORE),
                             aTopic("Java Core", 3, LlmInterviewTopicKind.STANDARD)),
                     "SOLID", "Расскажите про SOLID");
-            when(llmService.planInterview(expectedVacancy)).thenReturn(rawPlan);
+            when(llmService.planInterview(eq(expectedVacancy), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 8);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
 
             InterviewSessionResponse expectedResponse = mock(InterviewSessionResponse.class);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0)).thenReturn(expectedResponse);
@@ -182,9 +188,9 @@ class InterviewServiceTest {
             // then
             assertThat(result).isEqualTo(expectedResponse);
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue()).isEqualTo(rawPlan);
-            verify(llmService, times(1)).planInterview(expectedVacancy);
+            verify(llmService, times(1)).planInterview(eq(expectedVacancy), any());
         }
 
         @Test
@@ -196,11 +202,11 @@ class InterviewServiceTest {
 
             LlmInterviewPlan rawPlan = new LlmInterviewPlan(2,
                     List.of(aTopic("Java", 2, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), LlmInterviewPlan.MIN_COUNT);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -209,7 +215,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(LlmInterviewPlan.MIN_COUNT);
         }
 
@@ -222,11 +228,11 @@ class InterviewServiceTest {
 
             LlmInterviewPlan rawPlan = new LlmInterviewPlan(20,
                     List.of(aTopic("Java", 20, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), LlmInterviewPlan.MAX_COUNT);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -235,7 +241,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(LlmInterviewPlan.MAX_COUNT);
         }
 
@@ -251,11 +257,11 @@ class InterviewServiceTest {
                     List.of(aTopic("Java", 8, LlmInterviewTopicKind.CORE)), "Java", degenerateQuestion);
             LlmInterviewPlan usablePlan = new LlmInterviewPlan(8,
                     List.of(aTopic("Java", 8, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(degeneratePlan, usablePlan);
+            when(llmService.planInterview(any(), any())).thenReturn(degeneratePlan, usablePlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 8);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -263,9 +269,9 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(llmService, times(2)).planInterview(any());
+            verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().question()).isEqualTo("Расскажите про Java");
         }
 
@@ -275,15 +281,15 @@ class InterviewServiceTest {
             // given
             VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
             when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
-            when(llmService.planInterview(any())).thenReturn(new LlmInterviewPlan(8,
+            when(llmService.planInterview(any(), any())).thenReturn(new LlmInterviewPlan(8,
                     List.of(aTopic("Java", 8, LlmInterviewTopicKind.CORE)), "Java", null));
 
             // when / then
             assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Interview plan has no first question");
-            verify(llmService, times(2)).planInterview(any());
-            verify(interviewWriter, never()).createSession(any(), any(), any());
+            verify(llmService, times(2)).planInterview(any(), any());
+            verify(interviewWriter, never()).createSession(any(), any(), any(), any());
             verifyNoInteractions(interviewSessionMapper);
         }
 
@@ -298,11 +304,11 @@ class InterviewServiceTest {
                     List.of(aTopic("Java", 4, LlmInterviewTopicKind.CORE),
                             aTopic("SQL", 2, LlmInterviewTopicKind.STANDARD)),
                     "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 6);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -310,9 +316,9 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(llmService, times(2)).planInterview(any());
+            verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(6);
             assertThat(captor.getValue().topics()).containsExactly(
                     aTopic("Java", 4, LlmInterviewTopicKind.CORE),
@@ -331,11 +337,11 @@ class InterviewServiceTest {
                             aTopic("SQL", 2, LlmInterviewTopicKind.STANDARD),
                             aTopic("Git", 2, LlmInterviewTopicKind.STANDARD)),
                     "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 8);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -343,9 +349,9 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(llmService, times(2)).planInterview(any());
+            verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(8);
             assertThat(captor.getValue().topics()).containsExactly(
                     aTopic("Java", 4, LlmInterviewTopicKind.CORE),
@@ -366,11 +372,11 @@ class InterviewServiceTest {
                             aTopic("Мотивация", 1, LlmInterviewTopicKind.SOFT),
                             aTopic("SQL", 1, LlmInterviewTopicKind.STANDARD)),
                     "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 5);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -378,9 +384,9 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(llmService, times(2)).planInterview(any());
+            verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(5);
             assertThat(captor.getValue().topics()).containsExactly(
                     aTopic("Java", 3, LlmInterviewTopicKind.CORE),
@@ -396,11 +402,11 @@ class InterviewServiceTest {
             when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
 
             LlmInterviewPlan rawPlan = new LlmInterviewPlan(3, null, "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), LlmInterviewPlan.MIN_COUNT);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -408,9 +414,9 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(llmService, times(2)).planInterview(any());
+            verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(LlmInterviewPlan.MIN_COUNT);
             assertThat(captor.getValue().topics()).isNull();
         }
@@ -426,11 +432,11 @@ class InterviewServiceTest {
                     List.of(aTopic("SQL", 3, LlmInterviewTopicKind.CORE),
                             aTopic("Git", 3, LlmInterviewTopicKind.STANDARD)),
                     "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 7);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -439,7 +445,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(7);
             assertThat(captor.getValue().topics()).containsExactly(
                     aTopic("Java", 1, LlmInterviewTopicKind.CORE),
@@ -458,11 +464,11 @@ class InterviewServiceTest {
                     List.of(aTopic("Java", 3, LlmInterviewTopicKind.STANDARD),
                             aTopic("SQL", 3, LlmInterviewTopicKind.STANDARD)),
                     "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(rawPlan);
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 6);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -471,7 +477,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().topics()).containsExactly(
                     aTopic("Java", 3, LlmInterviewTopicKind.CORE),
                     aTopic("SQL", 3, LlmInterviewTopicKind.STANDARD));
@@ -490,12 +496,12 @@ class InterviewServiceTest {
                     .forEach(i -> topics.add(aTopic("Ядро " + i, 1, LlmInterviewTopicKind.CORE)));
             IntStream.rangeClosed(1, 6)
                     .forEach(i -> topics.add(aTopic("Тема " + i, 1, LlmInterviewTopicKind.STANDARD)));
-            when(llmService.planInterview(any()))
+            when(llmService.planInterview(any(), any()))
                     .thenReturn(new LlmInterviewPlan(13, topics, "Java", "Расскажите про Java"));
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), LlmInterviewPlan.MAX_COUNT);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -504,7 +510,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
             assertThat(captor.getValue().questionCount()).isEqualTo(LlmInterviewPlan.MAX_COUNT);
             assertThat(captor.getValue().topics())
                     .hasSize(LlmInterviewPlan.MAX_COUNT)
@@ -546,11 +552,11 @@ class InterviewServiceTest {
 
             LlmInterviewPlan plan = new LlmInterviewPlan(6,
                     List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(plan);
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 6);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -558,8 +564,8 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any());
-            verify(llmService, times(1)).planInterview(any());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any(), any());
+            verify(llmService, times(1)).planInterview(any(), any());
         }
 
         @Test
@@ -572,11 +578,11 @@ class InterviewServiceTest {
 
             LlmInterviewPlan plan = new LlmInterviewPlan(6,
                     List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(plan);
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 6);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -586,7 +592,98 @@ class InterviewServiceTest {
             // then
             verify(interviewSessionRepository, never())
                     .existsByUserIdAndVacancySnapshotIdInAndStatusNot(any(), any(), any());
-            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any(), any());
+        }
+
+        @Test
+        @DisplayName("По вакансии уже были интервью - их основные вопросы уходят блоком и в модель, и в сессию")
+        void passesQuestionsOfPastInterviewsAsAskedBefore() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<UUID> snapshotIds = List.of(UUID.randomUUID());
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(snapshotIds);
+            when(interviewSessionRepository.existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                    userId, snapshotIds, InterviewSession.Status.COMPLETED)).thenReturn(false);
+            when(interviewQuestionRepository.findQuestionTexts(userId, snapshotIds,
+                    InterviewSession.Status.COMPLETED, InterviewQuestion.Kind.MAIN))
+                    .thenReturn(List.of("Что такое интерфейс?", "Чем HashMap отличается от TreeMap?"));
+
+            LlmInterviewPlan plan = new LlmInterviewPlan(6,
+                    List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 6);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(llmService).planInterview(any(), eq(ASKED_BEFORE_BLOCK));
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any(), eq(ASKED_BEFORE_BLOCK));
+        }
+
+        @Test
+        @DisplayName("Завершённых интервью по вакансии не было - блока «уже задавалось» нет")
+        void passesNoAskedBeforeWhenNoPastQuestions() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<UUID> snapshotIds = List.of(UUID.randomUUID());
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(snapshotIds);
+            when(interviewSessionRepository.existsByUserIdAndVacancySnapshotIdInAndStatusNot(
+                    userId, snapshotIds, InterviewSession.Status.COMPLETED)).thenReturn(false);
+            when(interviewQuestionRepository.findQuestionTexts(userId, snapshotIds,
+                    InterviewSession.Status.COMPLETED, InterviewQuestion.Kind.MAIN)).thenReturn(List.of());
+
+            LlmInterviewPlan plan = new LlmInterviewPlan(6,
+                    List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 6);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(llmService).planInterview(any(), isNull());
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), any(), isNull());
+        }
+
+        @Test
+        @DisplayName("Снапшотов по вакансии нет - за прошлыми вопросами в базу не ходим")
+        void skipsAskedBeforeLookupWithoutSnapshots() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+            when(vacancyService.getSnapshotIds(vacancyData.sourceId())).thenReturn(List.of());
+
+            LlmInterviewPlan plan = new LlmInterviewPlan(6,
+                    List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 6);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(interviewQuestionRepository, never()).findQuestionTexts(any(), any(), any(), any());
+            verify(llmService).planInterview(any(), isNull());
         }
 
         @Test
@@ -598,11 +695,11 @@ class InterviewServiceTest {
 
             LlmInterviewPlan plan = new LlmInterviewPlan(6,
                     List.of(aTopic("Java", 6, LlmInterviewTopicKind.CORE)), "Java", "Расскажите про Java");
-            when(llmService.planInterview(any())).thenReturn(plan);
+            when(llmService.planInterview(any(), any())).thenReturn(plan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), 6);
-            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any())).thenReturn(createdSession);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
 
@@ -612,7 +709,7 @@ class InterviewServiceTest {
             // then
             InOrder order = inOrder(quotaService, llmService);
             order.verify(quotaService).checkInterviewAvailable(userId);
-            order.verify(llmService).planInterview(any());
+            order.verify(llmService).planInterview(any(), any());
         }
 
         @Test
@@ -824,7 +921,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Spring", "Расскажите про Spring");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
@@ -851,7 +948,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, null, null);
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
@@ -859,6 +956,55 @@ class InterviewServiceTest {
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(main.getId(), null);
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Модель вернула MAIN с прощальной репликой при исчерпанных основных - реплика сохраняется в сессии")
+        void savesClosingRemarkWhenModelSaysGoodbye() {
+            // given
+            InterviewSession session = activeSession(1);
+            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
+            session.setQuestions(List.of(main));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, null,
+                    "На этом всё, спасибо за разговор.");
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessage("No questions left");
+            verify(interviewWriter).closeQuestioning(main.getId(), "На этом всё, спасибо за разговор.");
+            verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Блок «уже задавалось» из сессии уходит модели вместе с историей беседы")
+        void passesSessionAskedBeforeToModel() {
+            // given
+            InterviewSession session = activeSession(5);
+            session.setAskedBefore(ASKED_BEFORE_BLOCK);
+            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
+            session.setQuestions(List.of(main));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Spring", "Расскажите про Spring");
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
+            when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
+                    .thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));
+
+            // when
+            interviewService.nextQuestion(sessionId, userId);
+
+            // then
+            verify(llmService).nextInterviewStep(any(), any(), any(), any(), eq(ASKED_BEFORE_BLOCK));
         }
 
         @Test
@@ -874,7 +1020,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "А что насчёт Java?");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.FOLLOW_UP, step.question(), step.topic()))
@@ -903,7 +1049,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "Ещё уточнение?");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(existingFollowUp.getId(), InterviewQuestion.Kind.MAIN,
@@ -932,7 +1078,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Тема", "Ещё уточнение?");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
@@ -959,7 +1105,7 @@ class InterviewServiceTest {
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "Тема",
                     "Поясните вопрос ещё раз");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(existingClarification.getId(), InterviewQuestion.Kind.CLARIFICATION,
@@ -989,7 +1135,7 @@ class InterviewServiceTest {
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.REDIRECT, "Тема",
                     "Давайте вернёмся к вопросу");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(redirect1.getId(), InterviewQuestion.Kind.REDIRECT,
@@ -1016,7 +1162,7 @@ class InterviewServiceTest {
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, "Тема",
                     "Похоже, разговор не складывается. Давайте на этом остановимся.");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
@@ -1039,13 +1185,13 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, null, null);
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("No questions left");
-            verify(llmService).nextInterviewStep(any(), any(), any(), any());
+            verify(llmService).nextInterviewStep(any(), any(), any(), any(), any());
             verify(interviewWriter).closeQuestioning(main.getId(), null);
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
         }
@@ -1086,7 +1232,7 @@ class InterviewServiceTest {
 
             LlmInterviewStep degenerate = new LlmInterviewStep(null, null, null);
             LlmInterviewStep usable = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про JVM");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(degenerate, usable);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(degenerate, usable);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, usable.question(), usable.topic()))
@@ -1097,7 +1243,7 @@ class InterviewServiceTest {
 
             // then
             assertThat(result).isEqualTo(expected);
-            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any());
+            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -1113,13 +1259,13 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep degenerate = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "   ");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(degenerate);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(degenerate);
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Interview step has no question");
-            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any());
+            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any(), any());
             verifyNoInteractions(interviewWriter);
         }
 
@@ -1136,7 +1282,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про GC");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
                     .thenThrow(new DataIntegrityViolationException("duplicate step"));
 
@@ -1176,7 +1322,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "SOLID", "Поясните ещё раз?");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(followUp.getId(), InterviewQuestion.Kind.CLARIFICATION,
                     step.question(), step.topic())).thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));
 
@@ -1190,7 +1336,7 @@ class InterviewServiceTest {
             ArgumentCaptor<List<LlmInterviewTurn>> historyCaptor = ArgumentCaptor.forClass(List.class);
             ArgumentCaptor<String> lastAnswerCaptor = ArgumentCaptor.forClass(String.class);
             verify(llmService).nextInterviewStep(vacancyCaptor.capture(), planCaptor.capture(),
-                    historyCaptor.capture(), lastAnswerCaptor.capture());
+                    historyCaptor.capture(), lastAnswerCaptor.capture(), any());
 
             assertThat(vacancyCaptor.getValue()).isEqualTo(new LlmInterviewVacancy(
                     vacancy.name(), vacancy.employer(), vacancy.experience(), vacancy.keySkills(), vacancy.description()));
@@ -1217,7 +1363,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про JVM");
-            when(llmService.nextInterviewStep(any(), any(), any(), any())).thenReturn(step);
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
                     .thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));
 
@@ -1226,7 +1372,7 @@ class InterviewServiceTest {
 
             // then
             ArgumentCaptor<LlmInterviewPlan> planCaptor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
-            verify(llmService).nextInterviewStep(any(), planCaptor.capture(), any(), any());
+            verify(llmService).nextInterviewStep(any(), planCaptor.capture(), any(), any(), any());
             assertThat(planCaptor.getValue().topics()).isNull();
         }
     }

@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ import tools.jackson.databind.ObjectMapper;
 public class InterviewService {
 
     private static final int MAX_QUESTIONS_PER_CASE = 6;
+    private static final String ASKED_BEFORE_HEADER = "Уже задавалось:";
     private static final TypeReference<List<LlmInterviewTopic>> PLAN_TOPICS_TYPE = new TypeReference<>() {
     };
 
@@ -78,14 +80,16 @@ public class InterviewService {
 
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
+        List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
 
-        checkNoUnfinishedInterview(vacancyData, userId);
+        checkNoUnfinishedInterview(vacancyData, userId, snapshotIds);
 
         quotaService.checkInterviewAvailable(userId);
 
-        LlmInterviewPlan plan = requestPlan(vacancyData);
+        String askedBefore = askedBefore(userId, snapshotIds);
+        LlmInterviewPlan plan = requestPlan(vacancyData, askedBefore);
 
-        InterviewSession session = interviewWriter.createSession(vacancyData, userId, plan);
+        InterviewSession session = interviewWriter.createSession(vacancyData, userId, plan, askedBefore);
         return interviewSessionMapper.toResponse(session, vacancyData, 0);
     }
 
@@ -196,8 +200,7 @@ public class InterviewService {
         return interviewReportMapper.toResponse(report, session, answeredMainSorted(session));
     }
 
-    private void checkNoUnfinishedInterview(VacancyData vacancyData, UUID userId) {
-        List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
+    private void checkNoUnfinishedInterview(VacancyData vacancyData, UUID userId, List<UUID> snapshotIds) {
         if (!snapshotIds.isEmpty() && interviewSessionRepository
                 .existsByUserIdAndVacancySnapshotIdInAndStatusNot(
                         userId, snapshotIds, InterviewSession.Status.COMPLETED)) {
@@ -207,20 +210,37 @@ public class InterviewService {
     }
 
     /**
+     * Основные вопросы прошлых интервью этого пользователя по этой вакансии - блоком для модели,
+     * чтобы она их не повторяла. Собирается один раз при создании сессии и дальше живёт в ней:
+     * блок идёт в кэшируемый префикс запроса и обязан быть одним и тем же на всех ходах беседы.
+     */
+    private String askedBefore(UUID userId, List<UUID> snapshotIds) {
+        if (snapshotIds.isEmpty()) {
+            return null;
+        }
+
+        List<String> questions = interviewQuestionRepository.findQuestionTexts(userId, snapshotIds,
+                InterviewSession.Status.COMPLETED, InterviewQuestion.Kind.MAIN);
+
+        return questions.isEmpty() ? null
+                : questions.stream().collect(Collectors.joining("\n- ", ASKED_BEFORE_HEADER + "\n- ", ""));
+    }
+
+    /**
      * План собеседования с одним повторным вызовом на вырожденный или несведённый ответ. План без
      * первого вопроса и после повтора - ошибка; план с несведённым распределением по темам (сумма
      * questions против questionCount, доля ядра, лимит SOFT-темы) после повтора не отвергается,
      * а приводится кодом - {@link #normalizePlan}.
      */
-    private LlmInterviewPlan requestPlan(VacancyData vacancyData) {
+    private LlmInterviewPlan requestPlan(VacancyData vacancyData, String askedBefore) {
         LlmInterviewVacancy vacancy = new LlmInterviewVacancy(vacancyData.name(), vacancyData.employer(),
                 vacancyData.experience(), vacancyData.keySkills(), vacancyData.description());
 
-        LlmInterviewPlan plan = llmService.planInterview(vacancy);
+        LlmInterviewPlan plan = llmService.planInterview(vacancy, askedBefore);
         if (!isUsablePlan(plan) || !isConsistentPlan(plan)) {
             log.warn("LLM returned an unusable or inconsistent interview plan, retrying "
                     + "[url={}, blankQuestion={}]", vacancyData.url(), !isUsablePlan(plan));
-            plan = llmService.planInterview(vacancy);
+            plan = llmService.planInterview(vacancy, askedBefore);
         }
         if (!isUsablePlan(plan)) {
             log.error("LLM returned an interview plan without the first question after retry [url={}]",
@@ -415,8 +435,9 @@ public class InterviewService {
     /**
      * Очередной ход беседы: модель получает вакансию, план и всю историю и возвращает следующую реплику.
      * Что с ней делать, решает код: не больше одного уточнения на основной вопрос (второе идёт как
-     * новый основной), основной сверх плана завершает интервью. Оборвать беседу решает модель
-     * ({@code END}); код лишь страхует от бесконечного топтания на одном вопросе.
+     * новый основной), основной сверх плана завершает интервью, и текст такого хода - прощальная
+     * реплика. Оборвать беседу решает модель ({@code END}); код лишь страхует от бесконечного
+     * топтания на одном вопросе.
      */
     private Optional<InterviewQuestionResponse> askNextStep(InterviewSession session) {
         List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
@@ -445,7 +466,7 @@ public class InterviewService {
 
         InterviewQuestion.Kind kind = resolveKind(step.kind(), cases.getLast());
         if (isFinalStep(kind, session.getTotalQuestions(), cases.size())) {
-            interviewWriter.closeQuestioning(answered.getId(), null);
+            interviewWriter.closeQuestioning(answered.getId(), closingRemark(step));
             return Optional.empty();
         }
 
@@ -459,8 +480,9 @@ public class InterviewService {
     }
 
     /**
-     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой вопрос допустим у
-     * {@code MAIN}, когда основные исчерпаны, и у {@code END} - в обоих случаях беседа кончилась.
+     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой текст допустим у
+     * {@code MAIN}, когда основные исчерпаны, и у {@code END} - в обоих случаях беседа кончилась
+     * и текст нужен лишь на прощание.
      */
     private LlmInterviewStep requestStep(InterviewSession session, List<InterviewQuestion> dialog, int mainAsked) {
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
@@ -477,7 +499,8 @@ public class InterviewService {
 
         String lastAnswer = dialog.getLast().getAnswerText();
 
-        LlmInterviewStep step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
+        LlmInterviewStep step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer,
+                session.getAskedBefore());
         if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
             return step;
         }
@@ -486,7 +509,7 @@ public class InterviewService {
                         + "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
                 isBlank(step.question()), mainAsked, session.getTotalQuestions());
 
-        step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer);
+        step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer, session.getAskedBefore());
         if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
             return step;
         }
@@ -513,6 +536,14 @@ public class InterviewService {
                 LlmInterviewStepKind.valueOf(question.getKind().name()),
                 question.getTopic(),
                 question.getText());
+    }
+
+    /**
+     * Прощальная реплика берётся только у {@code MAIN}: там модель прощается сама. Уточнение,
+     * которое код переквалифицировал в основной вопрос и тут же отбросил, прощанием не является.
+     */
+    private static String closingRemark(LlmInterviewStep step) {
+        return step.kind() == LlmInterviewStepKind.MAIN ? step.question() : null;
     }
 
     private static boolean isUsableStep(LlmInterviewStep step, int mainAsked, int totalQuestions) {

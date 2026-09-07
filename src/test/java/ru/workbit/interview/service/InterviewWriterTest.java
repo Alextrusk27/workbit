@@ -99,7 +99,7 @@ class InterviewWriterTest {
             when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // when
-            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId, PLAN);
+            InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId, PLAN, null);
 
             // then
             assertThat(result.getUserId()).isEqualTo(userId);
@@ -130,7 +130,7 @@ class InterviewWriterTest {
             when(interviewSessionRepository.save(any(InterviewSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // when
-            interviewWriter.createSession(VACANCY_DATA, userId, PLAN);
+            interviewWriter.createSession(VACANCY_DATA, userId, PLAN, null);
 
             // then
             InOrder order = inOrder(quotaService, vacancyService, interviewSessionRepository);
@@ -149,7 +149,7 @@ class InterviewWriterTest {
 
             // when
             InterviewSession result = interviewWriter.createSession(VACANCY_DATA, userId,
-                    new LlmInterviewPlan(5, null, null, "Первый вопрос"));
+                    new LlmInterviewPlan(5, null, null, "Первый вопрос"), null);
 
             // then
             assertThat(result.getPlanTopics()).isNull();

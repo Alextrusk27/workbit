@@ -54,11 +54,12 @@ public class InterviewWriter {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public InterviewSession createSession(VacancyData vacancyData, UUID userId, LlmInterviewPlan plan) {
+    public InterviewSession createSession(VacancyData vacancyData, UUID userId, LlmInterviewPlan plan,
+                                          String askedBefore) {
         quotaService.debitInterview(userId, "Интервью — " + vacancyData.name());
 
         UUID vacancySnapshotId = vacancyService.saveSnapshot(vacancyData);
-        InterviewSession session = saveNewSession(userId, plan, vacancySnapshotId);
+        InterviewSession session = saveNewSession(userId, plan, vacancySnapshotId, askedBefore);
         attachFirstQuestion(plan, session);
 
         return session;
@@ -102,7 +103,7 @@ public class InterviewWriter {
     /**
      * Завершает опрос: очередной вопрос не задаётся, а число основных вопросов сессии подрезается до
      * фактически отвеченных - иначе досрочный конец беседы не дал бы собрать отчёт. Прощальную реплику
-     * интервьюера, если беседу оборвал он, кандидат увидит в сессии.
+     * интервьюера кандидат увидит в сессии; её нет, только когда опрос закрыл сам код.
      */
     @Transactional
     public void closeQuestioning(UUID answeredQuestionId, String closingRemark) {
@@ -163,12 +164,14 @@ public class InterviewWriter {
                 : interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(parentQuestionId).size() + 1;
     }
 
-    private InterviewSession saveNewSession(UUID userId, LlmInterviewPlan plan, UUID vacancySnapshotId) {
+    private InterviewSession saveNewSession(UUID userId, LlmInterviewPlan plan, UUID vacancySnapshotId,
+                                            String askedBefore) {
         return interviewSessionRepository.save(
                 InterviewSession.builder()
                         .userId(userId)
                         .totalQuestions(plan.questionCount())
                         .planTopics(plan.topics() == null ? null : objectMapper.writeValueAsString(plan.topics()))
+                        .askedBefore(askedBefore)
                         .vacancySnapshotId(vacancySnapshotId)
                         .build()
         );

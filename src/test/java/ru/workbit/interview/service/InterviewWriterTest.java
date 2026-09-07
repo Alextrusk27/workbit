@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.ConflictException;
@@ -43,10 +44,14 @@ import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswerReview;
 import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
+import ru.workbit.llm.dto.LlmInterviewTopic;
+import ru.workbit.llm.dto.LlmInterviewTopicKind;
 import ru.workbit.llm.dto.LlmOfferProbability;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.model.VacancySnapshot;
 import ru.workbit.vacancy.service.VacancyService;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("InterviewWriterTest")
@@ -68,6 +73,8 @@ class InterviewWriterTest {
     InterviewQuestionMapper interviewQuestionMapper;
     @Mock
     InterviewReportMapper interviewReportMapper;
+    @Spy
+    ObjectMapper objectMapper = new JsonMapper();
 
     @InjectMocks
     InterviewWriter interviewWriter;
@@ -77,7 +84,10 @@ class InterviewWriterTest {
     class CreateSession {
 
         private static final LlmInterviewPlan PLAN = new LlmInterviewPlan(
-                7, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+                7,
+                List.of(new LlmInterviewTopic("Java core", 4, LlmInterviewTopicKind.CORE),
+                        new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
+                "Java core", "Что такое JVM?");
 
         @Test
         @DisplayName("Сохраняет снапшот вакансии, сессию из плана и единственный первый вопрос с kind MAIN")
@@ -95,7 +105,9 @@ class InterviewWriterTest {
             assertThat(result.getUserId()).isEqualTo(userId);
             assertThat(result.getVacancySnapshotId()).isEqualTo(vacancySnapshotId);
             assertThat(result.getTotalQuestions()).isEqualTo(7);
-            assertThat(result.getPlanTopics()).containsExactly("Java core", "Spring");
+            assertThat(result.getPlanTopics()).isEqualTo(
+                    "[{\"name\":\"Java core\",\"questions\":4,\"kind\":\"CORE\"},"
+                            + "{\"name\":\"Spring\",\"questions\":3,\"kind\":\"STANDARD\"}]");
 
             assertThat(result.getQuestions()).hasSize(1);
             InterviewQuestion first = result.getQuestions().getFirst();
@@ -362,7 +374,7 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(3L);
 
             // when
-            interviewWriter.closeQuestioning(answeredId);
+            interviewWriter.closeQuestioning(answeredId, null);
 
             // then
             assertThat(answered.isFollowUpChecked()).isTrue();
@@ -379,7 +391,7 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(5L);
 
             // when
-            interviewWriter.closeQuestioning(answeredId);
+            interviewWriter.closeQuestioning(answeredId, null);
 
             // then
             assertThat(answered.isFollowUpChecked()).isTrue();
@@ -396,10 +408,44 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(0L);
 
             // when
-            interviewWriter.closeQuestioning(answeredId);
+            interviewWriter.closeQuestioning(answeredId, null);
 
             // then
             assertThat(session.getTotalQuestions()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("Интервьюер оборвал беседу - прощальная реплика сохраняется без крайних пробелов")
+        void savesClosingRemarkTrimmed() {
+            // given
+            InterviewSession session = InterviewSession.builder().id(sessionId).totalQuestions(5).build();
+            InterviewQuestion answered = answeredIn(session);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(3L);
+
+            // when
+            interviewWriter.closeQuestioning(answeredId, "  Давайте на этом остановимся.  ");
+
+            // then
+            assertThat(session.getClosingRemark()).isEqualTo("Давайте на этом остановимся.");
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"   "})
+        @DisplayName("Прощальной реплики нет - closingRemark остаётся пустым")
+        void keepsClosingRemarkEmptyWhenRemarkIsBlank(String closingRemark) {
+            // given
+            InterviewSession session = InterviewSession.builder().id(sessionId).totalQuestions(5).build();
+            InterviewQuestion answered = answeredIn(session);
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
+            when(interviewQuestionRepository.countBySessionIdAndFollowUpFalseAndAnsweredTrue(sessionId)).thenReturn(3L);
+
+            // when
+            interviewWriter.closeQuestioning(answeredId, closingRemark);
+
+            // then
+            assertThat(session.getClosingRemark()).isNull();
         }
 
         @Test
@@ -409,7 +455,7 @@ class InterviewWriterTest {
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> interviewWriter.closeQuestioning(answeredId))
+            assertThatThrownBy(() -> interviewWriter.closeQuestioning(answeredId, null))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Question not found");
         }

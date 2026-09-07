@@ -4,7 +4,7 @@ import java.util.List;
 
 public record LlmInterviewPlan(
         int questionCount,
-        List<String> topics,
+        List<LlmInterviewTopic> topics,
         String topic,
         String question
 ) {

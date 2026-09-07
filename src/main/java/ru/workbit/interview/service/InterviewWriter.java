@@ -31,6 +31,7 @@ import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.service.VacancyService;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Slf4j
@@ -50,6 +51,7 @@ public class InterviewWriter {
 
     private final InterviewQuestionMapper interviewQuestionMapper;
     private final InterviewReportMapper interviewReportMapper;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public InterviewSession createSession(VacancyData vacancyData, UUID userId, LlmInterviewPlan plan) {
@@ -166,7 +168,7 @@ public class InterviewWriter {
                 InterviewSession.builder()
                         .userId(userId)
                         .totalQuestions(plan.questionCount())
-                        .planTopics(plan.topics())
+                        .planTopics(plan.topics() == null ? null : objectMapper.writeValueAsString(plan.topics()))
                         .vacancySnapshotId(vacancySnapshotId)
                         .build()
         );

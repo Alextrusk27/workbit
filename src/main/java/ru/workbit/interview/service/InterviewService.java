@@ -6,6 +6,7 @@ import static ru.workbit.interview.service.InterviewSessions.checkSessionNotComp
 import static ru.workbit.interview.service.InterviewSessions.groupCases;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -42,12 +43,16 @@ import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.llm.dto.LlmInterviewStep;
 import ru.workbit.llm.dto.LlmInterviewStepKind;
+import ru.workbit.llm.dto.LlmInterviewTopic;
+import ru.workbit.llm.dto.LlmInterviewTopicKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import ru.workbit.llm.service.LlmService;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Slf4j
@@ -55,6 +60,8 @@ import ru.workbit.vacancy.service.VacancyService;
 public class InterviewService {
 
     private static final int MAX_QUESTIONS_PER_CASE = 6;
+    private static final TypeReference<List<LlmInterviewTopic>> PLAN_TOPICS_TYPE = new TypeReference<>() {
+    };
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -67,6 +74,7 @@ public class InterviewService {
     private final InterviewSessionMapper interviewSessionMapper;
     private final InterviewQuestionMapper interviewQuestionMapper;
     private final InterviewReportMapper interviewReportMapper;
+    private final ObjectMapper objectMapper;
 
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
@@ -199,17 +207,19 @@ public class InterviewService {
     }
 
     /**
-     * План собеседования с одним повторным вызовом на ответ без первого вопроса. Число основных
-     * вопросов выбирает модель, код обрезает его в допустимый коридор.
+     * План собеседования с одним повторным вызовом на вырожденный или несведённый ответ. План без
+     * первого вопроса и после повтора - ошибка; план с несведённым распределением по темам (сумма
+     * questions против questionCount, доля ядра, лимит SOFT-темы) после повтора не отвергается,
+     * а приводится кодом - {@link #normalizePlan}.
      */
     private LlmInterviewPlan requestPlan(VacancyData vacancyData) {
         LlmInterviewVacancy vacancy = new LlmInterviewVacancy(vacancyData.name(), vacancyData.employer(),
                 vacancyData.experience(), vacancyData.keySkills(), vacancyData.description());
 
         LlmInterviewPlan plan = llmService.planInterview(vacancy);
-        if (!isUsablePlan(plan)) {
-            log.warn("LLM returned an interview plan without the first question, retrying [url={}]",
-                    vacancyData.url());
+        if (!isUsablePlan(plan) || !isConsistentPlan(plan)) {
+            log.warn("LLM returned an unusable or inconsistent interview plan, retrying "
+                    + "[url={}, blankQuestion={}]", vacancyData.url(), !isUsablePlan(plan));
             plan = llmService.planInterview(vacancy);
         }
         if (!isUsablePlan(plan)) {
@@ -217,16 +227,182 @@ public class InterviewService {
                     vacancyData.url());
             throw new LlmException("Interview plan has no first question");
         }
+        if (isConsistentPlan(plan)) {
+            return plan;
+        }
 
-        return new LlmInterviewPlan(
-                Math.clamp(plan.questionCount(), LlmInterviewPlan.MIN_COUNT, LlmInterviewPlan.MAX_COUNT),
-                plan.topics(),
-                plan.topic(),
-                plan.question());
+        log.warn("LLM returned an inconsistent interview plan after retry, normalizing [url={}]",
+                vacancyData.url());
+        return normalizePlan(plan);
     }
 
     private static boolean isUsablePlan(LlmInterviewPlan plan) {
         return plan.question() != null && !plan.question().isBlank();
+    }
+
+    /**
+     * Инварианты структурного плана: темы без дыр, questionCount в коридоре и равен сумме
+     * questions, на ядро - не меньше половины, про отношение к работе - не больше одного вопроса
+     * одной темой, тема первого вопроса есть в списке.
+     */
+    private static boolean isConsistentPlan(LlmInterviewPlan plan) {
+        List<LlmInterviewTopic> topics = plan.topics();
+        if (topics == null || topics.isEmpty() || !topics.stream().allMatch(InterviewService::isWellFormedTopic)) {
+            return false;
+        }
+
+        int count = plan.questionCount();
+        int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
+        int core = questionsOf(topics, LlmInterviewTopicKind.CORE);
+        int soft = questionsOf(topics, LlmInterviewTopicKind.SOFT);
+
+        return count >= LlmInterviewPlan.MIN_COUNT && count <= LlmInterviewPlan.MAX_COUNT
+                && sum == count
+                && core * 2 >= count
+                && soft <= 1
+                && plan.topic() != null
+                && topics.stream().anyMatch(t -> t.name().equals(plan.topic()));
+    }
+
+    private static boolean isWellFormedTopic(LlmInterviewTopic topic) {
+        return topic != null && topic.name() != null && !topic.name().isBlank()
+                && topic.questions() != null && topic.questions() >= 1 && topic.kind() != null;
+    }
+
+    private static int questionsOf(List<LlmInterviewTopic> topics, LlmInterviewTopicKind kind) {
+        return topics.stream()
+                .filter(t -> t.kind() == kind)
+                .mapToInt(LlmInterviewTopic::questions)
+                .sum();
+    }
+
+    /**
+     * Приводит несведённый план к инвариантам {@link #isConsistentPlan}: чинит вырожденные темы,
+     * оставляет одну SOFT-тему с одним вопросом, гарантирует тему первого вопроса и ядро,
+     * доводит долю ядра и сумму questions до коридора, а questionCount берёт из суммы.
+     * План вовсе без пригодных тем возвращается по-старому: без тем, с обрезанным questionCount.
+     */
+    private static LlmInterviewPlan normalizePlan(LlmInterviewPlan plan) {
+        List<LlmInterviewTopic> topics = new ArrayList<>();
+        for (LlmInterviewTopic topic : plan.topics() == null ? List.<LlmInterviewTopic>of() : plan.topics()) {
+            if (topic == null || topic.name() == null || topic.name().isBlank()) {
+                continue;
+            }
+            int questions = topic.questions() == null || topic.questions() < 1 ? 1 : topic.questions();
+            LlmInterviewTopicKind kind = topic.kind() == null ? LlmInterviewTopicKind.STANDARD : topic.kind();
+            topics.add(new LlmInterviewTopic(topic.name(), questions, kind));
+        }
+        if (topics.isEmpty()) {
+            int count = Math.clamp(plan.questionCount(), LlmInterviewPlan.MIN_COUNT, LlmInterviewPlan.MAX_COUNT);
+            return new LlmInterviewPlan(count, null, plan.topic(), plan.question());
+        }
+
+        dropExtraSoft(topics);
+        ensureFirstQuestionTopic(topics, plan.topic());
+        ensureCore(topics, plan.topic());
+        growCore(topics);
+        trimTo(topics, LlmInterviewPlan.MAX_COUNT, plan.topic());
+
+        int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
+        return new LlmInterviewPlan(sum, List.copyOf(topics), plan.topic(), plan.question());
+    }
+
+    /** Первая SOFT-тема остаётся с одним вопросом, остальные SOFT-темы отбрасываются. */
+    private static void dropExtraSoft(List<LlmInterviewTopic> topics) {
+        boolean seen = false;
+        for (int i = 0; i < topics.size(); ) {
+            LlmInterviewTopic topic = topics.get(i);
+            if (topic.kind() != LlmInterviewTopicKind.SOFT) {
+                i++;
+                continue;
+            }
+            if (seen) {
+                topics.remove(i);
+                continue;
+            }
+            seen = true;
+            topics.set(i, new LlmInterviewTopic(topic.name(), 1, topic.kind()));
+            i++;
+        }
+    }
+
+    private static void ensureFirstQuestionTopic(List<LlmInterviewTopic> topics, String firstTopic) {
+        if (firstTopic == null || firstTopic.isBlank()
+                || topics.stream().anyMatch(t -> t.name().equals(firstTopic))) {
+            return;
+        }
+        topics.addFirst(new LlmInterviewTopic(firstTopic, 1, LlmInterviewTopicKind.CORE));
+    }
+
+    /** Без единой CORE-темы ядром назначается тема первого вопроса, а нет её в плане - первая. */
+    private static void ensureCore(List<LlmInterviewTopic> topics, String firstTopic) {
+        if (topics.stream().anyMatch(t -> t.kind() == LlmInterviewTopicKind.CORE)) {
+            return;
+        }
+        int index = Math.max(indexOfName(topics, firstTopic), 0);
+        LlmInterviewTopic topic = topics.get(index);
+        topics.set(index, new LlmInterviewTopic(topic.name(), topic.questions(), LlmInterviewTopicKind.CORE));
+    }
+
+    /** Добавляет вопросы первой CORE-теме, пока ядро не займёт половину и сумма не дойдёт до MIN_COUNT. */
+    private static void growCore(List<LlmInterviewTopic> topics) {
+        int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
+        int core = questionsOf(topics, LlmInterviewTopicKind.CORE);
+        int extra = Math.max(sum - core * 2, 0);
+        extra += Math.max(LlmInterviewPlan.MIN_COUNT - (sum + extra), 0);
+        if (extra == 0) {
+            return;
+        }
+
+        int index = IntStream.range(0, topics.size())
+                .filter(i -> topics.get(i).kind() == LlmInterviewTopicKind.CORE)
+                .findFirst()
+                .orElseThrow();
+        LlmInterviewTopic topic = topics.get(index);
+        topics.set(index, new LlmInterviewTopic(topic.name(), topic.questions() + extra, topic.kind()));
+    }
+
+    /**
+     * Срезает сумму questions до лимита: с хвоста, сначала по не-CORE-темам, затем по CORE,
+     * последний вопрос темы не срезается. Когда резать больше нечего, хвостовые темы
+     * отбрасываются целиком; тема первого вопроса не отбрасывается никогда.
+     */
+    private static void trimTo(List<LlmInterviewTopic> topics, int limit, String firstTopic) {
+        int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
+        while (sum > limit) {
+            int index = lastReducible(topics, false);
+            if (index < 0) {
+                index = lastReducible(topics, true);
+            }
+            if (index >= 0) {
+                LlmInterviewTopic topic = topics.get(index);
+                topics.set(index, new LlmInterviewTopic(topic.name(), topic.questions() - 1, topic.kind()));
+                sum--;
+                continue;
+            }
+
+            for (int i = topics.size() - 1; i >= 0; i--) {
+                if (!topics.get(i).name().equals(firstTopic)) {
+                    sum -= topics.remove(i).questions();
+                    break;
+                }
+            }
+        }
+    }
+
+    private static int lastReducible(List<LlmInterviewTopic> topics, boolean core) {
+        return IntStream.range(0, topics.size())
+                .filter(i -> (topics.get(i).kind() == LlmInterviewTopicKind.CORE) == core)
+                .filter(i -> topics.get(i).questions() > 1)
+                .reduce((first, second) -> second)
+                .orElse(-1);
+    }
+
+    private static int indexOfName(List<LlmInterviewTopic> topics, String name) {
+        return IntStream.range(0, topics.size())
+                .filter(i -> topics.get(i).name().equals(name))
+                .findFirst()
+                .orElse(-1);
     }
 
     private static Optional<InterviewQuestion> unanswered(InterviewSession session) {
@@ -292,7 +468,7 @@ public class InterviewService {
         LlmInterviewVacancy llmVacancy = new LlmInterviewVacancy(vacancy.name(), vacancy.employer(),
                 vacancy.experience(), vacancy.keySkills(), vacancy.description());
 
-        LlmInterviewPlan plan = new LlmInterviewPlan(session.getTotalQuestions(), session.getPlanTopics(),
+        LlmInterviewPlan plan = new LlmInterviewPlan(session.getTotalQuestions(), readPlanTopics(session),
                 dialog.getFirst().getTopic(), dialog.getFirst().getText());
 
         List<LlmInterviewTurn> history = IntStream.range(0, dialog.size() - 1)
@@ -320,6 +496,16 @@ public class InterviewService {
                 isBlank(step.question()), mainAsked, session.getTotalQuestions());
 
         throw new LlmException("Interview step has no question");
+    }
+
+    /**
+     * Темы плана из сессии: JSON из БД разбирается в объекты и дальше сериализуется тем же
+     * ObjectMapper, что писал первый ход, - так восстановленный план совпадает байт в байт
+     * и кэш промпта не промахивается.
+     */
+    private List<LlmInterviewTopic> readPlanTopics(InterviewSession session) {
+        String json = session.getPlanTopics();
+        return json == null || json.isBlank() ? null : objectMapper.readValue(json, PLAN_TOPICS_TYPE);
     }
 
     private static LlmInterviewStep toStep(InterviewQuestion question) {

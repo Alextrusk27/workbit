@@ -48,9 +48,14 @@ public class InterviewSession {
     @Column(name = "total_questions", nullable = false)
     private int totalQuestions;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "plan_topics", columnDefinition = "text[]")
-    private List<String> planTopics;
+    /**
+     * Темы плана как JSON-массив объектов {@code {name, questions, kind}} - сырой строкой:
+     * (де)сериализацию держит сервис одним и тем же ObjectMapper, чтобы восстановленный из БД
+     * план воспроизводил JSON первого хода байт в байт (иначе кэш промпта промахивается).
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "plan_topics", columnDefinition = "jsonb")
+    private String planTopics;
 
     @Builder.Default
     @Column(nullable = false, updatable = false)

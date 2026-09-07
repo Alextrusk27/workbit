@@ -66,6 +66,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isNull();
+            assertThat(dto.closingRemark()).isNull();
         }
 
         @Test
@@ -78,6 +79,7 @@ class InterviewSessionMapperTest {
                     .status(InterviewSession.Status.COMPLETED)
                     .created(created)
                     .completedAt(completedAt)
+                    .closingRemark("Похоже, сегодня разговор не складывается.")
                     .build();
             var snapshotView = new VacancySnapshotView(
                     "654321",
@@ -104,6 +106,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isEqualTo(completedAt);
+            assertThat(dto.closingRemark()).isEqualTo("Похоже, сегодня разговор не складывается.");
         }
     }
 }

@@ -30,6 +30,8 @@ import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.llm.dto.LlmInterviewStep;
 import ru.workbit.llm.dto.LlmInterviewStepKind;
+import ru.workbit.llm.dto.LlmInterviewTopic;
+import ru.workbit.llm.dto.LlmInterviewTopicKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import ru.workbit.llm.dto.LlmOfferProbability;
@@ -136,7 +138,10 @@ class LlmServiceTest {
             // given
             var vacancy = new LlmInterviewVacancy(
                     "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
-            var expected = new LlmInterviewPlan(8, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+            var expected = new LlmInterviewPlan(8,
+                    List.of(new LlmInterviewTopic("Java core", 5, LlmInterviewTopicKind.CORE),
+                            new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
+                    "Java core", "Что такое JVM?");
             when(interviewer.plan(vacancy)).thenReturn(expected);
 
             // when
@@ -159,7 +164,10 @@ class LlmServiceTest {
             // given
             var vacancy = new LlmInterviewVacancy(
                     "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
-            var plan = new LlmInterviewPlan(8, List.of("Java core", "Spring"), "Java core", "Что такое JVM?");
+            var plan = new LlmInterviewPlan(8,
+                    List.of(new LlmInterviewTopic("Java core", 5, LlmInterviewTopicKind.CORE),
+                            new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
+                    "Java core", "Что такое JVM?");
             var history = List.of(new LlmInterviewTurn(
                     "Виртуальная машина Java",
                     new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java core", "Что такое JVM?")));

@@ -6,6 +6,7 @@ public record VacancySnapshotView(
         String sourceId,
         String name,
         String employer,
+        String employerLogoUrl,
         String url,
         String experience,
         List<String> keySkills,

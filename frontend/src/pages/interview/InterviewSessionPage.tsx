@@ -18,7 +18,7 @@ import {
   type InterviewQuestion,
   type InterviewSession,
 } from '@/features/interview/api'
-import { sessionSubtitle } from '@/features/interview/labels'
+import { interviewerName, sessionSubtitle } from '@/features/interview/labels'
 import {
   useFinishInterview,
   useInterviewSession,
@@ -26,7 +26,6 @@ import {
 } from '@/features/interview/useInterview'
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
-import { questionsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUnsavedAnswerGuard } from '@/lib/useUnsavedAnswerGuard'
 
@@ -181,6 +180,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
   }
 
   const finishing = loadState === 'done'
+  const interviewer = interviewerName(session.id)
 
   return (
     <Container>
@@ -205,7 +205,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
       <ChatShell
         className="mt-6"
-        name="AI-интервьюер"
+        name={`AI-интервьюер — ${interviewer}`}
+        avatarUrl={session.employerLogoUrl}
         status={finishing ? 'формируем разбор' : 'интервью идёт'}
         bodyRef={bodyRef}
         bodyClassName="h-[min(56svh,500px)]"
@@ -218,9 +219,9 @@ function SessionRun({ session }: { session: InterviewSession }) {
         }
       >
         <ChatBubble role="bot">
-          Проведём профессиональную часть собеседования:{' '}
-          {session.totalQuestions} {questionsWord(session.totalQuestions)}. По
-          ходу я не комментирую ответы — разбор будет после.
+          Добрый день! Меня зовут {interviewer}, я проведу профессиональную
+          часть собеседования. Это вопросы на темы, понимание которых нужно для
+          вакансии «{session.vacancyName}».
         </ChatBubble>
 
         {items.map((item) => (

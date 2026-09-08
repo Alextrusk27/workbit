@@ -1,8 +1,11 @@
 import type { ReactNode, RefObject } from 'react'
+import { useState } from 'react'
 import { cn } from '@/lib/cn'
 
 interface ChatShellProps {
   name: string
+  /** Логотип собеседника. Нет ссылки или картинка не загрузилась — фирменная плашка «w». */
+  avatarUrl?: string | null
   status?: string
   children: ReactNode
   footer?: ReactNode
@@ -14,6 +17,7 @@ interface ChatShellProps {
 /** Рамка чата: шапка с аватаром собеседника, прокручиваемое тело и композер. */
 export function ChatShell({
   name,
+  avatarUrl,
   status,
   children,
   footer,
@@ -21,6 +25,8 @@ export function ChatShell({
   bodyClassName,
   bodyRef,
 }: ChatShellProps) {
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
   return (
     <div
       className={cn(
@@ -29,12 +35,23 @@ export function ChatShell({
       )}
     >
       <div className="border-divider bg-glass flex items-center gap-3 border-b px-4.5 py-3.5">
-        <span
-          aria-hidden
-          className="bg-grad grid size-9 place-items-center rounded-md text-[15px] font-bold text-white"
-        >
-          w
-        </span>
+        {avatarUrl && !avatarFailed ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            aria-hidden
+            referrerPolicy="no-referrer"
+            onError={() => setAvatarFailed(true)}
+            className="border-line bg-card size-9 shrink-0 rounded-md border object-contain p-1"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="bg-grad grid size-9 shrink-0 place-items-center rounded-md text-[15px] font-bold text-white"
+          >
+            w
+          </span>
+        )}
         <div>
           <p className="text-ink text-[14.5px] font-semibold">{name}</p>
           {status && (

@@ -13,6 +13,7 @@ import ru.workbit.vacancy.model.VacancySnapshot;
 public interface VacancyMapper {
 
     @Mapping(target = "employer", source = "response.employer.name")
+    @Mapping(target = "employerLogoUrl", source = "response.employer.logoUrls.size240")
     @Mapping(target = "experience", source = "response.experience.name")
     @Mapping(target = "description", source = "description")
     VacancyData toVacancyData(HhVacancyResponse response, VacancySnapshot.Source source, String sourceId,

@@ -43,6 +43,9 @@ public class VacancySnapshot {
 
     private String employer;
 
+    @Column(name = "employer_logo_url")
+    private String employerLogoUrl;
+
     private String experience;
 
     @JdbcTypeCode(SqlTypes.ARRAY)

@@ -18,6 +18,11 @@ public record InterviewSessionResponse(
         @Schema(description = "Название работодателя", example = "ООО Ромашка")
         String employer,
 
+        @Schema(
+                description = "Ссылка на логотип работодателя, null если его нет в вакансии",
+                example = "https://img.hhcdn.ru/employer-logo/1234567.png")
+        String employerLogoUrl,
+
         @Schema(description = "Ссылка на вакансию", example = "https://hh.ru/vacancy/123456")
         String vacancyUrl,
 

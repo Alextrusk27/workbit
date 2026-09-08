@@ -28,6 +28,34 @@ export function sessionHeadline(session: {
   return session.vacancyName
 }
 
+/** Имена, которыми AI-интервьюер представляется кандидату: обычные русские имена
+ *  без отчеств — собеседование тренировочное, но разговор должен читаться живым. */
+const INTERVIEWER_NAMES = [
+  'Анна',
+  'Виктор',
+  'Дарья',
+  'Егор',
+  'Ирина',
+  'Кирилл',
+  'Марина',
+  'Никита',
+  'Ольга',
+  'Павел',
+  'Светлана',
+  'Тимур',
+] as const
+
+/** Имя интервьюера для сессии. Выбор детерминирован по её id, а не случаен на
+ *  каждый рендер: иначе имя менялось бы при перезагрузке страницы и при возврате
+ *  к незаконченному интервью. Хранить его на бэке ради этого не нужно. */
+export function interviewerName(sessionId: string): string {
+  let hash = 0
+  for (let i = 0; i < sessionId.length; i++) {
+    hash = (hash * 31 + sessionId.charCodeAt(i)) | 0
+  }
+  return INTERVIEWER_NAMES[Math.abs(hash) % INTERVIEWER_NAMES.length]
+}
+
 /** Подпись под заголовком — работодатель. */
 export function sessionSubtitle(session: {
   employer: InterviewSession['employer']

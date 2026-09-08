@@ -9,3 +9,6 @@ ALTER TABLE interview.session
 
 ALTER TABLE interview.session
     ADD COLUMN asked_before TEXT;
+
+ALTER TABLE vacancy.snapshot
+    ADD COLUMN employer_logo_url TEXT;

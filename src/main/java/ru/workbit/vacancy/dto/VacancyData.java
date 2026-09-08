@@ -9,6 +9,7 @@ public record VacancyData(
         String url,
         String name,
         String employer,
+        String employerLogoUrl,
         String experience,
         List<String> keySkills,
         String description

@@ -46,6 +46,7 @@ class InterviewSessionMapperTest {
                     "https://hh.ru/vacancy/123456",
                     "Java-разработчик",
                     "ООО Ромашка",
+                    "https://img.hhcdn.ru/employer-logo/123456.png",
                     "От 1 года до 3 лет",
                     List.of("Java", "Spring"),
                     "Описание вакансии"
@@ -59,6 +60,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.vacancyId()).isEqualTo("123456");
             assertThat(dto.vacancyName()).isEqualTo("Java-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Ромашка");
+            assertThat(dto.employerLogoUrl()).isEqualTo("https://img.hhcdn.ru/employer-logo/123456.png");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/123456");
             assertThat(dto.experience()).isEqualTo("От 1 года до 3 лет");
             assertThat(dto.status()).isEqualTo(InterviewSession.Status.IN_PROGRESS);
@@ -85,6 +87,7 @@ class InterviewSessionMapperTest {
                     "654321",
                     "Python-разработчик",
                     "ООО Лютик",
+                    "https://img.hhcdn.ru/employer-logo/654321.png",
                     "https://hh.ru/vacancy/654321",
                     "От 3 до 6 лет",
                     List.of("Python", "Django"),
@@ -99,6 +102,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.vacancyId()).isEqualTo("654321");
             assertThat(dto.vacancyName()).isEqualTo("Python-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Лютик");
+            assertThat(dto.employerLogoUrl()).isEqualTo("https://img.hhcdn.ru/employer-logo/654321.png");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/654321");
             assertThat(dto.experience()).isEqualTo("От 3 до 6 лет");
             assertThat(dto.status()).isEqualTo(InterviewSession.Status.COMPLETED);

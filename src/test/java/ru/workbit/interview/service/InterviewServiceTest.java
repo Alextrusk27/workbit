@@ -141,11 +141,11 @@ class InterviewServiceTest {
 
     private static VacancyData aVacancyData(String experience) {
         return new VacancyData(VacancySnapshot.Source.HH, "123", "https://hh.ru/vacancy/123",
-                "Java-разработчик", "ООО Ромашка", experience, List.of("Java", "Spring"), "Описание вакансии");
+                "Java-разработчик", "ООО Ромашка", null, experience, List.of("Java", "Spring"), "Описание вакансии");
     }
 
     private static VacancySnapshotView aVacancySnapshotView(String experience) {
-        return new VacancySnapshotView("123", "Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123",
+        return new VacancySnapshotView("123", "Java-разработчик", "ООО Ромашка", null, "https://hh.ru/vacancy/123",
                 experience, List.of("Java", "Spring"), "Описание вакансии");
     }
 

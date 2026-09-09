@@ -59,7 +59,7 @@ class InterviewWriterTest {
 
     private static final VacancyData VACANCY_DATA = new VacancyData(
             VacancySnapshot.Source.HH, "123", "https://hh.ru/vacancy/123",
-            "Java-разработчик", "Работодатель", "От 3 до 6 лет", List.of("Java", "Spring"), "Описание");
+            "Java-разработчик", "Работодатель", null, "От 3 до 6 лет", List.of("Java", "Spring"), "Описание");
 
     @Mock
     InterviewSessionRepository interviewSessionRepository;

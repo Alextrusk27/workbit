@@ -89,7 +89,7 @@ class InterviewControllerTest {
 
     private InterviewSessionResponse sessionResponse(UUID sessionId) {
         return new InterviewSessionResponse(
-                sessionId, "123456", "Java-разработчик", "ООО Ромашка", VACANCY_URL, "От 1 года до 3 лет",
+                sessionId, "123456", "Java-разработчик", "ООО Ромашка", null, VACANCY_URL, "От 1 года до 3 лет",
                 InterviewSession.Status.IN_PROGRESS, 3, 10, Instant.now(), null, null);
     }
 

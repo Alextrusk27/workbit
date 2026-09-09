@@ -48,7 +48,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
                 .userId(userId)
                 .skill("Spring Core")
                 .profession("Java-разработчик")
-                .level(TrainingSession.Level.JUNIOR)
+                .level(TrainingSession.Level.EASY)
                 .build();
     }
 
@@ -91,7 +91,7 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
         return BankQuestion.builder()
                 .professionId(professionId)
                 .skillId(skillId)
-                .levels(List.of("JUNIOR"))
+                .levels(List.of("EASY"))
                 .text("Вопрос из банка")
                 .build();
     }
@@ -273,22 +273,22 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     class SessionLevelCheck {
 
         @Test
-        @DisplayName("Уровень NOEXP у сессии проходит CHECK-констрейнт chk_session_level")
-        void noexpLevelIsAllowed() {
+        @DisplayName("Уровень EASY у сессии проходит CHECK-констрейнт chk_session_level")
+        void easyLevelIsAllowed() {
             // given
-            var user = em.persistAndFlush(aUser("noexp-level@example.com"));
+            var user = em.persistAndFlush(aUser("easy-level@example.com"));
             var session = TrainingSession.builder()
                     .userId(user.getId())
                     .skill("Основы Java")
                     .profession("Java-разработчик")
-                    .level(TrainingSession.Level.NOEXP)
+                    .level(TrainingSession.Level.EASY)
                     .build();
 
             // when
             var saved = em.persistFlushFind(session);
 
             // then
-            assertThat(saved.getLevel()).isEqualTo(TrainingSession.Level.NOEXP);
+            assertThat(saved.getLevel()).isEqualTo(TrainingSession.Level.EASY);
         }
     }
 

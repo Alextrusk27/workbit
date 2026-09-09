@@ -41,7 +41,7 @@ class TrainingUserFeedbackRepositoryIT extends AbstractPostgresIT {
                 .userId(userId)
                 .skill("Spring Core")
                 .profession("Java-разработчик")
-                .level(TrainingSession.Level.JUNIOR)
+                .level(TrainingSession.Level.EASY)
                 .build();
     }
 

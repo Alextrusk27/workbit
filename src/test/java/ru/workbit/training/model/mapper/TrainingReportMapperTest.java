@@ -59,7 +59,7 @@ class TrainingReportMapperTest {
                     .id(sessionId)
                     .skill("Spring Boot")
                     .profession("Java-разработчик")
-                    .level(TrainingSession.Level.MIDDLE)
+                    .level(TrainingSession.Level.MEDIUM)
                     .questions(List.of(sessionQuestion))
                     .build();
 
@@ -75,7 +75,7 @@ class TrainingReportMapperTest {
             assertThat(dto.sessionId()).isEqualTo(sessionId);
             assertThat(dto.skill()).isEqualTo("Spring Boot");
             assertThat(dto.profession()).isEqualTo("Java-разработчик");
-            assertThat(dto.level()).isEqualTo(TrainingSession.Level.MIDDLE);
+            assertThat(dto.level()).isEqualTo(TrainingSession.Level.MEDIUM);
             assertThat(dto.avgScore()).isEqualTo(4.2);
             assertThat(dto.overallFeedback()).isEqualTo("Итоговый фидбэк по тренировке");
             assertThat(dto.generatedAt()).isEqualTo(generatedAt);

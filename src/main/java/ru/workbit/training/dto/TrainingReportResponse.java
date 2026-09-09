@@ -19,7 +19,7 @@ public record TrainingReportResponse(
         @Schema(description = "Профессия, в контексте которой тренировался навык", example = "Java-разработчик")
         String profession,
 
-        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
+        @Schema(description = "Уровень сложности вопросов", example = "Средний")
         TrainingSession.Level level,
 
         @Schema(description = "Средний балл по всем оценённым ответам (1.0-5.0)", example = "3.8")

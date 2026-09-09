@@ -128,7 +128,7 @@ class BillingControllerTest {
                     new UsageResponse.UsageCounter(2, 3),
                     List.of(new UsageResponse.UsageEventResponse(
                             at, UsageEvent.Kind.SPEND, UsageEvent.Target.TRAINING, 1,
-                            "Тренировка — Java, Уверенный")));
+                            "Тренировка — Java, Средний")));
             when(quotaService.getUsage(USER_ID)).thenReturn(response);
 
             // when / then
@@ -143,7 +143,7 @@ class BillingControllerTest {
                     .andExpect(jsonPath("$.events[0].kind").value("SPEND"))
                     .andExpect(jsonPath("$.events[0].target").value("TRAINING"))
                     .andExpect(jsonPath("$.events[0].delta").value(1))
-                    .andExpect(jsonPath("$.events[0].label").value("Тренировка — Java, Уверенный"));
+                    .andExpect(jsonPath("$.events[0].label").value("Тренировка — Java, Средний"));
         }
 
         @Test

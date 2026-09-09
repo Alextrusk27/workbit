@@ -2,7 +2,6 @@ package ru.workbit.llm.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.NormalizerClient;
+import ru.workbit.llm.client.QuestionGeneratorClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -62,6 +62,9 @@ class LlmServiceTest {
     @Mock
     NormalizerClient normalizer;
 
+    @Mock
+    QuestionGeneratorClient questionGenerator;
+
     @InjectMocks
     LlmService llmService;
 
@@ -71,22 +74,20 @@ class LlmServiceTest {
 
         @ParameterizedTest(name = "уровень {0}")
         @EnumSource(TrainingSession.Level.class)
-        @DisplayName("Роутит вызов на агента training-question-generator-{грейд} по уровню сессии")
-        void routesByLevelGrade(TrainingSession.Level level) {
+        @DisplayName("Делегирует составителю вопросов запрос как есть, с грейдом уровня в поле level")
+        void delegatesToQuestionGenerator(TrainingSession.Level level) {
             // given
-            var grade = level.getGrade();
-            var request = new LlmTrainingQuestionsRequest("Spring Boot", "Java-разработчик", 5, List.of());
+            var request = new LlmTrainingQuestionsRequest(
+                    "Spring Boot", "Java-разработчик", level.getGrade(), 5, List.of());
             var expected = new LlmTrainingQuestions(List.of("Что такое JVM?"));
-            when(llm.call(anyString(), eq(request), eq(LlmTrainingQuestions.class))).thenReturn(expected);
+            when(questionGenerator.generate(request)).thenReturn(expected);
 
             // when
-            var result = llmService.generateTrainingQuestions(grade, request);
+            var result = llmService.generateTrainingQuestions(request);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmTrainingQuestions.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("training-question-generator-" + grade);
+            verifyNoInteractions(llm);
         }
     }
 

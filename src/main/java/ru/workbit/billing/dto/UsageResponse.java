@@ -37,7 +37,7 @@ public record UsageResponse(
             @Schema(description = "Величина операции, всегда положительная", example = "1")
             int delta,
 
-            @Schema(description = "Описание операции для показа пользователю", example = "Тренировка — Java, Уверенный")
+            @Schema(description = "Описание операции для показа пользователю", example = "Тренировка — Java, Средний")
             String label
     ) {
     }

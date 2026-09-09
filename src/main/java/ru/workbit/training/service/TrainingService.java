@@ -506,10 +506,10 @@ public class TrainingService {
 
     private List<String> generateQuestions(TrainingSession session, int missing, List<String> existingQuestions) {
         LlmTrainingQuestions generated = llmService.generateTrainingQuestions(
-                session.getLevel().getGrade(),
                 new LlmTrainingQuestionsRequest(
                         session.getSkill(),
                         session.getProfession(),
+                        session.getLevel().getGrade(),
                         missing,
                         existingQuestions));
 

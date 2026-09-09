@@ -39,7 +39,7 @@ class QuotaServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String INTERVIEW_LABEL = "Интервью — Java-разработчик";
-    private static final String TRAINING_LABEL = "Тренировка — Java, Уверенный";
+    private static final String TRAINING_LABEL = "Тренировка — Java, Средний";
     private static final String CREDIT_LABEL = "Тариф «Про» на 30 дней";
 
     @Mock

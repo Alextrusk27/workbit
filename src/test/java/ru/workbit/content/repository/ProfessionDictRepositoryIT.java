@@ -68,7 +68,7 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
         return BankQuestion.builder()
                 .professionId(professionId)
                 .skillId(skillId)
-                .levels(List.of("JUNIOR"))
+                .levels(List.of("EASY"))
                 .text("Что такое SOLID?")
                 .build();
     }

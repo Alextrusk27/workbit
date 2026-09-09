@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.NormalizerClient;
+import ru.workbit.llm.client.QuestionGeneratorClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -31,10 +32,11 @@ public class LlmService {
     private final InterviewerClient interviewer;
     private final ReviewerClient reviewer;
     private final NormalizerClient normalizer;
+    private final QuestionGeneratorClient questionGenerator;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
-        return llm.call("training-question-generator-" + grade, request, LlmTrainingQuestions.class);
+    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
+        return questionGenerator.generate(request);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

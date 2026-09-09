@@ -136,7 +136,7 @@ record UsageEventResponse(
       "kind": "SPEND",
       "target": "TRAINING",
       "delta": 1,
-      "label": "Тренировка — Spring Boot, Уверенный"
+      "label": "Тренировка — Spring Boot, Средний"
     },
     {
       "at": "2026-08-10T14:02:00Z",

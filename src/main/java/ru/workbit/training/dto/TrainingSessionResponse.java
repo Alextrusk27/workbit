@@ -15,7 +15,7 @@ public record TrainingSessionResponse(
         @Schema(description = "Профессия, в контексте которой тренируется навык", example = "Java-разработчик")
         String profession,
 
-        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
+        @Schema(description = "Уровень сложности вопросов", example = "Средний")
         TrainingSession.Level level,
 
         @Schema(description = "Статус сессии")

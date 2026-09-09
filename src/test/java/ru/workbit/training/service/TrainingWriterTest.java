@@ -109,7 +109,7 @@ class TrainingWriterTest {
                 + "затем сгенерированные без bankQuestionId и без referenceAnswer; orderIndex 1..N по порядку")
         void ordersBankThenGeneratedQuestionsCopyingReferenceAnswer() {
             // given
-            TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE).build();
+            TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
             UUID bankId1 = UUID.randomUUID();
             UUID bankId2 = UUID.randomUUID();
             BankQuestion bank1 = BankQuestion.builder().id(bankId1).text("Банковский вопрос 1")
@@ -119,7 +119,7 @@ class TrainingWriterTest {
             List<String> generated = List.of("Сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 3, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 3)).thenReturn(expectedResponse);
 
             // when
@@ -151,16 +151,16 @@ class TrainingWriterTest {
 
             verify(trainingSessionRepository).save(session);
             verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
-                    + TrainingSession.Level.MIDDLE.getLabel());
+                    + TrainingSession.Level.MEDIUM.getLabel());
         }
 
         @Test
         @DisplayName("Банк и генерация пусты - сохраняет сессию с пустым списком вопросов, answeredCount=0")
         void emptyQuestionsSavesSessionWithEmptyList() {
             // given
-            TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE).build();
+            TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 0, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(expectedResponse);
 
             // when
@@ -188,7 +188,7 @@ class TrainingWriterTest {
             TrainingQuestion existingUnanswered = TrainingQuestion.builder()
                     .id(UUID.randomUUID()).text("Существующий вопрос 2").orderIndex(2).answered(false).build();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(TrainingSession.Status.IN_PROGRESS)
                     .questions(new ArrayList<>(List.of(existingAnswered, existingUnanswered)))
                     .build();
@@ -200,7 +200,7 @@ class TrainingWriterTest {
             List<String> generated = List.of("Сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.IN_PROGRESS,
                     1, 4, null, null);
             when(trainingSessionMapper.toResponse(session, 1, 4)).thenReturn(expectedResponse);
 
@@ -248,7 +248,7 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(TrainingSession.Status.COMPLETED)
                     .questions(new ArrayList<>())
                     .build();
@@ -284,7 +284,7 @@ class TrainingWriterTest {
                     .feedback(feedback)
                     .build();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(TrainingSession.Status.COMPLETED)
                     .completedAt(Instant.now())
                     .report(TrainingReport.builder().avgScore(4.0).overallFeedback("Фидбэк").build())
@@ -293,7 +293,7 @@ class TrainingWriterTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, TrainingSession.Status.CREATED, 0, 1, null, null);
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 1, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 1)).thenReturn(expectedResponse);
 
             // when
@@ -312,7 +312,7 @@ class TrainingWriterTest {
             assertThat(session.getCompletedAt()).isNull();
             verify(trainingSessionRepository).save(session);
             verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
-                    + TrainingSession.Level.MIDDLE.getLabel());
+                    + TrainingSession.Level.MEDIUM.getLabel());
         }
 
         @Test
@@ -321,20 +321,20 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill("Java").profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill("Java").profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(TrainingSession.Status.COMPLETED)
                     .questions(new ArrayList<>())
                     .build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
             when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(
-                    new TrainingSessionResponse(sessionId, "Java", PROFESSION, TrainingSession.Level.MIDDLE,
+                    new TrainingSessionResponse(sessionId, "Java", PROFESSION, TrainingSession.Level.MEDIUM,
                             TrainingSession.Status.CREATED, 0, 0, null, null));
 
             // when
             trainingWriter.restartSession(sessionId);
 
             // then
-            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — Java, Уверенный");
+            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — Java, Средний");
         }
 
         @Test
@@ -358,7 +358,7 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(status)
                     .questions(new ArrayList<>())
                     .build();
@@ -427,7 +427,7 @@ class TrainingWriterTest {
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingQuestion q2 = answeredQuestion(2);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, q2))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -437,7 +437,7 @@ class TrainingWriterTest {
                     "Общий развёрнутый фидбэк по тренировке");
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
-                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.5,
+                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, 4.5,
                     llmReport.overallFeedback(), null, List.of());
             when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
@@ -469,7 +469,7 @@ class TrainingWriterTest {
                     .id(UUID.randomUUID()).text("Неотвеченный вопрос")
                     .orderIndex(3).answered(false).build();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, unanswered, q2))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -479,7 +479,7 @@ class TrainingWriterTest {
                     "Общий развёрнутый фидбэк по тренировке");
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
-                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.5,
+                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, 4.5,
                     llmReport.overallFeedback(), null, List.of());
             when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
@@ -506,7 +506,7 @@ class TrainingWriterTest {
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingQuestion q2 = answeredQuestion(2);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, q2))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -517,7 +517,7 @@ class TrainingWriterTest {
 
             when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
                     .thenReturn(new TrainingReportResponse(
-                            UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.0,
+                            UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, 4.0,
                             llmReport.overallFeedback(), null, List.of()));
 
             // when
@@ -536,7 +536,7 @@ class TrainingWriterTest {
             UUID sessionId = UUID.randomUUID();
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -547,7 +547,7 @@ class TrainingWriterTest {
 
             when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
                     .thenReturn(new TrainingReportResponse(
-                            UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 3.0,
+                            UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, 3.0,
                             llmReport.overallFeedback(), null, List.of()));
 
             // when
@@ -564,7 +564,7 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>()).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -584,7 +584,7 @@ class TrainingWriterTest {
             UUID sessionId = UUID.randomUUID();
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -605,7 +605,7 @@ class TrainingWriterTest {
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingQuestion q2 = answeredQuestion(2);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, q2))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -614,7 +614,7 @@ class TrainingWriterTest {
                     "Общий развёрнутый фидбэк по тренировке");
 
             TrainingReportResponse expectedResponse = new TrainingReportResponse(
-                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MIDDLE, 4.0,
+                    UUID.randomUUID(), sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, 4.0,
                     llmReport.overallFeedback(), null, List.of());
             when(trainingReportMapper.toResponse(any(TrainingReport.class), eq(session), any()))
                     .thenReturn(expectedResponse);
@@ -638,7 +638,7 @@ class TrainingWriterTest {
             TrainingQuestion q2 = answeredQuestion(2);
             TrainingQuestion q3 = answeredQuestion(3);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, q2, q3))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -661,7 +661,7 @@ class TrainingWriterTest {
             TrainingQuestion q1 = answeredQuestion(1);
             TrainingQuestion q2 = answeredQuestion(2);
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>(List.of(q1, q2))).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -686,7 +686,7 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .questions(new ArrayList<>()).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
@@ -718,7 +718,7 @@ class TrainingWriterTest {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = TrainingSession.builder()
-                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MIDDLE)
+                    .id(sessionId).skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM)
                     .status(TrainingSession.Status.COMPLETED).build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 

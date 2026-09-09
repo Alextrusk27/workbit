@@ -1,1 +1,1 @@
-Stub reviewer prompt for tests. The real prompt lives in workbit-secrets (prod/prompts).
+Stub reviewer prompt.

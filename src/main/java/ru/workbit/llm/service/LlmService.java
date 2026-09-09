@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
+import ru.workbit.llm.client.NormalizerClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -29,6 +30,7 @@ public class LlmService {
     private final LlmClient llm;
     private final InterviewerClient interviewer;
     private final ReviewerClient reviewer;
+    private final NormalizerClient normalizer;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
@@ -64,6 +66,6 @@ public class LlmService {
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
-        return llm.call("input-normalizer", request, LlmInputNormalization.class);
+        return normalizer.normalize(request);
     }
 }

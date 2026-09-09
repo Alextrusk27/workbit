@@ -92,6 +92,9 @@ management:
 
 llm:
   prompts-dir: ${LLM_PROMPTS_DIR:classpath:llm}
+  gateway:
+    base-url: ${LLM_GATEWAY_BASE_URL}
+    auth-token: ${LLM_GATEWAY_AUTH_TOKEN}
   yandex-ai:
     folder: ${YANDEX_FOLDER_ID}
     api-key: ${YANDEX_API_KEY}
@@ -103,12 +106,11 @@ llm:
       training-question-generator-senior: ${TQG_SENIOR}
       training-reviewer: ${TRAINING_REVIEWER}
       training-reference-answer: ${TRAINING_REFERENCE_ANSWER}
-      input-normalizer: ${INPUT_NORMALIZER}
   anthropic:
-    base-url: ${ANTHROPIC_BASE_URL}
-    auth-token: ${ANTHROPIC_AUTH_TOKEN}
     model: claude-opus-5
     effort: medium
+  openai:
+    model: gpt-5.4-mini
 
 speech:
   yandex:

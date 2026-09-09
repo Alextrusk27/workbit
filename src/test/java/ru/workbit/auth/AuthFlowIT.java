@@ -40,7 +40,8 @@ import ru.workbit.security.service.JWTService;
         "app.mail.from-mail=noreply@workbit.ru",
         "app.mail.base-url=https://workbit.ru",
         "spring.mail.host=localhost",
-        "spring.mail.port=25"
+        "spring.mail.port=25",
+        "llm.gateway.base-url=http://localhost"
 })
 @DisplayName("AuthFlowIT")
 class AuthFlowIT extends AbstractPostgresIT {

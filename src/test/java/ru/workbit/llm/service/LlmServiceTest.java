@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
+import ru.workbit.llm.client.NormalizerClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -57,6 +58,9 @@ class LlmServiceTest {
 
     @Mock
     ReviewerClient reviewer;
+
+    @Mock
+    NormalizerClient normalizer;
 
     @InjectMocks
     LlmService llmService;
@@ -218,19 +222,19 @@ class LlmServiceTest {
     class NormalizeInput {
 
         @Test
-        @DisplayName("Вызывает агента input-normalizer без грейда, с запросом как есть")
-        void callsInputNormalizerAgent() {
+        @DisplayName("Делегирует нормализатору запрос как есть")
+        void delegatesToNormalizer() {
             // given
             var request = new LlmInputNormalizationRequest("многопоточность", "джавист", List.of(), List.of());
             var expected = new LlmInputNormalization(true, List.of(), false, List.of("Java-разработчик"), true);
-            when(llm.call(eq("input-normalizer"), eq(request), eq(LlmInputNormalization.class)))
-                    .thenReturn(expected);
+            when(normalizer.normalize(request)).thenReturn(expected);
 
             // when
             var result = llmService.normalizeInput(request);
 
             // then
             assertThat(result).isEqualTo(expected);
+            verifyNoInteractions(llm);
         }
     }
 }

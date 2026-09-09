@@ -8,16 +8,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(AnthropicProperties.class)
+@EnableConfigurationProperties({GatewayProperties.class, AnthropicProperties.class})
 public class AnthropicConfig {
     private static final Duration TIMEOUT = Duration.ofMinutes(3);
     private static final int MAX_RETRIES = 4;
 
     @Bean
-    public AnthropicClient anthropicClient(AnthropicProperties props) {
+    public AnthropicClient anthropicClient(GatewayProperties gateway) {
         return AnthropicOkHttpClient.builder()
-                .baseUrl(props.baseUrl())
-                .authToken(props.authToken())
+                .baseUrl(gateway.baseUrl())
+                .authToken(gateway.authToken())
                 .timeout(TIMEOUT)
                 .maxRetries(MAX_RETRIES)
                 .build();

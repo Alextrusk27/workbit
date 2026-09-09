@@ -6,6 +6,7 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 @Configuration
 @EnableConfigurationProperties(YandexAiProperties.class)
@@ -14,6 +15,7 @@ public class YandexAiConfig {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(90);
 
     @Bean
+    @Primary
     public OpenAIClient openAiClient(YandexAiProperties props) {
         return OpenAIOkHttpClient.builder()
                 .apiKey(props.apiKey())

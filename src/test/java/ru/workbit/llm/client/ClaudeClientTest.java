@@ -53,7 +53,7 @@ class ClaudeClientTest {
     MessageService messageService;
 
     private final AnthropicProperties props = new AnthropicProperties(
-            "https://provod.example", "token", "claude-test-model", OutputConfig.Effort.MEDIUM);
+            "claude-test-model", OutputConfig.Effort.MEDIUM);
     private final ObjectMapper objectMapper = spy(new ObjectMapper());
 
     private ClaudeClient claudeClient;

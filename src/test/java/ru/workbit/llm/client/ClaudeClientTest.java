@@ -7,6 +7,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -73,8 +75,13 @@ class ClaudeClientTest {
                 LlmTrainingReferenceAnswer.class);
     }
 
-    @SuppressWarnings("unchecked")
     private void stubResponse(StructuredTextBlock<LlmTrainingReferenceAnswer> block) {
+        doReturn(responseOf(block)).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static StructuredMessage<LlmTrainingReferenceAnswer> responseOf(
+            StructuredTextBlock<LlmTrainingReferenceAnswer> block) {
         StructuredContentBlock<LlmTrainingReferenceAnswer> contentBlock = mock(StructuredContentBlock.class);
         when(contentBlock.text()).thenReturn(Optional.of(block));
 
@@ -82,8 +89,23 @@ class ClaudeClientTest {
         when(response.stopReason()).thenReturn(Optional.of(StopReason.END_TURN));
         when(response.usage()).thenReturn(mock(Usage.class));
         when(response.content()).thenReturn(List.of(contentBlock));
+        return response;
+    }
 
-        doReturn(response).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+    @SuppressWarnings("unchecked")
+    private static StructuredTextBlock<LlmTrainingReferenceAnswer> parsedBlock(LlmTrainingReferenceAnswer value) {
+        StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
+        when(block.text()).thenReturn(value);
+        return block;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static StructuredTextBlock<LlmTrainingReferenceAnswer> rawBlock(String raw,
+                                                                             AnthropicInvalidDataException cause) {
+        StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
+        when(block.text()).thenThrow(cause);
+        when(block.rawTextBlock()).thenReturn(TextBlock.builder().text(raw).citations(List.of()).build());
+        return block;
     }
 
     @SuppressWarnings("unchecked")
@@ -154,6 +176,69 @@ class ClaudeClientTest {
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM response is not parseable");
+        }
+
+        @Test
+        @DisplayName("JSON без ограды, но с пояснением вокруг - разбирается срезом от первой { до последней }")
+        void parsesJsonSurroundedByProseWhenSdkFailsToParse() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            String raw = "Вот ответ по схеме:\n{\"answer\":\"используйте индекс для поиска\"}\nГотово.";
+            stubResponse(rawBlock(raw, new AnthropicInvalidDataException("not parseable")));
+
+            // when
+            var result = ClaudeClientTest.this.converse();
+
+            // then
+            assertThat(result).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("Неразбираемый ответ перезапрашивается один раз: повтор вернул JSON - результат его")
+        void retriesOnceWhenResponseIsNotParseable() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            var unparseable = responseOf(rawBlock("**answer:**\n\n1. используйте индекс",
+                    new AnthropicInvalidDataException("not parseable")));
+            doReturn(unparseable, responseOf(parsedBlock(expected)))
+                    .when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+
+            // when
+            var result = ClaudeClientTest.this.converse();
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(messageService, times(2)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+        }
+
+        @Test
+        @DisplayName("Неразбираемый ответ и после повтора - LlmException, вызовов ровно два")
+        void throwsAfterSingleRetryWhenResponseStaysUnparseable() {
+            // given
+            var cause = new AnthropicInvalidDataException("not parseable");
+            stubResponse(rawBlock("это вообще не json", cause));
+
+            // when / then
+            assertThatThrownBy(ClaudeClientTest.this::converse)
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("LLM response is not parseable")
+                    .hasCause(cause);
+            verify(messageService, times(2)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+        }
+
+        @Test
+        @DisplayName("Ошибка провайдера не повторяется - вызов ровно один")
+        void doesNotRetryOnServiceException() {
+            // given
+            var serviceException = BadRequestException.builder()
+                    .headers(Headers.builder().build())
+                    .body(JsonValue.from(Map.of()))
+                    .build();
+            doThrow(serviceException).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+
+            // when / then
+            assertThatThrownBy(ClaudeClientTest.this::converse).isInstanceOf(LlmException.class);
+            verify(messageService, times(1)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test

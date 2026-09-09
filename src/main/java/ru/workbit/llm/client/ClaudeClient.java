@@ -34,6 +34,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Обвязка над AnthropicClient для вызовов со structured output.
  * Промпт агента идёт первым блоком первого user-сообщения, а не в system, вводная - вторым.
+ * Неразбираемый ответ (модель отдала не JSON) перезапрашивается один раз, как в {@link LlmClient}:
+ * у реселлера схема ответа - просьба в тексте, а не грамматика, и модель изредка отвечает
+ * markdown-списком вместо объекта; повтор идёт по кэшированному промпту и стоит дешевле первого вызова.
  */
 @Slf4j
 @Component
@@ -43,6 +46,7 @@ public class ClaudeClient {
     private static final CacheControlEphemeral CACHE_1H = CacheControlEphemeral.builder()
                     .ttl(CacheControlEphemeral.Ttl.TTL_1H).build();
     private static final Pattern JSON_FENCE = Pattern.compile("^\\s*```(?:json)?\\s*|\\s*```\\s*$");
+    private static final String NOT_PARSEABLE = "LLM response is not parseable";
 
     private final AnthropicClient client;
     private final AnthropicProperties props;
@@ -83,7 +87,7 @@ public class ClaudeClient {
                     .build());
         }
 
-        return send(messages, responseType);
+        return withParseRetry(() -> send(messages, responseType));
     }
 
     /**
@@ -102,7 +106,27 @@ public class ClaudeClient {
                 .contentOfBlockParams(List.of(cached(prompt), plain(task)))
                 .build();
 
-        return sendStreaming(List.of(message), responseType);
+        return withParseRetry(() -> sendStreaming(List.of(message), responseType));
+    }
+
+    /**
+     * Один повтор на неразбираемом ответе. Батарея генератора вопросов 2026-09-09: 1 ответ из 45 -
+     * markdown-заголовок и нумерованный список вместо объекта схемы; без повтора это оплаченный вызов
+     * и ошибка пользователю. Сетевые ошибки и статусы провайдера не повторяются - их гасит SDK.
+     */
+    private <T> T withParseRetry(Supplier<T> request) {
+        try {
+            return request.get();
+        } catch (UnparseableResponseException first) {
+            log.warn("Claude response is not parseable [model={}], retrying once: {}",
+                    props.model(), String.valueOf(first.getCause()));
+            try {
+                return request.get();
+            } catch (UnparseableResponseException second) {
+                log.error("Claude response is not parseable after retry [model={}]", props.model(), second);
+                throw second;
+            }
+        }
     }
 
     private <T> T send(List<MessageParam> messages, Class<T> responseType) {
@@ -151,8 +175,7 @@ public class ClaudeClient {
             return request.get();
 
         } catch (AnthropicInvalidDataException e) {
-            log.error("Claude response is not parseable [model={}]", props.model(), e);
-            throw new LlmException("LLM response is not parseable", e);
+            throw new UnparseableResponseException(e);
 
         } catch (AnthropicServiceException e) {
             log.error("Claude call failed [model={}]: status={}, type={}, body={}",
@@ -186,27 +209,46 @@ public class ClaudeClient {
 
     /**
      * Ответ по схеме, который SDK не разобрал: реселлер отдаёт structured output не как грамматику, а
-     * обычным текстом, и модель иногда оборачивает JSON в markdown-ограду. Снимаем ограду и разбираем
-     * сами - вызов уже оплачен, а у отчёта по интервью он длится минуту.
+     * обычным текстом, и модель иногда оборачивает JSON в markdown-ограду или пояснение. Снимаем ограду,
+     * затем берём текст от первой «{» до последней «}» и разбираем сами - вызов уже оплачен, а у отчёта
+     * по интервью он длится минуту. Объекта в тексте нет (markdown-список вместо JSON) - ответ
+     * неразбираемый, его перезапрашивает {@link #withParseRetry}.
      */
     private <T> T parseRawText(StructuredTextBlock<T> block, Class<T> responseType,
                                AnthropicInvalidDataException cause) {
 
         String raw = block.rawTextBlock().text();
-        String json = JSON_FENCE.matcher(raw).replaceAll("");
+        String unfenced = JSON_FENCE.matcher(raw).replaceAll("");
+        int from = unfenced.indexOf('{');
+        int to = unfenced.lastIndexOf('}');
 
-        if (json.equals(raw)) {
-            log.error("Claude response is not parseable [model={}]", props.model(), cause);
-            throw new LlmException("LLM response is not parseable", cause);
+        if (from < 0 || to < from) {
+            log.warn("Claude response has no JSON object [model={}]: {}", props.model(), abbreviate(raw));
+            throw new UnparseableResponseException(cause);
         }
 
-        log.warn("Claude wrapped the structured response in a markdown fence [model={}], unwrapping",
-                props.model());
+        String json = unfenced.substring(from, to + 1);
+        log.warn("Claude wrapped the structured response [model={}], unwrapping: {}",
+                props.model(), abbreviate(raw));
         try {
             return objectMapper.readValue(json, responseType);
         } catch (RuntimeException e) {
-            log.error("Claude response is not parseable even unwrapped [model={}]", props.model(), e);
-            throw new LlmException("LLM response is not parseable", e);
+            log.warn("Claude response is not parseable even unwrapped [model={}]", props.model(), e);
+            throw new UnparseableResponseException(e);
+        }
+    }
+
+    private static String abbreviate(String text) {
+        return text.length() <= 200 ? text : text.substring(0, 200) + "...";
+    }
+
+    /**
+     * Ответ не разобран ни SDK, ни по сырому тексту. Отдельный тип - чтобы {@link #withParseRetry}
+     * повторял только этот случай, а не статусы провайдера и сетевые ошибки.
+     */
+    private static final class UnparseableResponseException extends LlmException {
+        UnparseableResponseException(Throwable cause) {
+            super(NOT_PARSEABLE, cause);
         }
     }
 

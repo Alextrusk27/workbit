@@ -74,7 +74,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/professions")
-    @Loggable(logArgs = true)
+    @Loggable(logArgs = true, logResult = true)
     @Operation(
             summary = "Подсказки профессий",
             description = "Возвращает до 7 профессий из словаря по подстроке: сначала совпадения по началу названия, "
@@ -96,7 +96,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/skills")
-    @Loggable(logArgs = true)
+    @Loggable(logArgs = true, logResult = true)
     @Operation(
             summary = "Подсказки навыков",
             description = "Возвращает до 7 навыков словаря по подстроке: сначала совпадения по началу названия, затем "

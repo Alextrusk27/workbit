@@ -1,5 +1,7 @@
 package ru.workbit.util.aspect;
 
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,14 +62,21 @@ public class LoggingAspect {
 
     private String formatArgs(ProceedingJoinPoint pjp, Signature sig) {
         Object[] args = pjp.getArgs();
-        Annotation[][] paramAnnotations = ((MethodSignature) sig).getMethod().getParameterAnnotations();
+        MethodSignature signature = (MethodSignature) sig;
+        Annotation[][] paramAnnotations = signature.getMethod().getParameterAnnotations();
+        Class<?>[] paramTypes = signature.getParameterTypes();
+        String[] paramNames = signature.getParameterNames();
         List<String> rendered = new ArrayList<>(args.length);
         for (int i = 0; i < args.length; i++) {
-            if (!isSensitive(paramAnnotations[i])) {
-                rendered.add(String.valueOf(args[i]));
+            if (!isSensitive(paramAnnotations[i]) && !isInfrastructure(paramTypes[i])) {
+                rendered.add(paramNames[i] + "=" + args[i]);
             }
         }
         return rendered.toString();
+    }
+
+    private boolean isInfrastructure(Class<?> type) {
+        return ServletRequest.class.isAssignableFrom(type) || ServletResponse.class.isAssignableFrom(type);
     }
 
     private boolean isSensitive(Annotation[] annotations) {

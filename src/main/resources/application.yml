@@ -95,12 +95,6 @@ llm:
   gateway:
     base-url: ${LLM_GATEWAY_BASE_URL}
     auth-token: ${LLM_GATEWAY_AUTH_TOKEN}
-  yandex-ai:
-    folder: ${YANDEX_FOLDER_ID}
-    api-key: ${YANDEX_API_KEY}
-    log-level: ${LLM_LOG_LEVEL:info}
-    agents:
-      training-reviewer: ${TRAINING_REVIEWER}
   anthropic:
     model: claude-opus-5
     effort: medium

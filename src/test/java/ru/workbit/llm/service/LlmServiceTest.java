@@ -1,30 +1,25 @@
 package ru.workbit.llm.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.llm.client.InterviewerClient;
-import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.NormalizerClient;
 import ru.workbit.llm.client.QuestionGeneratorClient;
 import ru.workbit.llm.client.ReferenceAnswerClient;
 import ru.workbit.llm.client.ReviewerClient;
+import ru.workbit.llm.client.TrainingReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
@@ -52,9 +47,6 @@ class LlmServiceTest {
     private static final String ASKED_BEFORE = "Уже задавалось:\n- Что такое JVM?";
 
     @Mock
-    LlmClient llm;
-
-    @Mock
     InterviewerClient interviewer;
 
     @Mock
@@ -68,6 +60,9 @@ class LlmServiceTest {
 
     @Mock
     ReferenceAnswerClient referenceAnswer;
+
+    @Mock
+    TrainingReviewerClient trainingReviewer;
 
     @InjectMocks
     LlmService llmService;
@@ -91,7 +86,6 @@ class LlmServiceTest {
 
             // then
             assertThat(result).isEqualTo(expected);
-            verifyNoInteractions(llm);
         }
     }
 
@@ -100,21 +94,19 @@ class LlmServiceTest {
     class CreateTrainingReport {
 
         @Test
-        @DisplayName("Вызывает агента training-reviewer с запросом одной переменной JSON_STRING, а не полями DTO")
-        void callsTrainingReviewerAgentWithJsonStringVariable() {
+        @DisplayName("Делегирует рецензенту тренажёра запрос как есть")
+        void delegatesToTrainingReviewer() {
             // given
             var request = new LlmTrainingReportRequest("Spring Boot", "Java-разработчик", List.of());
             var expected = new LlmTrainingReport(List.of(), "Хороший результат");
-            when(llm.call(eq("training-reviewer"), any(), eq(LlmTrainingReport.class))).thenReturn(expected);
+            when(trainingReviewer.review(request)).thenReturn(expected);
 
             // when
             var result = llmService.createTrainingReport(request);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<Object> requestCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(llm).call(eq("training-reviewer"), requestCaptor.capture(), eq(LlmTrainingReport.class));
-            assertThat(requestCaptor.getValue()).isEqualTo(Map.of("JSON_STRING", request));
+            verify(trainingReviewer).review(request);
         }
     }
 
@@ -135,7 +127,6 @@ class LlmServiceTest {
 
             // then
             assertThat(result).isEqualTo(expected);
-            verifyNoInteractions(llm);
         }
     }
 
@@ -161,7 +152,6 @@ class LlmServiceTest {
             // then
             assertThat(result).isEqualTo(expected);
             verify(interviewer).plan(vacancy, ASKED_BEFORE);
-            verifyNoInteractions(llm);
         }
     }
 
@@ -192,7 +182,6 @@ class LlmServiceTest {
             // then
             assertThat(result).isEqualTo(expected);
             verify(interviewer).next(vacancy, plan, history, lastAnswer, ASKED_BEFORE);
-            verifyNoInteractions(llm);
         }
     }
 
@@ -218,7 +207,6 @@ class LlmServiceTest {
             // then
             assertThat(result).isEqualTo(expected);
             verify(reviewer).review(vacancy, answers);
-            verifyNoInteractions(llm);
         }
     }
 
@@ -239,7 +227,6 @@ class LlmServiceTest {
 
             // then
             assertThat(result).isEqualTo(expected);
-            verifyNoInteractions(llm);
         }
     }
 }

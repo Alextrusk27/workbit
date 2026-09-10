@@ -1,6 +1,5 @@
 package ru.workbit.training.model;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,7 +28,7 @@ public class TrainingFeedback {
     @UuidGenerator
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false, updatable = false)
     private TrainingQuestion question;
 

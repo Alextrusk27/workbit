@@ -8,6 +8,7 @@ import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.NormalizerClient;
 import ru.workbit.llm.client.QuestionGeneratorClient;
+import ru.workbit.llm.client.ReferenceAnswerClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -33,6 +34,7 @@ public class LlmService {
     private final ReviewerClient reviewer;
     private final NormalizerClient normalizer;
     private final QuestionGeneratorClient questionGenerator;
+    private final ReferenceAnswerClient referenceAnswer;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
@@ -46,7 +48,7 @@ public class LlmService {
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReferenceAnswer createReferenceAnswer(LlmTrainingReferenceAnswerRequest request) {
-        return llm.call("training-reference-answer", request, LlmTrainingReferenceAnswer.class);
+        return referenceAnswer.create(request);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)

@@ -23,6 +23,7 @@ import ru.workbit.llm.client.InterviewerClient;
 import ru.workbit.llm.client.LlmClient;
 import ru.workbit.llm.client.NormalizerClient;
 import ru.workbit.llm.client.QuestionGeneratorClient;
+import ru.workbit.llm.client.ReferenceAnswerClient;
 import ru.workbit.llm.client.ReviewerClient;
 import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
@@ -64,6 +65,9 @@ class LlmServiceTest {
 
     @Mock
     QuestionGeneratorClient questionGenerator;
+
+    @Mock
+    ReferenceAnswerClient referenceAnswer;
 
     @InjectMocks
     LlmService llmService;
@@ -119,19 +123,19 @@ class LlmServiceTest {
     class CreateReferenceAnswer {
 
         @Test
-        @DisplayName("Вызывает агента training-reference-answer без грейда, с запросом как есть")
-        void callsTrainingReferenceAnswerAgent() {
+        @DisplayName("Делегирует автору эталонов запрос как есть, без грейда")
+        void delegatesToReferenceAnswerClient() {
             // given
             var request = new LlmTrainingReferenceAnswerRequest("Spring Boot", "Java-разработчик", "Что такое JVM?");
             var expected = new LlmTrainingReferenceAnswer("JVM - виртуальная машина Java, которая выполняет байткод");
-            when(llm.call(eq("training-reference-answer"), eq(request), eq(LlmTrainingReferenceAnswer.class)))
-                    .thenReturn(expected);
+            when(referenceAnswer.create(request)).thenReturn(expected);
 
             // when
             var result = llmService.createReferenceAnswer(request);
 
             // then
             assertThat(result).isEqualTo(expected);
+            verifyNoInteractions(llm);
         }
     }
 

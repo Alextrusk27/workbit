@@ -14,4 +14,4 @@ WORKDIR /app
 COPY --from=build /build/target/workbit-*.jar app.jar
 USER workbit
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]

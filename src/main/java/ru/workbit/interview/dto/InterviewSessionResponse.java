@@ -1,10 +1,9 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.InterviewSession;
-
 import java.time.Instant;
 import java.util.UUID;
+import ru.workbit.interview.model.InterviewSession;
 
 public record InterviewSessionResponse(
         @Schema(description = "Идентификатор сессии")
@@ -19,6 +18,11 @@ public record InterviewSessionResponse(
         @Schema(description = "Название работодателя", example = "ООО Ромашка")
         String employer,
 
+        @Schema(
+                description = "Ссылка на логотип работодателя, null если его нет в вакансии",
+                example = "https://img.hhcdn.ru/employer-logo/1234567.png")
+        String employerLogoUrl,
+
         @Schema(description = "Ссылка на вакансию", example = "https://hh.ru/vacancy/123456")
         String vacancyUrl,
 
@@ -28,7 +32,9 @@ public record InterviewSessionResponse(
         @Schema(description = "Статус сессии")
         InterviewSession.Status status,
 
-        @Schema(description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)", example = "3")
+        @Schema(
+                description = "Количество основных вопросов, на которые уже дан ответ (уточняющие не считаются)",
+                example = "3")
         int answeredCount,
 
         @Schema(description = "Общее количество основных вопросов интервью", example = "10")
@@ -38,6 +44,11 @@ public record InterviewSessionResponse(
         Instant created,
 
         @Schema(description = "Момент завершения сессии, null пока сессия не завершена")
-        Instant completedAt
+        Instant completedAt,
+
+        @Schema(
+                description = "Прощальная реплика интервьюера в конце беседы; null, пока беседа идёт",
+                example = "На этом всё, спасибо за разговор. Дальше будет разбор ответов.")
+        String closingRemark
 ) {
 }

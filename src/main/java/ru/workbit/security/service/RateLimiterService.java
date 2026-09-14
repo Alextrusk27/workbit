@@ -1,13 +1,12 @@
 package ru.workbit.security.service;
 
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.security.config.RateLimitProperties;
-
-import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor

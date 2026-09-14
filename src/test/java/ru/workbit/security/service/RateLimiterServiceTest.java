@@ -1,5 +1,9 @@
 package ru.workbit.security.service;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -7,11 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.security.config.RateLimitProperties;
-
-import java.time.Duration;
-
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RateLimiterServiceTest")

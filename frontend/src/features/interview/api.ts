@@ -11,6 +11,7 @@ export interface InterviewSession {
   vacancyId: string
   vacancyName: string
   employer: string
+  employerLogoUrl: string | null
   vacancyUrl: string | null
   experience: string | null
   status: SessionStatus
@@ -18,6 +19,7 @@ export interface InterviewSession {
   totalQuestions: number
   created: string
   completedAt: string | null
+  closingRemark: string | null
 }
 
 export interface InterviewQuestion {

@@ -17,10 +17,13 @@ env:
 
 jobs:
   test:
-    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Refuse to deploy from a non-master ref
+        run: |
+          [ "$GITHUB_REF" = refs/heads/master ] || { echo "deploy only from master, got $GITHUB_REF"; exit 1; }
+
       - uses: actions/checkout@v4
 
       - name: Check version
@@ -124,12 +127,17 @@ jobs:
             compose.prod.yml Caddyfile \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/"
 
+      - name: Read version from pom
+        id: version
+        run: echo "version=$(bash .github/scripts/version.sh get)" >> "$GITHUB_OUTPUT"
+
       - name: Render .env from workbit-secrets and restart
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/workbit
           image="${{ env.IMAGE }}:${{ github.sha }}"
+          expected='${{ steps.version.outputs.version }}'
           prev=$(grep '^BACKEND_IMAGE=' .env 2>/dev/null | cut -d= -f2- || true)
           git -C secrets pull --ff-only
           umask 077
@@ -138,6 +146,14 @@ jobs:
             sops -d "$f" >> .env.tmp
             echo >> .env.tmp
           done
+          rm -rf prompts.tmp
+          mkdir -m 755 prompts.tmp
+          for f in secrets/prod/prompts/*.txt; do
+            sops -d "$f" > "prompts.tmp/${f##*/}"
+          done
+          chmod 644 prompts.tmp/*.txt
+          rm -rf prompts
+          mv prompts.tmp prompts
           token=$(curl -s -H 'Metadata-Flavor: Google' \
             'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
             | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
@@ -171,6 +187,13 @@ jobs:
           }
           docker compose -f compose.prod.yml up -d --wait --wait-timeout 300 \
             || rollback "new backend did not become healthy"
+          running=$(docker inspect -f '{{.Config.Image}}' backend 2>/dev/null || true)
+          [ "$running" = "$image" ] \
+            || rollback "backend runs '$running' instead of '$image'"
+          served=$(docker exec backend curl -sf http://localhost:8080/actuator/info \
+            | grep -o '"build":{[^}]*}' | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || true)
+          [ "$served" = "$expected" ] \
+            || rollback "backend reports version '$served' instead of '$expected'"
           docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile </dev/null
           code=""
           for i in $(seq 1 30); do
@@ -221,6 +244,12 @@ jobs:
         run: |
           html=$(curl -sf https://workbit.ru/) || { echo "index.html is not served"; exit 1; }
           echo "$html" | grep -q 'id="root"' || { echo "served HTML has no app root"; exit 1; }
+          expected=$(bash .github/scripts/version.sh get)
+          expected="${expected%-SNAPSHOT}"
+          served=$(echo "$html" | sed -n 's|.*<meta name="app-version" content="\([^"]*\)".*|\1|p')
+          [ "$served" = "$expected" ] \
+            || { echo "frontend serves version '$served', expected '$expected'"; exit 1; }
+          echo "frontend version $served"
           asset=$(echo "$html" | grep -o '/assets/[^"]*\.js' | head -1)
           [ -n "$asset" ] || { echo "no js bundle referenced in index.html"; exit 1; }
           ctype=$(curl -s -o /dev/null -w '%{content_type}' "https://workbit.ru$asset")
@@ -257,7 +286,7 @@ jobs:
           bash .github/scripts/prod-auth-smoke.sh
 
   release:
-    needs: deploy
+    needs: [ deploy, verify ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

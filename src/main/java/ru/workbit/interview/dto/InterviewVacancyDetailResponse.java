@@ -1,7 +1,6 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.util.List;
 
 public record InterviewVacancyDetailResponse(
@@ -23,7 +22,8 @@ public record InterviewVacancyDetailResponse(
         @Schema(description = "Интервью по вакансии, старые первыми")
         List<InterviewAttemptResponse> interviews,
 
-        @Schema(description = "Рекомендованные тренировки по отстающим навыкам из отчётов интервью, самые слабые первыми")
+        @Schema(description = "Рекомендованные тренировки по отстающим навыкам из отчётов интервью, самые слабые "
+                + "первыми")
         List<RecommendedTrainingResponse> recommendedTrainings
 ) {
 }

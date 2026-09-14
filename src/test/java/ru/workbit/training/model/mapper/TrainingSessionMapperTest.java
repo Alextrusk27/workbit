@@ -1,18 +1,17 @@
 package ru.workbit.training.model.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import ru.workbit.training.dto.CreateSessionRequest;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingSession;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 
 @DisplayName("TrainingSessionMapperTest")
 class TrainingSessionMapperTest {
@@ -28,7 +27,7 @@ class TrainingSessionMapperTest {
         void mapsRequestFieldsAndKeepsIgnoredDefaults() {
             // given
             var before = Instant.now();
-            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM);
 
             // when
             TrainingSession entity = mapper.toEntity(request);
@@ -36,7 +35,7 @@ class TrainingSessionMapperTest {
             // then
             assertThat(entity.getSkill()).isEqualTo("Spring Boot");
             assertThat(entity.getProfession()).isEqualTo("Java-разработчик");
-            assertThat(entity.getLevel()).isEqualTo(TrainingSession.Level.MIDDLE);
+            assertThat(entity.getLevel()).isEqualTo(TrainingSession.Level.MEDIUM);
 
             assertThat(entity.getId()).isNull();
             assertThat(entity.getUserId()).isNull();
@@ -63,7 +62,7 @@ class TrainingSessionMapperTest {
                     .id(sessionId)
                     .skill("Spring Boot")
                     .profession("Java-разработчик")
-                    .level(TrainingSession.Level.SENIOR)
+                    .level(TrainingSession.Level.HARD)
                     .status(TrainingSession.Status.COMPLETED)
                     .created(created)
                     .completedAt(completedAt)
@@ -76,7 +75,7 @@ class TrainingSessionMapperTest {
             assertThat(dto.id()).isEqualTo(sessionId);
             assertThat(dto.skill()).isEqualTo("Spring Boot");
             assertThat(dto.profession()).isEqualTo("Java-разработчик");
-            assertThat(dto.level()).isEqualTo(TrainingSession.Level.SENIOR);
+            assertThat(dto.level()).isEqualTo(TrainingSession.Level.HARD);
             assertThat(dto.status()).isEqualTo(TrainingSession.Status.COMPLETED);
             assertThat(dto.answeredCount()).isEqualTo(3);
             assertThat(dto.totalQuestions()).isEqualTo(10);

@@ -1,11 +1,10 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.InterviewReport;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import ru.workbit.interview.model.InterviewReport;
 
 public record InterviewReportResponse(
         @Schema(description = "Идентификатор отчёта")
@@ -26,7 +25,8 @@ public record InterviewReportResponse(
         @Schema(description = "Рекомендации, что проработать перед реальным собеседованием; может отсутствовать")
         String recommendations,
 
-        @Schema(description = "Самый слабый навык по итогам интервью — название темы для тренировки; может отсутствовать",
+        @Schema(description = "Самый слабый навык по итогам интервью — название темы для тренировки; может "
+                + "отсутствовать",
                 example = "Многопоточность")
         String weakestSkill,
 

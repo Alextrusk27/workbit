@@ -1,8 +1,7 @@
 package ru.workbit.security.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.time.Duration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.security.rate-limit")
 public record RateLimitProperties(

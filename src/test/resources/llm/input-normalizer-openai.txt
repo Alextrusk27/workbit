@@ -1,0 +1,1 @@
+Stub input normalizer prompt.

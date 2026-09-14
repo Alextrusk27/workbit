@@ -1,13 +1,12 @@
 package ru.workbit.interview.model.mapper;
 
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
-
-import java.util.List;
 
 @Mapper(componentModel = "spring", uses = InterviewQuestionMapper.class)
 public interface InterviewReportMapper {

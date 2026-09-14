@@ -1,5 +1,10 @@
 package ru.workbit.interview.model.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -8,12 +13,6 @@ import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.model.VacancySnapshot;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("InterviewSessionMapperTest")
 class InterviewSessionMapperTest {
@@ -47,6 +46,7 @@ class InterviewSessionMapperTest {
                     "https://hh.ru/vacancy/123456",
                     "Java-разработчик",
                     "ООО Ромашка",
+                    "https://img.hhcdn.ru/employer-logo/123456.png",
                     "От 1 года до 3 лет",
                     List.of("Java", "Spring"),
                     "Описание вакансии"
@@ -60,6 +60,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.vacancyId()).isEqualTo("123456");
             assertThat(dto.vacancyName()).isEqualTo("Java-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Ромашка");
+            assertThat(dto.employerLogoUrl()).isEqualTo("https://img.hhcdn.ru/employer-logo/123456.png");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/123456");
             assertThat(dto.experience()).isEqualTo("От 1 года до 3 лет");
             assertThat(dto.status()).isEqualTo(InterviewSession.Status.IN_PROGRESS);
@@ -67,6 +68,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isNull();
+            assertThat(dto.closingRemark()).isNull();
         }
 
         @Test
@@ -79,13 +81,17 @@ class InterviewSessionMapperTest {
                     .status(InterviewSession.Status.COMPLETED)
                     .created(created)
                     .completedAt(completedAt)
+                    .closingRemark("Похоже, сегодня разговор не складывается.")
                     .build();
             var snapshotView = new VacancySnapshotView(
                     "654321",
                     "Python-разработчик",
                     "ООО Лютик",
+                    "https://img.hhcdn.ru/employer-logo/654321.png",
                     "https://hh.ru/vacancy/654321",
-                    "От 3 до 6 лет"
+                    "От 3 до 6 лет",
+                    List.of("Python", "Django"),
+                    "Описание вакансии"
             );
 
             // when
@@ -96,6 +102,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.vacancyId()).isEqualTo("654321");
             assertThat(dto.vacancyName()).isEqualTo("Python-разработчик");
             assertThat(dto.employer()).isEqualTo("ООО Лютик");
+            assertThat(dto.employerLogoUrl()).isEqualTo("https://img.hhcdn.ru/employer-logo/654321.png");
             assertThat(dto.vacancyUrl()).isEqualTo("https://hh.ru/vacancy/654321");
             assertThat(dto.experience()).isEqualTo("От 3 до 6 лет");
             assertThat(dto.status()).isEqualTo(InterviewSession.Status.COMPLETED);
@@ -103,6 +110,7 @@ class InterviewSessionMapperTest {
             assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isEqualTo(completedAt);
+            assertThat(dto.closingRemark()).isEqualTo("Похоже, сегодня разговор не складывается.");
         }
     }
 }

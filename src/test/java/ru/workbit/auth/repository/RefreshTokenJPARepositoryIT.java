@@ -1,5 +1,11 @@
 package ru.workbit.auth.repository;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -10,13 +16,6 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.RefreshToken;
 import ru.workbit.auth.model.User;
-
-import java.time.Instant;
-import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

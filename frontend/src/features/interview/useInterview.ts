@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingKeys } from '@/features/billing/useBilling'
 import { finishWithReportFallback } from '@/lib/api'
+import { reachGoal } from '@/lib/metrika'
 import {
   interviewApi,
   type CreateInterviewRequest,
@@ -50,6 +51,7 @@ export function useCreateInterview() {
     mutationFn: (data: CreateInterviewRequest) =>
       interviewApi.createSession(data),
     onSuccess: () => {
+      reachGoal('interview_start')
       qc.invalidateQueries({ queryKey: keys.vacancies })
       qc.invalidateQueries({ queryKey: ['interview', 'vacancy'] })
       qc.invalidateQueries({ queryKey: billingKeys.quota })
@@ -72,6 +74,7 @@ export function useFinishInterview() {
         () => interviewApi.getReport(sessionId),
       ),
     onSuccess: (report, sessionId) => {
+      reachGoal('interview_finish')
       qc.setQueryData(keys.report(sessionId), report)
       qc.invalidateQueries({ queryKey: keys.session(sessionId) })
       qc.invalidateQueries({ queryKey: keys.vacancies })

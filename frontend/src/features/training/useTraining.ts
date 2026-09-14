@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingKeys } from '@/features/billing/useBilling'
 import { finishWithReportFallback } from '@/lib/api'
+import { reachGoal } from '@/lib/metrika'
 import {
   trainingApi,
   type CreateTrainingRequest,
@@ -99,6 +100,7 @@ export function useCreateSession() {
     mutationFn: (data: CreateTrainingRequest) =>
       trainingApi.createSession(data),
     onSuccess: () => {
+      reachGoal('training_start')
       qc.invalidateQueries({ queryKey: keys.sessions })
       qc.invalidateQueries({ queryKey: billingKeys.quota })
     },
@@ -128,6 +130,7 @@ export function useRestartSession() {
   return useMutation({
     mutationFn: (sessionId: string) => trainingApi.restartSession(sessionId),
     onSuccess: (session) => {
+      reachGoal('training_start')
       qc.setQueryData(keys.session(session.id), session)
       qc.removeQueries({ queryKey: keys.report(session.id) })
       qc.invalidateQueries({ queryKey: keys.sessions })
@@ -145,6 +148,7 @@ export function useFinishSession() {
         () => trainingApi.getReport(sessionId),
       ),
     onSuccess: (report, sessionId) => {
+      reachGoal('training_finish')
       qc.setQueryData(keys.report(sessionId), report)
       qc.invalidateQueries({ queryKey: keys.sessions })
       qc.invalidateQueries({ queryKey: keys.session(sessionId) })

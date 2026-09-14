@@ -1,5 +1,12 @@
 package ru.workbit.billing.repository;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,14 +18,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.billing.model.Payment;
-
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

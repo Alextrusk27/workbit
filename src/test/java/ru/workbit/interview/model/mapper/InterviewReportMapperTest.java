@@ -1,5 +1,11 @@
 package ru.workbit.interview.model.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -9,13 +15,6 @@ import ru.workbit.interview.dto.InterviewReportResponse;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 
 @DisplayName("InterviewReportMapperTest")
 class InterviewReportMapperTest {

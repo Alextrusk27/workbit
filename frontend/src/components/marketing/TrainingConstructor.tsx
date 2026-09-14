@@ -6,10 +6,9 @@ import { useAuth } from '@/features/auth/useAuth'
 import { motionConfig } from '@/lib/motion'
 
 const LEVELS = [
-  { code: 'NOEXP', label: 'Базовый' },
-  { code: 'JUNIOR', label: 'Начинающий' },
-  { code: 'MIDDLE', label: 'Уверенный' },
-  { code: 'SENIOR', label: 'Продвинутый' },
+  { code: 'EASY', label: 'Лёгкий' },
+  { code: 'MEDIUM', label: 'Средний' },
+  { code: 'HARD', label: 'Сложный' },
 ]
 
 const PAIRS: [string, string][] = [
@@ -38,7 +37,7 @@ export function TrainingConstructor() {
   const [profession, setProfession] = useState('')
   const [skill, setSkill] = useState('')
   const [manual, setManual] = useState(false)
-  const [level, setLevel] = useState(LEVELS[2])
+  const [level, setLevel] = useState(LEVELS[1])
   const [levelOpen, setLevelOpen] = useState(false)
   const levelRef = useRef<HTMLDivElement>(null)
   const pairIndex = useRef(0)

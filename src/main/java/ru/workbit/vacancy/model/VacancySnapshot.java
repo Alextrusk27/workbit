@@ -1,14 +1,22 @@
 package ru.workbit.vacancy.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UuidGenerator;
-import org.hibernate.type.SqlTypes;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "snapshot", schema = "vacancy")
@@ -34,6 +42,9 @@ public class VacancySnapshot {
     private String name;
 
     private String employer;
+
+    @Column(name = "employer_logo_url")
+    private String employerLogoUrl;
 
     private String experience;
 

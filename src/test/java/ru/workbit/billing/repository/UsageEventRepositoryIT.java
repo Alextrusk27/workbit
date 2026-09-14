@@ -1,5 +1,10 @@
 package ru.workbit.billing.repository;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -10,12 +15,6 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.billing.model.UsageEvent;
-
-import java.time.Instant;
-import java.util.UUID;
-
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

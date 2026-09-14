@@ -1,5 +1,20 @@
 package ru.workbit.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -9,7 +24,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import ru.workbit.auth.dto.*;
+import ru.workbit.auth.dto.RequestCodeRequest;
+import ru.workbit.auth.dto.VerifyCodeRequest;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.auth.service.AuthService;
@@ -19,18 +35,6 @@ import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthServiceTest")
@@ -252,10 +256,29 @@ class AuthServiceTest {
             // then
             verify(loginCodeService).consume(user, RAW_CODE);
             assertThat(user.isEmailVerified()).isTrue();
-            assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
-            assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
+            assertThat(result.newUser()).isTrue();
+            assertThat(result.tokens().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(result.tokens().refreshToken()).isEqualTo(REFRESH_TOKEN);
             assertThat(user.getLastSeen()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
             assertThat(user.getDeletionWarnedAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("Возвращает newUser=false при повторном входе подтверждённого пользователя")
+        void returnsNewUserFalseForVerifiedUser() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
+            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
+
+            // when
+            var result = authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE));
+
+            // then
+            verify(loginCodeService).consume(user, RAW_CODE);
+            assertThat(result.newUser()).isFalse();
+            assertThat(user.isEmailVerified()).isTrue();
         }
 
         @Test

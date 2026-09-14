@@ -1,11 +1,10 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.interview.model.InterviewReport;
-import ru.workbit.interview.model.InterviewSession;
-
 import java.time.Instant;
 import java.util.UUID;
+import ru.workbit.interview.model.InterviewReport;
+import ru.workbit.interview.model.InterviewSession;
 
 public record InterviewAttemptResponse(
         @Schema(description = "Идентификатор сессии интервью")

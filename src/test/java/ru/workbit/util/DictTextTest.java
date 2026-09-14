@@ -1,5 +1,9 @@
 package ru.workbit.util;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -8,11 +12,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.util.List;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("DictText")
 class DictTextTest {
@@ -72,11 +71,11 @@ class DictTextTest {
         void keepsPlusAndHashProducingDistinctKeys() {
             String c = DictText.matchKey("C");
             String cpp = DictText.matchKey("C++");
-            String cSharp = DictText.matchKey("C#");
+            String csharp = DictText.matchKey("C#");
 
             assertThat(c).isNotEqualTo(cpp);
-            assertThat(c).isNotEqualTo(cSharp);
-            assertThat(cpp).isNotEqualTo(cSharp);
+            assertThat(c).isNotEqualTo(csharp);
+            assertThat(cpp).isNotEqualTo(csharp);
         }
 
         @Test

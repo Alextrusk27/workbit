@@ -1,17 +1,12 @@
 package ru.workbit.billing.service;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.util.UriBuilder;
-import org.springframework.web.util.UriComponentsBuilder;
-import ru.workbit.billing.config.RobokassaProperties;
-import ru.workbit.billing.model.Payment;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -24,14 +19,18 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
+import ru.workbit.billing.config.RobokassaProperties;
+import ru.workbit.billing.model.Payment;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("RobokassaServiceTest")
 class RobokassaServiceTest {

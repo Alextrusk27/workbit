@@ -17,7 +17,7 @@ public record CreateSessionRequest(
         @Size(max = 100)
         String profession,
 
-        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
+        @Schema(description = "Уровень сложности вопросов", example = "Средний")
         @NotNull
         TrainingSession.Level level
 ) {

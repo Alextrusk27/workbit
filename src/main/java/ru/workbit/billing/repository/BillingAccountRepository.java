@@ -1,13 +1,12 @@
 package ru.workbit.billing.repository;
 
+import java.time.Instant;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.billing.model.BillingAccount;
-
-import java.time.Instant;
-import java.util.UUID;
 
 public interface BillingAccountRepository extends JpaRepository<@NotNull BillingAccount, @NotNull UUID> {
 

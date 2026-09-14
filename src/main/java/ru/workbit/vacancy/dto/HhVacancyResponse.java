@@ -1,7 +1,6 @@
 package ru.workbit.vacancy.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 
 public record HhVacancyResponse(
@@ -13,7 +12,14 @@ public record HhVacancyResponse(
         String description,
         boolean archived
 ) {
-    public record Employer(String name) {
+    public record Employer(String name, @JsonProperty("logo_urls") LogoUrls logoUrls) {
+    }
+
+    /**
+     * Логотипы работодателя с hh.ru: ключи - ширина в пикселях плюс оригинал.
+     * У части работодателей логотипа нет, тогда блок приходит null.
+     */
+    public record LogoUrls(@JsonProperty("240") String size240, String original) {
     }
 
     public record Salary(Integer from, Integer to, String currency) {

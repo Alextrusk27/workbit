@@ -1,5 +1,11 @@
 package ru.workbit.training.model.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -9,13 +15,6 @@ import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 
 @DisplayName("TrainingReportMapperTest")
 class TrainingReportMapperTest {
@@ -60,7 +59,7 @@ class TrainingReportMapperTest {
                     .id(sessionId)
                     .skill("Spring Boot")
                     .profession("Java-разработчик")
-                    .level(TrainingSession.Level.MIDDLE)
+                    .level(TrainingSession.Level.MEDIUM)
                     .questions(List.of(sessionQuestion))
                     .build();
 
@@ -76,7 +75,7 @@ class TrainingReportMapperTest {
             assertThat(dto.sessionId()).isEqualTo(sessionId);
             assertThat(dto.skill()).isEqualTo("Spring Boot");
             assertThat(dto.profession()).isEqualTo("Java-разработчик");
-            assertThat(dto.level()).isEqualTo(TrainingSession.Level.MIDDLE);
+            assertThat(dto.level()).isEqualTo(TrainingSession.Level.MEDIUM);
             assertThat(dto.avgScore()).isEqualTo(4.2);
             assertThat(dto.overallFeedback()).isEqualTo("Итоговый фидбэк по тренировке");
             assertThat(dto.generatedAt()).isEqualTo(generatedAt);

@@ -35,7 +35,7 @@ spring:
   application:
     name: ${app.name}
   lifecycle:
-    timeout-per-shutdown-phase: 20s
+    timeout-per-shutdown-phase: 270s
   flyway:
     placeholders:
       payment_inv_id_start: ${PAYMENT_INV_ID_START:1000000}
@@ -91,30 +91,15 @@ management:
         include: health, info
 
 llm:
-  yandex-ai:
-    folder: ${YANDEX_FOLDER_ID}
-    api-key: ${YANDEX_API_KEY}
-    log-level: ${LLM_LOG_LEVEL:info}
-    agents:
-      training-question-generator-noexp: ${TQG_NOEXP}
-      training-question-generator-junior: ${TQG_JUNIOR}
-      training-question-generator-middle: ${TQG_MIDDLE}
-      training-question-generator-senior: ${TQG_SENIOR}
-      training-reviewer: ${TRAINING_REVIEWER}
-      training-reference-answer: ${TRAINING_REFERENCE_ANSWER}
-      interview-question-generator-exp0: ${IQG_EXP0}
-      interview-question-generator-exp1: ${IQG_EXP1}
-      interview-question-generator-exp3: ${IQG_EXP3}
-      interview-question-generator-exp6: ${IQG_EXP6}
-      interview-follow-up-exp0: ${IFU_EXP0}
-      interview-follow-up-exp1: ${IFU_EXP1}
-      interview-follow-up-exp3: ${IFU_EXP3}
-      interview-follow-up-exp6: ${IFU_EXP6}
-      interview-reviewer-exp0: ${IRV_EXP0}
-      interview-reviewer-exp1: ${IRV_EXP1}
-      interview-reviewer-exp3: ${IRV_EXP3}
-      interview-reviewer-exp6: ${IRV_EXP6}
-      input-normalizer: ${INPUT_NORMALIZER}
+  prompts-dir: ${LLM_PROMPTS_DIR:classpath:llm}
+  gateway:
+    base-url: ${LLM_GATEWAY_BASE_URL}
+    auth-token: ${LLM_GATEWAY_AUTH_TOKEN}
+  anthropic:
+    model: claude-opus-5
+    effort: medium
+  openai:
+    model: gpt-5.4-mini
 
 speech:
   yandex:

@@ -1,5 +1,8 @@
 package ru.workbit.billing.service;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,10 +16,6 @@ import ru.workbit.billing.repository.BillingAccountRepository;
 import ru.workbit.billing.repository.UsageEventRepository;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.PaymentRequiredException;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor

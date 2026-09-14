@@ -1,5 +1,15 @@
 package ru.workbit.vacancy.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
@@ -13,17 +23,6 @@ import ru.workbit.vacancy.dto.VacancyStatusResponse;
 import ru.workbit.vacancy.model.VacancySnapshot;
 import ru.workbit.vacancy.model.mapper.VacancyMapper;
 import ru.workbit.vacancy.repository.VacancySnapshotRepository;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

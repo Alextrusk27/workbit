@@ -9,11 +9,20 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.interview.dto.CreateInterviewSessionRequest;
 import ru.workbit.interview.dto.FeedbackRequest;
@@ -30,28 +39,42 @@ import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
 
-import java.net.URI;
-import java.util.List;
-import java.util.UUID;
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/interview")
-@Tag(name = "Interview", description = "AI-интервью по вакансии: сессии, вопросы, ответы, отчёт с оценкой вероятности оффера")
+@Tag(
+        name = "Interview",
+        description = "AI-интервью по вакансии: сессии, вопросы, ответы, отчёт с оценкой вероятности оффера")
 public class InterviewController {
     private final InterviewService interviewService;
     private final InterviewVacancyService interviewVacancyService;
 
     @PostMapping("/sessions")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Создать сессию интервью", description = "По ссылке на вакансию hh.ru загружает её данные, генерирует через LLM набор вопросов под вакансию и создаёт сессию интервью. Первый вопрос запрашивается отдельным вызовом.")
+    @Operation(
+            summary = "Создать сессию интервью",
+            description = "По ссылке на вакансию hh.ru загружает её данные, просит LLM составить план собеседования - "
+            + "сколько основных вопросов задать и какие темы закрыть - и создаёт сессию с первым вопросом. Остальные "
+            + "вопросы рождаются по ходу беседы, каждый следующий запрашивается отдельным вызовом.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Сессия создана"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос или ссылка не является вакансией hh.ru", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Вакансия не найдена или в архиве", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "По этой вакансии уже есть незавершённое интервью", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "hh.ru или AI-сервис недоступны", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Невалидный запрос или ссылка не является вакансией hh.ru",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Вакансия не найдена или в архиве",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "По этой вакансии уже есть незавершённое интервью",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "hh.ru или AI-сервис недоступны",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewSessionResponse> createSession(
             @RequestBody @Valid CreateInterviewSessionRequest request,
@@ -69,7 +92,10 @@ public class InterviewController {
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Сессия найдена"),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия не найдена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewSessionResponse> getSession(
             @PathVariable UUID sessionId,
@@ -80,11 +106,19 @@ public class InterviewController {
 
     @GetMapping("/sessions/{sessionId}/questions")
     @Loggable(logArgs = true)
-    @Operation(summary = "История отвеченных вопросов", description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя - основные и уточняющие, в порядке беседы (основной вопрос, затем его уточнение). Нужна, чтобы при возврате в незавершённое интервью показать всю прошлую переписку. Оценки и разбор появляются в этих полях только после завершения интервью.")
+    @Operation(
+            summary = "История отвеченных вопросов",
+            description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя - основные и "
+            + "уточняющие, в порядке беседы (основной вопрос, затем его уточнение). Нужна, чтобы при возврате в "
+            + "незавершённое интервью показать всю прошлую переписку. Оценки и разбор появляются в этих полях только "
+            + "после завершения интервью.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "История возвращена"),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия не найдена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull List<@NotNull InterviewQuestionResponse>> answeredQuestions(
             @PathVariable UUID sessionId,
@@ -95,13 +129,29 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/questions/next")
     @Loggable(logArgs = true, logResult = true)
-    @Operation(summary = "Получить следующий вопрос", description = "Возвращает очередной неотвеченный основной вопрос (вопросы генерируются заранее при создании сессии) либо уточняющий вопрос (followUp: true), который LLM формирует по последнему ответу при необходимости. Уточняющие не входят в счётчик основных вопросов, на один основной — не больше одного. Когда все вопросы отвечены, возвращает 409.")
+    @Operation(
+            summary = "Получить следующий вопрос",
+            description = "Возвращает уже заданный неотвеченный вопрос, а если такого нет - просит LLM продолжить "
+            + "беседу по последнему ответу: новый основной вопрос либо уточнение (followUp: true) - развитие темы, "
+            + "пояснение непонятого вопроса или возврат к теме после реплики не по делу. Уточняющие не входят в "
+            + "счётчик основных вопросов, развитие темы - не больше одного на основной вопрос. Когда беседа окончена, "
+            + "возвращает 409 - дальше идти за отчётом, а прощальная реплика интервьюера лежит в поле "
+            + "closingRemark сессии.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопрос возвращён"),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Неотвеченных вопросов не осталось или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия не найдена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Беседа окончена, вопросов больше не будет, или сессия уже завершена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "AI-сервис недоступен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewQuestionResponse> nextQuestion(
             @PathVariable UUID sessionId,
@@ -112,14 +162,29 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/questions/{questionId}")
     @Loggable(logArgs = true)
-    @Operation(summary = "Отправить ответ на вопрос", description = "Сохраняет текст ответа на вопрос. Оценка по ходу интервью не выдаётся: фидбэк формируется только при завершении.")
+    @Operation(
+            summary = "Отправить ответ на вопрос",
+            description = "Сохраняет текст ответа на вопрос. Оценка по ходу интервью не выдаётся: фидбэк формируется "
+            + "только при завершении.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Ответ сохранён"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Вопрос принадлежит другому пользователю", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Вопрос не найден", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Вопрос уже отвечен, не принадлежит указанной сессии либо сессия завершена", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Невалидный запрос",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Вопрос принадлежит другому пользователю",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Вопрос не найден",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Вопрос уже отвечен, не принадлежит указанной сессии либо сессия завершена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> submitAnswer(
             @PathVariable UUID sessionId,
@@ -134,14 +199,30 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/questions/{questionId}/feedback")
     @Loggable(logArgs = true)
-    @Operation(summary = "Оценить разбор вопроса", description = "Сохраняет отзыв пользователя на разбор вопроса: лайк или дизлайк, у дизлайка — причины и необязательный комментарий. Отзыв анонимно помогает улучшать вопросы и разборы, пользователю обратно не показывается.")
+    @Operation(
+            summary = "Оценить разбор вопроса",
+            description = "Сохраняет отзыв пользователя на разбор вопроса: лайк или дизлайк, у дизлайка — причины и "
+            + "необязательный комментарий. Отзыв анонимно помогает улучшать вопросы и разборы, пользователю обратно не "
+            + "показывается.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Отзыв сохранён"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Вопрос принадлежит другому пользователю", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Вопрос не найден", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Вопрос не принадлежит указанной сессии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Невалидный запрос",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Вопрос принадлежит другому пользователю",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Вопрос не найден",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Вопрос не принадлежит указанной сессии",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> submitQuestionFeedback(
             @PathVariable UUID sessionId,
@@ -155,12 +236,21 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/report/feedback")
     @Loggable(logArgs = true)
-    @Operation(summary = "Оценить итоговый отчёт", description = "Сохраняет отзыв пользователя на итоговый отчёт интервью: лайк или дизлайк, у дизлайка — причины и необязательный комментарий.")
+    @Operation(
+            summary = "Оценить итоговый отчёт",
+            description = "Сохраняет отзыв пользователя на итоговый отчёт интервью: лайк или дизлайк, у дизлайка — "
+            + "причины и необязательный комментарий.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Отзыв сохранён"),
-            @ApiResponse(responseCode = "400", description = "Невалидный запрос", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Сессия или отчёт не найдены", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Невалидный запрос",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия или отчёт не найдены",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> submitReportFeedback(
             @PathVariable UUID sessionId,
@@ -173,13 +263,27 @@ public class InterviewController {
 
     @PostMapping("/sessions/{sessionId}/finish")
     @Loggable(logArgs = true)
-    @Operation(summary = "Завершить интервью", description = "Завершает интервью, запрашивает у LLM поразборный фидбэк по каждому ответу (с учётом ответов на уточняющие вопросы) и формирует итоговый отчёт с оценкой вероятности оффера. Доступно только после ответа на все основные вопросы — досрочного завершения нет. Уточняющие вопросы при завершении удаляются, в отчёте остаются только основные.")
+    @Operation(
+            summary = "Завершить интервью",
+            description = "Завершает интервью, запрашивает у LLM поразборный фидбэк по каждому ответу (с учётом "
+            + "ответов на уточняющие вопросы) и формирует итоговый отчёт с оценкой вероятности оффера. Доступно только "
+            + "после ответа на все основные вопросы — досрочного завершения нет. Уточняющие вопросы при завершении "
+            + "удаляются, в отчёте остаются только основные.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Отчёт сформирован"),
-            @ApiResponse(responseCode = "404", description = "Сессия не найдена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Отвечены не все основные вопросы или сессия уже завершена", content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "AI-сервис недоступен", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия не найдена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Отвечены не все основные вопросы или сессия уже завершена",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "AI-сервис недоступен",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewReportResponse> finishSession(
             @PathVariable UUID sessionId,
@@ -193,11 +297,17 @@ public class InterviewController {
 
     @GetMapping("/sessions/{sessionId}/report")
     @Loggable(logArgs = true)
-    @Operation(summary = "Получить отчёт по интервью", description = "Возвращает ранее сформированный отчёт по завершённому интервью, включая поразборный фидбэк по каждому вопросу и вероятность оффера.")
+    @Operation(
+            summary = "Получить отчёт по интервью",
+            description = "Возвращает ранее сформированный отчёт по завершённому интервью, включая поразборный фидбэк "
+            + "по каждому вопросу и вероятность оффера.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Отчёт найден"),
-            @ApiResponse(responseCode = "404", description = "Сессия или отчёт не найдены", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Сессия или отчёт не найдены",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewReportResponse> getReport(
             @PathVariable UUID sessionId,
@@ -208,7 +318,11 @@ public class InterviewController {
 
     @GetMapping("/vacancies")
     @Loggable(logArgs = true)
-    @Operation(summary = "Список вакансий пользователя", description = "Группирует интервью текущего пользователя по вакансиям и возвращает сводку по каждой: лучший результат, вероятность оффера лучшей попытки, число завершённых интервью и статус последнего. Вакансии с недавними интервью первыми.")
+    @Operation(
+            summary = "Список вакансий пользователя",
+            description = "Группирует интервью текущего пользователя по вакансиям и возвращает сводку по каждой: "
+            + "лучший результат, вероятность оффера лучшей попытки, число завершённых интервью и статус последнего. "
+            + "Вакансии с недавними интервью первыми.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Список вакансий")
@@ -221,11 +335,18 @@ public class InterviewController {
 
     @GetMapping("/vacancies/{vacancyId}")
     @Loggable(logArgs = true)
-    @Operation(summary = "Детали вакансии", description = "Возвращает вакансию с интервью по ней (старые первыми, у завершённых — оценка и вероятность оффера) и рекомендованными тренировками по отстающим навыкам из отчётов. Тренировка сопоставляется навыку по теме; для начатой возвращаются её статус и прогресс.")
+    @Operation(
+            summary = "Детали вакансии",
+            description = "Возвращает вакансию с интервью по ней (старые первыми, у завершённых — оценка и вероятность "
+            + "оффера) и рекомендованными тренировками по отстающим навыкам из отчётов. Тренировка сопоставляется "
+            + "навыку по теме; для начатой возвращаются её статус и прогресс.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вакансия найдена"),
-            @ApiResponse(responseCode = "404", description = "У пользователя нет интервью по этой вакансии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "У пользователя нет интервью по этой вакансии",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull InterviewVacancyDetailResponse> getVacancy(
             @PathVariable String vacancyId,
@@ -236,11 +357,16 @@ public class InterviewController {
 
     @DeleteMapping("/vacancies/{vacancyId}")
     @Loggable(logArgs = true)
-    @Operation(summary = "Удалить вакансию", description = "Удаляет все интервью пользователя по вакансии вместе с вопросами, ответами и отчётами.")
+    @Operation(
+            summary = "Удалить вакансию",
+            description = "Удаляет все интервью пользователя по вакансии вместе с вопросами, ответами и отчётами.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Вакансия удалена"),
-            @ApiResponse(responseCode = "404", description = "У пользователя нет интервью по этой вакансии", content = @Content(schema = @Schema(implementation = ApiError.class)))
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "У пользователя нет интервью по этой вакансии",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<@NotNull Void> deleteVacancy(
             @PathVariable String vacancyId,

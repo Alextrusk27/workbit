@@ -1,16 +1,15 @@
 package ru.workbit.interview.service;
 
-import lombok.extern.slf4j.Slf4j;
-import ru.workbit.exception.ConflictException;
-import ru.workbit.interview.model.InterviewQuestion;
-import ru.workbit.interview.model.InterviewSession;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.interview.model.InterviewQuestion;
+import ru.workbit.interview.model.InterviewSession;
 
 @Slf4j
 final class InterviewSessions {

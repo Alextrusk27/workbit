@@ -1,0 +1,1 @@
+Stub training question generator prompt.

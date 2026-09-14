@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16.1-alpine
     container_name: postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -10,6 +17,7 @@ services:
     volumes:
       - /mnt/pgdata/data:/var/lib/postgresql/data
     shm_size: 256mb
+    mem_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -20,17 +28,22 @@ services:
     image: ${BACKEND_IMAGE}
     container_name: backend
     restart: unless-stopped
+    logging: *default-logging
     env_file: [.env]
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      LLM_PROMPTS_DIR: file:/app/prompts
+    volumes:
+      - /opt/workbit/prompts:/app/prompts:ro
     depends_on:
       postgres:
         condition: service_healthy
     mem_limit: 3g
+    stop_grace_period: 300s
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health | grep -qE '200|401'"]
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health | grep -q 200"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -40,6 +53,7 @@ services:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"

@@ -1,5 +1,15 @@
 package ru.workbit.email;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -18,11 +28,6 @@ import org.thymeleaf.context.Context;
 import ru.workbit.email.properties.MailProperties;
 import ru.workbit.email.service.EmailService;
 import ru.workbit.exception.EmailSendException;
-
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EmailServiceTest")
@@ -92,7 +97,7 @@ class EmailServiceTest {
 
         @Test
         @DisplayName("Бросает EmailSendException, когда MimeMessage#setSubject кидает MessagingException")
-        void throwsEmailSendExceptionOnMessagingException() {
+        void throwsEmailSendExceptionOnMessagingException() throws MessagingException {
             // given
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(templateEngine.process(eq("email/login-code"), any(Context.class)))
@@ -101,11 +106,8 @@ class EmailServiceTest {
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
 
-            try {
-                doThrow(new MessagingException("smtp error"))
-                        .when(spyMessage).setSubject(any(), any());
-            } catch (MessagingException ignored) {
-            }
+            doThrow(new MessagingException("smtp error"))
+                    .when(spyMessage).setSubject(any(), any());
 
             // when / then
             assertThatThrownBy(() -> service.sendLoginCodeMail(TO, CODE))
@@ -138,7 +140,7 @@ class EmailServiceTest {
 
         @Test
         @DisplayName("Бросает EmailSendException, когда MimeMessage#setSubject кидает MessagingException")
-        void throwsEmailSendExceptionOnMessagingException() {
+        void throwsEmailSendExceptionOnMessagingException() throws MessagingException {
             // given
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
@@ -147,11 +149,8 @@ class EmailServiceTest {
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
-            try {
-                doThrow(new MessagingException("smtp error"))
-                        .when(spyMessage).setSubject(any(), any());
-            } catch (MessagingException ignored) {
-            }
+            doThrow(new MessagingException("smtp error"))
+                    .when(spyMessage).setSubject(any(), any());
 
             // when / then
             assertThatThrownBy(() -> service.sendAccountDeletionWarningMail(TO))
@@ -184,7 +183,7 @@ class EmailServiceTest {
 
         @Test
         @DisplayName("Проглатывает EmailSendException и не пробрасывает её")
-        void swallowsEmailSendException() {
+        void swallowsEmailSendException() throws MessagingException {
             // given
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
             when(templateEngine.process(eq("email/login-code"), any(Context.class)))
@@ -192,11 +191,8 @@ class EmailServiceTest {
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
-            try {
-                doThrow(new MessagingException("smtp error"))
-                        .when(spyMessage).setSubject(any(), any());
-            } catch (MessagingException ignored) {
-            }
+            doThrow(new MessagingException("smtp error"))
+                    .when(spyMessage).setSubject(any(), any());
 
             var event = new LoginCodeEmailEvent(TO, CODE);
 
@@ -231,7 +227,7 @@ class EmailServiceTest {
 
         @Test
         @DisplayName("Проглатывает EmailSendException и не пробрасывает её")
-        void swallowsEmailSendException() {
+        void swallowsEmailSendException() throws MessagingException {
             // given
             when(mailProperties.baseUrl()).thenReturn(BASE_URL);
             when(mailProperties.fromMail()).thenReturn(FROM_MAIL);
@@ -240,11 +236,8 @@ class EmailServiceTest {
 
             MimeMessage spyMessage = spy(realMimeMessage());
             when(mailSender.createMimeMessage()).thenReturn(spyMessage);
-            try {
-                doThrow(new MessagingException("smtp error"))
-                        .when(spyMessage).setSubject(any(), any());
-            } catch (MessagingException ignored) {
-            }
+            doThrow(new MessagingException("smtp error"))
+                    .when(spyMessage).setSubject(any(), any());
 
             var event = new AccountDeletionWarningEmailEvent(TO);
 

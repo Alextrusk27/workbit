@@ -74,7 +74,8 @@ public class InterviewerClient {
     }
 
     /**
-     * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы.
+     * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы. Схема ответа -
+     * {@link LlmInterviewStep}, без полей плана: они нужны только первому ходу.
      *
      * @param plan        план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
      * @param history     завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
@@ -105,12 +106,10 @@ public class InterviewerClient {
             }
         }
 
-        LlmInterviewReply reply = claude.converse(prompt, opening(vacancy, askedBefore), dialog,
+        return claude.converse(prompt, opening(vacancy, askedBefore), dialog,
                 candidateReply(lastAnswer, asked, total,
                         topicCounter(planned, askedByTopic, topic, asked, total)),
-                LlmInterviewReply.class);
-
-        return new LlmInterviewStep(reply.kind(), reply.topic(), reply.question());
+                LlmInterviewStep.class);
     }
 
     /**

@@ -920,7 +920,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Spring", "Расскажите про Spring");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про Spring", "Spring");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -970,8 +970,8 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, null,
-                    "На этом всё, спасибо за разговор.");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "На этом всё, спасибо за разговор.",
+                    null);
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
@@ -995,7 +995,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Spring", "Расскажите про Spring");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про Spring", "Spring");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
                     .thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));
@@ -1019,7 +1019,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "А что насчёт Java?");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "А что насчёт Java?", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -1048,7 +1048,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "Ещё уточнение?");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Ещё уточнение?", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -1077,7 +1077,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Тема", "Ещё уточнение?");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Ещё уточнение?", "Тема");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
@@ -1103,8 +1103,8 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "Тема",
-                    "Поясните вопрос ещё раз");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "Поясните вопрос ещё раз",
+                    "Тема");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -1133,8 +1133,8 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.REDIRECT, "Тема",
-                    "Давайте вернёмся к вопросу");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.REDIRECT, "Давайте вернёмся к вопросу",
+                    "Тема");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -1160,8 +1160,8 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, "Тема",
-                    "Похоже, разговор не складывается. Давайте на этом остановимся.");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, "Похоже, разговор не складывается. Давайте на этом остановимся.",
+                    "Тема");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
 
             // when / then
@@ -1231,7 +1231,7 @@ class InterviewServiceTest {
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
             LlmInterviewStep degenerate = new LlmInterviewStep(null, null, null);
-            LlmInterviewStep usable = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про JVM");
+            LlmInterviewStep usable = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про JVM", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(degenerate, usable);
 
             InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
@@ -1258,7 +1258,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep degenerate = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java", "   ");
+            LlmInterviewStep degenerate = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "   ", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(degenerate);
 
             // when / then
@@ -1281,7 +1281,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про GC");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про GC", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
                     .thenThrow(new DataIntegrityViolationException("duplicate step"));
@@ -1321,7 +1321,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "SOLID", "Поясните ещё раз?");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.CLARIFICATION, "Поясните ещё раз?", "SOLID");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(followUp.getId(), InterviewQuestion.Kind.CLARIFICATION,
                     step.question(), step.topic())).thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));
@@ -1346,7 +1346,7 @@ class InterviewServiceTest {
                             aTopic("Java Core", 2, LlmInterviewTopicKind.STANDARD)),
                     main.getTopic(), main.getText()));
             assertThat(historyCaptor.getValue()).containsExactly(new LlmInterviewTurn(main.getAnswerText(),
-                    new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, followUp.getTopic(), followUp.getText())));
+                    new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, followUp.getText(), followUp.getTopic())));
             assertThat(lastAnswerCaptor.getValue()).isEqualTo(followUp.getAnswerText());
         }
 
@@ -1362,7 +1362,7 @@ class InterviewServiceTest {
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
 
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java", "Расскажите про JVM");
+            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про JVM", "Java");
             when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
             when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, step.question(), step.topic()))
                     .thenReturn(Optional.of(mock(InterviewQuestionResponse.class)));

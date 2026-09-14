@@ -13,21 +13,27 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.JsonMissing;
 import com.anthropic.core.JsonValue;
 import com.anthropic.core.http.Headers;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.errors.AnthropicException;
 import com.anthropic.errors.AnthropicInvalidDataException;
 import com.anthropic.errors.BadRequestException;
+import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.OutputConfig;
+import com.anthropic.models.messages.RawContentBlockDeltaEvent;
+import com.anthropic.models.messages.RawContentBlockStartEvent;
+import com.anthropic.models.messages.RawMessageDeltaEvent;
+import com.anthropic.models.messages.RawMessageStopEvent;
+import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.StopReason;
-import com.anthropic.models.messages.StructuredContentBlock;
-import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.models.messages.TextBlock;
 import com.anthropic.models.messages.Usage;
 import com.anthropic.services.blocking.MessageService;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,11 +49,17 @@ import ru.workbit.llm.config.AnthropicProperties;
 import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Ответ модели стабится потоком настоящих SDK-событий в форме реселлера: {@code message_delta}
+ * без {@code usage}, так что стоп-причина читается обходным путём клиента, а текст ответа
+ * разбирает сам SDK - случаи «SDK не разобрал» кормятся сырым текстом, а не моком блока.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClaudeClientTest")
 class ClaudeClientTest {
 
     private static final String PROMPT = "Промпт агента";
+    private static final String ANSWER_JSON = "{\"answer\":\"используйте индекс для поиска\"}";
 
     @Mock
     AnthropicClient client;
@@ -75,46 +87,67 @@ class ClaudeClientTest {
                 LlmTrainingReferenceAnswer.class);
     }
 
-    private void stubResponse(StructuredTextBlock<LlmTrainingReferenceAnswer> block) {
-        doReturn(responseOf(block)).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+    private void stubText(String text) {
+        doReturn(streamOf(text, StopReason.END_TURN))
+                .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
     }
 
-    @SuppressWarnings("unchecked")
-    private static StructuredMessage<LlmTrainingReferenceAnswer> responseOf(
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block) {
-        StructuredContentBlock<LlmTrainingReferenceAnswer> contentBlock = mock(StructuredContentBlock.class);
-        when(contentBlock.text()).thenReturn(Optional.of(block));
+    private void stubStopReason(StopReason stop) {
+        doReturn(streamOf(null, stop))
+                .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+    }
 
-        StructuredMessage<LlmTrainingReferenceAnswer> response = mock(StructuredMessage.class);
-        when(response.stopReason()).thenReturn(Optional.of(StopReason.END_TURN));
-        when(response.usage()).thenReturn(mock(Usage.class));
-        when(response.content()).thenReturn(List.of(contentBlock));
+    /**
+     * Поток событий одного ответа; {@code text == null} - ответ без текстового блока.
+     */
+    @SuppressWarnings("unchecked")
+    private static StreamResponse<RawMessageStreamEvent> streamOf(String text, StopReason stop) {
+        List<RawMessageStreamEvent> events = new ArrayList<>();
+        events.add(RawMessageStreamEvent.ofMessageStart(Message.builder()
+                .id("msg_test")
+                .model("claude-test-model")
+                .content(List.of())
+                .container(Optional.empty())
+                .stopDetails(Optional.empty())
+                .stopReason(Optional.empty())
+                .stopSequence(Optional.empty())
+                .usage(Usage.builder()
+                        .inputTokens(10)
+                        .outputTokens(0)
+                        .cacheCreation(Optional.empty())
+                        .cacheCreationInputTokens(0)
+                        .cacheReadInputTokens(0)
+                        .inferenceGeo(Optional.empty())
+                        .outputTokensDetails(Optional.empty())
+                        .serverToolUse(Optional.empty())
+                        .serviceTier(Optional.empty())
+                        .build())
+                .build()));
+        if (text != null) {
+            events.add(RawMessageStreamEvent.ofContentBlockStart(RawContentBlockStartEvent.builder()
+                    .index(0)
+                    .contentBlock(TextBlock.builder().text("").citations(List.of()).build())
+                    .build()));
+            events.add(RawMessageStreamEvent.ofContentBlockDelta(RawContentBlockDeltaEvent.builder()
+                    .index(0)
+                    .textDelta(text)
+                    .build()));
+            events.add(RawMessageStreamEvent.ofContentBlockStop(0));
+        }
+        events.add(RawMessageStreamEvent.ofMessageDelta(RawMessageDeltaEvent.builder()
+                .delta(RawMessageDeltaEvent.Delta.builder()
+                        .container(Optional.empty())
+                        .stopDetails(Optional.empty())
+                        .stopReason(stop)
+                        .stopSequence(Optional.empty())
+                        .build())
+                .usage(JsonMissing.of())
+                .build()));
+        events.add(RawMessageStreamEvent.ofMessageStop(RawMessageStopEvent.builder().build()));
+
+        StreamResponse<RawMessageStreamEvent> response = mock(StreamResponse.class);
+        when(response.stream()).thenAnswer(invocation -> events.stream());
         return response;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static StructuredTextBlock<LlmTrainingReferenceAnswer> parsedBlock(LlmTrainingReferenceAnswer value) {
-        StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-        when(block.text()).thenReturn(value);
-        return block;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static StructuredTextBlock<LlmTrainingReferenceAnswer> rawBlock(String raw,
-                                                                             AnthropicInvalidDataException cause) {
-        StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-        when(block.text()).thenThrow(cause);
-        when(block.rawTextBlock()).thenReturn(TextBlock.builder().text(raw).citations(List.of()).build());
-        return block;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void stubResponseWithStopReason(StopReason stop) {
-        StructuredMessage<LlmTrainingReferenceAnswer> response = mock(StructuredMessage.class);
-        when(response.stopReason()).thenReturn(Optional.of(stop));
-        when(response.usage()).thenReturn(mock(Usage.class));
-
-        doReturn(response).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
     }
 
     @Nested
@@ -126,13 +159,7 @@ class ClaudeClientTest {
         void parsesFencedJsonWhenSdkFailsToParseStructuredOutput() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            String raw = "```json\n{\"answer\":\"используйте индекс для поиска\"}\n```";
-
-            @SuppressWarnings("unchecked")
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-            when(block.text()).thenThrow(new AnthropicInvalidDataException("not parseable"));
-            when(block.rawTextBlock()).thenReturn(TextBlock.builder().text(raw).citations(List.of()).build());
-            stubResponse(block);
+            stubText("```json\n" + ANSWER_JSON + "\n```");
 
             // when
             var result = ClaudeClientTest.this.converse();
@@ -142,35 +169,23 @@ class ClaudeClientTest {
         }
 
         @Test
-        @DisplayName("SDK не разобрал ответ, ограды нет - LlmException с исходной причиной")
+        @DisplayName("SDK не разобрал ответ, ограды нет - LlmException с причиной от SDK")
         void throwsWhenSdkFailsToParseAndThereIsNoFence() {
             // given
-            var cause = new AnthropicInvalidDataException("not parseable");
-
-            @SuppressWarnings("unchecked")
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-            when(block.text()).thenThrow(cause);
-            when(block.rawTextBlock()).thenReturn(
-                    TextBlock.builder().text("это вообще не json").citations(List.of()).build());
-            stubResponse(block);
+            stubText("это вообще не json");
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM response is not parseable")
-                    .hasCause(cause);
+                    .hasCauseInstanceOf(AnthropicInvalidDataException.class);
         }
 
         @Test
         @DisplayName("Ограда есть, но внутри не разбираемый JSON - LlmException")
         void throwsWhenFencedContentIsNotValidJson() {
             // given
-            @SuppressWarnings("unchecked")
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-            when(block.text()).thenThrow(new AnthropicInvalidDataException("not parseable"));
-            when(block.rawTextBlock()).thenReturn(
-                    TextBlock.builder().text("```json\nне json\n```").citations(List.of()).build());
-            stubResponse(block);
+            stubText("```json\nне json\n```");
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -183,8 +198,7 @@ class ClaudeClientTest {
         void parsesJsonSurroundedByProseWhenSdkFailsToParse() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            String raw = "Вот ответ по схеме:\n{\"answer\":\"используйте индекс для поиска\"}\nГотово.";
-            stubResponse(rawBlock(raw, new AnthropicInvalidDataException("not parseable")));
+            stubText("Вот ответ по схеме:\n" + ANSWER_JSON + "\nГотово.");
 
             // when
             var result = ClaudeClientTest.this.converse();
@@ -198,32 +212,32 @@ class ClaudeClientTest {
         void retriesOnceWhenResponseIsNotParseable() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            var unparseable = responseOf(rawBlock("**answer:**\n\n1. используйте индекс",
-                    new AnthropicInvalidDataException("not parseable")));
-            doReturn(unparseable, responseOf(parsedBlock(expected)))
-                    .when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            doReturn(streamOf("**answer:**\n\n1. используйте индекс", StopReason.END_TURN),
+                    streamOf(ANSWER_JSON, StopReason.END_TURN))
+                    .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when
             var result = ClaudeClientTest.this.converse();
 
             // then
             assertThat(result).isEqualTo(expected);
-            verify(messageService, times(2)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            verify(messageService, times(2)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
         @DisplayName("Неразбираемый ответ и после повтора - LlmException, вызовов ровно два")
         void throwsAfterSingleRetryWhenResponseStaysUnparseable() {
             // given
-            var cause = new AnthropicInvalidDataException("not parseable");
-            stubResponse(rawBlock("это вообще не json", cause));
+            doReturn(streamOf("это вообще не json", StopReason.END_TURN),
+                    streamOf("и снова не json", StopReason.END_TURN))
+                    .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM response is not parseable")
-                    .hasCause(cause);
-            verify(messageService, times(2)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+                    .hasCauseInstanceOf(AnthropicInvalidDataException.class);
+            verify(messageService, times(2)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
@@ -234,23 +248,20 @@ class ClaudeClientTest {
                     .headers(Headers.builder().build())
                     .body(JsonValue.from(Map.of()))
                     .build();
-            doThrow(serviceException).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            doThrow(serviceException).when(messageService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse).isInstanceOf(LlmException.class);
-            verify(messageService, times(1)).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            verify(messageService, times(1)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
-        @DisplayName("Нормальный путь не сломан: block.text() отрабатывает, ObjectMapper не трогается")
+        @DisplayName("Нормальный путь не сломан: SDK разобрал JSON сам, ObjectMapper не трогается")
         void returnsSdkParsedTextAndDoesNotTouchObjectMapper() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-
-            @SuppressWarnings("unchecked")
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-            when(block.text()).thenReturn(expected);
-            stubResponse(block);
+            stubText(ANSWER_JSON);
 
             // when
             var result = ClaudeClientTest.this.converse();
@@ -265,11 +276,7 @@ class ClaudeClientTest {
         void sendsDialogAndLastUserOnSubsequentTurn() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-
-            @SuppressWarnings("unchecked")
-            StructuredTextBlock<LlmTrainingReferenceAnswer> block = mock(StructuredTextBlock.class);
-            when(block.text()).thenReturn(expected);
-            stubResponse(block);
+            stubText(ANSWER_JSON);
 
             List<MessageParam> dialog = List.of(
                     MessageParam.builder().role(MessageParam.Role.ASSISTANT).content("Какой у вас опыт?").build());
@@ -287,7 +294,8 @@ class ClaudeClientTest {
         void wrapsAnthropicInvalidDataExceptionFromTheCallItself() {
             // given
             var cause = new AnthropicInvalidDataException("malformed response envelope");
-            doThrow(cause).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            doThrow(cause).when(messageService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -304,7 +312,8 @@ class ClaudeClientTest {
                     .headers(Headers.builder().build())
                     .body(JsonValue.from(Map.of()))
                     .build();
-            doThrow(serviceException).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            doThrow(serviceException).when(messageService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -318,7 +327,8 @@ class ClaudeClientTest {
         void wrapsGenericAnthropicException() {
             // given
             var anthropicException = new AnthropicException("connection reset");
-            doThrow(anthropicException).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            doThrow(anthropicException).when(messageService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -331,7 +341,7 @@ class ClaudeClientTest {
         @DisplayName("Модель отказалась отвечать (REFUSAL) - LlmException")
         void throwsWhenModelRefuses() {
             // given
-            stubResponseWithStopReason(StopReason.REFUSAL);
+            stubStopReason(StopReason.REFUSAL);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -343,7 +353,7 @@ class ClaudeClientTest {
         @DisplayName("Ответ упёрся в лимит токенов (MAX_TOKENS) - LlmException")
         void throwsWhenModelHitsMaxTokens() {
             // given
-            stubResponseWithStopReason(StopReason.MAX_TOKENS);
+            stubStopReason(StopReason.MAX_TOKENS);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
@@ -355,12 +365,7 @@ class ClaudeClientTest {
         @DisplayName("В ответе нет текстового блока - LlmException Model not response")
         void throwsWhenResponseHasNoTextBlock() {
             // given
-            @SuppressWarnings("unchecked")
-            StructuredMessage<LlmTrainingReferenceAnswer> response = mock(StructuredMessage.class);
-            when(response.stopReason()).thenReturn(Optional.of(StopReason.END_TURN));
-            when(response.usage()).thenReturn(mock(Usage.class));
-            when(response.content()).thenReturn(List.of());
-            doReturn(response).when(messageService).create(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            stubStopReason(StopReason.END_TURN);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)

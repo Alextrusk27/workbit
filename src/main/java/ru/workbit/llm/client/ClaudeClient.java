@@ -193,6 +193,7 @@ public class ClaudeClient {
                 .findFirst()
                 .orElseThrow(() -> new LlmException("Model not response"));
 
+        log.debug("Claude raw response [model={}]: {}", props.model(), block.rawTextBlock().text());
         try {
             return block.text();
         } catch (AnthropicInvalidDataException e) {

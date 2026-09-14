@@ -506,8 +506,8 @@ public class InterviewService {
         }
 
         log.warn("LLM returned degenerate interview step for session {}, retrying once "
-                        + "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
-                isBlank(step.question()), mainAsked, session.getTotalQuestions());
+                        + "[kind={}, topic={}, question={}, mainAsked={}/{}]", session.getId(), step.kind(),
+                step.topic(), step.question(), mainAsked, session.getTotalQuestions());
 
         step = llmService.nextInterviewStep(llmVacancy, plan, history, lastAnswer, session.getAskedBefore());
         if (isUsableStep(step, mainAsked, session.getTotalQuestions())) {
@@ -515,8 +515,8 @@ public class InterviewService {
         }
 
         log.error("LLM returned degenerate interview step for session {} after retry "
-                        + "[kind={}, blankQuestion={}, mainAsked={}/{}]", session.getId(), step.kind(),
-                isBlank(step.question()), mainAsked, session.getTotalQuestions());
+                        + "[kind={}, topic={}, question={}, mainAsked={}/{}]", session.getId(), step.kind(),
+                step.topic(), step.question(), mainAsked, session.getTotalQuestions());
 
         throw new LlmException("Interview step has no question");
     }

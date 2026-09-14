@@ -1768,17 +1768,23 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Сессия уже завершена - ConflictException")
-        void throwsWhenSessionAlreadyCompleted() {
+        @DisplayName("Сессия уже завершена - отдаёт готовый отчёт, LLM и запись не трогаются")
+        void returnsExistingReportWhenSessionAlreadyCompleted() {
             // given
             InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.COMPLETED,
                     vacancySnapshotId, 2);
+            session.setQuestions(List.of());
+            InterviewReport report = InterviewReport.builder().id(UUID.randomUUID()).build();
+            session.setReport(report);
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewReportMapper.toResponse(eq(report), eq(session), any())).thenReturn(expectedResponse);
 
-            // when / then
-            assertThatThrownBy(() -> interviewService.createReport(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Session already finished");
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isSameAs(expectedResponse);
             verifyNoInteractions(vacancyService, llmService, interviewWriter);
         }
 
@@ -1844,13 +1850,19 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Конкурентное завершение сессии - ConflictException вместо DataIntegrityViolationException")
-        void throwsConflictWhenWriterDetectsConcurrentCompletion() {
+        @DisplayName("Конкурентное завершение сессии - вместо DataIntegrityViolationException отдаёт отчёт, записанный победителем")
+        void returnsWinnersReportWhenWriterDetectsConcurrentCompletion() {
             // given
             InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
                     vacancySnapshotId, 1);
             session.setQuestions(List.of(aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1")));
-            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            InterviewSession completed = aSession(sessionId, userId, InterviewSession.Status.COMPLETED,
+                    vacancySnapshotId, 1);
+            completed.setQuestions(List.of());
+            InterviewReport report = InterviewReport.builder().id(UUID.randomUUID()).build();
+            completed.setReport(report);
+            when(interviewSessionRepository.findWithQuestionsById(sessionId))
+                    .thenReturn(Optional.of(session), Optional.of(completed));
 
             VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
             when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
@@ -1860,11 +1872,14 @@ class InterviewServiceTest {
             when(llmService.createInterviewReport(any(), any())).thenReturn(llmReport);
             when(interviewWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("already completed"));
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewReportMapper.toResponse(eq(report), eq(completed), any())).thenReturn(expectedResponse);
 
-            // when / then
-            assertThatThrownBy(() -> interviewService.createReport(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Session already finished");
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isSameAs(expectedResponse);
         }
 
         @Test

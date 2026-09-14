@@ -170,7 +170,10 @@ public class InterviewService {
         InterviewSession session = interviewSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
-        checkSessionNotCompleted(session);
+        if (session.getStatus() == InterviewSession.Status.COMPLETED) {
+            log.info("Interview session {} is already completed, returning the existing report", sessionId);
+            return getReport(sessionId, userId);
+        }
 
         List<InterviewQuestion> answered = answeredSorted(session);
         checkAllQuestionsAnswered(session, answered);
@@ -183,7 +186,7 @@ public class InterviewService {
             return interviewWriter.completeReport(sessionId, llmReport);
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent request already completed interview session {}", sessionId);
-            throw new ConflictException("Session already finished");
+            return getReport(sessionId, userId);
         }
     }
 

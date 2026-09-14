@@ -292,7 +292,10 @@ public class TrainingService {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
-        checkSessionNotCompleted(session);
+        if (session.getStatus() == TrainingSession.Status.COMPLETED) {
+            log.info("Training session {} is already completed, returning the existing report", sessionId);
+            return getReport(sessionId, userId);
+        }
 
         List<TrainingQuestion> answered = answeredSorted(session);
         checkEnoughAnsweredToFinish(sessionId, answered);
@@ -303,7 +306,7 @@ public class TrainingService {
             return trainingWriter.completeReport(sessionId, llmReport);
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent request already completed session {}", sessionId);
-            throw new ConflictException("Session already finished");
+            return getReport(sessionId, userId);
         }
     }
 

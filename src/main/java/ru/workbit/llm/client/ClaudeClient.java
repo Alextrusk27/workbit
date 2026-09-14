@@ -58,6 +58,7 @@ public class ClaudeClient {
      * прирост с прошлого хода - без неё вся переписка досылалась бы каждый ход по цене обычного входа.
      * Провайдер держит не больше четырёх меток на запрос, поэтому блоков вводной - не больше двух.
      * Схема ответа входит в кэшируемый префикс, поэтому на всех ходах беседы она должна быть одна.
+     * Стриминговый: нестриминговый запрос с max_tokens выше 21 333 провайдер отвергает с 400.
      *
      * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
      * @param opening      первая реплика пользователя (вводная задачи) блоками, каждый кэшируется отдельно
@@ -87,7 +88,7 @@ public class ClaudeClient {
                     .build());
         }
 
-        return withParseRetry(() -> send(messages, responseType));
+        return withParseRetry(() -> sendStreaming(messages, responseType));
     }
 
     /**
@@ -127,14 +128,6 @@ public class ClaudeClient {
                 throw second;
             }
         }
-    }
-
-    private <T> T send(List<MessageParam> messages, Class<T> responseType) {
-        StructuredMessageCreateParams<T> params = buildParams(messages, responseType);
-        StructuredMessage<T> response = call(() -> client.messages().create(params));
-
-        logUsage(response.usage());
-        return result(response, response.stopReason().orElse(null), responseType);
     }
 
     /**
@@ -277,12 +270,6 @@ public class ClaudeClient {
                 .text(text)
                 .build()
         );
-    }
-
-    private void logUsage(Usage usage) {
-        log.info("Claude usage [model={}]: input={}, output={}, cacheRead={}, cacheCreation={}",
-                props.model(), usage.inputTokens(), usage.outputTokens(),
-                usage.cacheReadInputTokens().orElse(0L), usage.cacheCreationInputTokens().orElse(0L));
     }
 
     /**

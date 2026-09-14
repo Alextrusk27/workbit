@@ -534,8 +534,8 @@ public class InterviewService {
     private static LlmInterviewStep toStep(InterviewQuestion question) {
         return new LlmInterviewStep(
                 LlmInterviewStepKind.valueOf(question.getKind().name()),
-                question.getTopic(),
-                question.getText());
+                question.getText(),
+                question.getTopic());
     }
 
     /**

@@ -171,9 +171,9 @@ class LlmServiceTest {
                     "Java core", "Что такое JVM?");
             var history = List.of(new LlmInterviewTurn(
                     "Виртуальная машина Java",
-                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java core", "Что такое JVM?")));
+                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Что такое JVM?", "Java core")));
             var lastAnswer = "Компилирует байткод в машинный код";
-            var expected = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java core", "А что такое JIT?");
+            var expected = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "А что такое JIT?", "Java core");
             when(interviewer.next(vacancy, plan, history, lastAnswer, ASKED_BEFORE)).thenReturn(expected);
 
             // when

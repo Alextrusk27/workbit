@@ -104,6 +104,14 @@ export const seoPages: SeoPage[] = [
     ],
   },
   {
+    path: '/interview-questions/sales-manager',
+    title:
+      'Вопросы на собеседовании менеджера по продажам: что спрашивают и как отвечать | Workbit',
+    description:
+      'Какие вопросы задают менеджеру по продажам на собеседовании и что хотят услышать: этапы сделки, возражения, холодные звонки, ролевая игра. Разбор с нуля и тренировка с ИИ.',
+    sources: ['frontend/src/pages/InterviewQuestionsSalesManagerPage.tsx'],
+  },
+  {
     path: '/privacy',
     title: 'Политика конфиденциальности | Workbit',
     description:

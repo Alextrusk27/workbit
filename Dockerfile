@@ -3,7 +3,7 @@ WORKDIR /build
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
-RUN mvn -B -DskipTests package
+RUN mvn -B -DskipTests -Dcheckstyle.skip package
 
 FROM eclipse-temurin:25-jre
 RUN apt-get update \
@@ -14,4 +14,4 @@ WORKDIR /app
 COPY --from=build /build/target/workbit-*.jar app.jar
 USER workbit
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]

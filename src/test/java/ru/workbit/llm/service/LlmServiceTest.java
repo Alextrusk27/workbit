@@ -1,53 +1,71 @@
 package ru.workbit.llm.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.workbit.llm.client.LlmClient;
-import ru.workbit.llm.dto.*;
+import ru.workbit.llm.client.InterviewerClient;
+import ru.workbit.llm.client.NormalizerClient;
+import ru.workbit.llm.client.QuestionGeneratorClient;
+import ru.workbit.llm.client.ReferenceAnswerClient;
+import ru.workbit.llm.client.ReviewerClient;
+import ru.workbit.llm.client.TrainingReviewerClient;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewPlan;
+import ru.workbit.llm.dto.LlmInterviewReport;
+import ru.workbit.llm.dto.LlmInterviewStep;
+import ru.workbit.llm.dto.LlmInterviewStepKind;
+import ru.workbit.llm.dto.LlmInterviewTopic;
+import ru.workbit.llm.dto.LlmInterviewTopicKind;
+import ru.workbit.llm.dto.LlmInterviewTurn;
+import ru.workbit.llm.dto.LlmInterviewVacancy;
+import ru.workbit.llm.dto.LlmOfferProbability;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
+import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.training.model.TrainingSession;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LlmServiceTest")
 class LlmServiceTest {
 
+    private static final String ASKED_BEFORE = "Уже задавалось:\n- Что такое JVM?";
+
     @Mock
-    LlmClient llm;
+    InterviewerClient interviewer;
+
+    @Mock
+    ReviewerClient reviewer;
+
+    @Mock
+    NormalizerClient normalizer;
+
+    @Mock
+    QuestionGeneratorClient questionGenerator;
+
+    @Mock
+    ReferenceAnswerClient referenceAnswer;
+
+    @Mock
+    TrainingReviewerClient trainingReviewer;
 
     @InjectMocks
     LlmService llmService;
-
-    private static Stream<Arguments> experienceGrades() {
-        return Stream.of(
-                Arguments.of("Нет опыта", "exp0"),
-                Arguments.of("От 1 года до 3 лет", "exp1"),
-                Arguments.of("От 3 до 6 лет", "exp3"),
-                Arguments.of("Более 6 лет", "exp6"),
-                Arguments.of("", "exp1"),
-                Arguments.of(null, "exp1"),
-                Arguments.of("Неизвестная категория опыта", "exp1")
-        );
-    }
 
     @Nested
     @DisplayName("GenerateTrainingQuestions")
@@ -55,22 +73,19 @@ class LlmServiceTest {
 
         @ParameterizedTest(name = "уровень {0}")
         @EnumSource(TrainingSession.Level.class)
-        @DisplayName("Роутит вызов на агента training-question-generator-{грейд} по уровню сессии")
-        void routesByLevelGrade(TrainingSession.Level level) {
+        @DisplayName("Делегирует составителю вопросов запрос как есть, с грейдом уровня в поле level")
+        void delegatesToQuestionGenerator(TrainingSession.Level level) {
             // given
-            var grade = level.getGrade();
-            var request = new LlmTrainingQuestionsRequest("Spring Boot", "Java-разработчик", 5, List.of());
+            var request = new LlmTrainingQuestionsRequest(
+                    "Spring Boot", "Java-разработчик", level.getGrade(), 5, List.of());
             var expected = new LlmTrainingQuestions(List.of("Что такое JVM?"));
-            when(llm.call(anyString(), eq(request), eq(LlmTrainingQuestions.class))).thenReturn(expected);
+            when(questionGenerator.generate(request)).thenReturn(expected);
 
             // when
-            var result = llmService.generateTrainingQuestions(grade, request);
+            var result = llmService.generateTrainingQuestions(request);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmTrainingQuestions.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("training-question-generator-" + grade);
         }
     }
 
@@ -79,21 +94,19 @@ class LlmServiceTest {
     class CreateTrainingReport {
 
         @Test
-        @DisplayName("Вызывает агента training-reviewer с запросом одной переменной JSON_STRING, а не полями DTO")
-        void callsTrainingReviewerAgentWithJsonStringVariable() {
+        @DisplayName("Делегирует рецензенту тренажёра запрос как есть")
+        void delegatesToTrainingReviewer() {
             // given
             var request = new LlmTrainingReportRequest("Spring Boot", "Java-разработчик", List.of());
             var expected = new LlmTrainingReport(List.of(), "Хороший результат");
-            when(llm.call(eq("training-reviewer"), any(), eq(LlmTrainingReport.class))).thenReturn(expected);
+            when(trainingReviewer.review(request)).thenReturn(expected);
 
             // when
             var result = llmService.createTrainingReport(request);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<Object> requestCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(llm).call(eq("training-reviewer"), requestCaptor.capture(), eq(LlmTrainingReport.class));
-            assertThat(requestCaptor.getValue()).isEqualTo(Map.of("JSON_STRING", request));
+            verify(trainingReviewer).review(request);
         }
     }
 
@@ -102,13 +115,12 @@ class LlmServiceTest {
     class CreateReferenceAnswer {
 
         @Test
-        @DisplayName("Вызывает агента training-reference-answer без грейда, с запросом как есть")
-        void callsTrainingReferenceAnswerAgent() {
+        @DisplayName("Делегирует автору эталонов запрос как есть, без грейда")
+        void delegatesToReferenceAnswerClient() {
             // given
             var request = new LlmTrainingReferenceAnswerRequest("Spring Boot", "Java-разработчик", "Что такое JVM?");
             var expected = new LlmTrainingReferenceAnswer("JVM - виртуальная машина Java, которая выполняет байткод");
-            when(llm.call(eq("training-reference-answer"), eq(request), eq(LlmTrainingReferenceAnswer.class)))
-                    .thenReturn(expected);
+            when(referenceAnswer.create(request)).thenReturn(expected);
 
             // when
             var result = llmService.createReferenceAnswer(request);
@@ -119,52 +131,57 @@ class LlmServiceTest {
     }
 
     @Nested
-    @DisplayName("GenerateInterviewQuestions")
-    class GenerateInterviewQuestions {
+    @DisplayName("PlanInterview")
+    class PlanInterview {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-question-generator-{суффикс} по грейду опыта")
-        void routesByExperienceGrade(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов interviewer.plan с той же вакансией и возвращает результат как есть")
+        void delegatesToInterviewer() {
             // given
-            var request = new LlmInterviewQuestionsRequest(
-                    "Java-разработчик", "ООО Ромашка", List.of("Java"), "Описание", 5, 10);
-            var expected = new LlmInterviewQuestions(List.of("Что такое JVM?"));
-            when(llm.call(anyString(), eq(request), eq(LlmInterviewQuestions.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var expected = new LlmInterviewPlan(8,
+                    List.of(new LlmInterviewTopic("Java core", 5, LlmInterviewTopicKind.CORE),
+                            new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
+                    "Java core", "Что такое JVM?");
+            when(interviewer.plan(vacancy, ASKED_BEFORE)).thenReturn(expected);
 
             // when
-            var result = llmService.generateInterviewQuestions(experience, request);
+            var result = llmService.planInterview(vacancy, ASKED_BEFORE);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmInterviewQuestions.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-question-generator-" + expectedSuffix);
+            verify(interviewer).plan(vacancy, ASKED_BEFORE);
         }
     }
 
     @Nested
-    @DisplayName("DecideInterviewFollowUp")
-    class DecideInterviewFollowUp {
+    @DisplayName("NextInterviewStep")
+    class NextInterviewStep {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-follow-up-{суффикс} по грейду опыта")
-        void routesByExperienceGrade(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов interviewer.next с теми же аргументами и возвращает результат как есть")
+        void delegatesToInterviewer() {
             // given
-            var request = new LlmInterviewFollowUpRequest(
-                    "Java-разработчик", "Что такое JVM?", "Виртуальная машина", List.of());
-            var expected = new LlmInterviewFollowUpDecision(false, null);
-            when(llm.call(anyString(), eq(request), eq(LlmInterviewFollowUpDecision.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var plan = new LlmInterviewPlan(8,
+                    List.of(new LlmInterviewTopic("Java core", 5, LlmInterviewTopicKind.CORE),
+                            new LlmInterviewTopic("Spring", 3, LlmInterviewTopicKind.STANDARD)),
+                    "Java core", "Что такое JVM?");
+            var history = List.of(new LlmInterviewTurn(
+                    "Виртуальная машина Java",
+                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Java core", "Что такое JVM?")));
+            var lastAnswer = "Компилирует байткод в машинный код";
+            var expected = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, "Java core", "А что такое JIT?");
+            when(interviewer.next(vacancy, plan, history, lastAnswer, ASKED_BEFORE)).thenReturn(expected);
 
             // when
-            var result = llmService.decideInterviewFollowUp(experience, request);
+            var result = llmService.nextInterviewStep(vacancy, plan, history, lastAnswer, ASKED_BEFORE);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(llm).call(agentKeyCaptor.capture(), eq(request), eq(LlmInterviewFollowUpDecision.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-follow-up-" + expectedSuffix);
+            verify(interviewer).next(vacancy, plan, history, lastAnswer, ASKED_BEFORE);
         }
     }
 
@@ -172,25 +189,24 @@ class LlmServiceTest {
     @DisplayName("CreateInterviewReport")
     class CreateInterviewReport {
 
-        @ParameterizedTest(name = "опыт \"{0}\" -> суффикс {1}")
-        @MethodSource("ru.workbit.llm.service.LlmServiceTest#experienceGrades")
-        @DisplayName("Роутит вызов на агента interview-reviewer-{суффикс} по грейду опыта и шлёт запрос одной переменной JSON_STRING")
-        void routesByExperienceGradeAndWrapsRequestAsJsonString(String experience, String expectedSuffix) {
+        @Test
+        @DisplayName("Делегирует вызов reviewer.review с теми же аргументами и возвращает результат как есть")
+        void delegatesToReviewer() {
             // given
-            var request = new LlmInterviewReportRequest("Java-разработчик", experience, List.of());
-            var expected = new LlmInterviewReport(List.of(), "HIGH", "Хорошо", "Подтянуть алгоритмы", null);
-            when(llm.call(anyString(), any(), eq(LlmInterviewReport.class))).thenReturn(expected);
+            var vacancy = new LlmInterviewVacancy(
+                    "Java-разработчик", "ООО Ромашка", "От 1 года до 3 лет", List.of("Java"), "Описание");
+            var answers = List.of(new LlmInterviewAnswer(
+                    1, "Java core", "Что такое JVM?", "Виртуальная машина Java", List.of()));
+            var expected = new LlmInterviewReport(
+                    List.of(), LlmOfferProbability.HIGH, "Хорошо", "Подтянуть алгоритмы", null);
+            when(reviewer.review(vacancy, answers)).thenReturn(expected);
 
             // when
-            var result = llmService.createInterviewReport(experience, request);
+            var result = llmService.createInterviewReport(vacancy, answers);
 
             // then
             assertThat(result).isEqualTo(expected);
-            ArgumentCaptor<String> agentKeyCaptor = ArgumentCaptor.forClass(String.class);
-            ArgumentCaptor<Object> requestCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(llm).call(agentKeyCaptor.capture(), requestCaptor.capture(), eq(LlmInterviewReport.class));
-            assertThat(agentKeyCaptor.getValue()).isEqualTo("interview-reviewer-" + expectedSuffix);
-            assertThat(requestCaptor.getValue()).isEqualTo(Map.of("JSON_STRING", request));
+            verify(reviewer).review(vacancy, answers);
         }
     }
 
@@ -199,13 +215,12 @@ class LlmServiceTest {
     class NormalizeInput {
 
         @Test
-        @DisplayName("Вызывает агента input-normalizer без грейда, с запросом как есть")
-        void callsInputNormalizerAgent() {
+        @DisplayName("Делегирует нормализатору запрос как есть")
+        void delegatesToNormalizer() {
             // given
             var request = new LlmInputNormalizationRequest("многопоточность", "джавист", List.of(), List.of());
             var expected = new LlmInputNormalization(true, List.of(), false, List.of("Java-разработчик"), true);
-            when(llm.call(eq("input-normalizer"), eq(request), eq(LlmInputNormalization.class)))
-                    .thenReturn(expected);
+            when(normalizer.normalize(request)).thenReturn(expected);
 
             // when
             var result = llmService.normalizeInput(request);

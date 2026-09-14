@@ -1,5 +1,7 @@
 package ru.workbit.auth.service;
 
+import java.security.SecureRandom;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -8,9 +10,6 @@ import ru.workbit.auth.model.LoginCode;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.LoginCodeJPARepository;
 import ru.workbit.exception.BadCredentialsException;
-
-import java.security.SecureRandom;
-import java.time.Instant;
 
 /**
  * Жизненный цикл одноразовых кодов входа: выпуск и одноразовое «погашение»

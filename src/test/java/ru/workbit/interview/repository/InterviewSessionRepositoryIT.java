@@ -1,5 +1,10 @@
 package ru.workbit.interview.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,12 +18,6 @@ import ru.workbit.interview.model.InterviewFeedback;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.vacancy.model.VacancySnapshot;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

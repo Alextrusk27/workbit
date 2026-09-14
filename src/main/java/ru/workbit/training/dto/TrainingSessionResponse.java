@@ -1,10 +1,9 @@
 package ru.workbit.training.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.training.model.*;
-
 import java.time.Instant;
 import java.util.UUID;
+import ru.workbit.training.model.TrainingSession;
 
 public record TrainingSessionResponse(
         @Schema(description = "Идентификатор сессии")
@@ -16,7 +15,7 @@ public record TrainingSessionResponse(
         @Schema(description = "Профессия, в контексте которой тренируется навык", example = "Java-разработчик")
         String profession,
 
-        @Schema(description = "Уровень сложности вопросов", example = "Уверенный")
+        @Schema(description = "Уровень сложности вопросов", example = "Средний")
         TrainingSession.Level level,
 
         @Schema(description = "Статус сессии")

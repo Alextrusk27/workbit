@@ -5,6 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
@@ -17,9 +19,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import ru.workbit.auth.service.AuthCookieService;
 import ru.workbit.security.service.JWTService;
 import ru.workbit.security.service.UserDetailsServiceImpl;
-
-import java.io.IOException;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -50,6 +49,7 @@ public class JWTAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             MDC.put("uid", userId.toString());
         } catch (UsernameNotFoundException ignored) {
+            // intentionally ignored: request proceeds unauthenticated
         }
     }
 

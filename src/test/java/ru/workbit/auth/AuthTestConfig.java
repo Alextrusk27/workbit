@@ -1,5 +1,8 @@
 package ru.workbit.auth;
 
+import static org.mockito.Mockito.mock;
+
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -7,12 +10,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.mail.javamail.JavaMailSender;
 import ru.workbit.email.LoginCodeEmailEvent;
 
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.mockito.Mockito.mock;
-
 /**
- * Тест-конфигурация для e2e-тестов auth-домена:
+ * Тест-конфигурация для e2e-тестов auth-домена.
  * - перехват кода входа из ApplicationEvent без реального SMTP
  * - mock-заглушка JavaMailSender
  */

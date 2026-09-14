@@ -50,10 +50,6 @@ management:
       exposure:
         include: "*"
 
-llm:
-  yandex-ai:
-    log-level: debug
-
 logging:
   level:
     root: INFO

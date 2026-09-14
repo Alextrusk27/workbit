@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError } from '@/lib/api'
+import { reachGoal } from '@/lib/metrika'
 import { authApi, type UserResponse } from './api'
 import { getCaptchaToken } from './captcha'
 
@@ -61,10 +62,12 @@ export function useVerifyCode() {
   return useMutation({
     mutationFn: (vars: { email: string; code: string }) =>
       authApi.verifyCode(vars.email, vars.code),
-    onSuccess: () =>
-      refreshMe(qc).catch(() => {
+    onSuccess: ({ newUser }) => {
+      if (newUser) reachGoal('registration')
+      return refreshMe(qc).catch(() => {
         void qc.invalidateQueries({ queryKey: ME_KEY })
-      }),
+      })
+    },
   })
 }
 

@@ -1,18 +1,17 @@
 package ru.workbit.interview.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.interview.model.InterviewQuestion;
 import ru.workbit.interview.model.InterviewSession;
-
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 
 @DisplayName("InterviewSessionsTest")
 class InterviewSessionsTest {

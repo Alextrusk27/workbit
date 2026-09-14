@@ -1,10 +1,9 @@
 package ru.workbit.auth.service;
 
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
 
 @Service
 public class AuthCookieService {

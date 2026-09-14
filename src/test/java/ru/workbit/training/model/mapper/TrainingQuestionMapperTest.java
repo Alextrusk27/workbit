@@ -1,15 +1,14 @@
 package ru.workbit.training.model.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import ru.workbit.training.dto.TrainingQuestionResponse;
 import ru.workbit.training.model.TrainingFeedback;
 import ru.workbit.training.model.TrainingQuestion;
-
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("TrainingQuestionMapperTest")
 class TrainingQuestionMapperTest {

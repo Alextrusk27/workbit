@@ -1,9 +1,8 @@
 package ru.workbit.billing.service;
 
-import ru.workbit.billing.model.Payment;
-
 import java.math.BigDecimal;
 import java.util.Map;
+import ru.workbit.billing.model.Payment;
 
 public interface PaymentProvider {
 

@@ -11,3 +11,4 @@ docs/
 target/
 *.env
 *.md
+src/main/resources/llm/

@@ -105,7 +105,7 @@ const audience = [
 
 const demoTrainTo = `/app/training/new?${new URLSearchParams({
   skill: 'Веб-аналитика',
-  level: 'MIDDLE',
+  level: 'MEDIUM',
 }).toString()}`
 
 function ThumbUpIcon() {

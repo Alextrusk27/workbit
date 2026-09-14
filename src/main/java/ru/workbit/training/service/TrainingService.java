@@ -1,48 +1,7 @@
 package ru.workbit.training.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.billing.service.QuotaService;
-import ru.workbit.exception.ConflictException;
-import ru.workbit.exception.ForbiddenException;
-import ru.workbit.exception.LlmException;
-import ru.workbit.exception.NotFoundException;
-import ru.workbit.exception.UnprocessableEntityException;
-import ru.workbit.training.dto.*;
-import ru.workbit.content.model.BankQuestion;
-import ru.workbit.content.model.DictStatus;
-import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.SkillDict;
-import ru.workbit.content.repository.ProfessionDictRepository;
-import ru.workbit.content.repository.QuestionBankRepository;
-import ru.workbit.content.repository.SkillDictRepository;
-import ru.workbit.training.model.TrainingQuestion;
-import ru.workbit.training.model.TrainingReport;
-import ru.workbit.training.model.TrainingSession;
-import ru.workbit.training.model.TrainingUserFeedback;
-import ru.workbit.training.model.mapper.TrainingQuestionMapper;
-import ru.workbit.training.model.mapper.TrainingReportMapper;
-import ru.workbit.training.model.mapper.TrainingSessionMapper;
-import ru.workbit.training.repository.TrainingQuestionRepository;
-import ru.workbit.training.repository.TrainingSessionRepository;
-import ru.workbit.training.repository.TrainingUserFeedbackRepository;
-import ru.workbit.llm.dto.LlmInputNormalization;
-import ru.workbit.llm.dto.LlmInputNormalizationRequest;
-import ru.workbit.llm.dto.LlmTrainingCase;
-import ru.workbit.llm.dto.LlmTrainingQuestions;
-import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
-import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
-import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
-import ru.workbit.llm.dto.LlmTrainingReport;
-import ru.workbit.llm.dto.LlmTrainingReportRequest;
-import ru.workbit.llm.service.LlmService;
-import ru.workbit.util.DictText;
+import static ru.workbit.training.service.TrainingSessions.answeredSorted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -55,9 +14,59 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
-import static ru.workbit.training.service.TrainingSessions.answeredSorted;
-import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.billing.service.QuotaService;
+import ru.workbit.content.model.BankQuestion;
+import ru.workbit.content.model.DictStatus;
+import ru.workbit.content.model.ProfessionDict;
+import ru.workbit.content.model.SkillDict;
+import ru.workbit.content.repository.ProfessionDictRepository;
+import ru.workbit.content.repository.QuestionBankRepository;
+import ru.workbit.content.repository.SkillDictRepository;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.UnprocessableEntityException;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmTrainingCase;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
+import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.llm.dto.LlmTrainingReportRequest;
+import ru.workbit.llm.service.LlmService;
+import ru.workbit.training.dto.CreateSessionRequest;
+import ru.workbit.training.dto.FeedbackRequest;
+import ru.workbit.training.dto.NormalizeInputRequest;
+import ru.workbit.training.dto.NormalizeInputResponse;
+import ru.workbit.training.dto.ReferenceAnswerResponse;
+import ru.workbit.training.dto.SubmitAnswerRequest;
+import ru.workbit.training.dto.TrainingOptionsResponse;
+import ru.workbit.training.dto.TrainingQuestionResponse;
+import ru.workbit.training.dto.TrainingReportResponse;
+import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.dto.TrainingSkillMatch;
+import ru.workbit.training.model.TrainingQuestion;
+import ru.workbit.training.model.TrainingReport;
+import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
+import ru.workbit.training.model.mapper.TrainingQuestionMapper;
+import ru.workbit.training.model.mapper.TrainingReportMapper;
+import ru.workbit.training.model.mapper.TrainingSessionMapper;
+import ru.workbit.training.repository.TrainingQuestionRepository;
+import ru.workbit.training.repository.TrainingSessionRepository;
+import ru.workbit.training.repository.TrainingUserFeedbackRepository;
+import ru.workbit.util.DictText;
 
 @Service
 @RequiredArgsConstructor
@@ -497,10 +506,10 @@ public class TrainingService {
 
     private List<String> generateQuestions(TrainingSession session, int missing, List<String> existingQuestions) {
         LlmTrainingQuestions generated = llmService.generateTrainingQuestions(
-                session.getLevel().getGrade(),
                 new LlmTrainingQuestionsRequest(
                         session.getSkill(),
                         session.getProfession(),
+                        session.getLevel().getGrade(),
                         missing,
                         existingQuestions));
 

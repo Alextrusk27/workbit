@@ -1,5 +1,6 @@
 package ru.workbit.speech.ws;
 
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -12,8 +13,6 @@ import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.security.config.RateLimitProperties;
 import ru.workbit.security.service.RateLimiterService;
 import ru.workbit.util.ClientIp;
-
-import java.util.Map;
 
 /**
  * Ограничивает частоту открытия сессий распознавания по IP — бакет {@code stt}.

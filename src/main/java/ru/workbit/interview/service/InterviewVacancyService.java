@@ -1,5 +1,14 @@
 package ru.workbit.interview.service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,16 +25,6 @@ import ru.workbit.training.dto.TrainingSkillMatch;
 import ru.workbit.training.service.TrainingService;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -115,7 +114,9 @@ public class InterviewVacancyService {
         List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyId);
         List<InterviewSession> sessions = snapshotIds.isEmpty()
                 ? List.of()
-                : interviewSessionRepository.findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(userId, snapshotIds);
+                : interviewSessionRepository.findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(
+                        userId,
+                        snapshotIds);
         if (sessions.isEmpty()) {
             log.warn("User {} has no interviews for vacancy {}", userId, vacancyId);
             throw new NotFoundException("Vacancy not found");

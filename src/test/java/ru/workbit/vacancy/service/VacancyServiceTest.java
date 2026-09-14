@@ -1,5 +1,21 @@
 package ru.workbit.vacancy.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,23 +34,6 @@ import ru.workbit.vacancy.dto.VacancyStatusResponse;
 import ru.workbit.vacancy.model.VacancySnapshot;
 import ru.workbit.vacancy.model.mapper.VacancyMapper;
 import ru.workbit.vacancy.repository.VacancySnapshotRepository;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VacancyServiceTest")
@@ -74,7 +73,8 @@ class VacancyServiceTest {
             when(vacancySnapshotRepository.findById(id)).thenReturn(Optional.of(snapshot));
 
             VacancySnapshotView expectedView = new VacancySnapshotView(
-                    "123", "Java-разработчик", "ООО Ромашка", "https://hh.ru/vacancy/123", "От 3 до 6 лет");
+                    "123", "Java-разработчик", "ООО Ромашка", null, "https://hh.ru/vacancy/123", "От 3 до 6 лет",
+                    List.of("Java", "Spring"), "Описание вакансии");
             when(vacancyMapper.toSnapshotView(snapshot)).thenReturn(expectedView);
 
             // when
@@ -115,8 +115,10 @@ class VacancyServiceTest {
             when(vacancySnapshotRepository.findAllById(List.of(id1, id2)))
                     .thenReturn(List.of(snapshot1, snapshot2));
 
-            VacancySnapshotView view1 = new VacancySnapshotView("1", "Java-разработчик", "ООО Ромашка", "url1", "level1");
-            VacancySnapshotView view2 = new VacancySnapshotView("2", "Python-разработчик", "ООО Лютик", "url2", "level2");
+            VacancySnapshotView view1 = new VacancySnapshotView("1", "Java-разработчик", "ООО Ромашка", null, "url1",
+                    "level1", List.of("Java"), "Описание 1");
+            VacancySnapshotView view2 = new VacancySnapshotView("2", "Python-разработчик", "ООО Лютик", null, "url2",
+                    "level2", List.of("Python"), "Описание 2");
             when(vacancyMapper.toSnapshotView(snapshot1)).thenReturn(view1);
             when(vacancyMapper.toSnapshotView(snapshot2)).thenReturn(view2);
 
@@ -145,7 +147,7 @@ class VacancyServiceTest {
     private HhVacancyResponse anHhVacancyResponse(boolean archived) {
         return new HhVacancyResponse(
                 "Java-разработчик",
-                new HhVacancyResponse.Employer("ООО Ромашка"),
+                new HhVacancyResponse.Employer("ООО Ромашка", null),
                 new HhVacancyResponse.Salary(100000, 200000, "RUR"),
                 new HhVacancyResponse.Experience("От 3 до 6 лет"),
                 List.of(new HhVacancyResponse.KeySkill("Java")),
@@ -166,7 +168,7 @@ class VacancyServiceTest {
 
             VacancyData expected = new VacancyData(VacancySnapshot.Source.HH, "123456",
                     "https://hh.ru/vacancy/123456", "Java-разработчик",
-                    "ООО Ромашка", "От 3 до 6 лет", List.of("Java"), "Описание");
+                    "ООО Ромашка", null, "От 3 до 6 лет", List.of("Java"), "Описание");
             when(vacancyMapper.toVacancyData(hhVacancy, VacancySnapshot.Source.HH, "123456",
                     "https://hh.ru/vacancy/123456", "Описание"))
                     .thenReturn(expected);
@@ -237,7 +239,7 @@ class VacancyServiceTest {
         void savesSnapshotAndReturnsId() {
             // given
             VacancyData data = new VacancyData(VacancySnapshot.Source.HH, "123", "https://hh.ru/vacancy/123",
-                    "Java-разработчик", "ООО Ромашка", "От 3 до 6 лет", List.of("Java"), "Описание");
+                    "Java-разработчик", "ООО Ромашка", null, "От 3 до 6 лет", List.of("Java"), "Описание");
             UUID snapshotId = UUID.randomUUID();
             VacancySnapshot mappedSnapshot = aSnapshot(snapshotId);
             when(vacancyMapper.toSnapshot(data)).thenReturn(mappedSnapshot);

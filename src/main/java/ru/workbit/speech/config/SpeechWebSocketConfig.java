@@ -1,5 +1,6 @@
 package ru.workbit.speech.config;
 
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,8 +10,6 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 import ru.workbit.speech.ws.SttHandshakeInterceptor;
 import ru.workbit.speech.ws.SttWebSocketHandler;
-
-import java.util.List;
 
 /**
  * Публикация распознавания наружу: адрес ручки, лимит по IP и размер буфера под аудио.

@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Доступ к SpeechKit — секция {@code speech.yandex}.
  *
- * @param apiKey ключ сервисного аккаунта Yandex Cloud; тот же, что у llm-модуля
+ * @param apiKey ключ сервисного аккаунта Yandex Cloud
  * @param host   адрес сервиса распознавания
  * @param port   порт gRPC
  */

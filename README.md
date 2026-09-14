@@ -26,7 +26,8 @@ based on real hh.ru job postings, answering by text or voice.
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
-![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-LLM_%7C_STT_%7C_VM-5282FF)
+![Claude](https://img.shields.io/badge/Claude-Opus_5-D97757?logo=anthropic&logoColor=white)
+![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-STT_%7C_VM-5282FF)
 ![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
 ![Coverage](https://img.shields.io/badge/coverage-87%25_lines-44cc11)
@@ -40,7 +41,6 @@ based on real hh.ru job postings, answering by text or voice.
 - [Features](#-features)
 - [Screenshots](#-screenshots)
 - [Tech Stack](#-tech-stack)
-- [Integrations](#-integrations)
 - [Architecture](#-architecture)
 - [Technical Highlights](#-technical-highlights)
 - [Repository Structure](#-repository-structure)
@@ -52,7 +52,7 @@ based on real hh.ru job postings, answering by text or voice.
 
 ## ✨ Features
 
-- 🎯 **AI interview for a job posting** — paste an hh.ru vacancy link: questions are generated for the required experience level (noexp / junior / middle / senior), follow-up questions are asked along the way, and the session ends with a report: a score, offer probability, recommendations, and your weakest skill (with a shortcut to the trainer).
+- 🎯 **AI interview for a job posting** — paste an hh.ru vacancy link: the interviewer (Claude) drafts a plan for it and runs an adaptive conversation where every question depends on your previous answers. The session ends with a report: a score, offer probability, recommendations, and your weakest skill (with a shortcut to the trainer).
 - 📚 **Skills trainer** — practice on a "skill + profession" pair at a chosen difficulty level: questions from a curated bank topped up by the LLM, a reference answer on demand, and a final review with a score. Free-form input is canonicalized via dictionaries and an LLM normalizer.
 - 💳 **Subscription plans** — Start / Pro / Max with monthly quotas for interviews and trainings (unlimited trainings on Max); one-time payments via Robokassa, usage history in the settings.
 
@@ -77,7 +77,7 @@ based on real hh.ru job postings, answering by text or voice.
 | Core | Java 25, Spring Boot 4 (Web, Data JPA, Security, WebSocket, Validation, Actuator, AspectJ) |
 | Database | PostgreSQL 16, Flyway (schema per domain), Hibernate (`ddl-auto: validate`) |
 | Security | Spring Security + JWT (JJWT), HttpOnly cookies, in-memory per-IP rate limiting |
-| LLM | Yandex AI Studio via an OpenAI-compatible API (`openai-java`), 19 prompt agents |
+| LLM | Claude Opus 5 via the Messages API (`anthropic-java`) for the prompt agents, gpt-5.4-mini via an OpenAI-compatible route (`openai-java`) for the input normalizer |
 | Speech | Yandex SpeechKit STT v3 — bidirectional gRPC streaming, stubs generated from proto at build time (`protobuf-maven-plugin`) |
 | Email | Spring Mail + Thymeleaf templates, Spring domain events (AFTER_COMMIT) |
 | Billing | Plan quotas with atomic debits; Robokassa one-time payments — signed URLs and webhooks (SHA-256), a per-minute reconciliation job |
@@ -103,7 +103,6 @@ based on real hh.ru job postings, answering by text or voice.
 | Persistence | Testcontainers (postgres:16) + `@DataJpaTest` on the Flyway-migrated schema |
 | Email | GreenMail — real SMTP delivery and assertions on the HTML body of the email |
 | E2E | `@SpringBootTest(RANDOM_PORT)` + TestRestTemplate on top of Testcontainers |
-| Coverage | JaCoCo — 87% lines, 76% branches (per-domain breakdown in [Tests](#-tests)) |
 
 ### Infrastructure
 
@@ -114,15 +113,6 @@ based on real hh.ru job postings, answering by text or voice.
 | CI/CD | GitHub Actions: tests on PRs, release pipeline from `master` (image build → Yandex Container Registry, VM rollout with rollback), weekly security scan, nightly database backup, canary checks |
 | Hosting | Yandex Cloud (VM, Container Registry), dedicated disk for PostgreSQL data |
 
-## 🔌 Integrations
-
-| Service | Role |
-|---|---|
-| **hh.ru API** | vacancy data by link for the AI interview: required experience, skills, description |
-| **Yandex AI Studio** | the LLM behind question generation, follow-ups, reviews, and input normalization — 19 prompt agents |
-| **Yandex SpeechKit STT v3** | streaming speech recognition for voice input |
-| **Robokassa** | one-time payments for subscription plans: payment URL signing, webhook verification, lost-webhook reconciliation |
-| **SMTP email** | transactional emails with the login code |
 
 ## 🏗 Architecture
 
@@ -140,7 +130,8 @@ flowchart TB
 
     BE -->|"schema per domain, Flyway"| PG[("PostgreSQL 16")]
     vacancy -->|"vacancy data"| HH["hh.ru API"]
-    llm -->|"OpenAI-compatible API, 19 agents"| YA["Yandex AI Studio"]
+    llm -->|"Messages API: Claude agents"| CL["Claude Opus 5"]
+    llm -->|"OpenAI-compatible route: normalizer"| GPT["gpt-5.4-mini"]
     speech -->|"bidirectional gRPC stream"| STT["Yandex SpeechKit STT v3"]
     billing -->|"payments, webhooks"| RK["Robokassa"]
     email -->|"SMTP"| MX["Mail"]
@@ -164,12 +155,11 @@ sequenceDiagram
 ## 🔍 Technical Highlights
 
 - **Package-by-feature + a DB schema per domain** — `auth`, `training`, `interview`, `vacancy`, `content`, `billing`, `llm`, `email`, `speech`; only DTOs are exposed, cross-domain communication goes through Spring events.
-- **Grade-based routing of LLM agents** — the question generator, follow-up, and reviewer agents are split by candidate experience (4×3 agents), routed by the experience string from the hh API.
-- **Voice input (streaming speech recognition)** — answers are dictated via Yandex SpeechKit STT v3: a browser AudioWorklet sends LPCM chunks over WebSocket, the backend proxies them into a bidirectional SpeechKit gRPC stream and returns partial/final/refinement hypotheses; session length is capped server-side.
+- **Adaptive interview on Claude** — the model plans the interview for the vacancy, then on every turn picks the next step from the whole history (a question, a follow-up, a clarification, or the end); the code enforces the rules and limits, the dialog is stored in the DB. The prompt, the vacancy, and the dialog tail are cached so only the last turn's increment is billed; the prompts themselves live in a SOPS-encrypted secrets repository and are decrypted at deploy time.
 - **Passwordless login** — email + a one-time 6-digit code, no separate sign-up; JWT tokens in HttpOnly cookies, silent refresh on 401.
 - **Free-form input canonicalization** — Unicode normalization (NFKC, typographic hyphens), comparison keys built from significant words, dictionaries with upsert, and an LLM normalizer as a barrier against garbage input.
-- **Privacy under Russian law (152-FZ)** — physical account deletion via DB cascades, auto-deletion of inactive accounts, user content banned from logs (`@Sensitive`, a logging aspect with MDC), an opt-out header against training models on user data.
-- **Graceful LLM degradation** — a precheck for degenerate model responses, a single retry, meaningful HTTP statuses (409 "out of questions" vs 503 "AI service unavailable").
+- **Privacy under Russian law (152-FZ)** — physical account deletion via DB cascades, auto-deletion of inactive accounts, user content banned from logs (`@Sensitive`, a logging aspect with MDC), only anonymized answer texts reach the LLM provider.
+- **Graceful LLM degradation** — a precheck for degenerate model responses, a fallback parser for structured output wrapped in markdown fences, a single retry, extended SDK retries against gateway blips, meaningful HTTP statuses (409 "out of questions" vs 503 "AI service unavailable").
 - **Idempotent payments** — the Robokassa webhook confirms a payment with a conditional `UPDATE` (concurrent retries can't double-credit), the plan is credited in the same transaction, and a per-minute reconciliation job picks up lost webhooks via the provider's status API.
 
 ## 🗂 Repository Structure
@@ -178,6 +168,7 @@ sequenceDiagram
 src/                  backend (Maven, ru.workbit:workbit)
   main/resources/db/migration/   Flyway migrations
   main/proto/                    SpeechKit STT contract
+  main/resources/llm/            agent prompts (not in git — decrypted from the secrets repository)
 frontend/             SPA (React + Vite)
 docs/                 REST contract descriptions and legal documents
 .github/workflows/    CI, deploy, security scan, backups, canary (GitHub Actions)
@@ -203,7 +194,7 @@ Requirements: JDK 25, Node.js 22+, Docker.
    ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 
-   Environment variables are required (the full list lives in `application.yml`): without the Yandex keys, question generation and voice input don't work; without the SMTP password, login code emails don't arrive.
+   Environment variables are required (the full list lives in `application.yml`): without the LLM gateway URL and token, the interview and the trainer don't work; without the Yandex key, voice input doesn't work; without the SMTP password, login code emails don't arrive. Agent prompts are not in git: put them into the directory `LLM_PROMPTS_DIR` points to.
 
 3. **Frontend** (port 5173)
 
@@ -230,16 +221,17 @@ Coverage — JaCoCo on `./mvnw verify`: 87% lines, 76% branches (generated Speec
 
 | Domain | Lines | % |
 |---|---|---:|
+| `content` | `██████████` | 100% |
 | `email` | `██████████` | 100% |
 | `billing` | `██████████` | 99% |
 | `interview` | `██████████` | 98% |
-| `auth` | `██████████` | 97% |
+| `auth` | `██████████` | 98% |
 | `training` | `██████████` | 97% |
 | `security` | `█████████░` | 94% |
-| `util` | `█████████░` | 92% |
-| `llm` | `█████████░` | 91% |
-| `exception` | `████████░░` | 78% |
-| `vacancy` | `████░░░░░░` | 35% |
+| `util` | `█████████░` | 91% |
+| `llm` | `█████████░` | 87% |
+| `exception` | `████████░░` | 82% |
+| `vacancy` | `███░░░░░░░` | 31% |
 | `speech` | `██░░░░░░░░` | 19% |
 | **total** | `█████████░` | **87%** |
 
@@ -250,7 +242,7 @@ The weakly covered `vacancy` and `speech` are thin wrappers around external APIs
 ## ⚙️ CI/CD
 
 - **CI** ([`ci.yml`](.github/workflows/ci.yml)) — on PRs to `develop` and `master`: `mvn verify` (unit tests plus Testcontainers integration tests), a backend image build without a push, frontend lint, tests and build.
-- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — on push to `master`: tests, then in parallel the backend image goes to Yandex Container Registry and the frontend bundle is built, then the rollout to the VM over SSH ([`compose.prod.yml`](compose.prod.yml): postgres + backend + caddy; TLS and frontend static files served by Caddy). The rollout renders `.env` from SOPS-encrypted secrets, dumps the database beforehand, waits for the new container to become healthy and rolls back to the previous image if the backend smoke fails (`/api/v1/auth/me` must answer 401); the frontend is rsynced and checked for a canonical link, JSON-LD and an honest 404. Afterwards a separate job runs an authenticated smoke with a live LLM call, and the release job tags the version and publishes GitHub release notes.
+- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — on push to `master`: tests, backend image to Yandex Container Registry, rollout to the VM over SSH ([`compose.prod.yml`](compose.prod.yml)) with a database dump beforehand and an automatic rollback to the previous image if the smoke fails; then an authenticated smoke with a live LLM call, a version tag and release notes.
 - **Security scan** ([`security.yml`](.github/workflows/security.yml)) — weekly: Trivy over the repository dependencies and over the built backend image (CRITICAL/HIGH, fixable only), plus `npm audit` for the frontend.
 - **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — nightly `pg_dump -Fc` on the VM with a 14-day rotation.
 - **Canary** ([`canary.yml`](.github/workflows/canary.yml)) — every three hours: the home page and `/api/v1/auth/me` (401 expected), with retries; once a day the same authenticated smoke with a live LLM call.
@@ -261,7 +253,7 @@ REST contracts (human-readable API descriptions, in Russian):
 
 - [Authentication](docs/auth-api.md) — code-based login, refresh, logout, account deletion
 - [Skills trainer](docs/training-api.md) — sessions, questions, dictionary suggestions, report
-- [AI interview](docs/interview-api.md) — vacancy-based sessions, follow-ups, report, per-vacancy aggregation
+- [AI interview](docs/interview-api.md) — adaptive vacancy-based dialog, report, per-vacancy aggregation
 - [Billing](docs/billing-api.md) — plan quotas, usage history, Robokassa payments
 - [Speech recognition](docs/speech-api.md) — the STT WebSocket protocol
 

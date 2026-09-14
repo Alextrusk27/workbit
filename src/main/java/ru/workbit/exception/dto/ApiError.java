@@ -1,9 +1,8 @@
 package ru.workbit.exception.dto;
 
-import org.springframework.http.HttpStatus;
-
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 
 public record ApiError(
         String timestamp,

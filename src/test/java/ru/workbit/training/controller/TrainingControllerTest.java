@@ -1,47 +1,5 @@
 package ru.workbit.training.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import ru.workbit.security.service.UserDetailsServiceImpl;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.mockito.ArgumentCaptor;
-import ru.workbit.exception.ConflictException;
-import ru.workbit.exception.ForbiddenException;
-import ru.workbit.exception.LlmException;
-import ru.workbit.exception.NotFoundException;
-import ru.workbit.exception.PaymentRequiredException;
-import ru.workbit.exception.TooManyRequestsException;
-import ru.workbit.exception.UnprocessableEntityException;
-import ru.workbit.exception.controller.ExceptionController;
-import ru.workbit.training.dto.CreateSessionRequest;
-import ru.workbit.training.dto.FeedbackRequest;
-import ru.workbit.training.dto.NormalizeInputRequest;
-import ru.workbit.training.dto.NormalizeInputResponse;
-import ru.workbit.training.dto.ReferenceAnswerResponse;
-import ru.workbit.training.dto.TrainingOptionsResponse;
-import ru.workbit.training.dto.TrainingQuestionResponse;
-import ru.workbit.training.dto.TrainingSessionResponse;
-import ru.workbit.training.model.TrainingSession;
-import ru.workbit.training.model.TrainingUserFeedback;
-import ru.workbit.training.service.TrainingService;
-import ru.workbit.security.config.RateLimitProperties;
-import ru.workbit.security.config.SecurityConfig;
-import ru.workbit.security.model.CustomUserDetails;
-import ru.workbit.security.service.JWTService;
-import ru.workbit.security.service.RateLimiterService;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -57,6 +15,47 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
+import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.exception.UnprocessableEntityException;
+import ru.workbit.exception.controller.ExceptionController;
+import ru.workbit.security.config.RateLimitProperties;
+import ru.workbit.security.config.SecurityConfig;
+import ru.workbit.security.model.CustomUserDetails;
+import ru.workbit.security.service.JWTService;
+import ru.workbit.security.service.RateLimiterService;
+import ru.workbit.security.service.UserDetailsServiceImpl;
+import ru.workbit.training.dto.CreateSessionRequest;
+import ru.workbit.training.dto.FeedbackRequest;
+import ru.workbit.training.dto.NormalizeInputRequest;
+import ru.workbit.training.dto.NormalizeInputResponse;
+import ru.workbit.training.dto.ReferenceAnswerResponse;
+import ru.workbit.training.dto.TrainingOptionsResponse;
+import ru.workbit.training.dto.TrainingQuestionResponse;
+import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.model.TrainingSession;
+import ru.workbit.training.model.TrainingUserFeedback;
+import ru.workbit.training.service.TrainingService;
 
 @WebMvcTest(TrainingController.class)
 @Import({SecurityConfig.class, ExceptionController.class})
@@ -92,7 +91,7 @@ class TrainingControllerTest {
 
     private TrainingSessionResponse sessionResponse(String skill, String profession) {
         return new TrainingSessionResponse(
-                UUID.randomUUID(), skill, profession, TrainingSession.Level.MIDDLE, TrainingSession.Status.IN_PROGRESS,
+                UUID.randomUUID(), skill, profession, TrainingSession.Level.MEDIUM, TrainingSession.Status.IN_PROGRESS,
                 0, 10, Instant.now(), null);
     }
 
@@ -108,7 +107,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 201, Location и тело с skill/profession при валидном запросе")
         void returns201OnHappyPath() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM);
             var response = sessionResponse("Spring Boot", "Java-разработчик");
             when(trainingService.create(any(), any())).thenReturn(response);
 
@@ -128,7 +127,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда skill пустая строка")
         void returns400WhenSkillBlank() throws Exception {
             // given
-            var request = new CreateSessionRequest("", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("", "Java-разработчик", TrainingSession.Level.MEDIUM);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -144,7 +143,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда profession пустая строка")
         void returns400WhenProfessionBlank() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "", TrainingSession.Level.MEDIUM);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -160,7 +159,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда skill длиннее 100 символов")
         void returns400WhenSkillTooLong() throws Exception {
             // given
-            var request = new CreateSessionRequest("a".repeat(101), "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("a".repeat(101), "Java-разработчик", TrainingSession.Level.MEDIUM);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -176,7 +175,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 400, когда profession длиннее 100 символов")
         void returns400WhenProfessionTooLong() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "b".repeat(101), TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "b".repeat(101), TrainingSession.Level.MEDIUM);
 
             // when / then
             mvc.perform(post(BASE + "/sessions")
@@ -210,7 +209,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 401, когда нет аутентификации")
         void returns401WithoutAuthentication() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM);
 
             // when / then — эндпоинт защищён (.anyRequest().authenticated()), без токена -> 401
             mvc.perform(post(BASE + "/sessions")
@@ -225,7 +224,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 422, когда сервис не распознал навык")
         void returns422WhenSkillNotRecognized() throws Exception {
             // given
-            var request = new CreateSessionRequest("Ктулхурделла", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Ктулхурделла", "Java-разработчик", TrainingSession.Level.MEDIUM);
             when(trainingService.create(any(), any()))
                     .thenThrow(new UnprocessableEntityException("Skill not recognized"));
 
@@ -244,7 +243,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 422, когда сервис не распознал профессию")
         void returns422WhenProfessionNotRecognized() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "Астролог", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Астролог", TrainingSession.Level.MEDIUM);
             when(trainingService.create(any(), any()))
                     .thenThrow(new UnprocessableEntityException("Profession not recognized"));
 
@@ -263,7 +262,7 @@ class TrainingControllerTest {
         @DisplayName("Возвращает 402, когда квота тренировок исчерпана")
         void returns402WhenQuotaExhausted() throws Exception {
             // given
-            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE);
+            var request = new CreateSessionRequest("Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM);
             when(trainingService.create(any(), any()))
                     .thenThrow(new PaymentRequiredException("Training quota exhausted"));
 
@@ -293,7 +292,7 @@ class TrainingControllerTest {
             var response = new TrainingOptionsResponse(
                     List.of("Spring Boot", "Docker"),
                     List.of("Java-разработчик", "Frontend-разработчик"),
-                    List.of(TrainingSession.Level.JUNIOR, TrainingSession.Level.MIDDLE, TrainingSession.Level.SENIOR),
+                    List.of(TrainingSession.Level.EASY, TrainingSession.Level.MEDIUM, TrainingSession.Level.HARD),
                     10, 50, 3);
             when(trainingService.getOptions()).thenReturn(response);
 
@@ -308,7 +307,7 @@ class TrainingControllerTest {
                     .andExpect(jsonPath("$.professions[0]").value("Java-разработчик"))
                     .andExpect(jsonPath("$.professions[1]").value("Frontend-разработчик"))
                     .andExpect(jsonPath("$.levels").isArray())
-                    .andExpect(jsonPath("$.levels[0]").value("Начинающий"))
+                    .andExpect(jsonPath("$.levels[0]").value("Лёгкий"))
                     .andExpect(jsonPath("$.questionCap").value(10))
                     .andExpect(jsonPath("$.maxQuestions").value(50))
                     .andExpect(jsonPath("$.minAnswersToFinish").value(3));
@@ -844,7 +843,7 @@ class TrainingControllerTest {
         void returns200OnHappyPath() throws Exception {
             // given
             var response = new TrainingSessionResponse(
-                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE,
+                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM,
                     TrainingSession.Status.IN_PROGRESS, 10, 20, Instant.now(), null);
             when(trainingService.addQuestions(sessionId, USER_ID)).thenReturn(response);
 
@@ -942,7 +941,7 @@ class TrainingControllerTest {
         void returns200OnHappyPath() throws Exception {
             // given
             var response = new TrainingSessionResponse(
-                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MIDDLE,
+                    sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM,
                     TrainingSession.Status.CREATED, 0, 10, Instant.now(), null);
             when(trainingService.restart(sessionId, USER_ID)).thenReturn(response);
 

@@ -1,9 +1,8 @@
 package ru.workbit.billing.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.billing.model.BillingAccount;
-
 import java.time.Instant;
+import ru.workbit.billing.model.BillingAccount;
 
 public record QuotaResponse(
         @Schema(description = "Тариф", example = "FREE")

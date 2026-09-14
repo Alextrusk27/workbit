@@ -4,7 +4,7 @@ import java.util.List;
 
 public record LlmInterviewReport(
         List<LlmInterviewAnswerReview> answers,
-        String offerProbability,
+        LlmOfferProbability offerProbability,
         String overallFeedback,
         String recommendations,
         String weakestSkill

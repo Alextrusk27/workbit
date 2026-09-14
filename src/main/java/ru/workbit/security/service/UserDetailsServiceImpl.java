@@ -1,5 +1,7 @@
 package ru.workbit.security.service;
 
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -7,12 +9,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
-
-import java.util.List;
-import java.util.UUID;
+import ru.workbit.security.model.CustomUserDetails;
 
 @Service
 @RequiredArgsConstructor

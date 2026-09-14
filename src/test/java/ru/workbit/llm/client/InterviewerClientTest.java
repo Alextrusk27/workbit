@@ -75,7 +75,7 @@ class InterviewerClientTest {
     }
 
     private static LlmInterviewTurn aTurn(String answer, LlmInterviewStepKind kind, String topic, String question) {
-        return new LlmInterviewTurn(answer, new LlmInterviewStep(kind, topic, question));
+        return new LlmInterviewTurn(answer, new LlmInterviewStep(kind, question, topic));
     }
 
     private static String contentOf(List<MessageParam> dialog, int index) {
@@ -168,15 +168,15 @@ class InterviewerClientTest {
         }
 
         private void stubReply() {
-            LlmInterviewReply reply = new LlmInterviewReply(LlmInterviewStepKind.MAIN, null, null,
-                    STEP_TOPIC, "Расскажите про индексы");
-            when(claude.converse(any(), any(), any(), any(), eq(LlmInterviewReply.class))).thenReturn(reply);
+            LlmInterviewStep reply = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про индексы",
+                    STEP_TOPIC);
+            when(claude.converse(any(), any(), any(), any(), eq(LlmInterviewStep.class))).thenReturn(reply);
         }
 
         private String captureLastUser() {
             ArgumentCaptor<String> lastUserCaptor = ArgumentCaptor.forClass(String.class);
             verify(claude).converse(any(), any(), dialogCaptor.capture(), lastUserCaptor.capture(),
-                    eq(LlmInterviewReply.class));
+                    eq(LlmInterviewStep.class));
             return lastUserCaptor.getValue();
         }
 
@@ -205,7 +205,7 @@ class InterviewerClientTest {
             assertThat(lastUser).isEqualTo(
                     "Ответ кандидата: Ответ 3\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(step).isEqualTo(
-                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, STEP_TOPIC, "Расскажите про индексы"));
+                    new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про индексы", STEP_TOPIC));
         }
 
         @Test
@@ -224,7 +224,7 @@ class InterviewerClientTest {
             // then
             ArgumentCaptor<String> lastUserCaptor = ArgumentCaptor.forClass(String.class);
             verify(claude, times(2)).converse(any(), any(), dialogCaptor.capture(), lastUserCaptor.capture(),
-                    eq(LlmInterviewReply.class));
+                    eq(LlmInterviewStep.class));
 
             List<MessageParam> firstDialog = dialogCaptor.getAllValues().getFirst();
             List<MessageParam> secondDialog = dialogCaptor.getAllValues().getLast();
@@ -244,7 +244,7 @@ class InterviewerClientTest {
             interviewerClient.next(aVacancy(), plan, List.of(), "Ответ 1", ASKED_BEFORE);
 
             // then
-            verify(claude).converse(any(), openingCaptor.capture(), any(), any(), eq(LlmInterviewReply.class));
+            verify(claude).converse(any(), openingCaptor.capture(), any(), any(), eq(LlmInterviewStep.class));
             assertThat(openingCaptor.getValue()).hasSize(2).last(STRING).isEqualTo(ASKED_BEFORE);
         }
 

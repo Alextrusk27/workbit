@@ -3,10 +3,10 @@ package ru.workbit.llm.dto;
 import java.util.List;
 
 /**
- * Ответ интервьюера в схеме structured output. Схема одна на все ходы беседы, потому что входит в
- * кэшируемый префикс запроса: разные схемы на первом и последующих ходах давали бы вторую запись
- * кэша за интервью. Первый ход заполняет {@code questionCount} и {@code topics} (темы с числом
- * вопросов и видом), дальнейшие - {@code kind}; что именно спрашивать на каждом ходе, говорит промпт.
+ * Ответ интервьюера на первом ходе в схеме structured output: план ({@code questionCount} и
+ * {@code topics} - темы с числом вопросов и видом) и первый вопрос. Дальнейшие ходы идут по схеме
+ * {@link LlmInterviewStep}: обязательные поля плана на каждом ходе толкали модель к «пустому
+ * шаблону» с пустым {@code question}.
  */
 public record LlmInterviewReply(
         LlmInterviewStepKind kind,

@@ -26,7 +26,7 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
     @Query("""
             SELECT q FROM InterviewQuestion q
             WHERE q.session.id = :sessionId AND q.answered = false
-            ORDER BY q.followUp DESC, q.orderIndex DESC
+            ORDER BY q.followUp DESC, q.orderIndex
             LIMIT 1
             """)
     Optional<InterviewQuestion> findNextUnanswered(UUID sessionId);

@@ -428,7 +428,7 @@ public class InterviewService {
     private static Optional<InterviewQuestion> unanswered(InterviewSession session) {
         return session.getQuestions().stream()
                 .filter(q -> !q.isAnswered())
-                .max(Comparator.<InterviewQuestion, Boolean>comparing(InterviewQuestion::isFollowUp)
+                .min(Comparator.<InterviewQuestion, Boolean>comparing(InterviewQuestion::isFollowUp).reversed()
                         .thenComparingInt(InterviewQuestion::getOrderIndex));
     }
 

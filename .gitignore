@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 .kotlin
 *.env
+src/main/resources/llm/
 
 ### IntelliJ IDEA ###
 .idea/
@@ -42,3 +43,6 @@ CLAUDE.md
 .claude/
 .agents/
 ai-workspace/
+.mcp.json
+
+.playwright-mcp/

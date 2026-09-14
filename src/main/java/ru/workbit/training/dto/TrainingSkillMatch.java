@@ -1,8 +1,7 @@
 package ru.workbit.training.dto;
 
-import ru.workbit.training.model.TrainingSession;
-
 import java.util.UUID;
+import ru.workbit.training.model.TrainingSession;
 
 public record TrainingSkillMatch(
         UUID sessionId,

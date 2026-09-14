@@ -28,6 +28,34 @@ export function sessionHeadline(session: {
   return session.vacancyName
 }
 
+/** Имена, которыми AI-интервьюер представляется кандидату: обычные русские имена
+ *  без отчеств — собеседование тренировочное, но разговор должен читаться живым. */
+const INTERVIEWER_NAMES = [
+  'Анна',
+  'Виктор',
+  'Дарья',
+  'Егор',
+  'Ирина',
+  'Кирилл',
+  'Марина',
+  'Никита',
+  'Ольга',
+  'Павел',
+  'Светлана',
+  'Тимур',
+] as const
+
+/** Имя интервьюера для сессии. Выбор детерминирован по её id, а не случаен на
+ *  каждый рендер: иначе имя менялось бы при перезагрузке страницы и при возврате
+ *  к незаконченному интервью. Хранить его на бэке ради этого не нужно. */
+export function interviewerName(sessionId: string): string {
+  let hash = 0
+  for (let i = 0; i < sessionId.length; i++) {
+    hash = (hash * 31 + sessionId.charCodeAt(i)) | 0
+  }
+  return INTERVIEWER_NAMES[Math.abs(hash) % INTERVIEWER_NAMES.length]
+}
+
 /** Подпись под заголовком — работодатель. */
 export function sessionSubtitle(session: {
   employer: InterviewSession['employer']
@@ -35,17 +63,16 @@ export function sessionSubtitle(session: {
   return session.employer || 'Работодатель не указан'
 }
 
-/** Код уровня тренировки по требуемому опыту вакансии: строки hh.ru разложены
- *  как в грейдовом роутинге бэка, нераспознанное — начальный. */
-export type TrainingLevelCode = 'NOEXP' | 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+/** Код уровня тренировки по требуемому опыту вакансии: у тренажёра три уровня
+ *  сложности, «Нет опыта» и «От 1 года до 3 лет» ведут в лёгкий, нераспознанное — тоже. */
+export type TrainingLevelCode = 'EASY' | 'MEDIUM' | 'HARD'
 
 export function trainingLevelCode(
   experience: string | null,
 ): TrainingLevelCode {
-  if (experience === 'Нет опыта') return 'NOEXP'
-  if (experience === 'От 3 до 6 лет') return 'MIDDLE'
-  if (experience === 'Более 6 лет') return 'SENIOR'
-  return 'JUNIOR'
+  if (experience === 'От 3 до 6 лет') return 'MEDIUM'
+  if (experience === 'Более 6 лет') return 'HARD'
+  return 'EASY'
 }
 
 /** Тон для подсветки вероятности оффера. В палитре нет красного, поэтому

@@ -1,5 +1,14 @@
 package ru.workbit.training.service;
 
+import static ru.workbit.training.service.TrainingSessions.answeredSorted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionCompleted;
+import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -10,6 +19,8 @@ import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
+import ru.workbit.llm.dto.LlmTrainingCaseReview;
+import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.training.dto.TrainingReportResponse;
 import ru.workbit.training.dto.TrainingSessionResponse;
 import ru.workbit.training.model.TrainingFeedback;
@@ -20,19 +31,7 @@ import ru.workbit.training.model.mapper.TrainingReportMapper;
 import ru.workbit.training.model.mapper.TrainingSessionMapper;
 import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
-import ru.workbit.llm.dto.LlmTrainingCaseReview;
-import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.util.DictText;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-
-import static ru.workbit.training.service.TrainingSessions.answeredSorted;
-import static ru.workbit.training.service.TrainingSessions.checkSessionCompleted;
-import static ru.workbit.training.service.TrainingSessions.checkSessionNotCompleted;
 
 @Component
 @Slf4j

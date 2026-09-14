@@ -1,5 +1,8 @@
 package ru.workbit.auth.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -9,10 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.email.AccountDeletionWarningEmailEvent;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
 
 @Service
 @Slf4j

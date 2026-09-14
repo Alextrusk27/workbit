@@ -2,10 +2,9 @@ package ru.workbit.speech.client;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import yandex.cloud.api.ai.stt.v3.Stt;
-
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Открытая сессия распознавания: отправляющая половина gRPC-стрима.

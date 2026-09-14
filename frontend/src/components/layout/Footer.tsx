@@ -42,6 +42,7 @@ export function Footer() {
                 © {new Date(__BUILD_TS__).getFullYear()} Workbit. Все права
                 защищены.
               </span>
+              <span>v{__APP_VERSION__}</span>
               {import.meta.env.DEV && (
                 <Link
                   to="/brand"

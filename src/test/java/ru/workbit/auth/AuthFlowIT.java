@@ -1,5 +1,10 @@
 package ru.workbit.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,12 +28,6 @@ import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.service.JWTService;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 @Import(AuthTestConfig.class)
@@ -41,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.mail.from-mail=noreply@workbit.ru",
         "app.mail.base-url=https://workbit.ru",
         "spring.mail.host=localhost",
-        "spring.mail.port=25"
+        "spring.mail.port=25",
+        "llm.gateway.base-url=http://localhost"
 })
 @DisplayName("AuthFlowIT")
 class AuthFlowIT extends AbstractPostgresIT {

@@ -6,7 +6,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 public record RequestCodeRequest(
-        @Schema(description = "Email, на который отправить код (незнакомый — заводит нового пользователя)", example = "user@example.com")
+        @Schema(
+                description = "Email, на который отправить код (незнакомый — заводит нового пользователя)",
+                example = "user@example.com")
         @NotBlank
         @Email
         String email,

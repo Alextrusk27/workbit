@@ -1,12 +1,11 @@
 package ru.workbit.auth.service;
 
-import org.springframework.stereotype.Component;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import org.springframework.stereotype.Component;
 
 /**
  * Генерация случайных токенов и их SHA-256-хэширование.

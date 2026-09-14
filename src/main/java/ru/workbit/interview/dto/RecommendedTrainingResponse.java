@@ -1,7 +1,6 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.util.UUID;
 
 public record RecommendedTrainingResponse(
@@ -18,13 +17,19 @@ public record RecommendedTrainingResponse(
                 allowableValues = {"CREATED", "IN_PROGRESS", "COMPLETED"})
         String trainingStatus,
 
-        @Schema(description = "Средняя оценка завершённой тренировки, null пока тренировка не завершена", example = "4.2")
+        @Schema(
+                description = "Средняя оценка завершённой тренировки, null пока тренировка не завершена",
+                example = "4.2")
         Double trainingScore,
 
-        @Schema(description = "Количество отвеченных основных вопросов тренировки, null если тренировка не начата", example = "4")
+        @Schema(
+                description = "Количество отвеченных основных вопросов тренировки, null если тренировка не начата",
+                example = "4")
         Integer answeredCount,
 
-        @Schema(description = "Общее количество основных вопросов тренировки, null если тренировка не начата", example = "10")
+        @Schema(
+                description = "Общее количество основных вопросов тренировки, null если тренировка не начата",
+                example = "10")
         Integer totalQuestions
 ) {
 }

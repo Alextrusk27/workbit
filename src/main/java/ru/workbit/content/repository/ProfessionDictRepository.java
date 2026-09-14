@@ -1,15 +1,14 @@
 package ru.workbit.content.repository;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 public interface ProfessionDictRepository extends JpaRepository<@NotNull ProfessionDict, @NotNull UUID> {
 

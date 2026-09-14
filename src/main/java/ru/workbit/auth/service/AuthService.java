@@ -1,20 +1,22 @@
 package ru.workbit.auth.service;
 
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.auth.dto.*;
+import ru.workbit.auth.dto.RequestCodeRequest;
+import ru.workbit.auth.dto.TokenResponse;
+import ru.workbit.auth.dto.UserResponse;
+import ru.workbit.auth.dto.VerifyCodeRequest;
+import ru.workbit.auth.model.User;
+import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
-import ru.workbit.auth.model.User;
-import ru.workbit.auth.repository.UserJPARepository;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -51,15 +53,20 @@ public class AuthService {
     }
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
-    public TokenResponse verifyCode(VerifyCodeRequest request) {
+    public VerifyCodeResult verifyCode(VerifyCodeRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid code"));
         loginCodeService.consume(user, request.code());
 
+        boolean newUser = !user.isEmailVerified();
         user.setEmailVerified(true);
         TokenResponse tokens = issueTokens(user);
-        log.info("Login success uid={}", user.getId());
-        return tokens;
+        log.info("Login success uid={} newUser={}", user.getId(), newUser);
+        return new VerifyCodeResult(tokens, newUser);
+    }
+
+    /** Результат входа по коду: токены для cookie и признак первой авторизации (регистрации). */
+    public record VerifyCodeResult(TokenResponse tokens, boolean newUser) {
     }
 
     @Transactional

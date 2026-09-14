@@ -1,15 +1,14 @@
 package ru.workbit.auth.service;
 
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.auth.model.RefreshToken;
+import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.RefreshTokenJPARepository;
 import ru.workbit.exception.BadCredentialsException;
-import ru.workbit.auth.model.User;
-
-import java.time.Instant;
 
 /**
  * Жизненный цикл refresh-токенов: выпуск, ротация (с детектом повторного

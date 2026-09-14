@@ -22,7 +22,7 @@ import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
 import { usePageTitle } from '@/lib/usePageTitle'
 
-const LEVEL_CODES = ['NOEXP', 'JUNIOR', 'MIDDLE', 'SENIOR']
+const LEVEL_CODES = ['EASY', 'MEDIUM', 'HARD']
 
 const fromQuery = (value: string | null) => (value ?? '').slice(0, 100)
 

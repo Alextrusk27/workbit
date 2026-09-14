@@ -1,14 +1,25 @@
 package ru.workbit.interview.model;
 
 import com.fasterxml.jackson.annotation.JsonValue;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.Size;
-import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
-
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "report", schema = "interview")
@@ -59,20 +70,6 @@ public class InterviewReport {
 
         OfferProbability(String name) {
             this.name = name;
-        }
-
-        public static Optional<OfferProbability> fromString(String value) {
-            if (value == null) {
-                return Optional.empty();
-            }
-            String normalized = value.trim();
-            for (OfferProbability probability : values()) {
-                if (probability.name().equalsIgnoreCase(normalized)
-                        || probability.name.equalsIgnoreCase(normalized)) {
-                    return Optional.of(probability);
-                }
-            }
-            return Optional.empty();
         }
     }
 }

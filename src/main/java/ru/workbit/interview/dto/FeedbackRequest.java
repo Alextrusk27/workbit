@@ -3,9 +3,8 @@ package ru.workbit.interview.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import ru.workbit.interview.model.InterviewUserFeedback;
-
 import java.util.List;
+import ru.workbit.interview.model.InterviewUserFeedback;
 
 public record FeedbackRequest(
         @Schema(description = "Оценка разбора", example = "DOWN")

@@ -1,15 +1,14 @@
 package ru.workbit.billing.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import ru.workbit.billing.model.Payment;
 import ru.workbit.billing.repository.PaymentRepository;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor

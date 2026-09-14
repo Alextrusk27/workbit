@@ -1,10 +1,9 @@
 package ru.workbit.exception.controller;
 
-import ru.workbit.exception.*;
-import tools.jackson.core.exc.StreamReadException;
-import tools.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import java.util.Collections;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
@@ -17,10 +16,19 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import ru.workbit.exception.BadCredentialsException;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.ForbiddenException;
+import ru.workbit.exception.InternalServerException;
+import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NotFoundException;
+import ru.workbit.exception.PaymentRequiredException;
+import ru.workbit.exception.TooManyRequestsException;
+import ru.workbit.exception.UnprocessableEntityException;
+import ru.workbit.exception.VacancyFetchException;
 import ru.workbit.exception.dto.ApiError;
-
-import java.util.Collections;
-import java.util.List;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 @RestControllerAdvice
 @Slf4j
@@ -44,8 +52,9 @@ public class ExceptionController {
                     .toList();
 
             case MethodArgumentTypeMismatchException mtm -> {
-                String typeName = mtm.getRequiredType() != null ?
-                        mtm.getRequiredType().getName() : "unknown";
+                String typeName = mtm.getRequiredType() != null
+                        ? mtm.getRequiredType().getName()
+                        : "unknown";
                 yield List.of("Parameter '%s' should be of type %s".formatted(mtm.getName(), typeName));
             }
 

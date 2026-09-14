@@ -18,7 +18,7 @@ import {
   type InterviewQuestion,
   type InterviewSession,
 } from '@/features/interview/api'
-import { sessionSubtitle } from '@/features/interview/labels'
+import { interviewerName, sessionSubtitle } from '@/features/interview/labels'
 import {
   useFinishInterview,
   useInterviewSession,
@@ -84,6 +84,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
     'loading' | 'idle' | 'done' | 'error'
   >('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [closingRemark, setClosingRemark] = useState<string | null>(null)
 
   const submit = useSubmitInterviewAnswer()
   const finish = useFinishInterview()
@@ -114,6 +115,10 @@ function SessionRun({ session }: { session: InterviewSession }) {
       setLoadState('idle')
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
+        const fresh = await interviewApi
+          .getSession(session.id)
+          .catch(() => null)
+        setClosingRemark(fresh?.closingRemark ?? null)
         setLoadState('done')
       } else {
         setLoadState('error')
@@ -175,6 +180,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
   }
 
   const finishing = loadState === 'done'
+  const interviewer = interviewerName(session.id)
 
   return (
     <Container>
@@ -199,7 +205,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
       <ChatShell
         className="mt-6"
-        name="AI-интервьюер"
+        name={`AI-интервьюер — ${interviewer}`}
+        avatarUrl={session.employerLogoUrl}
         status={finishing ? 'формируем разбор' : 'интервью идёт'}
         bodyRef={bodyRef}
         bodyClassName="h-[min(56svh,500px)]"
@@ -211,6 +218,12 @@ function SessionRun({ session }: { session: InterviewSession }) {
           />
         }
       >
+        <ChatBubble role="bot">
+          Добрый день! Меня зовут {interviewer}, я проведу профессиональную
+          часть собеседования. Это вопросы на темы, понимание которых нужно для
+          вакансии «{session.vacancyName}».
+        </ChatBubble>
+
         {items.map((item) => (
           <ChatMessages key={item.q.questionId} item={item} items={items} />
         ))}
@@ -224,8 +237,8 @@ function SessionRun({ session }: { session: InterviewSession }) {
         {finishing && !finish.isError && (
           <ChatBubble role="bot" who="Интервью завершено">
             <Spinner className="mr-2.5" />
-            Спасибо, это был последний вопрос. Формирую разбор: оценки по
-            каждому ответу, правки и вероятность оффера…
+            {closingRemark ?? 'Спасибо, это был последний вопрос.'} Формирую
+            разбор: оценки по каждому ответу, правки и вероятность оффера…
           </ChatBubble>
         )}
       </ChatShell>

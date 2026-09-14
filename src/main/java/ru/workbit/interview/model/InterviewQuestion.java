@@ -1,11 +1,24 @@
 package ru.workbit.interview.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
-
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "question", schema = "interview")
@@ -32,6 +45,14 @@ public class InterviewQuestion {
     @Column(nullable = false, updatable = false)
     private String text;
 
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(nullable = false, updatable = false)
+    private Kind kind = Kind.MAIN;
+
+    @Column(updatable = false)
+    private String topic;
+
     @Column(nullable = false, updatable = false)
     private int orderIndex;
 
@@ -51,4 +72,8 @@ public class InterviewQuestion {
 
     @Column
     private Instant answeredAt;
+
+    public enum Kind {
+        MAIN, FOLLOW_UP, CLARIFICATION, REDIRECT
+    }
 }

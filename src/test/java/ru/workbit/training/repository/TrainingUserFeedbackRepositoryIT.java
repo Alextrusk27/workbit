@@ -1,5 +1,9 @@
 package ru.workbit.training.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,11 +16,6 @@ import ru.workbit.auth.model.User;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
 import ru.workbit.training.model.TrainingUserFeedback;
-
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -42,7 +41,7 @@ class TrainingUserFeedbackRepositoryIT extends AbstractPostgresIT {
                 .userId(userId)
                 .skill("Spring Core")
                 .profession("Java-разработчик")
-                .level(TrainingSession.Level.JUNIOR)
+                .level(TrainingSession.Level.EASY)
                 .build();
     }
 

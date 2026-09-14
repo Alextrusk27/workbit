@@ -1,10 +1,9 @@
 package ru.workbit.billing.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.workbit.billing.model.UsageEvent;
-
 import java.time.Instant;
 import java.util.List;
+import ru.workbit.billing.model.UsageEvent;
 
 public record UsageResponse(
         @Schema(description = "Счётчик интервью текущего тарифа")
@@ -38,7 +37,7 @@ public record UsageResponse(
             @Schema(description = "Величина операции, всегда положительная", example = "1")
             int delta,
 
-            @Schema(description = "Описание операции для показа пользователю", example = "Тренировка — Java, Уверенный")
+            @Schema(description = "Описание операции для показа пользователю", example = "Тренировка — Java, Средний")
             String label
     ) {
     }

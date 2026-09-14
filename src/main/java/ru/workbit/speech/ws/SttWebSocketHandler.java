@@ -1,5 +1,8 @@
 package ru.workbit.speech.ws;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,10 +18,6 @@ import ru.workbit.speech.client.SttSession;
 import ru.workbit.speech.dto.SttEvent;
 import ru.workbit.speech.dto.SttResult;
 import tools.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Мост между браузером и SpeechKit: бинарные фреймы с аудио уходят в распознавание,

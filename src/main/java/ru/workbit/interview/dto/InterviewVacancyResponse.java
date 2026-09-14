@@ -1,10 +1,9 @@
 package ru.workbit.interview.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
-
-import java.time.Instant;
 
 public record InterviewVacancyResponse(
         @Schema(description = "Идентификатор вакансии", example = "123456")
@@ -28,7 +27,9 @@ public record InterviewVacancyResponse(
         @Schema(description = "Количество завершённых интервью по вакансии", example = "3")
         int completedCount,
 
-        @Schema(description = "Лучшая средняя оценка среди завершённых интервью, null если завершённых нет", example = "4.0")
+        @Schema(
+                description = "Лучшая средняя оценка среди завершённых интервью, null если завершённых нет",
+                example = "4.0")
         Double bestScore,
 
         @Schema(description = "Вероятность оффера лучшей попытки, null если завершённых интервью нет")

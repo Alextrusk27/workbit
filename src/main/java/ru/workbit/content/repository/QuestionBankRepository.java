@@ -1,12 +1,11 @@
 package ru.workbit.content.repository;
 
+import java.util.List;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.content.model.BankQuestion;
-
-import java.util.List;
-import java.util.UUID;
 
 public interface QuestionBankRepository extends JpaRepository<@NotNull BankQuestion, @NotNull UUID> {
 

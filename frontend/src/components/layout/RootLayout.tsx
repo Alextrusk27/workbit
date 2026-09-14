@@ -1,14 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { CookieConsent } from '@/components/CookieConsent'
-
-declare global {
-  interface Window {
-    ym?: (id: number, action: string, ...params: unknown[]) => void
-  }
-}
-
-const METRIKA_ID = 111653697
+import { METRIKA_ID } from '@/lib/metrika'
 
 /** Корневая обёртка над всеми группами роутов: сюда вешаем то, что должно быть
  *  на любой странице (баннер cookie, хиты Метрики). */

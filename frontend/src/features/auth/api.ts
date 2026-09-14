@@ -6,6 +6,11 @@ export interface UserResponse {
   created: string
 }
 
+/** Ответ `POST /auth/verify-code`: `newUser` — первая авторизация (регистрация). */
+export interface VerifyCodeResponse {
+  newUser: boolean
+}
+
 export const authApi = {
   requestCode: (
     email: string,
@@ -18,7 +23,7 @@ export const authApi = {
     }),
 
   verifyCode: (email: string, code: string) =>
-    apiFetch<void>('/auth/verify-code', {
+    apiFetch<VerifyCodeResponse>('/auth/verify-code', {
       method: 'POST',
       body: { email, code },
     }),

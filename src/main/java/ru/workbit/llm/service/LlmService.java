@@ -1,60 +1,74 @@
 package ru.workbit.llm.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import ru.workbit.llm.client.LlmClient;
-import ru.workbit.llm.dto.*;
+import ru.workbit.llm.client.InterviewerClient;
+import ru.workbit.llm.client.NormalizerClient;
+import ru.workbit.llm.client.QuestionGeneratorClient;
+import ru.workbit.llm.client.ReferenceAnswerClient;
+import ru.workbit.llm.client.ReviewerClient;
+import ru.workbit.llm.client.TrainingReviewerClient;
+import ru.workbit.llm.dto.LlmInputNormalization;
+import ru.workbit.llm.dto.LlmInputNormalizationRequest;
+import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewPlan;
+import ru.workbit.llm.dto.LlmInterviewReport;
+import ru.workbit.llm.dto.LlmInterviewStep;
+import ru.workbit.llm.dto.LlmInterviewTurn;
+import ru.workbit.llm.dto.LlmInterviewVacancy;
+import ru.workbit.llm.dto.LlmTrainingQuestions;
+import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
+import ru.workbit.llm.dto.LlmTrainingReport;
+import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import ru.workbit.util.annotation.Loggable;
-
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class LlmService {
-    private final LlmClient llm;
+    private final InterviewerClient interviewer;
+    private final ReviewerClient reviewer;
+    private final NormalizerClient normalizer;
+    private final QuestionGeneratorClient questionGenerator;
+    private final ReferenceAnswerClient referenceAnswer;
+    private final TrainingReviewerClient trainingReviewer;
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmTrainingQuestions generateTrainingQuestions(String grade, LlmTrainingQuestionsRequest request) {
-        return llm.call("training-question-generator-" + grade, request, LlmTrainingQuestions.class);
+    public LlmTrainingQuestions generateTrainingQuestions(LlmTrainingQuestionsRequest request) {
+        return questionGenerator.generate(request);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReport createTrainingReport(LlmTrainingReportRequest request) {
-        return llm.call("training-reviewer", Map.of("JSON_STRING", request), LlmTrainingReport.class);
+        return trainingReviewer.review(request);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmTrainingReferenceAnswer createReferenceAnswer(LlmTrainingReferenceAnswerRequest request) {
-        return llm.call("training-reference-answer", request, LlmTrainingReferenceAnswer.class);
+        return referenceAnswer.create(request);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewQuestions generateInterviewQuestions(String experience, LlmInterviewQuestionsRequest request) {
-        return llm.call("interview-question-generator-" + experienceGrade(experience), request, LlmInterviewQuestions.class);
+    public LlmInterviewPlan planInterview(LlmInterviewVacancy vacancy, String askedBefore) {
+        return interviewer.plan(vacancy, askedBefore);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewFollowUpDecision decideInterviewFollowUp(String experience, LlmInterviewFollowUpRequest request) {
-        return llm.call("interview-follow-up-" + experienceGrade(experience), request, LlmInterviewFollowUpDecision.class);
+    public LlmInterviewStep nextInterviewStep(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
+                                              List<LlmInterviewTurn> history, String lastAnswer,
+                                              String askedBefore) {
+        return interviewer.next(vacancy, plan, history, lastAnswer, askedBefore);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
-    public LlmInterviewReport createInterviewReport(String experience, LlmInterviewReportRequest request) {
-        return llm.call("interview-reviewer-" + experienceGrade(experience), Map.of("JSON_STRING", request), LlmInterviewReport.class);
+    public LlmInterviewReport createInterviewReport(LlmInterviewVacancy vacancy, List<LlmInterviewAnswer> answers) {
+        return reviewer.review(vacancy, answers);
     }
 
     @Loggable(level = "DEBUG", logArgs = true, logResult = true)
     public LlmInputNormalization normalizeInput(LlmInputNormalizationRequest request) {
-        return llm.call("input-normalizer", request, LlmInputNormalization.class);
-    }
-
-    private static String experienceGrade(String experience) {
-        return switch (experience == null ? "" : experience) {
-            case "Нет опыта" -> "exp0";
-            case "От 1 года до 3 лет" -> "exp1";
-            case "От 3 до 6 лет" -> "exp3";
-            case "Более 6 лет" -> "exp6";
-            default -> "exp1";
-        };
+        return normalizer.normalize(request);
     }
 }

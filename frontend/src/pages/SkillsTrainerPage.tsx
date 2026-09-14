@@ -485,6 +485,17 @@ export function SkillsTrainerPage() {
               </Reveal>
             ))}
           </div>
+          <Reveal>
+            <p className="text-muted mt-7 text-center text-[15px]">
+              Что спрашивают на самом деле — разбираем по профессиям:{' '}
+              <Link
+                to="/interview-questions/sales-manager"
+                className="text-indigo hover:text-violet transition-colors"
+              >
+                вопросы на собеседовании менеджера по продажам
+              </Link>
+            </p>
+          </Reveal>
         </Container>
       </section>
 

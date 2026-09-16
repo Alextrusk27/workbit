@@ -245,6 +245,7 @@ The weakly covered `vacancy` and `speech` are thin wrappers around external APIs
 - **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — on push to `master`: tests, backend image to Yandex Container Registry, rollout to the VM over SSH ([`compose.prod.yml`](compose.prod.yml)) with a database dump beforehand and an automatic rollback to the previous image if the smoke fails; then an authenticated smoke with a live LLM call, a version tag and release notes.
 - **Security scan** ([`security.yml`](.github/workflows/security.yml)) — weekly: Trivy over the repository dependencies and over the built backend image (CRITICAL/HIGH, fixable only), plus `npm audit` for the frontend.
 - **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — nightly `pg_dump -Fc` on the VM with a 14-day rotation.
+- **Branches and releases** — how `master`/`develop`, hotfixes and the repository settings the pipeline relies on work: [`CONTRIBUTING.md`](CONTRIBUTING.md) (in Russian).
 - **Canary** ([`canary.yml`](.github/workflows/canary.yml)) — every three hours: the home page and `/api/v1/auth/me` (401 expected), with retries; once a day the same authenticated smoke with a live LLM call.
 
 ## 📚 Documentation

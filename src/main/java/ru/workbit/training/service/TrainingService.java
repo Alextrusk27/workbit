@@ -67,6 +67,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.training.repository.TrainingUserFeedbackRepository;
 import ru.workbit.util.DictText;
+import ru.workbit.util.SingleFlight;
 
 @Service
 @RequiredArgsConstructor
@@ -91,12 +92,23 @@ public class TrainingService {
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
     private final QuotaService quotaService;
+    private final SingleFlight singleFlight;
 
     private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingQuestionMapper trainingQuestionMapper;
     private final TrainingReportMapper trainingReportMapper;
 
     public TrainingSessionResponse create(CreateSessionRequest request, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("training.create", List.of(
+                        userId,
+                        DictText.normalize(request.skill()),
+                        DictText.normalize(request.profession()),
+                        request.level())),
+                () -> createSession(request, userId));
+    }
+
+    private TrainingSessionResponse createSession(CreateSessionRequest request, UUID userId) {
         quotaService.checkTrainingAvailable(userId);
 
         TrainingSession session = trainingSessionMapper.toEntity(request);
@@ -194,6 +206,12 @@ public class TrainingService {
      * заданные вопросы. Ни одного нового вопроса — 409: предлагать по этому навыку и уровню нечего.
      */
     public TrainingSessionResponse addQuestions(UUID sessionId, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("training.more", List.of(sessionId, userId)),
+                () -> appendQuestions(sessionId, userId));
+    }
+
+    private TrainingSessionResponse appendQuestions(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
@@ -264,6 +282,12 @@ public class TrainingService {
      * живьём — генерируется по первому запросу и кешируется, чтобы повторный показ не стоил вызова LLM.
      */
     public ReferenceAnswerResponse getReferenceAnswer(UUID sessionId, UUID questionId, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("training.reference-answer", List.of(sessionId, questionId, userId)),
+                () -> loadOrGenerateReferenceAnswer(sessionId, questionId, userId));
+    }
+
+    private ReferenceAnswerResponse loadOrGenerateReferenceAnswer(UUID sessionId, UUID questionId, UUID userId) {
         TrainingQuestion question = trainingQuestionRepository.findWithSessionById(questionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
 
@@ -289,6 +313,12 @@ public class TrainingService {
     }
 
     public TrainingReportResponse createReport(UUID sessionId, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("training.finish", List.of(sessionId, userId)),
+                () -> generateReport(sessionId, userId));
+    }
+
+    private TrainingReportResponse generateReport(UUID sessionId, UUID userId) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));

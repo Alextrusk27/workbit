@@ -35,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -86,6 +87,7 @@ import ru.workbit.training.repository.TrainingQuestionRepository;
 import ru.workbit.training.repository.TrainingSessionRepository;
 import ru.workbit.training.repository.TrainingUserFeedbackRepository;
 import ru.workbit.util.DictText;
+import ru.workbit.util.SingleFlight;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TrainingServiceTest")
@@ -118,6 +120,8 @@ class TrainingServiceTest {
     TrainingQuestionMapper trainingQuestionMapper;
     @Mock
     TrainingReportMapper trainingReportMapper;
+    @Spy
+    SingleFlight singleFlight = new SingleFlight();
 
     @InjectMocks
     TrainingService trainingService;
@@ -1036,6 +1040,23 @@ class TrainingServiceTest {
             verifyNoInteractions(trainingSessionMapper, llmService, trainingWriter, questionBankRepository,
                     professionDictRepository, skillDictRepository);
         }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом training.create из нормализованного ввода")
+        void goesThroughSingleFlightWithKeyFromNormalizedInput() {
+            // given
+            CreateSessionRequest request = new CreateSessionRequest(
+                    "  Spring   Boot ", "Java‑разработчик", TrainingSession.Level.MEDIUM);
+            doThrow(new PaymentRequiredException("Training quota exhausted"))
+                    .when(quotaService).checkTrainingAvailable(userId);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.create(request, userId))
+                    .isInstanceOf(PaymentRequiredException.class);
+
+            verify(singleFlight).run(eq(new SingleFlight.Key(
+                    "training.create", List.of(userId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM))), any());
+        }
     }
 
     @Nested
@@ -1655,6 +1676,19 @@ class TrainingServiceTest {
                     .hasMessage("Paid plan required");
             verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
         }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом training.more (sessionId, userId)")
+        void goesThroughSingleFlightWithSessionAndUserKey() {
+            // given
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class);
+
+            verify(singleFlight).run(eq(new SingleFlight.Key("training.more", List.of(sessionId, userId))), any());
+        }
     }
 
     @Nested
@@ -2068,6 +2102,24 @@ class TrainingServiceTest {
                     .hasMessage("Reference answer is not available");
             verifyNoInteractions(trainingWriter);
         }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом training.reference-answer (sessionId, questionId, userId)")
+        void goesThroughSingleFlightWithSessionQuestionAndUserKey() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, "Кешированный эталонный ответ");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when
+            trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
+
+            // then
+            verify(singleFlight).run(eq(new SingleFlight.Key(
+                    "training.reference-answer", List.of(sessionId, question.getId(), userId))), any());
+        }
     }
 
     @Nested
@@ -2277,6 +2329,21 @@ class TrainingServiceTest {
                     .isInstanceOf(LlmException.class);
             verify(llmService, times(2)).createTrainingReport(any());
             verify(trainingWriter).completeReport(sessionId, secondDegenerate);
+        }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом training.finish (sessionId, userId)")
+        void goesThroughSingleFlightWithSessionAndUserKey() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class);
+
+            verify(singleFlight).run(eq(new SingleFlight.Key("training.finish", List.of(sessionId, userId))), any());
         }
     }
 

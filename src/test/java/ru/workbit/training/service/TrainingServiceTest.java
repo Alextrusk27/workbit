@@ -2132,19 +2132,25 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Сессия уже завершена - ConflictException")
-        void throwsWhenSessionCompleted() {
+        @DisplayName("Сессия уже завершена - отдаёт готовый отчёт, LLM и запись не трогаются")
+        void returnsExistingReportWhenSessionCompleted() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             session.setStatus(TrainingSession.Status.COMPLETED);
+            session.setQuestions(List.of());
+            TrainingReport report = TrainingReport.builder().id(UUID.randomUUID()).trainingSession(session).build();
+            session.setReport(report);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingReportMapper.toResponse(eq(report), eq(session), any())).thenReturn(expectedResponse);
 
-            // when / then
-            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Session already finished");
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isSameAs(expectedResponse);
             verifyNoInteractions(llmService, trainingWriter);
         }
 
@@ -2166,24 +2172,33 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("completeReport бросает DataIntegrityViolationException - ConflictException")
-        void throwsConflictWhenCompleteReportHitsConcurrentConflict() {
+        @DisplayName("completeReport бросает DataIntegrityViolationException - отдаёт отчёт, записанный победителем")
+        void returnsWinnersReportWhenCompleteReportHitsConcurrentConflict() {
             // given
             UUID sessionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
             session.setQuestions(List.of(aQuestion(1), aQuestion(2), aQuestion(3)));
-            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            TrainingSession completed = aSession(sessionId, userId, PROFESSION);
+            completed.setStatus(TrainingSession.Status.COMPLETED);
+            completed.setQuestions(List.of());
+            TrainingReport report = TrainingReport.builder().id(UUID.randomUUID()).trainingSession(completed).build();
+            completed.setReport(report);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId))
+                    .thenReturn(Optional.of(session), Optional.of(completed));
 
             LlmTrainingReport llmReport = usableReport(3);
             when(llmService.createTrainingReport(any())).thenReturn(llmReport);
             when(trainingWriter.completeReport(sessionId, llmReport))
                     .thenThrow(new DataIntegrityViolationException("session already completed concurrently"));
+            TrainingReportResponse expectedResponse = mock(TrainingReportResponse.class);
+            when(trainingReportMapper.toResponse(eq(report), eq(completed), any())).thenReturn(expectedResponse);
 
-            // when / then
-            assertThatThrownBy(() -> trainingService.createReport(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessage("Session already finished");
+            // when
+            var result = trainingService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isSameAs(expectedResponse);
         }
 
         @Test

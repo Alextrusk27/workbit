@@ -67,6 +67,7 @@ import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import ru.workbit.llm.dto.LlmOfferProbability;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.util.SingleFlight;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.model.VacancySnapshot;
@@ -105,6 +106,8 @@ class InterviewServiceTest {
     InterviewReportMapper interviewReportMapper;
     @Spy
     ObjectMapper objectMapper = new JsonMapper();
+    @Spy
+    SingleFlight singleFlight = new SingleFlight();
 
     @InjectMocks
     InterviewService interviewService;
@@ -726,6 +729,33 @@ class InterviewServiceTest {
                     .isInstanceOf(PaymentRequiredException.class)
                     .hasMessage("Interview quota exhausted");
             verifyNoInteractions(llmService, interviewWriter);
+        }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом interview.create (userId, vacancyUrl)")
+        void goesThroughSingleFlightWithUserAndVacancyUrlKey() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            LlmInterviewPlan rawPlan = new LlmInterviewPlan(8,
+                    List.of(aTopic("SOLID", 5, LlmInterviewTopicKind.CORE),
+                            aTopic("Java Core", 3, LlmInterviewTopicKind.STANDARD)),
+                    "SOLID", "Расскажите про SOLID");
+            when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 8);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(singleFlight).run(eq(new SingleFlight.Key(
+                    "interview.create", List.of(userId, vacancyUrl))), any());
         }
     }
 
@@ -1375,6 +1405,23 @@ class InterviewServiceTest {
             verify(llmService).nextInterviewStep(any(), planCaptor.capture(), any(), any(), any());
             assertThat(planCaptor.getValue().topics()).isNull();
         }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом interview.next (sessionId, userId)")
+        void goesThroughSingleFlightWithSessionAndUserKey() {
+            // given
+            InterviewSession session = activeSession(5);
+            InterviewQuestion unansweredMain = aMain(UUID.randomUUID(), 2, false, false);
+            session.setQuestions(List.of(unansweredMain));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            when(interviewQuestionMapper.toDto(unansweredMain)).thenReturn(mock(InterviewQuestionResponse.class));
+
+            // when
+            interviewService.nextQuestion(sessionId, userId);
+
+            // then
+            verify(singleFlight).run(eq(new SingleFlight.Key("interview.next", List.of(sessionId, userId))), any());
+        }
     }
 
     @Nested
@@ -1984,6 +2031,26 @@ class InterviewServiceTest {
                     .isInstanceOf(LlmException.class);
             verify(llmService, times(2)).createInterviewReport(any(), any());
             verify(interviewWriter).completeReport(sessionId, secondDegenerate);
+        }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом interview.finish (sessionId, userId)")
+        void goesThroughSingleFlightWithSessionAndUserKey() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.COMPLETED,
+                    vacancySnapshotId, 2);
+            session.setQuestions(List.of());
+            InterviewReport report = InterviewReport.builder().id(UUID.randomUUID()).build();
+            session.setReport(report);
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            when(interviewReportMapper.toResponse(eq(report), eq(session), any()))
+                    .thenReturn(mock(InterviewReportResponse.class));
+
+            // when
+            interviewService.createReport(sessionId, userId);
+
+            // then
+            verify(singleFlight).run(eq(new SingleFlight.Key("interview.finish", List.of(sessionId, userId))), any());
         }
     }
 

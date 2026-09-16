@@ -49,6 +49,7 @@ import ru.workbit.llm.dto.LlmInterviewTopicKind;
 import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import ru.workbit.llm.service.LlmService;
+import ru.workbit.util.SingleFlight;
 import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.service.VacancyService;
@@ -72,6 +73,7 @@ public class InterviewService {
     private final VacancyService vacancyService;
     private final LlmService llmService;
     private final QuotaService quotaService;
+    private final SingleFlight singleFlight;
 
     private final InterviewSessionMapper interviewSessionMapper;
     private final InterviewQuestionMapper interviewQuestionMapper;
@@ -79,6 +81,12 @@ public class InterviewService {
     private final ObjectMapper objectMapper;
 
     public InterviewSessionResponse createSession(String vacancyUrl, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("interview.create", List.of(userId, vacancyUrl)),
+                () -> startSession(vacancyUrl, userId));
+    }
+
+    private InterviewSessionResponse startSession(String vacancyUrl, UUID userId) {
         VacancyData vacancyData = vacancyService.fetch(vacancyUrl);
         List<UUID> snapshotIds = vacancyService.getSnapshotIds(vacancyData.sourceId());
 
@@ -103,6 +111,12 @@ public class InterviewService {
     }
 
     public InterviewQuestionResponse nextQuestion(UUID sessionId, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("interview.next", List.of(sessionId, userId)),
+                () -> loadOrAskNextQuestion(sessionId, userId));
+    }
+
+    private InterviewQuestionResponse loadOrAskNextQuestion(UUID sessionId, UUID userId) {
         InterviewSession session = interviewSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
@@ -167,6 +181,12 @@ public class InterviewService {
     }
 
     public InterviewReportResponse createReport(UUID sessionId, UUID userId) {
+        return singleFlight.run(
+                new SingleFlight.Key("interview.finish", List.of(sessionId, userId)),
+                () -> generateReport(sessionId, userId));
+    }
+
+    private InterviewReportResponse generateReport(UUID sessionId, UUID userId) {
         InterviewSession session = interviewSessionRepository.findWithQuestionsById(sessionId)
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));

@@ -245,6 +245,7 @@ Caddyfile             конфиг reverse proxy
 - **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — на push в `master`: тесты, образ бэкенда в Yandex Container Registry, выкладка на VM по SSH ([`compose.prod.yml`](compose.prod.yml)) с дампом БД перед обновлением и автооткатом на предыдущий образ, если не прошёл smoke; затем авторизованный smoke с живым вызовом LLM, тег версии и release notes.
 - **Security scan** ([`security.yml`](.github/workflows/security.yml)) — еженедельно: Trivy по зависимостям репозитория и по собранному образу бэкенда (CRITICAL/HIGH, только исправимые) плюс `npm audit` для фронтенда.
 - **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — ночной `pg_dump -Fc` на VM с ротацией за 14 дней.
+- **Ветки и релизы** — правила работы с `master`/`develop`, хотфиксами и настройки репозитория, на которые опирается пайплайн: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - **Canary** ([`canary.yml`](.github/workflows/canary.yml)) — каждые три часа: главная страница и `/api/v1/auth/me` (ожидается 401), с повторами; раз в сутки — тот же авторизованный smoke с живым вызовом LLM.
 
 ## 📚 Документация

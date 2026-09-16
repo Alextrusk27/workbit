@@ -13,7 +13,7 @@
 
     <groupId>ru.workbit</groupId>
     <artifactId>workbit</artifactId>
-    <version>1.4.4-SNAPSHOT</version>
+    <version>1.4.5-SNAPSHOT</version>
 
     <properties>
         <java.version>25</java.version>

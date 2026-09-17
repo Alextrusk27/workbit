@@ -241,8 +241,9 @@ Caddyfile             конфиг reverse proxy
 
 ## ⚙️ CI/CD
 
-- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — на PR в `develop` и `master`: `mvn verify` (юнит-тесты и интеграционные на Testcontainers), сборка образа бэкенда без публикации, линт, тесты и сборка фронтенда.
-- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — на push в `master`: тесты, образ бэкенда в Yandex Container Registry, выкладка на VM по SSH ([`compose.prod.yml`](compose.prod.yml)) с дампом БД перед обновлением и автооткатом на предыдущий образ, если не прошёл smoke; затем авторизованный smoke с живым вызовом LLM, тег версии и release notes.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — на PR в `develop` и `master`: `mvn verify` (юнит-тесты и интеграционные на Testcontainers), сборка образа бэкенда без публикации, линт, тесты и сборка фронтенда; джоба `changes` запускает джобы бэкенда и фронтенда только при изменении их путей.
+- **Deploy** ([`deploy.yml`](.github/workflows/deploy.yml)) — на push в `master` (кроме правок только фронтенда и документации): тесты, образ бэкенда в Yandex Container Registry, выкладка на VM по SSH ([`compose.prod.yml`](compose.prod.yml)) с дампом БД перед обновлением и автооткатом на предыдущий образ, если не прошёл smoke; затем авторизованный smoke с живым вызовом LLM, тег версии и release notes, обратное слияние `master` в `develop` и следующая snapshot-версия.
+- **Deploy frontend** ([`deploy-frontend.yml`](.github/workflows/deploy-frontend.yml)) — на push в `master`, задевший только фронтенд или юридические документы в `docs/`: линт, тесты и сборка, preflight-проверка, что бэкенд на проде соответствует `HEAD`, rsync `dist` на VM, smoke и обратное слияние выкаченного коммита в `develop`. Push, задевший ещё и бэкенд-пути, оставляется полному Deploy.
 - **Security scan** ([`security.yml`](.github/workflows/security.yml)) — еженедельно: Trivy по зависимостям репозитория и по собранному образу бэкенда (CRITICAL/HIGH, только исправимые) плюс `npm audit` для фронтенда.
 - **DB backup** ([`backup.yml`](.github/workflows/backup.yml)) — ночной `pg_dump -Fc` на VM с ротацией за 14 дней.
 - **Ветки и релизы** — правила работы с `master`/`develop`, хотфиксами и настройки репозитория, на которые опирается пайплайн: [`CONTRIBUTING.md`](CONTRIBUTING.md).

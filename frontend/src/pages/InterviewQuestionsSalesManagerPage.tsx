@@ -6,6 +6,7 @@ import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { useAuth } from '@/features/auth/useAuth'
+import { trainingPath } from '@/lib/trainingPath'
 
 const PROFESSION = 'Менеджер по продажам'
 
@@ -173,14 +174,6 @@ const tricky = [
   },
 ]
 
-function trainingPath(skill: string, level: 'EASY' | 'MEDIUM'): string {
-  return `/app/training/new?${new URLSearchParams({
-    profession: PROFESSION,
-    skill,
-    level,
-  }).toString()}`
-}
-
 function Section({
   id,
   title,
@@ -251,9 +244,11 @@ function TrainLink({
 
 export function InterviewQuestionsSalesManagerPage() {
   const { isAuthenticated } = useAuth()
-  const objectionsEasy = trainingPath('Работа с возражениями', 'EASY')
-  const objectionsMedium = trainingPath('Работа с возражениями', 'MEDIUM')
-  const stagesEasy = trainingPath('Этапы продаж', 'EASY')
+  const train = (skill: string, level: 'EASY' | 'MEDIUM') =>
+    trainingPath({ profession: PROFESSION, skill, level })
+  const objectionsEasy = train('Работа с возражениями', 'EASY')
+  const objectionsMedium = train('Работа с возражениями', 'MEDIUM')
+  const stagesEasy = train('Этапы продаж', 'EASY')
   const guard = (target: string) => (isAuthenticated ? target : '/login')
 
   return (

@@ -1,4 +1,5 @@
 import { faq } from '@/content/faq'
+import { seo as home } from '@/content/pages/home'
 import { plans } from '@/content/plans'
 
 export const SITE = 'https://workbit.ru'
@@ -20,10 +21,12 @@ function price(value: string): string {
 export const seoPages: SeoPage[] = [
   {
     path: '/',
-    title: 'Тренажёр собеседований с AI: бесплатный старт | Workbit',
-    description:
-      'Тренажёр собеседований с AI — симулятор реального интервью: пробное собеседование по вакансии с hh.ru и тренировка навыка. Разбор ответов и честная оценка шансов на оффер.',
-    sources: ['frontend/src/pages/HomePage.tsx', 'frontend/src/content/faq.ts'],
+    ...home,
+    sources: [
+      'frontend/src/content/pages/home.ts',
+      'frontend/src/content/plans.ts',
+      'frontend/src/content/faq.ts',
+    ],
     jsonLd: () => [
       {
         '@context': 'https://schema.org',

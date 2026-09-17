@@ -1,0 +1,213 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'frontend/**'
+      - '!frontend/README.md'
+      - '!frontend/runtime/**'
+      - 'docs/offer.md'
+      - 'docs/privacy-policy.md'
+      - 'docs/user-agreement.md'
+      - '.github/workflows/deploy-frontend.yml'
+      - '.github/scripts/upload-frontend.sh'
+      - '.github/scripts/frontend-smoke.sh'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only check the prod state, no build and no rollout'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  BACKEND_PATHS: src pom.xml Dockerfile .dockerignore compose.prod.yml Caddyfile
+
+concurrency:
+  group: ${{ inputs.dry_run && 'deploy-dry-run' || 'deploy' }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.mixed.outputs.skip }}
+    steps:
+      - name: Refuse to deploy from a non-master ref
+        run: |
+          [ "$GITHUB_REF" = refs/heads/master ] || { echo "deploy only from master, got $GITHUB_REF"; exit 1; }
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Leave a mixed push to the full Deploy
+        id: mixed
+        if: github.event_name == 'push'
+        run: |
+          before='${{ github.event.before }}'
+          if [[ "$before" =~ ^0+$ ]]; then
+            echo "::notice::branch was just created, backend paths not compared"
+            exit 0
+          fi
+          if ! git cat-file -e "$before^{commit}"; then
+            echo "::notice::previous head $before is unknown (force push?), backend paths not compared"
+            exit 0
+          fi
+          if [ -n "$(git diff --name-only "$before" "$GITHUB_SHA" -- $BACKEND_PATHS)" ]; then
+            echo "::notice::backend paths changed, the full Deploy carries the frontend"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: gate
+    if: ${{ needs.gate.outputs.skip != 'true' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check version
+        run: bash .github/scripts/version.sh get
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: frontend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Test
+        run: npm test
+        working-directory: frontend
+
+      - name: Build
+        run: APP_BUILD="${GITHUB_SHA::7}" npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SMARTCAPTCHA_SITEKEY: ${{ vars.VITE_SMARTCAPTCHA_SITEKEY }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: frontend/dist
+          retention-days: 1
+
+  preflight:
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Check prod against HEAD
+        run: |
+          state=$(ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<'EOF'
+          set -euo pipefail
+          deployed=$(docker inspect -f '{{.Config.Image}}' backend | sed 's/.*://')
+          html=$(curl -sf --resolve workbit.ru:443:127.0.0.1 https://workbit.ru/) \
+            || { echo "prod frontend does not answer" >&2; exit 1; }
+          served=$(printf '%s' "$html" | sed -n 's/.*app-build" content="\([^"]*\)".*/\1/p')
+          echo "$deployed"
+          echo "$served"
+          EOF
+          )
+          deployed=$(echo "$state" | sed -n 1p)
+          served=$(echo "$state" | sed -n 2p)
+          echo "prod backend image: $deployed, prod frontend build: ${served:-none}"
+          git cat-file -e "$deployed^{commit}" \
+            || { echo "backend image on prod is built from unknown commit $deployed"; exit 1; }
+          git merge-base --is-ancestor "$deployed" "$GITHUB_SHA" \
+            || { echo "backend on prod ($deployed) is newer than HEAD: this is a re-run of an old run"; exit 1; }
+          if [ -n "$(git diff --name-only "$deployed" "$GITHUB_SHA" -- $BACKEND_PATHS)" ]; then
+            echo "backend on prod ($deployed) is behind HEAD on backend paths, run the full Deploy first: gh workflow run deploy.yml"
+            exit 1
+          fi
+          if [ -n "$served" ]; then
+            git cat-file -e "$served^{commit}" \
+              || { echo "frontend on prod is build '$served' of unknown origin (manual build?), refusing to deploy over it"; exit 1; }
+            git merge-base --is-ancestor "$served" "$GITHUB_SHA" \
+              || { echo "frontend on prod ($served) is newer than HEAD: this is a re-run of an old run"; exit 1; }
+          fi
+
+  deploy:
+    needs: [ build, preflight ]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://workbit.ru
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Upload frontend
+        run: |
+          SSH_KEY=~/.ssh/id_deploy \
+          SSH_DEST="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          bash .github/scripts/upload-frontend.sh
+
+      - name: Smoke test frontend
+        run: |
+          version=$(bash .github/scripts/version.sh get)
+          bash .github/scripts/frontend-smoke.sh "${version%-SNAPSHOT}" "${GITHUB_SHA::7}"
+
+  merge-back:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Merge the rolled-out commit into develop
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin develop
+          git checkout -B develop origin/develop
+          git merge "$GITHUB_SHA" -m "chore: merge master into develop after frontend rollout" \
+            || { echo "::error::merge conflict, merge master into develop by hand: $(git diff --name-only --diff-filter=U | xargs)"; exit 1; }
+          git push origin develop

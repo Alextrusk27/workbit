@@ -3,6 +3,24 @@ name: Deploy
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - 'frontend/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'README.ru.md'
+      - 'CONTRIBUTING.md'
+      - 'LICENSE'
+      - 'run/**'
+      - 'docker-compose.yml'
+      - '.github/dependabot.yml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/canary.yml'
+      - '.github/workflows/backup.yml'
+      - '.github/workflows/security.yml'
+      - '.github/workflows/deploy-frontend.yml'
+      - '.github/workflows/deploy-runtime.yml'
+      - '.github/scripts/upload-frontend.sh'
+      - '.github/scripts/frontend-smoke.sh'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +29,7 @@ permissions:
 concurrency:
   group: deploy
   cancel-in-progress: false
+  queue: max
 
 env:
   IMAGE: cr.yandex/${{ vars.YC_REGISTRY_ID }}/workbit-backend
@@ -24,13 +43,13 @@ jobs:
         run: |
           [ "$GITHUB_REF" = refs/heads/master ] || { echo "deploy only from master, got $GITHUB_REF"; exit 1; }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check version
         run: bash .github/scripts/version.sh check
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
@@ -44,9 +63,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Login to Yandex Container Registry
         uses: yc-actions/yc-cr-login@ee42362bcacb854964afa3a3180ca8ae6dd388f8 # v3.0.2
@@ -54,7 +73,7 @@ jobs:
           yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -68,11 +87,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -87,13 +107,13 @@ jobs:
         working-directory: frontend
 
       - name: Build
-        run: npm run build
+        run: APP_BUILD="${GITHUB_SHA::7}" npm run build
         working-directory: frontend
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_SMARTCAPTCHA_SITEKEY: ${{ vars.VITE_SMARTCAPTCHA_SITEKEY }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: frontend/dist
@@ -107,9 +127,9 @@ jobs:
       name: production
       url: https://workbit.ru
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -231,37 +251,14 @@ jobs:
 
       - name: Upload frontend
         run: |
-          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
-            dist/assets/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/assets/"
-          ls dist/assets | ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "cd /opt/workbit/www/assets && xargs -r -d '\n' touch --"
-          rsync -az --delete --exclude assets -e "ssh -i ~/.ssh/id_deploy" \
-            dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/workbit/www/"
-          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "find /opt/workbit/www/assets -type f -mtime +14 -delete"
+          SSH_KEY=~/.ssh/id_deploy \
+          SSH_DEST="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          bash .github/scripts/upload-frontend.sh
 
       - name: Smoke test frontend
         run: |
-          html=$(curl -sf https://workbit.ru/) || { echo "index.html is not served"; exit 1; }
-          echo "$html" | grep -q 'id="root"' || { echo "served HTML has no app root"; exit 1; }
-          expected=$(bash .github/scripts/version.sh get)
-          expected="${expected%-SNAPSHOT}"
-          served=$(echo "$html" | sed -n 's|.*<meta name="app-version" content="\([^"]*\)".*|\1|p')
-          [ "$served" = "$expected" ] \
-            || { echo "frontend serves version '$served', expected '$expected'"; exit 1; }
-          echo "frontend version $served"
-          asset=$(echo "$html" | grep -o '/assets/[^"]*\.js' | head -1)
-          [ -n "$asset" ] || { echo "no js bundle referenced in index.html"; exit 1; }
-          ctype=$(curl -s -o /dev/null -w '%{content_type}' "https://workbit.ru$asset")
-          case "$ctype" in
-            *javascript*) echo "frontend is up ($asset)" ;;
-            *) echo "bundle $asset served as '$ctype' instead of javascript"; exit 1 ;;
-          esac
-          echo "$html" | grep -q 'rel="canonical"' || { echo "no canonical on /"; exit 1; }
-          curl -s https://workbit.ru/pricing | grep -q 'application/ld+json' || { echo "no json-ld on /pricing"; exit 1; }
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://workbit.ru/definitely-missing)
-          [ "$code" = "404" ] || { echo "soft 404: /definitely-missing answered $code"; exit 1; }
-          echo "seo checks passed"
+          version='${{ steps.version.outputs.version }}'
+          bash .github/scripts/frontend-smoke.sh "${version%-SNAPSHOT}" "${GITHUB_SHA::7}"
 
   verify:
     needs: deploy
@@ -269,7 +266,7 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Prepare SSH
         run: |
@@ -292,7 +289,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -326,16 +323,32 @@ jobs:
           name: Workbit ${{ steps.version.outputs.release }}
           generate_release_notes: true
 
-      - name: Open the next snapshot on develop
-        if: steps.tag.outputs.created
+      - name: Sync develop
         run: |
+          release='${{ steps.version.outputs.release }}'
           next='${{ steps.version.outputs.next }}'
           git fetch origin develop
           git checkout -B develop origin/develop
-          bash .github/scripts/version.sh set "$next"
-          if git diff --quiet; then
-            echo "::notice::develop is already on $next"
-          else
+
+          merge_failed=
+          if ! git merge -m "chore: merge master into develop after release" "$GITHUB_SHA"; then
+            merge_failed=$(git diff --name-only --diff-filter=U | sort | xargs)
+            merge_failed="${merge_failed:-(git merge failed without conflict markers)}"
+            git merge --abort 2>/dev/null || true
+          fi
+
+          current=$(bash .github/scripts/version.sh get)
+          current="${current%-SNAPSHOT}"
+          if [ "$(printf '%s\n%s\n' "$current" "$release" | sort -V | tail -1)" = "$release" ]; then
+            bash .github/scripts/version.sh set "$next"
             git commit -am "chore: start $next"
-            git push origin develop
+          else
+            echo "::notice::develop is already on $current-SNAPSHOT, above the released $release"
+          fi
+
+          git push origin develop
+
+          if [ -n "$merge_failed" ]; then
+            echo "::error::master is not merged into develop: $merge_failed. Tag is set; merge master into develop by hand"
+            exit 1
           fi

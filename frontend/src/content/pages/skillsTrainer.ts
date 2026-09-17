@@ -1,4 +1,4 @@
-import type { Cta, Hero } from '@/content/types'
+import type { Cta, Hero, PageSeo } from '@/content/types'
 
 export type SkillsTrainerIcon = 'role' | 'clock' | 'chart'
 
@@ -61,7 +61,7 @@ export interface SkillsTrainerContent {
   cta: { title: string; body: string; primary: Cta; note: string }
 }
 
-export const seo = {
+export const seo: PageSeo = {
   title: 'Тренажёр с вопросами и ответами ИИ для собеседования | Workbit',
   description:
     'Вопросы на собеседовании с ответами ИИ: десять вопросов по навыку — от разработки до бухгалтерии и права. Подготовка к техническому собеседованию и не только.',

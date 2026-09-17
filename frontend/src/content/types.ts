@@ -1,3 +1,8 @@
+export interface PageSeo {
+  title: string
+  description: string
+}
+
 export interface Hero {
   lead: string
   accent?: string

@@ -4,7 +4,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble'
 import { TypingDots } from '@/components/chat/TypingDots'
 import { Stars } from '@/components/ui/Stars'
 import { IconMic, IconSend } from '@/components/marketing/icons'
-import { heroChatScenarios } from '@/content/demo/heroChat'
+import { heroChatLabel, heroChatScenarios } from '@/content/demo/heroChat'
 import { motionConfig } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
@@ -47,7 +47,6 @@ function Wave() {
  *  ответа — один элемент, содержимое меняется на месте, иначе смена выглядит
  *  прыжком. */
 export function HeroChatDemo() {
-  const animated = motionConfig.shouldAnimate({ essential: true })
   const [phase, setPhase] = useState<Phase>('switch')
   const [scene, setScene] = useState(0)
   const [fading, setFading] = useState(false)
@@ -56,10 +55,6 @@ export function HeroChatDemo() {
   const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!animated) {
-      setPhase('review')
-      return
-    }
     const root = rootRef.current
     if (!root) return
     const observer = new IntersectionObserver(([entry]) =>
@@ -67,10 +62,15 @@ export function HeroChatDemo() {
     )
     observer.observe(root)
     return () => observer.disconnect()
-  }, [animated])
+  }, [])
 
   useEffect(() => {
-    if (!animated || !visible) return
+    if (!visible) return
+    if (!motionConfig.shouldAnimate({ essential: true })) {
+      setFading(false)
+      setPhase('review')
+      return
+    }
     let cancelled = false
 
     const sleep = (ms: number) =>
@@ -116,7 +116,7 @@ export function HeroChatDemo() {
     return () => {
       cancelled = true
     }
-  }, [animated, visible])
+  }, [visible])
 
   const recording = phase === 'recording'
   const current = heroChatScenarios[scene]
@@ -126,7 +126,7 @@ export function HeroChatDemo() {
       ref={rootRef}
       role="img"
       className="overflow-anchor-none"
-      aria-label="Пример интервью: вопросы для интернет-маркетолога, бухгалтера и Python-разработчика, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой"
+      aria-label={heroChatLabel}
     >
       <div aria-hidden>
         <ChatShell

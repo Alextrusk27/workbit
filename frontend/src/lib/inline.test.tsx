@@ -50,4 +50,8 @@ describe('inline', () => {
       `${STRONG}Что проверяют</strong> — и ${ROUTER_LINK('/faq')}зачем</a> это нужно`,
     )
   })
+
+  it('пустую строку отдаёт как null, чтобы guard на children её отсекал', () => {
+    expect(inline('')).toBeNull()
+  })
 })

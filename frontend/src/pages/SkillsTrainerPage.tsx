@@ -16,8 +16,8 @@ import {
 } from '@/content/pages/skillsTrainer'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
+import { ctaLink, type CtaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
-import { trainingPath } from '@/lib/trainingPath'
 
 const icons: Record<SkillsTrainerIcon, typeof IconRole> = {
   role: IconRole,
@@ -26,9 +26,6 @@ const icons: Record<SkillsTrainerIcon, typeof IconRole> = {
 }
 
 const { hero, flow, report, reference, start, audience, cta } = skillsTrainer
-
-const target = (c: Cta) =>
-  'to' in c ? c.to : 'start' in c ? '/app/training/new' : trainingPath(c.train)
 
 function ThumbUpIcon() {
   return (
@@ -164,13 +161,7 @@ function ReferenceDemo() {
   )
 }
 
-function VacancyDemo({
-  trainTo,
-  trainState,
-}: {
-  trainTo: string
-  trainState: unknown
-}) {
+function VacancyDemo({ train }: { train: CtaLink }) {
   const { vacancy } = start
   return (
     <div className="border-line bg-card shadow-chat rounded-xl border px-6 py-5.5">
@@ -217,8 +208,7 @@ function VacancyDemo({
             <span className="flex items-center gap-3">
               <Stars value={vacancy.weak.score} />
               <Link
-                to={trainTo}
-                state={trainState}
+                {...train}
                 className="text-indigo hover:text-violet text-[12.5px] font-semibold whitespace-nowrap transition-colors"
               >
                 {vacancy.weak.cta.label}
@@ -233,9 +223,8 @@ function VacancyDemo({
 
 export function SkillsTrainerPage() {
   const { isAuthenticated } = useAuth()
-  const guard = (path: string) => (isAuthenticated ? path : '/login')
-  const trainTo = target(start.vacancy.weak.cta)
-  const startTo = target(cta.primary)
+  const link = (c: Cta) =>
+    ctaLink(c, { start: '/app/training/new', isAuthenticated })
 
   return (
     <>
@@ -346,7 +335,7 @@ export function SkillsTrainerPage() {
                 </div>
                 <p className="mt-6 text-[15px]">
                   <Link
-                    to={target(start.link)}
+                    {...link(start.link)}
                     className="text-indigo hover:text-violet font-semibold transition-colors"
                   >
                     {start.link.label}
@@ -354,10 +343,7 @@ export function SkillsTrainerPage() {
                 </p>
               </div>
 
-              <VacancyDemo
-                trainTo={guard(trainTo)}
-                trainState={{ from: { pathname: trainTo } }}
-              />
+              <VacancyDemo train={link(start.vacancy.weak.cta)} />
             </div>
           </Reveal>
         </Container>
@@ -398,8 +384,7 @@ export function SkillsTrainerPage() {
               actions={
                 <div className="flex flex-col items-center">
                   <Link
-                    to={guard(startTo)}
-                    state={{ from: { pathname: startTo } }}
+                    {...link(cta.primary)}
                     className={buttonClasses({ className: 'px-7' })}
                   >
                     {cta.primary.label}

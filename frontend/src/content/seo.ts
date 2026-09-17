@@ -1,5 +1,7 @@
+import { rubrics } from '@/content/articles'
 import { faq } from '@/content/faq'
 import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
+import { seo as blogSeo } from '@/content/pages/blog'
 import { seo as homeSeo } from '@/content/pages/home'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
@@ -105,13 +107,27 @@ export const seoPages: SeoPage[] = [
     ],
   },
   {
-    path: '/interview-questions/sales-manager',
-    title:
-      'Вопросы на собеседовании менеджера по продажам: что спрашивают и как отвечать | Workbit',
-    description:
-      'Какие вопросы задают менеджеру по продажам на собеседовании и что хотят услышать: этапы сделки, возражения, холодные звонки, ролевая игра. Разбор с нуля и тренировка с ИИ.',
-    sources: ['frontend/src/pages/InterviewQuestionsSalesManagerPage.tsx'],
+    path: '/blog',
+    ...blogSeo,
+    sources: [
+      'frontend/src/content/pages/blog.ts',
+      'frontend/src/content/articles/index.ts',
+      ...Object.keys(rubrics).map(
+        (rubric) => `frontend/src/content/articles/${rubric}/index.ts`,
+      ),
+    ],
   },
+  ...Object.entries(rubrics).flatMap(([rubric, { entries }]) =>
+    entries.map(({ slug, title, description }) => ({
+      path: `/blog/${rubric}/${slug}`,
+      title,
+      description,
+      sources: [
+        `frontend/src/content/articles/${rubric}/index.ts`,
+        `frontend/src/content/articles/${rubric}/${slug}.ts`,
+      ],
+    })),
+  ),
   {
     path: '/privacy',
     title: 'Политика конфиденциальности | Workbit',

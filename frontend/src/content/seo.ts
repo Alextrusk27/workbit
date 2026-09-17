@@ -1,5 +1,6 @@
 import { faq } from '@/content/faq'
 import { seo as home } from '@/content/pages/home'
+import { seo as skillsTrainer } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
 
 export const SITE = 'https://workbit.ru'
@@ -53,10 +54,8 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/skills-trainer',
-    title: 'Тренажёр с вопросами и ответами ИИ для собеседования | Workbit',
-    description:
-      'Вопросы на собеседовании с ответами ИИ: десять вопросов по навыку — от разработки до бухгалтерии и права. Подготовка к техническому собеседованию и не только.',
-    sources: ['frontend/src/pages/SkillsTrainerPage.tsx'],
+    ...skillsTrainer,
+    sources: ['frontend/src/content/pages/skillsTrainer.ts'],
   },
   {
     path: '/faq',

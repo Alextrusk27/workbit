@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -82,6 +83,8 @@ function metaBlock(page, canonical) {
 }
 
 function lastmod(sources) {
+  const missing = sources.find((s) => !existsSync(join(repoRoot, s)))
+  if (missing) throw new Error(`Source ${missing} does not exist`)
   try {
     const out = execFileSync(
       'git',

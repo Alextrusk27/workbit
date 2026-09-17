@@ -16,6 +16,7 @@ const links = [
   { label: 'Тренажёр навыков', to: '/skills-trainer' },
   { label: 'Тарифы', to: '/pricing' },
   { label: 'FAQ', to: '/faq' },
+  { label: 'Блог', to: '/blog' },
 ]
 
 function navLinkClass(isActive: boolean): string {

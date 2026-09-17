@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
@@ -9,6 +10,19 @@ const { version } = JSON.parse(
 ) as { version: string }
 
 const appVersion = version.replace('-SNAPSHOT', '')
+const appBuild = process.env.APP_BUILD ?? 'dev'
+
+function commitTime(): number {
+  try {
+    const seconds = Number(
+      execFileSync('git', ['log', '-1', '--format=%ct'], {
+        encoding: 'utf8',
+      }).trim(),
+    )
+    if (seconds > 0) return seconds * 1000
+  } catch {}
+  return Date.now()
+}
 
 const versionMeta: Plugin = {
   name: 'app-version-meta',
@@ -20,6 +34,11 @@ const versionMeta: Plugin = {
         attrs: { name: 'app-version', content: appVersion },
         injectTo: 'head' as const,
       },
+      {
+        tag: 'meta',
+        attrs: { name: 'app-build', content: appBuild },
+        injectTo: 'head' as const,
+      },
     ],
   },
 }
@@ -28,7 +47,7 @@ const versionMeta: Plugin = {
 export default defineConfig({
   plugins: [react(), tailwindcss(), versionMeta],
   define: {
-    __BUILD_TS__: JSON.stringify(Date.now()),
+    __BUILD_TS__: JSON.stringify(commitTime()),
     __APP_VERSION__: JSON.stringify(appVersion),
   },
   server: {

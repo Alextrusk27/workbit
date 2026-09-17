@@ -24,9 +24,10 @@
 2. **В `master` и `develop` не коммитят и не пушат напрямую.** Локальные `master` и
    `develop` — зеркала origin. Новая ветка:
    `git fetch && git switch -c <имя> --no-track origin/<база>`, первый push —
-   `git push -u origin HEAD`. Единственное исключение — обратное слияние
-   `master → develop` после хотфикса, пока его не делает CI: локальный
-   `git merge origin/master` в `develop` и push либо кнопка Update branch на релизном PR.
+   `git push -u origin HEAD`. Обратное слияние `master → develop` после выката делает CI.
+   Единственное исключение — когда CI его не сделал (красный шаг слияния либо push в
+   `master` не запустил ни одного пайплайна): локальный `git merge origin/master` в
+   `develop` и push либо кнопка Update branch на релизном PR.
 
 3. **PR мержится только merge-коммитом.** Squash и rebase выключены в настройках репо.
 
@@ -35,15 +36,16 @@
    должен быть влит в `develop`.
 
 5. **Хотфикс — ветка от `origin/master`, PR в `master`, первым коммитом
-   `bash .github/scripts/version.sh set X.Y.(Z+1)-SNAPSHOT`.** Сразу после выката —
-   обратное слияние в `develop`; конфликт на строке версии решается в пользу `develop`.
+   `bash .github/scripts/version.sh set X.Y.(Z+1)-SNAPSHOT`.** Бамп ведёт его полным
+   `Deploy` с тегом; правка только фронта или `docs/*.md` идёт без бампа и без тега.
+   Конфликт при обратном слиянии решается руками, версия — в пользу `develop`.
 
 6. **Минорный или мажорный бамп в `develop` — отдельный PR (`chore: start X.Y.0-SNAPSHOT`)
    сразу перед релизным**, не тогда, когда в работе хотфикс.
 
-7. **Откат — только revert-коммитом через PR в `master`.** Старые run'ы `Deploy` не
-   перезапускают, `workflow_dispatch` запускают только с `master`. Прод меняется только
-   пайплайном.
+7. **Откат — только revert-коммитом через PR в `master`.** Старые run'ы `Deploy` и
+   `Deploy frontend` не перезапускают, `workflow_dispatch` запускают только с `master`.
+   Прод меняется только пайплайном.
 
 8. **Dependabot мержится только в `develop`.** Security-PR, которые GitHub открывает в
    `master`, перенацелить на `develop` (Edit → base), не закрывать.
@@ -62,9 +64,9 @@ branches и Automatically delete head branches включены.
 **Settings → Rules → Rulesets** (bypass пустой):
 
 - `master`: Restrict deletions, Block force pushes, Require a pull request (approvals 0,
-  merge method — только Merge), Require status checks — `checkstyle`, `test`, `docker`,
-  `frontend` (джобы `ci.yml`). «Require branches to be up to date» включается, когда CI
-  начнёт сам вливать `master` в `develop`.
+  merge method — только Merge), Require status checks — `changes`, `checkstyle`, `test`,
+  `docker`, `frontend` (джобы `ci.yml`; без `changes` пропущенные джобы считаются
+  зелёными), Require branches to be up to date.
 - `develop`: Restrict deletions, Block force pushes. Без Require a pull request: CI пушит
   в `develop` от `GITHUB_TOKEN`.
 

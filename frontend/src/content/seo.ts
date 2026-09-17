@@ -1,4 +1,5 @@
 import { faq } from '@/content/faq'
+import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as homeSeo } from '@/content/pages/home'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
@@ -47,10 +48,8 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/ai-interview',
-    title: 'Собеседование с нейросетью по вакансии с hh.ru | Workbit',
-    description:
-      'Пробное мок-интервью по ссылке с hh.ru: полная сессия вопросов под требования вакансии, ответы текстом или голосом, фидбек с оценками в конце.',
-    sources: ['frontend/src/pages/AiInterviewPage.tsx'],
+    ...aiInterviewSeo,
+    sources: ['frontend/src/content/pages/aiInterview.ts'],
   },
   {
     path: '/skills-trainer',

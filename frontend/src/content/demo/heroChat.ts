@@ -6,6 +6,9 @@ export interface HeroChatScenario {
   score: number
 }
 
+export const heroChatLabel =
+  'Пример интервью: вопросы для интернет-маркетолога, бухгалтера и Python-разработчика, голосовой ответ кандидата и разбор рецензента в отчёте с оценкой'
+
 /** Сценарии крутятся по кругу — по одному на цикл анимации. */
 export const heroChatScenarios: HeroChatScenario[] = [
   {

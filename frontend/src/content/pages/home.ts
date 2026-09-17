@@ -1,4 +1,4 @@
-import type { Cta, Hero } from '@/content/types'
+import type { Cta, Hero, PageSeo } from '@/content/types'
 
 export type HomeIcon = 'role' | 'pencil' | 'chart' | 'clock'
 
@@ -49,7 +49,7 @@ export interface HomeContent {
   }
 }
 
-export const seo = {
+export const seo: PageSeo = {
   title: 'Тренажёр собеседований с AI: бесплатный старт | Workbit',
   description:
     'Тренажёр собеседований с AI — симулятор реального интервью: пробное собеседование по вакансии с hh.ru и тренировка навыка. Разбор ответов и честная оценка шансов на оффер.',

@@ -16,6 +16,7 @@ describe('реестр статей', () => {
   it('каждая запись загружает тело статьи', async () => {
     for (const { entries } of Object.values(rubrics)) {
       for (const entry of entries) {
+        expect(entry.published).toMatch(/^\d{4}-\d{2}-\d{2}$/)
         const { article } = await entry.load()
         expect(article.hero.lead).toBeTruthy()
       }

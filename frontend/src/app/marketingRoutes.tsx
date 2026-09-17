@@ -26,7 +26,7 @@ export const marketingRoute: RouteObject = {
       path: 'blog/:rubric/:slug',
       loader: async ({ params }) => {
         const entry = findArticle(params.rubric, params.slug)
-        return entry ? (await entry.load()).article : null
+        return entry ? { entry, article: (await entry.load()).article } : null
       },
       element: <ArticlePage />,
     },

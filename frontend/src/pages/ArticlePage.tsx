@@ -6,7 +6,12 @@ import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import type { Article, ArticleBlock } from '@/content/articles/types'
+import type {
+  Article,
+  ArticleBlock,
+  ArticleEntry,
+} from '@/content/articles/types'
+import { blog } from '@/content/pages/blog'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { ctaLink, type CtaLink } from '@/lib/cta'
@@ -117,17 +122,37 @@ function Block({ block, resolve }: { block: ArticleBlock; resolve: Resolve }) {
 }
 
 export function ArticlePage() {
-  const article = useLoaderData() as Article | null
+  const data = useLoaderData() as {
+    entry: ArticleEntry
+    article: Article
+  } | null
   const { isAuthenticated } = useAuth()
-  if (!article) return <NotFoundPage />
+  if (!data) return <NotFoundPage />
 
-  const { hero, intro, sections, cta } = article
+  const { published } = data.entry
+  const { hero, intro, sections, cta } = data.article
   const resolve: Resolve = (c) =>
     ctaLink(c, { start: '/app/training/new', isAuthenticated })
 
   return (
     <>
-      <PageHero title={<HeroTitle hero={hero} />}>{inline(intro)}</PageHero>
+      <PageHero
+        title={<HeroTitle hero={hero} />}
+        back={{ to: '/blog', label: blog.back }}
+      >
+        <span className="text-dim text-[14.5px]">
+          {blog.author} ·{' '}
+          <time dateTime={published}>
+            {new Date(published).toLocaleDateString('ru-RU', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              timeZone: 'UTC',
+            })}
+          </time>
+        </span>
+        {intro && <span className="mt-2 block">{inline(intro)}</span>}
+      </PageHero>
 
       {sections.map((s) => (
         <Section key={s.id} id={s.id} title={s.title}>
@@ -142,6 +167,7 @@ export function ArticlePage() {
           <Reveal>
             <CtaPanel
               title={cta.title}
+              wide
               actions={
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex flex-wrap justify-center gap-3.5">
@@ -163,7 +189,9 @@ export function ArticlePage() {
                       </Link>
                     )}
                   </div>
-                  <p className="text-dim text-[13.5px]">{inline(cta.note)}</p>
+                  {cta.note && (
+                    <p className="text-dim text-[13.5px]">{inline(cta.note)}</p>
+                  )}
                 </div>
               }
             >

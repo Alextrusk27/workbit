@@ -58,12 +58,26 @@ export function BlogPage() {
                     className="border-line bg-card hover:border-line-hover flex h-full flex-col overflow-hidden rounded-2xl border transition hover:-translate-y-[3px]"
                   >
                     <div className="border-line grid aspect-video place-items-center border-b bg-[linear-gradient(135deg,rgba(99,102,241,0.16),rgba(139,92,246,0.12)_60%,rgba(103,232,249,0.06))]">
-                      <Logo className="text-[34px]" />
+                      {t.cover ? (
+                        <img
+                          src={t.cover}
+                          alt=""
+                          loading="lazy"
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <Logo className="text-[34px]" />
+                      )}
                     </div>
                     <div className="flex flex-1 flex-col gap-2.5 p-6">
-                      <span className="text-dim text-xs font-semibold tracking-[0.05em] uppercase">
-                        {t.label}
-                      </span>
+                      <div className="text-dim flex items-baseline justify-between gap-3 text-xs">
+                        <span className="font-semibold tracking-[0.05em] uppercase">
+                          {t.label}
+                        </span>
+                        <time dateTime={t.published}>
+                          {t.published.split('-').reverse().join('.')}
+                        </time>
+                      </div>
                       <h2 className="text-ink text-[17px] font-semibold tracking-[-0.01em]">
                         {t.name}
                       </h2>

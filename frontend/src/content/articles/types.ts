@@ -14,20 +14,22 @@ export interface ArticleSection {
 
 export interface Article {
   hero: Hero
-  intro: string
+  intro?: string
   sections: ArticleSection[]
   cta: {
     title: string
     body: string
     primary: Cta
     secondary?: Cta
-    note: string
+    note?: string
   }
 }
 
 export interface ArticleEntry extends PageSeo {
   slug: string
   name: string
+  cover?: string
+  published: string
   load: () => Promise<{ article: Article }>
 }
 

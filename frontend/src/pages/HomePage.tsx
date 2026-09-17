@@ -21,14 +21,14 @@ import {
   IconRole,
   IconStar,
 } from '@/components/marketing/icons'
-import { faq } from '@/content/faq'
+import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
 import { plans, promoActive } from '@/content/plans'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
+import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
-import { trainingPath } from '@/lib/trainingPath'
 
 const icons: Record<HomeIcon, typeof IconRole> = {
   role: IconRole,
@@ -37,7 +37,7 @@ const icons: Record<HomeIcon, typeof IconRole> = {
   clock: IconClock,
 }
 
-const { hero, simulator, demo, trainer, pricing, cta } = home
+const { hero, simulator, demo, trainer, pricing, faq, cta } = home
 const { progress } = demo
 
 const chartYs = [
@@ -51,9 +51,11 @@ const chartYs = [
 const chartLine = progress.points
   .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x * 10} ${p.y}`)
   .join(' ')
-const chartArea = `${chartLine} L940 160 L60 160 Z`
+const [firstPoint] = progress.points
+const lastPoint = progress.points[progress.points.length - 1]
+const chartArea = `${chartLine} L${lastPoint.x * 10} 160 L${firstPoint.x * 10} 160 Z`
 
-const homeFaq = faq.filter((item) => item.home)
+const homeFaq = faqItems.filter((item) => item.home)
 
 const statTile =
   'border-line bg-glass min-w-0 rounded-[10px] border px-3 py-2.5 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0'
@@ -94,14 +96,7 @@ function StepCard({
 export function HomePage() {
   const { isAuthenticated } = useAuth()
   const startTo = isAuthenticated ? '/app' : '/login'
-  const ctaTo = (c: Cta) =>
-    'to' in c
-      ? c.to
-      : 'start' in c
-        ? startTo
-        : isAuthenticated
-          ? trainingPath(c.train)
-          : '/login'
+  const link = (c: Cta) => ctaLink(c, { start: '/app', isAuthenticated })
 
   return (
     <>
@@ -115,7 +110,7 @@ export function HomePage() {
               {inline(hero.text)}
             </p>
             <div className="mt-8">
-              <Link to={ctaTo(hero.cta)} className={buttonClasses()}>
+              <Link {...link(hero.cta)} className={buttonClasses()}>
                 {hero.cta.label}
               </Link>
             </div>
@@ -239,7 +234,7 @@ export function HomePage() {
                   who={demo.answer.who}
                   className="max-w-full"
                 >
-                  {inline(demo.answer.text)}
+                  {demo.answer.text}
                 </ChatBubble>
               </StepCard>
             </Reveal>
@@ -406,7 +401,7 @@ export function HomePage() {
                 </p>
                 <div className="mt-6">
                   <Link
-                    to={ctaTo(trainer.cta)}
+                    {...link(trainer.cta)}
                     className={buttonClasses({ variant: 'secondary' })}
                   >
                     {trainer.cta.label}
@@ -438,8 +433,11 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title={pricing.title}>
-              {pricing.lead}
-              {promoActive && ` ${pricing.promoLead}`}
+              {inline(
+                promoActive
+                  ? `${pricing.lead} ${pricing.promoLead}`
+                  : pricing.lead,
+              )}
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -459,9 +457,7 @@ export function HomePage() {
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title={home.faq.title}>
-              {inline(home.faq.lead)}
-            </SectionHead>
+            <SectionHead title={faq.title}>{inline(faq.lead)}</SectionHead>
           </Reveal>
           <FaqList items={homeFaq} />
         </Container>
@@ -474,11 +470,11 @@ export function HomePage() {
               title={cta.title}
               actions={
                 <>
-                  <Link to={ctaTo(cta.primary)} className={buttonClasses()}>
+                  <Link {...link(cta.primary)} className={buttonClasses()}>
                     {cta.primary.label}
                   </Link>
                   <Link
-                    to={ctaTo(cta.secondary)}
+                    {...link(cta.secondary)}
                     className={buttonClasses({ variant: 'secondary' })}
                   >
                     {cta.secondary.label}

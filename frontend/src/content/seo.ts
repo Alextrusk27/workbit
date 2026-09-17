@@ -1,13 +1,13 @@
 import { faq } from '@/content/faq'
-import { seo as home } from '@/content/pages/home'
+import { seo as homeSeo } from '@/content/pages/home'
+import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
+import type { PageSeo } from '@/content/types'
 
 export const SITE = 'https://workbit.ru'
 
-export interface SeoPage {
+export interface SeoPage extends PageSeo {
   path: string
-  title: string
-  description: string
   sources: string[]
   jsonLd?: () => object[]
 }
@@ -21,9 +21,10 @@ function price(value: string): string {
 export const seoPages: SeoPage[] = [
   {
     path: '/',
-    ...home,
+    ...homeSeo,
     sources: [
       'frontend/src/content/pages/home.ts',
+      'frontend/src/content/demo/heroChat.ts',
       'frontend/src/content/plans.ts',
       'frontend/src/content/faq.ts',
     ],
@@ -53,10 +54,8 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/skills-trainer',
-    title: 'Тренажёр с вопросами и ответами ИИ для собеседования | Workbit',
-    description:
-      'Вопросы на собеседовании с ответами ИИ: десять вопросов по навыку — от разработки до бухгалтерии и права. Подготовка к техническому собеседованию и не только.',
-    sources: ['frontend/src/pages/SkillsTrainerPage.tsx'],
+    ...skillsTrainerSeo,
+    sources: ['frontend/src/content/pages/skillsTrainer.ts'],
   },
   {
     path: '/faq',

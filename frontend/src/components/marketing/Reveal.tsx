@@ -43,6 +43,7 @@ export function Reveal({
 
   return (
     <motion.div
+      key={asIs ? 'as-is' : 'reveal'}
       ref={ref}
       className={className}
       initial={

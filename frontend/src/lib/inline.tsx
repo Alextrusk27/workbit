@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 const TOKEN = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)|\n/g
 const LINK = 'text-indigo hover:text-violet transition-colors'
 
-export function inline(text: string): ReactNode[] {
+export function inline(text: string): ReactNode {
   const nodes: ReactNode[] = []
   let last = 0
   for (const m of text.matchAll(TOKEN)) {
@@ -34,5 +34,5 @@ export function inline(text: string): ReactNode[] {
     last = m.index + token.length
   }
   if (last < text.length) nodes.push(text.slice(last))
-  return nodes
+  return nodes.length ? nodes : null
 }

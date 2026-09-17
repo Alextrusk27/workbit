@@ -1,10 +1,15 @@
 import { interviewQuestions } from '@/content/articles/interview-questions'
-import type { ArticleEntry } from '@/content/articles/types'
+import { news } from '@/content/articles/news'
+import type { ArticleEntry, Rubric } from '@/content/articles/types'
 
-export const articles: Record<string, ArticleEntry[]> = {
-  'interview-questions': interviewQuestions,
+export const rubrics: Record<string, Rubric> = {
+  'interview-questions': {
+    label: 'Вопросы на собеседовании',
+    entries: interviewQuestions,
+  },
+  news: { label: 'Новости', entries: news },
 }
 
 export function findArticle(rubric = '', slug = ''): ArticleEntry | undefined {
-  return articles[rubric]?.find((a) => a.slug === slug)
+  return rubrics[rubric]?.entries.find((a) => a.slug === slug)
 }

@@ -15,6 +15,7 @@ const columns = [
     links: [
       { label: 'Тарифы', to: '/pricing' },
       { label: 'FAQ', to: '/faq' },
+      { label: 'Блог', to: '/blog' },
     ],
   },
   {

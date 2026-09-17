@@ -27,5 +27,11 @@ export interface Article {
 
 export interface ArticleEntry extends PageSeo {
   slug: string
+  name: string
   load: () => Promise<{ article: Article }>
+}
+
+export interface Rubric {
+  label: string
+  entries: ArticleEntry[]
 }

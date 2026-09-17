@@ -1,6 +1,7 @@
-import { articles } from '@/content/articles'
+import { rubrics } from '@/content/articles'
 import { faq } from '@/content/faq'
 import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
+import { seo as blogSeo } from '@/content/pages/blog'
 import { seo as homeSeo } from '@/content/pages/home'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
@@ -105,7 +106,18 @@ export const seoPages: SeoPage[] = [
       },
     ],
   },
-  ...Object.entries(articles).flatMap(([rubric, entries]) =>
+  {
+    path: '/blog',
+    ...blogSeo,
+    sources: [
+      'frontend/src/content/pages/blog.ts',
+      'frontend/src/content/articles/index.ts',
+      ...Object.keys(rubrics).map(
+        (rubric) => `frontend/src/content/articles/${rubric}/index.ts`,
+      ),
+    ],
+  },
+  ...Object.entries(rubrics).flatMap(([rubric, { entries }]) =>
     entries.map(({ slug, title, description }) => ({
       path: `/blog/${rubric}/${slug}`,
       title,

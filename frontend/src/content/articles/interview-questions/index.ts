@@ -3,6 +3,7 @@ import type { ArticleEntry } from '@/content/articles/types'
 export const interviewQuestions: ArticleEntry[] = [
   {
     slug: 'sales-manager',
+    name: 'Вопросы на собеседовании менеджера по продажам',
     title:
       'Вопросы на собеседовании менеджера по продажам: что спрашивают и как отвечать | Workbit',
     description:

@@ -9,6 +9,7 @@ import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { FaqList } from '@/components/marketing/FaqList'
 import { FeatureCard } from '@/components/marketing/FeatureCard'
 import { HeroChatDemo } from '@/components/marketing/HeroChatDemo'
+import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
 import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
@@ -21,46 +22,23 @@ import {
   IconStar,
 } from '@/components/marketing/icons'
 import { faq } from '@/content/faq'
+import { home, type HomeIcon } from '@/content/pages/home'
 import { plans, promoActive } from '@/content/plans'
+import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
+import { inline } from '@/lib/inline'
+import { trainingPath } from '@/lib/trainingPath'
 
-const features = [
-  {
-    icon: <IconRole className="size-5" />,
-    title: 'Вопросы под вакансию',
-    body: 'Список вопросов генерируется на основе содержания вакансии.',
-  },
-  {
-    icon: <IconPencil className="size-5" />,
-    title: 'Правки на полях',
-    body: 'ИИ отмечает сильные и слабые стороны твоих ответов.',
-  },
-  {
-    icon: <IconChart className="size-5" />,
-    title: 'Вероятность оффера',
-    body: 'На основе твоих ответов нейросеть даст прогноз вероятности получения оффера.',
-  },
-  {
-    icon: <IconClock className="size-5" />,
-    title: 'История сессий',
-    body: 'Отслеживай прогресс в целом по вакансии в личном кабинете.',
-  },
-]
+const icons: Record<HomeIcon, typeof IconRole> = {
+  role: IconRole,
+  pencil: IconPencil,
+  chart: IconChart,
+  clock: IconClock,
+}
 
-const reportRows = [
-  { title: 'Вопрос 4 · Воронка и метрики', score: 5 },
-  { title: 'Вопрос 5 · Падение CTR', score: 2 },
-  { title: 'Вопрос 6 · Сегментация', score: 4 },
-]
-
-const progressPoints = [
-  { x: 6, y: 92.5, date: '12 мая' },
-  { x: 28, y: 81.3, date: '18 мая' },
-  { x: 50, y: 85, date: '26 мая' },
-  { x: 72, y: 62.5, date: '2 июн' },
-  { x: 94, y: 40, date: '9 июн' },
-]
+const { hero, simulator, demo, trainer, pricing, cta } = home
+const { progress } = demo
 
 const chartYs = [
   { top: 10, label: '5★' },
@@ -70,29 +48,12 @@ const chartYs = [
   { top: 160, label: '1★' },
 ]
 
-const chartLine = progressPoints
+const chartLine = progress.points
   .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x * 10} ${p.y}`)
   .join(' ')
 const chartArea = `${chartLine} L940 160 L60 160 Z`
 
-const professions = [
-  'Маркетинг',
-  'Разработка',
-  'Продажи',
-  'Аналитика',
-  'Финансы',
-  'HR',
-  'Дизайн',
-  'Поддержка',
-]
-
 const homeFaq = faq.filter((item) => item.home)
-
-const trainerSteps = [
-  { label: 'Навык', value: 'Работа с возражениями' },
-  { label: 'Профессия', value: 'Менеджер по продажам' },
-  { label: 'Уровень', value: 'Средний' },
-]
 
 const statTile =
   'border-line bg-glass min-w-0 rounded-[10px] border px-3 py-2.5 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0'
@@ -133,6 +94,14 @@ function StepCard({
 export function HomePage() {
   const { isAuthenticated } = useAuth()
   const startTo = isAuthenticated ? '/app' : '/login'
+  const ctaTo = (c: Cta) =>
+    'to' in c
+      ? c.to
+      : 'start' in c
+        ? startTo
+        : isAuthenticated
+          ? trainingPath(c.train)
+          : '/login'
 
   return (
     <>
@@ -140,18 +109,14 @@ export function HomePage() {
         <Container className="relative grid grid-cols-[minmax(0,1fr)] items-center gap-9 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
           <div>
             <h1 className="text-ink text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
-              Тренажёр собеседований{' '}
-              <span className="text-grad">с AI-интервьюером</span>
+              <HeroTitle hero={hero} />
             </h1>
             <p className="text-muted mt-5.5 max-w-[48ch] text-lg">
-              Подготовка к собеседованию онлайн: пройди тестовое интервью по
-              выбранной вакансии с hh.ru. Подберём вероятные вопросы по
-              требованиям работодателя и оценим твои ответы. Стань ближе к
-              получению оффера!
+              {inline(hero.text)}
             </p>
             <div className="mt-8">
-              <Link to={startTo} className={buttonClasses()}>
-                Начать интервью — бесплатно
+              <Link to={ctaTo(hero.cta)} className={buttonClasses()}>
+                {hero.cta.label}
               </Link>
             </div>
           </div>
@@ -163,9 +128,8 @@ export function HomePage() {
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Симулятор собеседования">
-              Попробуй свои силы в пробном собеседовании по любой вакансии с
-              hh.ru.
+            <SectionHead title={simulator.title}>
+              {inline(simulator.lead)}
             </SectionHead>
           </Reveal>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-2 lg:grid-cols-12">
@@ -175,23 +139,16 @@ export function HomePage() {
                   <IconLink />
                 </div>
                 <h3 className="text-ink text-xl font-bold tracking-[-0.01em]">
-                  Интервью по вакансии
+                  {simulator.vacancy.title}
                 </h3>
                 <p className="text-muted mt-2 max-w-[52ch] text-[14.5px]">
-                  Вставь ссылку на вакансию с hh.ru — тренажёр соберёт сессию
-                  под конкретные требования работодателя.
+                  {inline(simulator.vacancy.body)}
                 </p>
                 <div className="mt-5">
                   <VacancyUrlForm variant="card" />
                 </div>
                 <p className="text-dim mt-3.5 text-[13px]">
-                  Первое интервью бесплатно ·{' '}
-                  <Link
-                    to="/ai-interview"
-                    className="text-indigo hover:text-violet transition-colors"
-                  >
-                    Как устроено AI-интервью →
-                  </Link>
+                  {inline(simulator.vacancy.note)}
                 </p>
               </div>
             </Reveal>
@@ -201,14 +158,13 @@ export function HomePage() {
                   <IconStar />
                 </div>
                 <h3 className="text-ink text-xl font-bold tracking-[-0.01em]">
-                  Оценка каждого ответа
+                  {simulator.scoring.title}
                 </h3>
                 <p className="text-muted mt-2 text-[14.5px]">
-                  Звёзды от 1 до 5 за каждый ответ. В отчёте видно, где просел и
-                  что подтянуть.
+                  {inline(simulator.scoring.body)}
                 </p>
                 <div className="border-surface-line bg-surface mt-5 flex flex-col gap-2 rounded-[10px] border px-3.5 py-[13px]">
-                  {reportRows.map((r) => (
+                  {simulator.scoring.rows.map((r) => (
                     <div
                       key={r.title}
                       className="flex items-center justify-between gap-2.5 text-[13px]"
@@ -220,23 +176,30 @@ export function HomePage() {
                 </div>
               </div>
             </Reveal>
-            {features.map((f, i) => (
-              <Reveal
-                key={f.title}
-                delay={(i + 2) * 0.05}
-                className="lg:col-span-3"
-              >
-                <FeatureCard size="sm" icon={f.icon} title={f.title}>
-                  {f.body}
-                </FeatureCard>
-              </Reveal>
-            ))}
+            {simulator.features.map((f, i) => {
+              const Icon = icons[f.icon]
+              return (
+                <Reveal
+                  key={f.title}
+                  delay={(i + 2) * 0.05}
+                  className="lg:col-span-3"
+                >
+                  <FeatureCard
+                    size="sm"
+                    icon={<Icon className="size-5" />}
+                    title={f.title}
+                  >
+                    {inline(f.body)}
+                  </FeatureCard>
+                </Reveal>
+              )
+            })}
           </div>
           <Reveal className="mt-7 flex flex-wrap items-center justify-center gap-2">
             <span className="text-muted mr-1 text-[13.5px]">
-              Подойдёт для любой профессии:
+              {simulator.professions.label}
             </span>
-            {professions.map((p) => (
+            {simulator.professions.items.map((p) => (
               <span
                 key={p}
                 className="border-line text-muted rounded-full border px-3 py-1 text-[13px]"
@@ -244,7 +207,9 @@ export function HomePage() {
                 {p}
               </span>
             ))}
-            <span className="text-dim text-[13.5px]">и другие</span>
+            <span className="text-dim text-[13.5px]">
+              {simulator.professions.tail}
+            </span>
           </Reveal>
         </Container>
       </section>
@@ -252,48 +217,44 @@ export function HomePage() {
       <section id="demo" className="scroll-mt-20 py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Тестовое собеседование">
-              Отвечай на вопросы AI-интервьюера по вакансии в диалоговом окне в
-              свободной форме.
-            </SectionHead>
+            <SectionHead title={demo.title}>{inline(demo.lead)}</SectionHead>
           </Reveal>
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-3">
             <Reveal>
-              <StepCard n="1" title="Вопрос">
+              <StepCard n="1" title={demo.question.title}>
                 <ChatBubble
                   role="bot"
-                  who="Workbit-интервьюер · 7 / 10 · Маркетолог"
+                  who={demo.question.who}
                   className="max-w-full"
                 >
-                  CTR рекламной кампании упал вдвое при том же бюджете. Как
-                  будешь искать причину?
+                  {inline(demo.question.text)}
                 </ChatBubble>
               </StepCard>
             </Reveal>
             <Reveal delay={0.05}>
-              <StepCard n="2" title="Ответ">
-                <ChatBubble role="user" who="Ты" className="max-w-full">
-                  Сначала посмотрю частоту показов и выгорание креативов, потом
-                  разбивку по площадкам и сегментам. Если просело везде
-                  равномерно — обновлю креативы и пересоберу аудитории.
+              <StepCard n="2" title={demo.answer.title}>
+                <ChatBubble
+                  role="user"
+                  who={demo.answer.who}
+                  className="max-w-full"
+                >
+                  {inline(demo.answer.text)}
                 </ChatBubble>
               </StepCard>
             </Reveal>
             <Reveal delay={0.1}>
-              <StepCard n="3" title="Разбор">
+              <StepCard n="3" title={demo.review.title}>
                 <ChatBubble
                   role="bot"
-                  who="Разбор рецензента"
+                  who={demo.review.who}
                   className="max-w-full"
                 >
                   <span className="mb-1.5 flex items-center gap-2 text-[12.5px]">
-                    <Stars value={4} />
-                    <span className="text-dim">4 из 5</span>
+                    <Stars value={demo.review.score} />
+                    <span className="text-dim">{demo.review.score} из 5</span>
                   </span>
-                  Верная логика: частота → площадки → сегменты. Уточни, как
-                  отделишь выгорание креатива от выгорания аудитории —
-                  интервьюеры спросят про тест.
+                  {inline(demo.review.text)}
                 </ChatBubble>
               </StepCard>
             </Reveal>
@@ -306,42 +267,48 @@ export function HomePage() {
                   <div className="flex items-center gap-2.5">
                     <StepBadge n="4" />
                     <span className="text-ink text-[15px] font-semibold">
-                      Прогресс по вакансии
+                      {progress.title}
                     </span>
                   </div>
                   <p className="text-muted mt-2 text-[13.5px]">
-                    Интернет-маркетолог · оценка за попытку, 5 последних
-                    интервью
+                    {inline(progress.lead)}
                   </p>
                 </div>
                 <div className="grid w-full grid-cols-3 gap-3 sm:flex sm:w-auto sm:gap-9">
                   <div className={statTile}>
                     <p className="text-ink m-0 flex items-center gap-2 text-[17px] leading-[26px] font-bold tabular-nums sm:text-[19px] sm:leading-normal">
-                      4,2
-                      <Stars value={4} className="text-xs max-sm:hidden" />
+                      {progress.best.value}
+                      <Stars
+                        value={progress.best.stars}
+                        className="text-xs max-sm:hidden"
+                      />
                       <span className="text-star text-xs sm:hidden">★</span>
                     </p>
                     <p className="text-dim mt-[3px] text-[11px] sm:text-xs">
-                      <span className="sm:hidden">Лучшая</span>
-                      <span className="max-sm:hidden">Лучшая оценка</span>
+                      <span className="sm:hidden">
+                        {progress.best.shortLabel}
+                      </span>
+                      <span className="max-sm:hidden">
+                        {progress.best.label}
+                      </span>
                     </p>
                   </div>
                   <div className={statTile}>
                     <p className="text-ok m-0 text-[17px] leading-[26px] font-bold tabular-nums sm:text-[19px] sm:leading-normal">
-                      +1,2
+                      {progress.trend.value}
                     </p>
                     <p className="text-dim mt-[3px] text-[11px] sm:text-xs">
-                      Динамика
+                      {progress.trend.label}
                     </p>
                   </div>
                   <div className={statTile}>
                     <p className="m-0 leading-[26px] sm:leading-[29px]">
                       <span className="bg-ok/12 text-ok inline-flex h-5.5 items-center rounded-full px-2.5 text-xs font-semibold">
-                        высокая
+                        {progress.offer.value}
                       </span>
                     </p>
                     <p className="text-dim mt-[3px] text-[11px] sm:text-xs">
-                      Оффер
+                      {progress.offer.label}
                     </p>
                   </div>
                 </div>
@@ -390,25 +357,25 @@ export function HomePage() {
                       vectorEffect="non-scaling-stroke"
                     />
                   </svg>
-                  {progressPoints.map((p, i) => (
+                  {progress.points.map((p, i) => (
                     <span
                       key={p.date}
                       style={{ left: `${p.x}%`, top: p.y }}
                       className={cn(
                         'absolute -translate-x-1/2 -translate-y-1/2 rounded-full',
-                        i === progressPoints.length - 1
+                        i === progress.points.length - 1
                           ? 'bg-indigo ring-indigo/15 size-[11px] ring-4'
                           : 'bg-canvas border-indigo size-[9px] border-[2.5px]',
                       )}
                     />
                   ))}
-                  {progressPoints.map((p, i) => (
+                  {progress.points.map((p, i) => (
                     <span
                       key={p.date}
                       style={{ left: `${p.x}%` }}
                       className={cn(
                         'absolute top-[174px] -translate-x-1/2 text-[11px] whitespace-nowrap',
-                        i === progressPoints.length - 1
+                        i === progress.points.length - 1
                           ? 'text-indigo font-semibold'
                           : 'text-dim',
                       )}
@@ -419,8 +386,7 @@ export function HomePage() {
                 </div>
               </div>
               <p className="text-dim mt-3.5 text-[13px]">
-                Проходи интервью по вакансии повторно и отслеживай прогресс в
-                карточке вакансии.
+                {inline(progress.note)}
               </p>
             </div>
           </Reveal>
@@ -433,24 +399,22 @@ export function HomePage() {
             <div className="border-line bg-card grid grid-cols-[minmax(0,1fr)] items-center gap-9 rounded-[20px] border px-6 py-8 sm:px-12 sm:py-11 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-12">
               <div>
                 <h2 className="text-ink text-[clamp(26px,3vw,32px)]">
-                  Тренажёр навыков
+                  {trainer.title}
                 </h2>
                 <p className="text-muted mt-3 max-w-[52ch] text-base">
-                  Короткие тренировки по одному навыку: выбери тему, уточни
-                  профессией и уровнем — и отрабатывай нужные темы между
-                  интервью.
+                  {inline(trainer.body)}
                 </p>
                 <div className="mt-6">
                   <Link
-                    to="/skills-trainer"
+                    to={ctaTo(trainer.cta)}
                     className={buttonClasses({ variant: 'secondary' })}
                   >
-                    Попробовать тренажёр
+                    {trainer.cta.label}
                   </Link>
                 </div>
               </div>
               <div className="flex flex-col gap-2.5">
-                {trainerSteps.map((s, i) => (
+                {trainer.steps.map((s, i) => (
                   <div
                     key={s.label}
                     className="border-surface-line bg-surface flex items-center gap-3 rounded-xl border px-4 py-[13px]"
@@ -473,10 +437,9 @@ export function HomePage() {
       <section id="pricing" className="scroll-mt-20 py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Тарифы">
-              Без автоплатежей.
-              {promoActive &&
-                ' До 1 октября к покупке — до 5 интервью в подарок.'}
+            <SectionHead title={pricing.title}>
+              {pricing.lead}
+              {promoActive && ` ${pricing.promoLead}`}
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -496,14 +459,8 @@ export function HomePage() {
       <section className="py-10 sm:py-16">
         <Container>
           <Reveal>
-            <SectionHead title="Частые вопросы">
-              Коротко о формате, оценке ответов и оплате.{' '}
-              <Link
-                to="/faq"
-                className="text-indigo hover:text-violet transition-colors"
-              >
-                Все вопросы →
-              </Link>
+            <SectionHead title={home.faq.title}>
+              {inline(home.faq.lead)}
             </SectionHead>
           </Reveal>
           <FaqList items={homeFaq} />
@@ -514,26 +471,25 @@ export function HomePage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Пройди бесплатное тестовое собеседование сейчас"
+              title={cta.title}
               actions={
                 <>
-                  <Link to={startTo} className={buttonClasses()}>
-                    Пройти первое интервью бесплатно
+                  <Link to={ctaTo(cta.primary)} className={buttonClasses()}>
+                    {cta.primary.label}
                   </Link>
                   <Link
-                    to="/skills-trainer"
+                    to={ctaTo(cta.secondary)}
                     className={buttonClasses({ variant: 'secondary' })}
                   >
-                    Попробовать тренажёр навыков
+                    {cta.secondary.label}
                   </Link>
                   <p className="text-dim basis-full text-[13.5px]">
-                    Доступно сразу после входа по email — без анкеты, без карты
+                    {inline(cta.note)}
                   </p>
                 </>
               }
             >
-              Вставь ссылку на вакансию с hh.ru — получи вопросы под требования
-              работодателя и разбор каждого ответа.
+              {inline(cta.body)}
             </CtaPanel>
           </Reveal>
         </Container>

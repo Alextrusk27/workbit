@@ -5,9 +5,10 @@ import { AiInterviewPage } from '@/pages/AiInterviewPage'
 import { SkillsTrainerPage } from '@/pages/SkillsTrainerPage'
 import { FaqPage } from '@/pages/FaqPage'
 import { PricingPage } from '@/pages/PricingPage'
-import { InterviewQuestionsSalesManagerPage } from '@/pages/InterviewQuestionsSalesManagerPage'
+import { ArticlePage } from '@/pages/ArticlePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ErrorPage } from '@/pages/ErrorPage'
+import { findArticle } from '@/content/articles'
 
 export const marketingRoute: RouteObject = {
   path: '/',
@@ -20,8 +21,12 @@ export const marketingRoute: RouteObject = {
     { path: 'faq', element: <FaqPage /> },
     { path: 'pricing', element: <PricingPage /> },
     {
-      path: 'interview-questions/sales-manager',
-      element: <InterviewQuestionsSalesManagerPage />,
+      path: 'blog/:rubric/:slug',
+      loader: async ({ params }) => {
+        const entry = findArticle(params.rubric, params.slug)
+        return entry ? (await entry.load()).article : null
+      },
+      element: <ArticlePage />,
     },
     {
       path: 'privacy',

@@ -1,3 +1,4 @@
+import { articles } from '@/content/articles'
 import { faq } from '@/content/faq'
 import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as homeSeo } from '@/content/pages/home'
@@ -104,14 +105,17 @@ export const seoPages: SeoPage[] = [
       },
     ],
   },
-  {
-    path: '/interview-questions/sales-manager',
-    title:
-      'Вопросы на собеседовании менеджера по продажам: что спрашивают и как отвечать | Workbit',
-    description:
-      'Какие вопросы задают менеджеру по продажам на собеседовании и что хотят услышать: этапы сделки, возражения, холодные звонки, ролевая игра. Разбор с нуля и тренировка с ИИ.',
-    sources: ['frontend/src/pages/InterviewQuestionsSalesManagerPage.tsx'],
-  },
+  ...Object.entries(articles).flatMap(([rubric, entries]) =>
+    entries.map(({ slug, title, description }) => ({
+      path: `/blog/${rubric}/${slug}`,
+      title,
+      description,
+      sources: [
+        `frontend/src/content/articles/${rubric}/index.ts`,
+        `frontend/src/content/articles/${rubric}/${slug}.ts`,
+      ],
+    })),
+  ),
   {
     path: '/privacy',
     title: 'Политика конфиденциальности | Workbit',

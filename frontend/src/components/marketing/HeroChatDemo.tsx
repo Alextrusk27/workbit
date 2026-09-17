@@ -4,55 +4,11 @@ import { ChatBubble } from '@/components/chat/ChatBubble'
 import { TypingDots } from '@/components/chat/TypingDots'
 import { Stars } from '@/components/ui/Stars'
 import { IconMic, IconSend } from '@/components/marketing/icons'
+import { heroChatScenarios } from '@/content/demo/heroChat'
 import { motionConfig } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
-interface Scenario {
-  role: string
-  question: string
-  answer: string
-  review: string
-  score: number
-}
-
-/** Сценарии крутятся по кругу — по одному на цикл анимации. */
-const SCENARIOS: Scenario[] = [
-  {
-    role: 'Интернет-маркетолог',
-    question: 'Как поймёшь, что рекламная кампания окупается?',
-    answer:
-      'Считаю ROMI: доход от кампании минус расходы, делённые на расходы. Ещё смотрю CAC и LTV, чтобы видеть окупаемость на дистанции…',
-    review:
-      'Хорошо, что связал ROMI с LTV. Уточни, как учтёшь отложенные конверсии.',
-    score: 4,
-  },
-  {
-    role: 'Бухгалтер',
-    question: 'Чем отличается счёт 60 от счёта 62?',
-    answer:
-      '60 — расчёты с поставщиками и подрядчиками, 62 — с покупателями и заказчиками. По 60 обычно кредиторка, по 62 — дебиторка…',
-    review:
-      'Верно. Добавь про авансы: выданные и полученные идут на отдельных субсчетах.',
-    score: 5,
-  },
-  {
-    role: 'Python-разработчик',
-    question: 'Чем list отличается от tuple?',
-    answer:
-      'List можно менять, tuple — нет. Tuple пишется в круглых скобках, list — в квадратных… Больше отличий, наверное, не назову.',
-    review:
-      'База верная, но этого мало. Добавь: tuple хешируем и может быть ключом словаря, а ещё компактнее в памяти.',
-    score: 3,
-  },
-]
-
-const PHASES = [
-  'switch',
-  'question',
-  'recording',
-  'answer',
-  'review',
-] as const
+const PHASES = ['switch', 'question', 'recording', 'answer', 'review'] as const
 type Phase = (typeof PHASES)[number]
 
 const reached = (current: Phase, target: Phase) =>
@@ -92,7 +48,7 @@ function Wave() {
  *  прыжком. */
 export function HeroChatDemo() {
   const animated = motionConfig.shouldAnimate({ essential: true })
-  const [phase, setPhase] = useState<Phase>(animated ? 'switch' : 'review')
+  const [phase, setPhase] = useState<Phase>('switch')
   const [scene, setScene] = useState(0)
   const [fading, setFading] = useState(false)
   const [visible, setVisible] = useState(true)
@@ -100,7 +56,10 @@ export function HeroChatDemo() {
   const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!animated) return
+    if (!animated) {
+      setPhase('review')
+      return
+    }
     const root = rootRef.current
     if (!root) return
     const observer = new IntersectionObserver(([entry]) =>
@@ -138,7 +97,7 @@ export function HeroChatDemo() {
       while (!cancelled) {
         setFading(false)
         setPhase('switch')
-        setScene(i % SCENARIOS.length)
+        setScene(i % heroChatScenarios.length)
         i += 1
         await sleep(1400)
 
@@ -160,7 +119,7 @@ export function HeroChatDemo() {
   }, [animated, visible])
 
   const recording = phase === 'recording'
-  const current = SCENARIOS[scene]
+  const current = heroChatScenarios[scene]
 
   return (
     <div

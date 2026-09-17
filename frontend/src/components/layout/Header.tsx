@@ -14,9 +14,9 @@ import { cn } from '@/lib/cn'
 const links = [
   { label: 'AI-интервью', to: '/ai-interview' },
   { label: 'Тренажёр навыков', to: '/skills-trainer' },
-  { label: 'Блог', to: '/blog' },
   { label: 'Тарифы', to: '/pricing' },
   { label: 'FAQ', to: '/faq' },
+  { label: 'Блог', to: '/blog' },
 ]
 
 function navLinkClass(isActive: boolean): string {

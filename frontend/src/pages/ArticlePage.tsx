@@ -28,10 +28,8 @@ function Section({
     <section id={id} className="pb-10 sm:pb-14">
       <Container>
         <Reveal>
-          <div className="mx-auto max-w-[72ch]">
-            <h2 className="text-ink text-[clamp(26px,3.2vw,36px)]">{title}</h2>
-            <div className="mt-5 flex flex-col gap-4">{children}</div>
-          </div>
+          <h2 className="text-ink text-[clamp(26px,3.2vw,36px)]">{title}</h2>
+          <div className="mt-5 flex flex-col gap-4">{children}</div>
         </Reveal>
       </Container>
     </section>
@@ -76,7 +74,7 @@ function Block({ block, resolve }: { block: ArticleBlock; resolve: Resolve }) {
       )
     case 'qa':
       return (
-        <div className="mt-2 flex flex-col gap-4">
+        <div className="mt-2 grid gap-4 lg:grid-cols-2">
           {block.items.map((item) => (
             <article
               key={item.q}

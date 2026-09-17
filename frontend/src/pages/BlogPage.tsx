@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Chip } from '@/components/ui/Chip'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
@@ -12,7 +12,12 @@ import { inline } from '@/lib/inline'
 const { hero } = blog
 
 export function BlogPage() {
+  const location = useLocation()
   const [rubric, setRubric] = useState<string | null>(null)
+  useEffect(() => {
+    const value = new URLSearchParams(location.search).get('rubric')
+    setRubric(value && Object.hasOwn(rubrics, value) ? value : null)
+  }, [location])
   const tiles = Object.entries(rubrics)
     .filter(([key]) => rubric === null || rubric === key)
     .flatMap(([key, r]) =>

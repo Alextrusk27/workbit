@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
+import { rubrics } from '@/content/articles'
 
 const columns = [
   {
@@ -15,7 +16,16 @@ const columns = [
     links: [
       { label: 'Тарифы', to: '/pricing' },
       { label: 'FAQ', to: '/faq' },
-      { label: 'Блог', to: '/blog' },
+    ],
+  },
+  {
+    title: 'Блог',
+    links: [
+      { label: 'Все статьи', to: '/blog' },
+      ...Object.entries(rubrics).map(([key, r]) => ({
+        label: r.label,
+        to: `/blog?rubric=${key}`,
+      })),
     ],
   },
   {
@@ -32,8 +42,8 @@ export function Footer() {
   return (
     <footer className="border-divider mt-8 border-t sm:mt-12">
       <Container className="pt-7 pb-5 sm:pb-6">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:gap-x-16">
-          <div className="col-span-2 flex max-w-[36ch] flex-col gap-2.5 sm:col-span-3 lg:col-span-1">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:gap-x-14">
+          <div className="col-span-2 flex max-w-[36ch] flex-col gap-2.5 sm:col-span-4 lg:col-span-1">
             <Logo />
             <p className="text-muted text-[13px]">
               Тренажёр собеседований с AI-рецензентом под профессию или навык

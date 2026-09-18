@@ -20,6 +20,7 @@ const { render, seoPages, notFoundSeo, SITE } = await import(
 )
 
 const ROOT_MARKER = '<div id="root"></div>'
+const NOINDEX = '    <meta name="robots" content="noindex" />'
 const HEAD_MARKER = '</head>'
 const DESCRIPTION_RE = /<meta\s+name="description"\s+content="[^"]*"\s*\/>/s
 const TITLE_RE = /<title>.*?<\/title>/s
@@ -113,7 +114,7 @@ if (!template.includes(ROOT_MARKER)) {
   throw new Error('Template is missing an empty #root container')
 }
 const base = withHead(template, fontPreloads())
-writeFileSync(join(dist, 'spa.html'), base)
+writeFileSync(join(dist, 'spa.html'), withHead(base, NOINDEX))
 
 for (const page of seoPages) {
   const canonical = page.path === '/' ? `${SITE}/` : `${SITE}${page.path}`
@@ -134,7 +135,7 @@ for (const page of seoPages) {
 const notFoundHtml = pageHtml(base, {
   title: notFoundSeo.title,
   description: notFoundSeo.description,
-  headExtra: '    <meta name="robots" content="noindex" />',
+  headExtra: NOINDEX,
   appHtml: await render('/404'),
 })
 writeFileSync(join(dist, '404.html'), notFoundHtml)

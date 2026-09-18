@@ -3,41 +3,35 @@ import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { FaqList } from '@/components/marketing/FaqList'
+import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import { faq } from '@/content/faq'
+import { faq as faqItems } from '@/content/faq'
+import { faq } from '@/content/pages/faq'
+import { inline } from '@/lib/inline'
 
-const SUPPORT_EMAIL = 'support@workbit.ru'
+const { hero, cta } = faq
 
 export function FaqPage() {
   const [copied, setCopied] = useState(false)
 
   const copySupportEmail = async () => {
     try {
-      await navigator.clipboard.writeText(SUPPORT_EMAIL)
+      await navigator.clipboard.writeText(cta.email)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      window.location.href = `mailto:${SUPPORT_EMAIL}`
+      window.location.href = `mailto:${cta.email}`
     }
   }
 
   return (
     <>
-      <PageHero
-        title={
-          <>
-            Частые вопросы{' '}
-            <span className="text-grad">о тренажёре собеседований</span>
-          </>
-        }
-      >
-        Коротко о формате, профессиях, оценке ответов и тарифах.
-      </PageHero>
+      <PageHero title={<HeroTitle hero={hero} />}>{inline(hero.text)}</PageHero>
 
       <section className="py-10 sm:py-16">
         <Container>
-          <FaqList items={faq} />
+          <FaqList items={faqItems} />
         </Container>
       </section>
 
@@ -45,25 +39,18 @@ export function FaqPage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Остались вопросы?"
+              title={cta.title}
               actions={
                 <button
                   type="button"
                   onClick={copySupportEmail}
                   className={buttonClasses({ variant: 'secondary' })}
                 >
-                  {copied ? 'Адрес скопирован' : 'Скопировать адрес'}
+                  {copied ? cta.copied : cta.copy}
                 </button>
               }
             >
-              Не нашёл ответ? Напиши нам на{' '}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
-              >
-                {SUPPORT_EMAIL}
-              </a>{' '}
-              — поможем разобраться.
+              {inline(cta.body)}
             </CtaPanel>
           </Reveal>
         </Container>

@@ -38,7 +38,7 @@ export interface HomeContent {
     cta: Cta
     steps: { label: string; value: string }[]
   }
-  pricing: { title: string; lead: string; promoLead: string }
+  pricing: { title: string; lead: string }
   faq: { title: string; lead: string }
   cta: {
     title: string
@@ -169,7 +169,6 @@ export const home: HomeContent = {
   pricing: {
     title: 'Тарифы',
     lead: 'Без автоплатежей.',
-    promoLead: 'До 1 октября к покупке — до 5 интервью в подарок.',
   },
   faq: {
     title: 'Частые вопросы',

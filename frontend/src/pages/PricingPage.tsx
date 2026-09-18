@@ -5,19 +5,26 @@ import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
+import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
-import { plans, promoActive } from '@/content/plans'
+import { pricing } from '@/content/pages/pricing'
+import { plans, promo } from '@/content/plans'
 import { useAuth } from '@/features/auth/useAuth'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import type { PaymentProduct } from '@/features/billing/api'
 import { getErrorMessage } from '@/lib/api'
+import { ctaLink } from '@/lib/cta'
+import { inline } from '@/lib/inline'
+
+const { hero, note, cta } = pricing
 
 export function PricingPage() {
   const { isAuthenticated } = useAuth()
   const createPayment = useCreatePayment()
   const [error, setError] = useState<string | null>(null)
   const startTo = isAuthenticated ? '/app' : '/login'
+  const faqLink = ctaLink(cta.primary, { start: '/app', isAuthenticated })
 
   const buy = (product: PaymentProduct) => {
     if (createPayment.isPending) return
@@ -33,14 +40,7 @@ export function PricingPage() {
 
   return (
     <>
-      <PageHero
-        title={
-          <>
-            Сколько стоит{' '}
-            <span className="text-grad">подготовка к собеседованию</span>
-          </>
-        }
-      />
+      <PageHero title={<HeroTitle hero={hero} />} />
 
       <section className="py-10 sm:py-16">
         <Container>
@@ -69,18 +69,7 @@ export function PricingPage() {
           </div>
 
           <p className="text-dim mt-7 text-center text-[13.5px]">
-            {promoActive &&
-              'До 1 октября — интервью в подарок к каждой покупке: +2 на Про и +5 на Максе. '}
-            Тариф действует 30 дней с момента оплаты. Не хватило лимита — оплати
-            тариф ещё раз: срок продлится, а лимиты добавятся к оставшимся.
-            Условия оплаты определяет{' '}
-            <Link
-              to="/offer"
-              className="text-indigo hover:text-violet underline underline-offset-2 transition-colors"
-            >
-              Публичная оферта
-            </Link>
-            .
+            {inline(promo.active ? `${promo.pricing} ${note}` : note)}
           </p>
         </Container>
       </section>
@@ -89,18 +78,17 @@ export function PricingPage() {
         <Container>
           <Reveal>
             <CtaPanel
-              title="Остались вопросы?"
+              title={cta.title}
               actions={
                 <Link
-                  to="/faq"
+                  {...faqLink}
                   className={buttonClasses({ variant: 'secondary' })}
                 >
-                  Открыть FAQ
+                  {cta.primary.label}
                 </Link>
               }
             >
-              Загляни в FAQ — там коротко о формате, профессиях и оценке
-              ответов.
+              {inline(cta.body)}
             </CtaPanel>
           </Reveal>
         </Container>

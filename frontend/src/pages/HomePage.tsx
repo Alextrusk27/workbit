@@ -23,7 +23,7 @@ import {
 } from '@/components/marketing/icons'
 import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
-import { plans, promoActive } from '@/content/plans'
+import { plans, promo } from '@/content/plans'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
@@ -434,9 +434,7 @@ export function HomePage() {
           <Reveal>
             <SectionHead title={pricing.title}>
               {inline(
-                promoActive
-                  ? `${pricing.lead} ${pricing.promoLead}`
-                  : pricing.lead,
+                promo.active ? `${pricing.lead} ${promo.home}` : pricing.lead,
               )}
             </SectionHead>
           </Reveal>

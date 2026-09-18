@@ -19,8 +19,14 @@ export interface Plan {
 }
 
 /** Акция «интервью в подарок» — по 30 сентября 2026 включительно. */
-export const promoActive =
-  __BUILD_TS__ < Date.parse('2026-10-01T00:00:00+03:00')
+export const promo = {
+  active: __BUILD_TS__ < Date.parse('2026-10-01T00:00:00+03:00'),
+  pro: '+2 интервью в подарок до 1 октября',
+  max: '+5 интервью в подарок до 1 октября',
+  pricing:
+    'До 1 октября — интервью в подарок к каждой покупке: +2 на Про и +5 на Максе.',
+  home: 'До 1 октября к покупке — до 5 интервью в подарок.',
+}
 
 export const plans: Plan[] = [
   {
@@ -44,7 +50,7 @@ export const plans: Plan[] = [
     period: '/ месяц',
     cta: 'Перейти на Про',
     featured: true,
-    promo: promoActive ? '+2 интервью в подарок до 1 октября' : undefined,
+    promo: promo.active ? promo.pro : undefined,
     features: [
       '10 AI-интервью в месяц',
       '20 тренировок в месяц',
@@ -65,7 +71,7 @@ export const plans: Plan[] = [
     period: '/ месяц',
     cta: 'Перейти на Макс',
     featured: false,
-    promo: promoActive ? '+5 интервью в подарок до 1 октября' : undefined,
+    promo: promo.active ? promo.max : undefined,
     features: [
       '25 AI-интервью в месяц',
       'Безлимит тренировок',

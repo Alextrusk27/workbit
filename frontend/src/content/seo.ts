@@ -2,7 +2,9 @@ import { rubrics } from '@/content/articles'
 import { faq } from '@/content/faq'
 import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as blogSeo } from '@/content/pages/blog'
+import { seo as faqSeo } from '@/content/pages/faq'
 import { seo as homeSeo } from '@/content/pages/home'
+import { seo as pricingSeo } from '@/content/pages/pricing'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
 import { plans } from '@/content/plans'
 import type { PageSeo } from '@/content/types'
@@ -60,10 +62,11 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/faq',
-    title: 'Частые вопросы о тренажёре собеседований | Workbit',
-    description:
-      'Как работает AI-интервью, по каким профессиям есть вопросы, как ИИ оценивает ответы и что входит в тарифы — короткие ответы на частые вопросы.',
-    sources: ['frontend/src/pages/FaqPage.tsx', 'frontend/src/content/faq.ts'],
+    ...faqSeo,
+    sources: [
+      'frontend/src/content/pages/faq.ts',
+      'frontend/src/content/faq.ts',
+    ],
     jsonLd: () => [
       {
         '@context': 'https://schema.org',
@@ -78,14 +81,9 @@ export const seoPages: SeoPage[] = [
   },
   {
     path: '/pricing',
-    title: 'Сколько стоит подготовка к собеседованию | Workbit',
-    description: `${plans
-      .map((p) => `${p.name} — ${p.period ? `${p.price} в месяц` : p.price}`)
-      .join(
-        ', ',
-      )} — тарифы тренажёра собеседований. Разовый платёж на 30 дней, без автосписаний и привязки карты.`,
+    ...pricingSeo,
     sources: [
-      'frontend/src/pages/PricingPage.tsx',
+      'frontend/src/content/pages/pricing.ts',
       'frontend/src/content/plans.ts',
     ],
     jsonLd: () => [

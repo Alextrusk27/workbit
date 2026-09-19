@@ -23,7 +23,7 @@ import {
 } from '@/components/marketing/icons'
 import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
-import { plans, promo } from '@/content/plans'
+import { packs, promo } from '@/content/packs'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
@@ -95,7 +95,6 @@ function StepCard({
 
 export function HomePage() {
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app' : '/login'
   const link = (c: Cta) => ctaLink(c, { start: '/app', isAuthenticated })
 
   return (
@@ -439,15 +438,17 @@ export function HomePage() {
             </SectionHead>
           </Reveal>
           <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.map((p, i) => (
-              <Reveal key={p.name} delay={i * 0.05}>
-                <PlanCard
-                  plan={p}
-                  features={p.previewFeatures}
-                  to={p.featured ? '/pricing' : startTo}
-                />
-              </Reveal>
-            ))}
+            {packs
+              .filter((p) => p.product)
+              .map((p, i) => (
+                <Reveal key={p.name} delay={i * 0.05}>
+                  <PlanCard
+                    plan={p}
+                    features={p.previewFeatures}
+                    to="/pricing"
+                  />
+                </Reveal>
+              ))}
           </div>
         </Container>
       </section>

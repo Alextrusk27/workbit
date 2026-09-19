@@ -1,14 +1,21 @@
-import { useQuota } from '@/features/billing/useBilling'
+import { OPERATION_COST } from '@/content/packs'
+import { useBalance } from '@/features/billing/useBilling'
+import { cn } from '@/lib/cn'
+import { limitsWord } from '@/lib/plural'
 
-/** Остаток по тарифу; при загрузке или ошибке не рендерится. */
-export function QuotaBadge({ kind }: { kind: 'interview' | 'training' }) {
-  const { data } = useQuota()
+/** Баланс лимитов; при загрузке или ошибке не рендерится. */
+export function QuotaBadge() {
+  const { data } = useBalance()
   if (!data) return null
-  const left =
-    kind === 'interview' ? data.planInterviewsLeft : data.planTrainingsLeft
+  const low = data.limits < OPERATION_COST.interview
   return (
-    <span className="text-dim text-[13px] whitespace-nowrap tabular-nums">
-      {left === null ? 'Безлимит' : `Осталось: ${left}`}
+    <span
+      className={cn(
+        'text-[13px] whitespace-nowrap tabular-nums',
+        low ? 'text-star font-semibold' : 'text-dim',
+      )}
+    >
+      {data.limits} {limitsWord(data.limits)}
     </span>
   )
 }

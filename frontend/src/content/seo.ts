@@ -6,7 +6,7 @@ import { seo as faqSeo } from '@/content/pages/faq'
 import { seo as homeSeo } from '@/content/pages/home'
 import { seo as pricingSeo } from '@/content/pages/pricing'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
-import { plans } from '@/content/plans'
+import { packs } from '@/content/packs'
 import type { PageSeo } from '@/content/types'
 
 export const SITE = 'https://workbit.ru'
@@ -30,7 +30,7 @@ export const seoPages: SeoPage[] = [
     sources: [
       'frontend/src/content/pages/home.ts',
       'frontend/src/content/demo/heroChat.ts',
-      'frontend/src/content/plans.ts',
+      'frontend/src/content/packs.ts',
       'frontend/src/content/faq.ts',
     ],
     jsonLd: () => [
@@ -84,7 +84,7 @@ export const seoPages: SeoPage[] = [
     ...pricingSeo,
     sources: [
       'frontend/src/content/pages/pricing.ts',
-      'frontend/src/content/plans.ts',
+      'frontend/src/content/packs.ts',
     ],
     jsonLd: () => [
       {
@@ -94,9 +94,9 @@ export const seoPages: SeoPage[] = [
         url: SITE,
         applicationCategory: 'EducationalApplication',
         operatingSystem: 'Web',
-        offers: plans.map((p) => ({
+        offers: packs.map((p) => ({
           '@type': 'Offer',
-          name: `Тариф «${p.name}»`,
+          name: p.product ? `Пакет ${p.name}` : p.name,
           price: price(p.price),
           priceCurrency: 'RUB',
           url: `${SITE}/pricing`,

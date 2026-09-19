@@ -12,7 +12,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { plans } from '@/content/plans'
+import { packs } from '@/content/packs'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useTheme, type Theme } from '@/lib/useTheme'
 
@@ -283,7 +283,7 @@ export function BrandPage() {
 
       <Section title="Карточка тарифа">
         <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
-          {plans.slice(0, 2).map((p) => (
+          {packs.slice(1, 3).map((p) => (
             <PlanCard
               key={p.name}
               plan={p}

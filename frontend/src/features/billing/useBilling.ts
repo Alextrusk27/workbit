@@ -9,10 +9,10 @@ export const billingKeys = {
 
 export const PAYMENT_ID_KEY = 'workbit:payment-id'
 
-export function useQuota() {
+export function useBalance() {
   return useQuery({
     queryKey: billingKeys.quota,
-    queryFn: billingApi.quota,
+    queryFn: billingApi.balance,
     staleTime: 60 * 1000,
   })
 }

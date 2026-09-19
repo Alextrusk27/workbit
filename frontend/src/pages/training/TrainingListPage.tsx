@@ -50,7 +50,7 @@ export function TrainingListPage() {
         title="Мои тренировки"
         actions={
           <div className="flex items-center gap-4">
-            <QuotaBadge kind="training" />
+            <QuotaBadge />
             <Link to="/app/training/new" className={buttonClasses()}>
               Новая тренировка
             </Link>

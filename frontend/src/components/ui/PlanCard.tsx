@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import type { Plan } from '@/content/plans'
+import type { Pack } from '@/content/packs'
 import { cn } from '@/lib/cn'
 
 function GiftIcon() {
@@ -27,7 +27,7 @@ function GiftIcon() {
 }
 
 interface PlanCardProps {
-  plan: Plan
+  plan: Pack
   features: string[]
   to: string
   /** Обработчик CTA вместо ссылки — например, запуск оплаты. */

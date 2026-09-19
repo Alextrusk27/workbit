@@ -196,6 +196,6 @@ export const skillsTrainer: SkillsTrainerContent = {
     title: 'Стань лучшим кандидатом',
     body: 'Каждая тренировка — шаг к офферу мечты',
     primary: { label: 'Начать тренировку', start: true },
-    note: '3 тренировки бесплатно · [Вопросы о формате](/faq)',
+    note: '2 тренировки бесплатно · [Вопросы о формате](/faq)',
   },
 }

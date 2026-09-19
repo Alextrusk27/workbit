@@ -9,15 +9,16 @@ import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { PageHero } from '@/components/marketing/PageHero'
 import { Reveal } from '@/components/marketing/Reveal'
 import { pricing } from '@/content/pages/pricing'
-import { plans, promo } from '@/content/plans'
+import { operations, packs, promo } from '@/content/packs'
 import { useAuth } from '@/features/auth/useAuth'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import type { PaymentProduct } from '@/features/billing/api'
 import { getErrorMessage } from '@/lib/api'
 import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
+import { limitsWord } from '@/lib/plural'
 
-const { hero, note, cta } = pricing
+const { hero, operations: operationsCopy, note, cta } = pricing
 
 export function PricingPage() {
   const { isAuthenticated } = useAuth()
@@ -49,8 +50,8 @@ export function PricingPage() {
               <Alert>{error}</Alert>
             </div>
           )}
-          <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.map((p, i) => (
+          <div className="grid justify-center gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            {packs.map((p, i) => (
               <Reveal key={p.name} delay={i * 0.05}>
                 <PlanCard
                   plan={p}
@@ -71,6 +72,39 @@ export function PricingPage() {
           <p className="text-dim mt-7 text-center text-[13.5px]">
             {inline(promo.active ? `${promo.pricing} ${note}` : note)}
           </p>
+        </Container>
+      </section>
+
+      <section className="pb-10 sm:pb-16">
+        <Container>
+          <Reveal>
+            <div className="mx-auto max-w-[720px]">
+              <h2 className="text-ink text-center text-[26px] font-bold tracking-[-0.02em]">
+                {operationsCopy.title}
+              </h2>
+              <p className="text-muted mt-3 text-center text-[15px]">
+                {operationsCopy.lead}
+              </p>
+              <ul className="border-line bg-card divide-divider mt-7 divide-y rounded-2xl border px-6">
+                {operations.map((op) => (
+                  <li
+                    key={op.name}
+                    className="flex items-baseline justify-between gap-6 py-4"
+                  >
+                    <div>
+                      <p className="text-ink text-[15px] font-semibold">
+                        {op.name}
+                      </p>
+                      <p className="text-dim mt-1 text-[13px]">{op.note}</p>
+                    </div>
+                    <p className="text-ink shrink-0 text-[15px] font-bold whitespace-nowrap tabular-nums">
+                      {op.cost} {limitsWord(op.cost)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
         </Container>
       </section>
 

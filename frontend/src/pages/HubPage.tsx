@@ -5,14 +5,15 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
-import { PLAN_LABELS, productPrice } from '@/features/billing/labels'
+import { productPrice } from '@/features/billing/labels'
 import {
   PAYMENT_ID_KEY,
   billingKeys,
+  useBalance,
   usePayment,
-  useQuota,
 } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
+import { limitsWord } from '@/lib/plural'
 import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -43,27 +44,17 @@ function SectionCard({
   )
 }
 
-function PlanLine() {
-  const { data } = useQuota()
+function BalanceLine() {
+  const { data } = useBalance()
   if (!data) return null
-
-  const until = data.planExpiresAt
-    ? ` до ${formatDate(data.planExpiresAt)}`
-    : ''
 
   return (
     <p className="text-dim mt-10 text-[13.5px]">
-      Тариф:{' '}
-      <span className="text-ink font-semibold">
-        {PLAN_LABELS[data.plan]}
-        {until}
+      Лимиты:{' '}
+      <span className="text-ink font-semibold tabular-nums">
+        {data.limits} {limitsWord(data.limits)}
       </span>
-      <span className="tabular-nums">
-        {' '}
-        · осталось интервью: {data.planInterviewsLeft}, тренировок:{' '}
-        {data.planTrainingsLeft ?? 'безлимит'}
-      </span>{' '}
-      ·{' '}
+      {data.expiresAt && ` · действуют до ${formatDate(data.expiresAt)}`} ·{' '}
       <Link
         to="/pricing"
         className="text-indigo hover:text-violet transition-colors"
@@ -151,7 +142,7 @@ export function HubPage() {
         />
       </div>
 
-      <PlanLine />
+      <BalanceLine />
 
       {paid && !paymentFailed && (
         <PaymentSuccessModal

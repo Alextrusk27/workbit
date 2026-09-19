@@ -58,7 +58,7 @@ export function InterviewListPage() {
         title="Мои интервью"
         actions={
           <div className="flex items-center gap-4">
-            <QuotaBadge kind="interview" />
+            <QuotaBadge />
             <Link to="/app/interview/new" className={buttonClasses()}>
               Новое интервью
             </Link>

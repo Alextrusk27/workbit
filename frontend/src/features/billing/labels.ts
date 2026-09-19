@@ -1,16 +1,10 @@
-import { plans } from '@/content/plans'
-import type { PaymentProduct, Plan } from './api'
+import { packs } from '@/content/packs'
+import type { PaymentProduct } from './api'
 
-export const PLAN_LABELS: Record<Plan, string> = {
-  FREE: 'Старт',
-  PRO: 'Про',
-  MAX: 'Макс',
-}
-
-/** Цена продукта в рублях — из карточек тарифов (`content/plans.ts`),
+/** Цена продукта в рублях — из карточек пакетов (`content/packs.ts`),
  *  чтобы сумма для аналитики не разъезжалась с витриной. */
 export function productPrice(product: PaymentProduct): number | undefined {
-  const price = plans.find((p) => p.product === product)?.price
+  const price = packs.find((p) => p.product === product)?.price
   const value = price ? parseInt(price, 10) : NaN
   return Number.isFinite(value) ? value : undefined
 }

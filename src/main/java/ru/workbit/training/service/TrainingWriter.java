@@ -13,7 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
@@ -45,7 +46,7 @@ class TrainingWriter {
     private final TrainingQuestionRepository trainingQuestionRepository;
     private final ProfessionDictRepository professionDictRepository;
     private final SkillDictRepository skillDictRepository;
-    private final QuotaService quotaService;
+    private final LimitService limitService;
 
     private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingReportMapper trainingReportMapper;
@@ -65,7 +66,7 @@ class TrainingWriter {
     @Transactional
     public TrainingSessionResponse createSession(TrainingSession session, List<BankQuestion> bankQuestions,
                                                  List<String> generatedQuestions) {
-        quotaService.debitTraining(session.getUserId(), spendLabel(session));
+        limitService.debit(session.getUserId(), UsageEvent.Operation.TRAINING, spendLabel(session));
 
         List<TrainingQuestion> questions = new ArrayList<>();
         for (BankQuestion bankQuestion : bankQuestions) {
@@ -88,6 +89,7 @@ class TrainingWriter {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
+        limitService.debit(session.getUserId(), UsageEvent.Operation.TRAINING_MORE, moreLabel(session));
 
         List<TrainingQuestion> questions = session.getQuestions();
         int orderIndex = questions.stream().mapToInt(TrainingQuestion::getOrderIndex).max().orElse(0);
@@ -114,7 +116,7 @@ class TrainingWriter {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionCompleted(session);
-        quotaService.debitTraining(session.getUserId(), spendLabel(session));
+        limitService.debit(session.getUserId(), UsageEvent.Operation.TRAINING_RESTART, spendLabel(session));
 
         for (TrainingQuestion question : session.getQuestions()) {
             question.setFeedback(null);
@@ -135,6 +137,15 @@ class TrainingWriter {
         return "Тренировка — " + session.getSkill() + ", " + session.getLevel().getLabel();
     }
 
+    private static String moreLabel(TrainingSession session) {
+        return "Ещё вопросы — " + session.getSkill() + ", " + session.getLevel().getLabel();
+    }
+
+    private static String referenceAnswerLabel(TrainingQuestion question) {
+        return "Эталонный ответ — " + question.getTrainingSession().getSkill()
+                + ", вопрос " + question.getOrderIndex();
+    }
+
     private static TrainingQuestion buildQuestion(TrainingSession session, String text, UUID bankQuestionId,
                                                   String referenceAnswer, int orderIndex) {
         return TrainingQuestion.builder()
@@ -151,6 +162,17 @@ class TrainingWriter {
         trainingQuestionRepository.findById(questionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"))
                 .setReferenceAnswer(answer);
+    }
+
+    @Transactional
+    public void unlockReferenceAnswer(UUID questionId, String answer, UUID userId) {
+        TrainingQuestion question = trainingQuestionRepository.findWithSessionById(questionId)
+                .orElseThrow(() -> new NotFoundException("Question not found"));
+        limitService.debit(userId, UsageEvent.Operation.REFERENCE_ANSWER, referenceAnswerLabel(question));
+        if (answer != null) {
+            question.setReferenceAnswer(answer);
+        }
+        question.setReferenceAnswerUnlockedAt(Instant.now());
     }
 
     @Transactional

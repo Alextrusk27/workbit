@@ -26,7 +26,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
@@ -64,7 +65,7 @@ class TrainingWriterTest {
     @Mock
     SkillDictRepository skillDictRepository;
     @Mock
-    QuotaService quotaService;
+    LimitService limitService;
     @Mock
     TrainingSessionMapper trainingSessionMapper;
     @Mock
@@ -150,8 +151,8 @@ class TrainingWriterTest {
             assertThat(third.getReferenceAnswer()).isNull();
 
             verify(trainingSessionRepository).save(session);
-            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
-                    + TrainingSession.Level.MEDIUM.getLabel());
+            verify(limitService).debit(session.getUserId(), UsageEvent.Operation.TRAINING, "Тренировка — " + SKILL
+                    + ", " + TrainingSession.Level.MEDIUM.getLabel());
         }
 
         @Test
@@ -226,6 +227,8 @@ class TrainingWriterTest {
 
             verify(trainingSessionRepository).save(session);
             verify(trainingSessionMapper).toResponse(session, 1, 4);
+            verify(limitService).debit(session.getUserId(), UsageEvent.Operation.TRAINING_MORE,
+                    "Ещё вопросы — " + SKILL + ", " + TrainingSession.Level.MEDIUM.getLabel());
         }
 
         @Test
@@ -240,10 +243,11 @@ class TrainingWriterTest {
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
             verify(trainingSessionRepository, never()).save(any());
+            verifyNoInteractions(limitService);
         }
 
         @Test
-        @DisplayName("Сессия уже завершена - ConflictException")
+        @DisplayName("Сессия уже завершена - ConflictException, до списания не доходит")
         void throwsWhenSessionCompleted() {
             // given
             UUID sessionId = UUID.randomUUID();
@@ -259,6 +263,7 @@ class TrainingWriterTest {
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
             verify(trainingSessionRepository, never()).save(any());
+            verifyNoInteractions(limitService);
         }
     }
 
@@ -311,8 +316,8 @@ class TrainingWriterTest {
             assertThat(session.getStatus()).isEqualTo(TrainingSession.Status.CREATED);
             assertThat(session.getCompletedAt()).isNull();
             verify(trainingSessionRepository).save(session);
-            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — " + SKILL + ", "
-                    + TrainingSession.Level.MEDIUM.getLabel());
+            verify(limitService).debit(session.getUserId(), UsageEvent.Operation.TRAINING_RESTART,
+                    "Тренировка — " + SKILL + ", " + TrainingSession.Level.MEDIUM.getLabel());
         }
 
         @Test
@@ -334,7 +339,8 @@ class TrainingWriterTest {
             trainingWriter.restartSession(sessionId);
 
             // then
-            verify(quotaService).debitTraining(session.getUserId(), "Тренировка — Java, Средний");
+            verify(limitService).debit(session.getUserId(), UsageEvent.Operation.TRAINING_RESTART,
+                    "Тренировка — Java, Средний");
         }
 
         @Test
@@ -402,6 +408,70 @@ class TrainingWriterTest {
             assertThatThrownBy(() -> trainingWriter.saveReferenceAnswer(questionId, "Ответ"))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Question not found");
+        }
+    }
+
+    @Nested
+    @DisplayName("UnlockReferenceAnswer")
+    class UnlockReferenceAnswer {
+
+        @Test
+        @DisplayName("Передан сгенерированный ответ - выставляет referenceAnswer, списывает лимит и ставит unlockedAt")
+        void setsAnswerDebitsAndSetsUnlockedAt() {
+            // given
+            UUID questionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
+            TrainingQuestion question = TrainingQuestion.builder()
+                    .id(questionId).trainingSession(session).text("Что такое JVM?").orderIndex(3).build();
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            // when
+            trainingWriter.unlockReferenceAnswer(questionId, "Сгенерированный эталонный ответ", userId);
+
+            // then
+            assertThat(question.getReferenceAnswer()).isEqualTo("Сгенерированный эталонный ответ");
+            assertThat(question.getReferenceAnswerUnlockedAt()).isNotNull();
+            verify(limitService).debit(userId, UsageEvent.Operation.REFERENCE_ANSWER,
+                    "Эталонный ответ — " + SKILL + ", вопрос 3");
+        }
+
+        @Test
+        @DisplayName("Ответ не передан (банковый вопрос) - referenceAnswer не трогается, но списание и unlockedAt происходят")
+        void keepsExistingAnswerWhenAnswerIsNullButStillDebitsAndUnlocks() {
+            // given
+            UUID questionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            TrainingSession session = TrainingSession.builder()
+                    .skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
+            TrainingQuestion question = TrainingQuestion.builder()
+                    .id(questionId).trainingSession(session).text("Что такое JVM?")
+                    .referenceAnswer("Готовый ответ из банка").orderIndex(1).build();
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
+
+            // when
+            trainingWriter.unlockReferenceAnswer(questionId, null, userId);
+
+            // then
+            assertThat(question.getReferenceAnswer()).isEqualTo("Готовый ответ из банка");
+            assertThat(question.getReferenceAnswerUnlockedAt()).isNotNull();
+            verify(limitService).debit(userId, UsageEvent.Operation.REFERENCE_ANSWER,
+                    "Эталонный ответ — " + SKILL + ", вопрос 1");
+        }
+
+        @Test
+        @DisplayName("Вопрос не найден - NotFoundException, списания не происходит")
+        void throwsWhenQuestionNotFound() {
+            // given
+            UUID questionId = UUID.randomUUID();
+            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> trainingWriter.unlockReferenceAnswer(questionId, "ответ", UUID.randomUUID()))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Question not found");
+            verifyNoInteractions(limitService);
         }
     }
 

@@ -20,7 +20,9 @@ public record TrainingQuestionResponse(
         Integer score,
 
         @Schema(description = "Текстовый фидбэк по ответу от LLM, до формирования отчёта null")
-        String feedback
+        String feedback,
 
+        @Schema(description = "Эталонный ответ уже разблокирован, повторный просмотр бесплатен", example = "false")
+        boolean referenceAnswerUnlocked
 ) {
 }

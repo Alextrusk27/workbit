@@ -272,6 +272,10 @@ public class TrainingController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Вопросы добавлены"),
             @ApiResponse(
+                    responseCode = "402",
+                    description = "Не хватает лимитов",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "Сессия не найдена",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -297,13 +301,18 @@ public class TrainingController {
     @Operation(
             summary = "Посмотреть эталонный ответ",
             description = "Возвращает эталонный ответ на вопрос: у вопроса из банка он подготовлен заранее, у "
-            + "сгенерированного - создаётся через LLM при первом запросе и далее отдаётся из кеша.")
+            + "сгенерированного - создаётся через LLM при первом запросе и далее отдаётся из кеша. Первый просмотр "
+            + "списывает 1 лимит и доступен только после покупки любого пакета; повторный просмотр бесплатен.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Эталонный ответ"),
             @ApiResponse(
+                    responseCode = "402",
+                    description = "Не хватает лимитов",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(
                     responseCode = "403",
-                    description = "Вопрос принадлежит другому пользователю",
+                    description = "Вопрос принадлежит другому пользователю или пакет ещё не покупался",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(
                     responseCode = "404",
@@ -489,6 +498,10 @@ public class TrainingController {
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Тренировка перезапущена"),
+            @ApiResponse(
+                    responseCode = "402",
+                    description = "Не хватает лимитов",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(
                     responseCode = "404",
                     description = "Сессия не найдена",

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import ru.workbit.billing.model.Payment;
 
 public record PaymentCreateRequest(
-        @Schema(description = "Оплачиваемый продукт", example = "PLAN_PRO")
+        @Schema(description = "Оплачиваемый продукт", example = "PACK_200")
         @NotNull(message = "Product is required")
         Payment.Product product
 ) {

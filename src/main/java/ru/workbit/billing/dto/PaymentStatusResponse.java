@@ -7,7 +7,7 @@ public record PaymentStatusResponse(
         @Schema(description = "Статус платежа", example = "PAID")
         Payment.Status status,
 
-        @Schema(description = "Оплачиваемый продукт", example = "PLAN_PRO")
+        @Schema(description = "Оплачиваемый продукт", example = "PACK_200")
         Payment.Product product
 ) {
 }

@@ -25,16 +25,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.workbit.billing.dto.BalanceResponse;
 import ru.workbit.billing.dto.PaymentCreateRequest;
 import ru.workbit.billing.dto.PaymentCreateResponse;
 import ru.workbit.billing.dto.PaymentStatusResponse;
-import ru.workbit.billing.dto.QuotaResponse;
 import ru.workbit.billing.dto.UsageResponse;
-import ru.workbit.billing.model.BillingAccount;
 import ru.workbit.billing.model.Payment;
 import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.billing.service.PaymentService;
-import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.security.config.SecurityConfig;
@@ -57,7 +56,7 @@ class BillingControllerTest {
     private final ObjectMapper om = new ObjectMapper();
 
     @MockitoBean
-    QuotaService quotaService;
+    LimitService limitService;
 
     @MockitoBean
     PaymentService paymentService;
@@ -82,21 +81,20 @@ class BillingControllerTest {
     class GetQuota {
 
         @Test
-        @DisplayName("Возвращает 200 с тарифом и остатками квот")
-        void returns200WithQuota() throws Exception {
+        @DisplayName("Возвращает 200 с балансом лимитов")
+        void returns200WithBalance() throws Exception {
             // given
             var expiresAt = Instant.parse("2026-09-01T00:00:00Z");
-            var response = new QuotaResponse(BillingAccount.Plan.FREE, expiresAt, 1, 3);
-            when(quotaService.getQuota(USER_ID)).thenReturn(response);
+            var response = new BalanceResponse(20, expiresAt, false);
+            when(limitService.getBalance(USER_ID)).thenReturn(response);
 
             // when / then
             mvc.perform(get(BASE + "/quota")
                             .with(user(principal())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.plan").value("FREE"))
-                    .andExpect(jsonPath("$.planExpiresAt").value("2026-09-01T00:00:00Z"))
-                    .andExpect(jsonPath("$.planInterviewsLeft").value(1))
-                    .andExpect(jsonPath("$.planTrainingsLeft").value(3));
+                    .andExpect(jsonPath("$.limits").value(20))
+                    .andExpect(jsonPath("$.expiresAt").value("2026-09-01T00:00:00Z"))
+                    .andExpect(jsonPath("$.paid").value(false));
         }
 
         @Test
@@ -106,7 +104,7 @@ class BillingControllerTest {
             mvc.perform(get(BASE + "/quota"))
                     .andExpect(status().isUnauthorized());
 
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(limitService);
         }
     }
 
@@ -119,30 +117,29 @@ class BillingControllerTest {
     class GetUsage {
 
         @Test
-        @DisplayName("Возвращает 200 со счётчиками и историей операций")
+        @DisplayName("Возвращает 200 с балансом и историей операций")
         void returns200WithUsage() throws Exception {
             // given
+            var expiresAt = Instant.parse("2026-09-01T00:00:00Z");
             var at = Instant.parse("2026-08-10T12:00:00Z");
             var response = new UsageResponse(
-                    new UsageResponse.UsageCounter(1, 1),
-                    new UsageResponse.UsageCounter(2, 3),
+                    20, expiresAt, true,
                     List.of(new UsageResponse.UsageEventResponse(
-                            at, UsageEvent.Kind.SPEND, UsageEvent.Target.TRAINING, 1,
+                            at, UsageEvent.Kind.SPEND, UsageEvent.Operation.TRAINING, 10,
                             "Тренировка — Java, Средний")));
-            when(quotaService.getUsage(USER_ID)).thenReturn(response);
+            when(limitService.getUsage(USER_ID)).thenReturn(response);
 
             // when / then
             mvc.perform(get(BASE + "/usage")
                             .with(user(principal())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.interviews.left").value(1))
-                    .andExpect(jsonPath("$.interviews.total").value(1))
-                    .andExpect(jsonPath("$.trainings.left").value(2))
-                    .andExpect(jsonPath("$.trainings.total").value(3))
+                    .andExpect(jsonPath("$.limits").value(20))
+                    .andExpect(jsonPath("$.expiresAt").value("2026-09-01T00:00:00Z"))
+                    .andExpect(jsonPath("$.paid").value(true))
                     .andExpect(jsonPath("$.events[0].at").value("2026-08-10T12:00:00Z"))
                     .andExpect(jsonPath("$.events[0].kind").value("SPEND"))
-                    .andExpect(jsonPath("$.events[0].target").value("TRAINING"))
-                    .andExpect(jsonPath("$.events[0].delta").value(1))
+                    .andExpect(jsonPath("$.events[0].operation").value("TRAINING"))
+                    .andExpect(jsonPath("$.events[0].delta").value(10))
                     .andExpect(jsonPath("$.events[0].label").value("Тренировка — Java, Средний"));
         }
 
@@ -153,7 +150,7 @@ class BillingControllerTest {
             mvc.perform(get(BASE + "/usage"))
                     .andExpect(status().isUnauthorized());
 
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(limitService);
         }
     }
 
@@ -171,19 +168,19 @@ class BillingControllerTest {
             // given
             var paymentId = UUID.fromString("22222222-2222-2222-2222-222222222222");
             var response = new PaymentCreateResponse(paymentId, "https://auth.robokassa.ru/Merchant/Index/1");
-            when(paymentService.create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com"))
+            when(paymentService.create(USER_ID, Payment.Product.PACK_200, "user@example.com"))
                     .thenReturn(response);
 
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PLAN_PRO))))
+                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PACK_200))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.paymentId").value(paymentId.toString()))
                     .andExpect(jsonPath("$.paymentUrl").value("https://auth.robokassa.ru/Merchant/Index/1"));
 
-            verify(paymentService).create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com");
+            verify(paymentService).create(USER_ID, Payment.Product.PACK_200, "user@example.com");
         }
 
         @Test
@@ -192,7 +189,7 @@ class BillingControllerTest {
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PLAN_PRO))))
+                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PACK_200))))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(paymentService);
@@ -223,6 +220,23 @@ class BillingControllerTest {
 
             verifyNoInteractions(paymentService);
         }
+
+        @Test
+        @DisplayName("Возвращает 400, когда product снят с продажи")
+        void returns400WhenProductNotPurchasable() throws Exception {
+            // given
+            when(paymentService.create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com"))
+                    .thenThrow(new IllegalArgumentException("Product is not purchasable"));
+
+            // when / then
+            mvc.perform(post(BASE + "/payments")
+                            .with(user(principal()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PLAN_PRO))))
+                    .andExpect(status().isBadRequest());
+
+            verify(paymentService).create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -239,7 +253,7 @@ class BillingControllerTest {
         @DisplayName("Возвращает 200 со статусом и продуктом платежа")
         void returns200WithPaymentStatus() throws Exception {
             // given
-            var response = new PaymentStatusResponse(Payment.Status.PAID, Payment.Product.PLAN_PRO);
+            var response = new PaymentStatusResponse(Payment.Status.PAID, Payment.Product.PACK_200);
             when(paymentService.get(paymentId, USER_ID)).thenReturn(response);
 
             // when / then
@@ -247,7 +261,7 @@ class BillingControllerTest {
                             .with(user(principal())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("PAID"))
-                    .andExpect(jsonPath("$.product").value("PLAN_PRO"));
+                    .andExpect(jsonPath("$.product").value("PACK_200"));
         }
 
         @Test

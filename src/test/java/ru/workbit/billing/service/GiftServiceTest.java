@@ -21,7 +21,7 @@ class GiftServiceTest {
     private static final UUID USER_ID = UUID.randomUUID();
 
     @Mock
-    QuotaService quotaService;
+    LimitService limitService;
 
     @InjectMocks
     GiftService giftService;
@@ -38,8 +38,22 @@ class GiftServiceTest {
     class GrantPromoGift {
 
         @Test
-        @DisplayName("Оплата до дедлайна для PLAN_PRO — начисляет 2 интервью с меткой PROMO_LABEL")
-        void creditsProGiftBeforeDeadline() {
+        @DisplayName("Оплата пакета до дедлайна — начисляет 10 лимитов с меткой PROMO_LABEL")
+        void creditsGiftForPackBeforeDeadline() {
+            // given
+            Payment payment = aPayment(Payment.Product.PACK_50);
+            Instant paidAt = GiftService.PROMO_UNTIL.minusSeconds(3600);
+
+            // when
+            giftService.grantPromoGift(payment, paidAt);
+
+            // then
+            verify(limitService).creditGift(USER_ID, GiftService.GIFT_LIMITS, GiftService.PROMO_LABEL);
+        }
+
+        @Test
+        @DisplayName("Оплата legacy-продукта до дедлайна — начисляет те же 10 лимитов")
+        void creditsGiftForLegacyProductBeforeDeadline() {
             // given
             Payment payment = aPayment(Payment.Product.PLAN_PRO);
             Instant paidAt = GiftService.PROMO_UNTIL.minusSeconds(3600);
@@ -48,66 +62,49 @@ class GiftServiceTest {
             giftService.grantPromoGift(payment, paidAt);
 
             // then
-            verify(quotaService).creditInterviews(USER_ID, Payment.Product.PLAN_PRO.getGiftInterviews(),
-                    GiftService.PROMO_LABEL);
-        }
-
-        @Test
-        @DisplayName("Оплата до дедлайна для PLAN_MAX — начисляет 5 интервью с меткой PROMO_LABEL")
-        void creditsMaxGiftBeforeDeadline() {
-            // given
-            Payment payment = aPayment(Payment.Product.PLAN_MAX);
-            Instant paidAt = GiftService.PROMO_UNTIL.minusSeconds(3600);
-
-            // when
-            giftService.grantPromoGift(payment, paidAt);
-
-            // then
-            verify(quotaService).creditInterviews(USER_ID, Payment.Product.PLAN_MAX.getGiftInterviews(),
-                    GiftService.PROMO_LABEL);
+            verify(limitService).creditGift(USER_ID, GiftService.GIFT_LIMITS, GiftService.PROMO_LABEL);
         }
 
         @Test
         @DisplayName("Оплата за секунду до дедлайна — начисление есть")
         void creditsGiftOneSecondBeforeDeadline() {
             // given
-            Payment payment = aPayment(Payment.Product.PLAN_PRO);
+            Payment payment = aPayment(Payment.Product.PACK_50);
             Instant paidAt = GiftService.PROMO_UNTIL.minusSeconds(1);
 
             // when
             giftService.grantPromoGift(payment, paidAt);
 
             // then
-            verify(quotaService).creditInterviews(USER_ID, Payment.Product.PLAN_PRO.getGiftInterviews(),
-                    GiftService.PROMO_LABEL);
+            verify(limitService).creditGift(USER_ID, GiftService.GIFT_LIMITS, GiftService.PROMO_LABEL);
         }
 
         @Test
         @DisplayName("Оплата ровно в момент дедлайна — начисления нет")
         void doesNotCreditExactlyAtDeadline() {
             // given
-            Payment payment = aPayment(Payment.Product.PLAN_PRO);
+            Payment payment = aPayment(Payment.Product.PACK_50);
             Instant paidAt = GiftService.PROMO_UNTIL;
 
             // when
             giftService.grantPromoGift(payment, paidAt);
 
             // then
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(limitService);
         }
 
         @Test
         @DisplayName("Оплата после дедлайна — начисления нет")
         void doesNotCreditAfterDeadline() {
             // given
-            Payment payment = aPayment(Payment.Product.PLAN_PRO);
+            Payment payment = aPayment(Payment.Product.PACK_50);
             Instant paidAt = GiftService.PROMO_UNTIL.plusSeconds(3600);
 
             // when
             giftService.grantPromoGift(payment, paidAt);
 
             // then
-            verifyNoInteractions(quotaService);
+            verifyNoInteractions(limitService);
         }
     }
 }

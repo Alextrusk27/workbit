@@ -20,11 +20,14 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentProvider paymentProvider;
-    private final QuotaService quotaService;
+    private final LimitService limitService;
     private final GiftService giftService;
 
     @Transactional
     public PaymentCreateResponse create(UUID userId, Payment.Product product, String email) {
+        if (!product.isPurchasable()) {
+            throw new IllegalArgumentException("Product is not purchasable");
+        }
         Payment payment = paymentRepository.save(Payment.builder()
                 .invId(paymentRepository.nextInvId())
                 .userId(userId)
@@ -63,7 +66,7 @@ public class PaymentService {
         }
 
         Payment.Product product = payment.getProduct();
-        quotaService.creditPlan(payment.getUserId(), product.getPlan(), product.getLabel());
+        limitService.creditPack(payment.getUserId(), product, product.getLabel());
         giftService.grantPromoGift(payment, paidAt);
         log.info("Payment {} (invId {}) confirmed for user {}",
                 payment.getId(), payment.getInvId(), payment.getUserId());

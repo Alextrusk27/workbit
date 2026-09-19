@@ -54,19 +54,24 @@ public class Payment {
 
     @Getter
     public enum Product {
-        PLAN_PRO(BillingAccount.Plan.PRO, new BigDecimal("790.00"), "Тариф «Про» на 30 дней", 2),
-        PLAN_MAX(BillingAccount.Plan.MAX, new BigDecimal("1490.00"), "Тариф «Макс» на 30 дней", 5);
+        PACK_50(50, new BigDecimal("690.00"), "Пакет 50 лимитов", true),
+        PACK_200(200, new BigDecimal("2290.00"), "Пакет 200 лимитов", true),
+        PACK_500(500, new BigDecimal("4990.00"), "Пакет 500 лимитов", true),
+        @Deprecated
+        PLAN_PRO(400, new BigDecimal("790.00"), "Тариф «Про» на 30 дней", false),
+        @Deprecated
+        PLAN_MAX(1000, new BigDecimal("1490.00"), "Тариф «Макс» на 30 дней", false);
 
-        private final BillingAccount.Plan plan;
+        private final int limits;
         private final BigDecimal price;
         private final String label;
-        private final int giftInterviews;
+        private final boolean purchasable;
 
-        Product(BillingAccount.Plan plan, BigDecimal price, String label, int giftInterviews) {
-            this.plan = plan;
+        Product(int limits, BigDecimal price, String label, boolean purchasable) {
+            this.limits = limits;
             this.price = price;
             this.label = label;
-            this.giftInterviews = giftInterviews;
+            this.purchasable = purchasable;
         }
 
         public String getDescription() {

@@ -5,6 +5,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
+import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Field } from '@/components/ui/Field'
@@ -12,7 +13,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { packs } from '@/content/packs'
+import { freePack } from '@/content/limits'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useTheme, type Theme } from '@/lib/useTheme'
 
@@ -281,16 +282,14 @@ export function BrandPage() {
         </div>
       </Section>
 
-      <Section title="Карточка тарифа">
+      <Section title="Карточки тарифов">
         <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
-          {packs.slice(1, 3).map((p) => (
-            <PlanCard
-              key={p.name}
-              plan={p}
-              features={p.previewFeatures}
-              to="/pricing"
-            />
-          ))}
+          <PlanCard
+            plan={freePack}
+            features={freePack.previewFeatures}
+            to="/pricing"
+          />
+          <TopUpCard to="/pricing" />
         </div>
       </Section>
     </Container>

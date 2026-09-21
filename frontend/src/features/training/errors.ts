@@ -1,4 +1,4 @@
-import { OPERATION_COST } from '@/content/packs'
+import { OPERATION_COST } from '@/content/limits'
 import { apiErrorDetail, getErrorMessage } from '@/lib/api'
 
 /** Детали training-ошибок с бэка (ApiError.errors[0]). Стабильный контракт для UI. */
@@ -29,7 +29,7 @@ const RU_MESSAGE: Record<string, string> = {
   [TRAINING_DETAIL.QUESTION_LIMIT_REACHED]:
     'Достигнут потолок вопросов в одной тренировке. Заверши её и получи разбор.',
   [TRAINING_DETAIL.PURCHASE_REQUIRED]:
-    'Эталонные ответы доступны после покупки любого пакета лимитов.',
+    'Эталонные ответы доступны после первого пополнения баланса.',
 }
 
 /** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст.

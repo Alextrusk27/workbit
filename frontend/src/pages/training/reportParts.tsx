@@ -4,10 +4,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { FeedbackWidget } from '@/components/app/FeedbackWidget'
 import { Alert } from '@/components/ui/Alert'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { Limits } from '@/components/ui/LimitIcon'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
-import { OPERATION_COST } from '@/content/packs'
+import { OPERATION_COST } from '@/content/limits'
 import { billingKeys, useBalance } from '@/features/billing/useBilling'
 import { trainingApi, type TrainingQuestion } from '@/features/training/api'
 import { trainingErrorMessage } from '@/features/training/errors'
@@ -98,11 +99,11 @@ export function ReferenceAnswer({
       return (
         <Link
           to="/pricing"
-          title="Доступно после покупки любого пакета"
+          title="Доступно после первого пополнения"
           className={`${REFERENCE_LINK_CLASS} inline-flex items-center gap-1.5`}
         >
           <LockIcon />
-          Эталонный ответ — после покупки любого пакета
+          Эталонный ответ — после первого пополнения
         </Link>
       )
     }
@@ -113,7 +114,12 @@ export function ReferenceAnswer({
         className={REFERENCE_LINK_CLASS}
       >
         Посмотреть эталонный ответ
-        {!isUnlocked && balance?.paid && ` · ${OPERATION_COST.reference} лимит`}
+        {!isUnlocked && balance?.paid && (
+          <>
+            {' · '}
+            <Limits value={OPERATION_COST.reference} />
+          </>
+        )}
       </button>
     )
   }

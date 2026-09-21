@@ -6,7 +6,7 @@ import { seo as faqSeo } from '@/content/pages/faq'
 import { seo as homeSeo } from '@/content/pages/home'
 import { seo as pricingSeo } from '@/content/pages/pricing'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
-import { packs } from '@/content/packs'
+import { TOPUP, topUpQuote } from '@/content/limits'
 import type { PageSeo } from '@/content/types'
 
 export const SITE = 'https://workbit.ru'
@@ -17,12 +17,6 @@ export interface SeoPage extends PageSeo {
   jsonLd?: () => object[]
 }
 
-function price(value: string): string {
-  const match = /^(\d+) ₽$/.exec(value)
-  if (!match) throw new Error(`Unexpected plan price format: ${value}`)
-  return match[1]
-}
-
 export const seoPages: SeoPage[] = [
   {
     path: '/',
@@ -30,7 +24,7 @@ export const seoPages: SeoPage[] = [
     sources: [
       'frontend/src/content/pages/home.ts',
       'frontend/src/content/demo/heroChat.ts',
-      'frontend/src/content/packs.ts',
+      'frontend/src/content/limits.ts',
       'frontend/src/content/faq.ts',
     ],
     jsonLd: () => [
@@ -84,7 +78,7 @@ export const seoPages: SeoPage[] = [
     ...pricingSeo,
     sources: [
       'frontend/src/content/pages/pricing.ts',
-      'frontend/src/content/packs.ts',
+      'frontend/src/content/limits.ts',
     ],
     jsonLd: () => [
       {
@@ -94,10 +88,10 @@ export const seoPages: SeoPage[] = [
         url: SITE,
         applicationCategory: 'EducationalApplication',
         operatingSystem: 'Web',
-        offers: packs.map((p) => ({
+        offers: TOPUP.tiers.map((tier) => ({
           '@type': 'Offer',
-          name: p.product ? `Пакет ${p.name}` : p.name,
-          price: price(p.price),
+          name: `Пополнение на ${tier.from} лимитов`,
+          price: topUpQuote(tier.from).amount,
           priceCurrency: 'RUB',
           url: `${SITE}/pricing`,
         })),

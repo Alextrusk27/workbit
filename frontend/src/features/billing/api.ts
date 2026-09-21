@@ -13,9 +13,8 @@ export type UsageOperation =
   | 'TRAINING_RESTART'
   | 'TRAINING_MORE'
   | 'REFERENCE_ANSWER'
-  | 'PACK'
+  | 'TOPUP'
   | 'WELCOME'
-  | 'GIFT'
   | 'EXPIRE'
 
 export interface UsageEvent {
@@ -30,7 +29,6 @@ export interface Usage extends Balance {
   events: UsageEvent[]
 }
 
-export type PaymentProduct = 'PACK_50' | 'PACK_200' | 'PACK_500'
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED'
 
 export interface PaymentCreated {
@@ -40,16 +38,17 @@ export interface PaymentCreated {
 
 export interface Payment {
   status: PaymentStatus
-  product: PaymentProduct
+  limits: number
+  amount: number
 }
 
 export const billingApi = {
   balance: () => apiFetch<Balance>('/billing/quota'),
   usage: () => apiFetch<Usage>('/billing/usage'),
-  createPayment: (product: PaymentProduct) =>
+  createPayment: (limits: number) =>
     apiFetch<PaymentCreated>('/billing/payments', {
       method: 'POST',
-      body: { product },
+      body: { limits },
     }),
   payment: (id: string) => apiFetch<Payment>(`/billing/payments/${id}`),
 }

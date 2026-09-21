@@ -5,7 +5,7 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
-import { productPrice } from '@/features/billing/labels'
+import { Limits } from '@/components/ui/LimitIcon'
 import {
   PAYMENT_ID_KEY,
   billingKeys,
@@ -13,7 +13,6 @@ import {
   usePayment,
 } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
-import { limitsWord } from '@/lib/plural'
 import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -52,7 +51,7 @@ function BalanceLine() {
     <p className="text-dim mt-10 text-[13.5px]">
       Лимиты:{' '}
       <span className="text-ink font-semibold tabular-nums">
-        {data.limits} {limitsWord(data.limits)}
+        <Limits value={data.limits} />
       </span>
       {data.expiresAt && ` · действуют до ${formatDate(data.expiresAt)}`} ·{' '}
       <Link
@@ -96,14 +95,13 @@ export function HubPage() {
   useEffect(() => {
     if (payment?.status !== 'PAID') return
     sessionStorage.removeItem(PAYMENT_ID_KEY)
-    const price = productPrice(payment.product)
-    reachGoal(
-      'payment_success',
-      price !== undefined ? { order_price: price, currency: 'RUB' } : undefined,
-    )
+    reachGoal('payment_success', {
+      order_price: payment.amount,
+      currency: 'RUB',
+    })
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     qc.invalidateQueries({ queryKey: billingKeys.usage })
-  }, [payment?.status, payment?.product, qc])
+  }, [payment?.status, payment?.amount, qc])
 
   return (
     <Container>

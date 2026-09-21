@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
-import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ChatBubble } from '@/components/chat/ChatBubble'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
@@ -12,6 +11,7 @@ import { HeroChatDemo } from '@/components/marketing/HeroChatDemo'
 import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
+import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 import {
   IconChart,
@@ -23,7 +23,6 @@ import {
 } from '@/components/marketing/icons'
 import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
-import { packs, promo } from '@/content/packs'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
@@ -432,24 +431,14 @@ export function HomePage() {
         <Container>
           <Reveal>
             <SectionHead title={pricing.title}>
-              {inline(
-                promo.active ? `${pricing.lead} ${promo.home}` : pricing.lead,
-              )}
+              {inline(pricing.lead)}
             </SectionHead>
           </Reveal>
-          <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {packs
-              .filter((p) => p.product)
-              .map((p, i) => (
-                <Reveal key={p.name} delay={i * 0.05}>
-                  <PlanCard
-                    plan={p}
-                    features={p.previewFeatures}
-                    to="/pricing"
-                  />
-                </Reveal>
-              ))}
-          </div>
+          <Reveal>
+            <div className="mx-auto max-w-[560px]">
+              <TopUpCard to="/pricing" />
+            </div>
+          </Reveal>
         </Container>
       </section>
 

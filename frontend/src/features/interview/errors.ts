@@ -1,4 +1,4 @@
-import { OPERATION_COST } from '@/content/packs'
+import { OPERATION_COST } from '@/content/limits'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 
 /** Русское сообщение об ошибке создания интервью. Бэк отдаёт текст по-английски,

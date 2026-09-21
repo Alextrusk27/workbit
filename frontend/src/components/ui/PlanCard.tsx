@@ -1,30 +1,7 @@
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import type { Pack } from '@/content/packs'
+import type { Pack } from '@/content/limits'
 import { cn } from '@/lib/cn'
-
-function GiftIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="15"
-      height="15"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="shrink-0"
-    >
-      <path d="M20 12v10H4V12" />
-      <path d="M2 7h20v5H2z" />
-      <path d="M12 22V7" />
-      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-    </svg>
-  )
-}
 
 interface PlanCardProps {
   plan: Pack
@@ -38,7 +15,7 @@ interface PlanCardProps {
   heading?: 'h2' | 'h3'
 }
 
-/** Карточка тарифа: цена, состав и переход к оформлению. */
+/** Карточка пакета: цена, состав и переход к оформлению. */
 export function PlanCard({
   plan,
   features,
@@ -83,12 +60,6 @@ export function PlanCard({
           {plan.period}
         </span>
       </p>
-      {plan.promo && (
-        <p className="bg-violet/12 border-violet/25 text-violet-strong mt-4.5 flex items-center gap-2.5 rounded-lg border px-3.5 py-[9px] text-[13px] leading-snug font-semibold">
-          <GiftIcon />
-          {plan.promo}
-        </p>
-      )}
       <ul className="mt-5.5 flex grow flex-col gap-2.5">
         {features.map((f) => (
           <li key={f} className="text-muted flex gap-2.5 text-[14.5px]">

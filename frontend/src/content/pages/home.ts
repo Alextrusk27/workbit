@@ -38,7 +38,6 @@ export interface HomeContent {
     cta: Cta
     steps: { label: string; value: string }[]
   }
-  pricing: { title: string; lead: string }
   faq: { title: string; lead: string }
   cta: {
     title: string
@@ -165,10 +164,6 @@ export const home: HomeContent = {
       { label: 'Профессия', value: 'Менеджер по продажам' },
       { label: 'Уровень', value: 'Средний' },
     ],
-  },
-  pricing: {
-    title: 'Тарифы',
-    lead: 'Без автоплатежей.',
   },
   faq: {
     title: 'Частые вопросы',

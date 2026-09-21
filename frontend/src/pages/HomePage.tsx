@@ -11,7 +11,6 @@ import { HeroChatDemo } from '@/components/marketing/HeroChatDemo'
 import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { Reveal } from '@/components/marketing/Reveal'
 import { SectionHead } from '@/components/marketing/SectionHead'
-import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 import {
   IconChart,
@@ -25,7 +24,6 @@ import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
-import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { cn } from '@/lib/cn'
 import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
@@ -37,7 +35,7 @@ const icons: Record<HomeIcon, typeof IconRole> = {
   clock: IconClock,
 }
 
-const { hero, simulator, demo, trainer, pricing, faq, cta } = home
+const { hero, simulator, demo, trainer, faq, cta } = home
 const { progress } = demo
 
 const chartYs = [
@@ -95,7 +93,6 @@ function StepCard({
 
 export function HomePage() {
   const { isAuthenticated } = useAuth()
-  const openTopUp = useTopUpModal()
   const link = (c: Cta) => ctaLink(c, { start: '/app', isAuthenticated })
 
   return (
@@ -424,21 +421,6 @@ export function HomePage() {
                   </div>
                 ))}
               </div>
-            </div>
-          </Reveal>
-        </Container>
-      </section>
-
-      <section id="pricing" className="scroll-mt-20 py-10 sm:py-16">
-        <Container>
-          <Reveal>
-            <SectionHead title={pricing.title}>
-              {inline(pricing.lead)}
-            </SectionHead>
-          </Reveal>
-          <Reveal>
-            <div className="mx-auto max-w-[560px]">
-              <TopUpCard onBuy={openTopUp} />
             </div>
           </Reveal>
         </Container>

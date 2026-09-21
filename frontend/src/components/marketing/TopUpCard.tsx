@@ -7,6 +7,10 @@ import { cn } from '@/lib/cn'
 import { limitsWord } from '@/lib/plural'
 
 const DEFAULT_LIMITS = 200
+const DISCOUNT_FROM = TOPUP.tiers[1].from
+const MAX_PERCENT = Math.round(
+  (1 - TOPUP.tiers.at(-1)!.price / TOPUP.tiers[0].price) * 100,
+)
 
 function rub(value: number): string {
   return value.toLocaleString('ru-RU')
@@ -69,7 +73,8 @@ export function TopUpCard({
   const [raw, setRaw] = useState(String(initialLimits))
   const [limits, setLimits] = useState(initialLimits)
   const quote = topUpQuote(limits)
-  const base = TOPUP.tiers[0].price
+  const oldAmount = quote.amount + quote.saving
+  const percent = Math.round((quote.saving / oldAmount) * 100)
   const unit = limitsToUnit(limits)
 
   const pick = (value: number) => {
@@ -126,24 +131,30 @@ export function TopUpCard({
           <p className="text-ink text-[28px] leading-none font-extrabold tracking-[-0.03em] tabular-nums sm:text-[36px]">
             {rub(quote.amount)} ₽
           </p>
-          <p className="text-muted mt-2 flex items-center justify-end gap-2 text-[13.5px] whitespace-nowrap tabular-nums">
-            <span className="inline-flex items-center gap-1">
-              {rub(quote.perLimit)} ₽ / <LimitIcon className="size-[0.9em]" />
-              <span className="sr-only">лимит</span>
-            </span>
-            {quote.discount > 0 && (
-              <>
-                <s className="text-dim max-sm:hidden">{rub(base)} ₽</s>
-                <span className="text-violet-strong font-semibold">
-                  −{quote.discount}%
-                </span>
-              </>
+          <p
+            className={cn(
+              'text-muted mt-2 flex items-center justify-end gap-2 text-[13.5px] whitespace-nowrap tabular-nums',
+              quote.saving === 0 && 'invisible',
             )}
+          >
+            <s className="text-dim">{rub(oldAmount)} ₽</s>
+            <span className="text-violet-strong font-semibold">
+              −{rub(quote.saving)} ₽
+            </span>
+            <span className="bg-violet/13 border-violet/22 text-violet-strong rounded-full border px-2.5 py-[2px] text-xs font-bold whitespace-nowrap">
+              −{percent}%
+            </span>
           </p>
         </div>
       </div>
 
       <div className="mt-6">
+        <p className="text-muted mb-3 text-[13px]">
+          <span className="text-violet-strong font-semibold">
+            Скидка до {MAX_PERCENT}%
+          </span>{' '}
+          при покупке от <Limits value={DISCOUNT_FROM} />
+        </p>
         <div className="relative">
           <input
             type="range"

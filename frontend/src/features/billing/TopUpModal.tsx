@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { IconClose } from '@/components/marketing/icons'
 import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { Alert } from '@/components/ui/Alert'
 import { Limits } from '@/components/ui/LimitIcon'
@@ -105,7 +106,7 @@ function TopUpModal({
             }}
           >
             {error && <Alert>{error}</Alert>}
-            <div className="bg-pop shadow-chat rounded-2xl">
+            <div className="bg-pop shadow-chat relative rounded-2xl">
               <TopUpCard
                 initialLimits={initialLimits}
                 onBuy={isAuthenticated ? buy : undefined}
@@ -132,14 +133,15 @@ function TopUpModal({
                   Лимиты действуют 3 месяца с момента последней покупки.
                 </p>
               </TopUpCard>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Закрыть"
+                className="text-muted hover:text-ink hover:bg-indigo/8 absolute top-4 right-4 inline-flex size-9 items-center justify-center rounded-md transition-colors"
+              >
+                <IconClose className="size-5" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-muted hover:text-ink mx-auto text-[13.5px] transition-colors"
-            >
-              Закрыть
-            </button>
           </motion.div>
         </motion.div>
       )}

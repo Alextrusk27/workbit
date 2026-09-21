@@ -43,11 +43,8 @@ export const TOPUP = {
 } as const
 
 export interface TopUpQuote {
-  limits: number
-  perLimit: number
   amount: number
-  /** Скидка от базовой цены в процентах, 0 на первой ступени. */
-  discount: number
+  saving: number
 }
 
 export function normalizeLimits(value: number): number {
@@ -57,14 +54,9 @@ export function normalizeLimits(value: number): number {
 }
 
 export function topUpQuote(limits: number): TopUpQuote {
-  const base = TOPUP.tiers[0].price
   const tier = [...TOPUP.tiers].reverse().find((t) => limits >= t.from)!
-  return {
-    limits,
-    perLimit: tier.price,
-    amount: Math.floor(limits * tier.price),
-    discount: Math.round((1 - tier.price / base) * 100),
-  }
+  const amount = Math.floor(limits * tier.price)
+  return { amount, saving: limits * TOPUP.tiers[0].price - amount }
 }
 
 export const freePack: Pack = {

@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { OPERATION_COST } from '@/content/limits'
+import { TopUpLink } from '@/features/billing/TopUpLink'
 import { apiErrorDetail, getErrorMessage } from '@/lib/api'
 
 /** Детали training-ошибок с бэка (ApiError.errors[0]). Стабильный контракт для UI. */
@@ -32,15 +34,19 @@ const RU_MESSAGE: Record<string, string> = {
     'Эталонные ответы доступны после первого пополнения баланса.',
 }
 
-/** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст.
- *  `operation` подставляет цену в текст 402 — стоит операция по-разному. */
+/** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст. */
 export function trainingErrorMessage(
   error: unknown,
   operation: TrainingOperation = 'training',
-): string {
+): ReactNode {
   const detail = apiErrorDetail(error)
   if (detail === TRAINING_DETAIL.NOT_ENOUGH_LIMITS)
-    return `Не хватает лимитов: ${OPERATION_NAME[operation]} стоит ${OPERATION_COST[operation]}. Пополни баланс на странице тарифов.`
+    return (
+      <>
+        Не хватает лимитов: {OPERATION_NAME[operation]} стоит{' '}
+        {OPERATION_COST[operation]}. <TopUpLink />.
+      </>
+    )
   if (detail && RU_MESSAGE[detail]) return RU_MESSAGE[detail]
   return getErrorMessage(error)
 }

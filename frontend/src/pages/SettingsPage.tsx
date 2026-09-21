@@ -182,9 +182,9 @@ function UsageHistory({ events }: { events: UsageEvent[] }) {
           </div>
 
           <ul className="mt-3">
-            {visible.map((row, i) => (
+            {visible.map((row) => (
               <li
-                key={i}
+                key={`${row.at}|${row.operation}|${row.label}`}
                 className="border-divider grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 border-t py-[11px] last:border-b sm:flex sm:items-baseline sm:gap-4"
               >
                 <span className="text-dim col-start-1 row-start-1 text-[13px] tabular-nums sm:w-[140px] sm:shrink-0">

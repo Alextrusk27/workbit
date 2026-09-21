@@ -1,17 +1,8 @@
 export interface Pack {
   name: string
   price: string
-  /** Перечёркнутая цена до скидки — показывается вместе с плашкой discount. */
-  oldPrice?: string
-  /** Текст плашки скидки, например «−30%». */
-  discount?: string
-  period: string
   cta: string
-  featured: boolean
-  /** Полный список — страница тарифов. */
   features: string[]
-  /** Короткий список — превью на главной. */
-  previewFeatures: string[]
 }
 
 export const OPERATION_COST = {
@@ -28,7 +19,6 @@ export const operations: { name: string; cost: number }[] = [
   { name: 'Тренировка навыка, 10 вопросов', cost: OPERATION_COST.training },
 ]
 
-/** Зеркало `TopUpPricing` на бэке: границы, шаг и ступени цены за лимит. */
 export const TOPUP = {
   min: 10,
   max: 500,
@@ -62,16 +52,8 @@ export function topUpQuote(limits: number): TopUpQuote {
 export const freePack: Pack = {
   name: 'Бесплатно',
   price: '0 ₽',
-  period: '',
   cta: 'Начать бесплатно',
-  featured: false,
   features: [
-    `${WELCOME_LIMITS} лимитов при регистрации`,
-    'Хватит на AI-интервью или две тренировки',
-    'Полный разбор: оценки и правки на полях',
-    'Эталонные ответы — после первого пополнения',
-  ],
-  previewFeatures: [
     `${WELCOME_LIMITS} лимитов при регистрации`,
     'AI-интервью или две тренировки',
     'Полный разбор ответов',

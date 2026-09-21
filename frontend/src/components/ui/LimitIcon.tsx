@@ -1,10 +1,6 @@
 import { cn } from '@/lib/cn'
 import { limitsWord } from '@/lib/plural'
 
-/** Знак лимитов — внутренней валюты Workbit: четырёхлучевая искра, «заряд на
- *  попытку». Одна форма, `currentColor`, читается в 16 px. Ставится после числа,
- *  как ₽: «20 ✦». Размер — от кегля (`1em`), переопределяется через `className`.
- *  Источник и варианты (заливка/обводка) — `docs/design/limit-glyphs/`. */
 export function LimitIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -18,8 +14,6 @@ export function LimitIcon({ className }: { className?: string }) {
   )
 }
 
-/** Число лимитов со знаком: «20 ✦». Для скринридера слово остаётся — «20 лимитов».
- *  `prefix` — знак операции в истории списаний («−», «+»). */
 export function Limits({
   value,
   prefix,

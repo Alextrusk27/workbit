@@ -10,6 +10,7 @@ import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { OPERATION_COST } from '@/content/limits'
 import type { SessionStatus, TrainingSession } from '@/features/training/api'
 import { formatDate } from '@/lib/dates'
 import { trainingErrorMessage } from '@/features/training/errors'
@@ -50,7 +51,7 @@ export function TrainingListPage() {
         title="Мои тренировки"
         actions={
           <div className="flex items-center gap-4">
-            <QuotaBadge />
+            <QuotaBadge lowBelow={OPERATION_COST.training} />
             <Link to="/app/training/new" className={buttonClasses()}>
               Новая тренировка
             </Link>

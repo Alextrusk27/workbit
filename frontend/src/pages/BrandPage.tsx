@@ -284,11 +284,7 @@ export function BrandPage() {
 
       <Section title="Карточки тарифов">
         <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
-          <PlanCard
-            plan={freePack}
-            features={freePack.previewFeatures}
-            to="/login"
-          />
+          <PlanCard plan={freePack} to="/login" />
           <TopUpCard />
         </div>
       </Section>

@@ -1,13 +1,12 @@
-import { OPERATION_COST } from '@/content/limits'
 import { useBalance } from '@/features/billing/useBilling'
 import { Limits } from '@/components/ui/LimitIcon'
 import { cn } from '@/lib/cn'
 
 /** Баланс лимитов; при загрузке или ошибке не рендерится. */
-export function QuotaBadge() {
+export function QuotaBadge({ lowBelow }: { lowBelow: number }) {
   const { data } = useBalance()
   if (!data) return null
-  const low = data.limits < OPERATION_COST.interview
+  const low = data.limits < lowBelow
   return (
     <span
       className={cn(

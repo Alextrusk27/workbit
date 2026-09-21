@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DictationHints } from '@/components/speech/DictationHints'
 import { MicButton } from '@/components/speech/MicButton'
@@ -338,7 +338,7 @@ function FinishBar({
   onFinish: () => void
   batch: number
   addPending: boolean
-  addError: string | null
+  addError: ReactNode
   onAddQuestions: () => void
 }) {
   if (pending) {

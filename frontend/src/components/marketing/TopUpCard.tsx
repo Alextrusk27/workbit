@@ -20,7 +20,6 @@ const STOPS = TOPUP.tiers.map((tier) => tier.from)
 const SEGMENT = 100
 const SLIDER_MAX = (STOPS.length - 1) * SEGMENT
 const THUMB = 20
-/** Ширина бегунка в единицах слайдера: точка ступени под ним не рисуется. */
 const THUMB_UNITS = 15
 
 function unitToLimits(unit: number): number {
@@ -38,15 +37,12 @@ function limitsToUnit(limits: number): number {
   )
 }
 
-/** Позиция центра бегунка для отметки `i`: бегунок ходит от `THUMB/2` до
- *  `100% − THUMB/2`, поэтому точки и подписи ступеней считаются от той же оси. */
 function stopLeft(i: number): string {
   const f = i / (STOPS.length - 1)
   return `calc(${f * 100}% + ${THUMB / 2 - THUMB * f}px)`
 }
 
 interface TopUpCardProps {
-  /** Запуск оплаты на выбранное число лимитов; без него CTA — ссылка `to`. */
   onBuy?: (limits: number) => void
   to?: string
   initialLimits?: number
@@ -54,11 +50,9 @@ interface TopUpCardProps {
   disabled?: boolean
   className?: string
   children?: ReactNode
-  /** Уровень заголовка карточки в иерархии страницы. */
   heading?: 'h2' | 'h3'
 }
 
-/** Карточка пополнения: выбор числа лимитов, цена по ступеням и переход к оплате. */
 export function TopUpCard({
   onBuy,
   to = '/login',

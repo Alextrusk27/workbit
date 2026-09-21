@@ -62,9 +62,6 @@ const REFERENCE_LINK_CLASS =
 
 /** Эталонный ответ по кнопке: до первого клика запрос не уходит, дальше
  *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM.
- *  Первый просмотр стоит 1 лимит и открыт только после покупки, поэтому
- *  кнопка показывает цену, пока `unlocked` не стал true (сам флаг из DTO
- *  или удачный ответ в этом кэше), а без покупки — замок со ссылкой на тарифы.
  *  `withFeedback` добавляет лайк/дизлайк под текстом — для прогона, где
  *  виджета кейса ещё нет; в отчёте оценивается кейс целиком. */
 export function ReferenceAnswer({
@@ -82,18 +79,15 @@ export function ReferenceAnswer({
   const qc = useQueryClient()
   const { data: balance } = useBalance()
   const openTopUp = useTopUpModal()
-  const { data, isFetching, isError, error } = useReferenceAnswer(
-    sessionId,
-    questionId,
-    open,
-  )
+  const { data, isFetching, isFetchedAfterMount, isError, error } =
+    useReferenceAnswer(sessionId, questionId, open)
   const isUnlocked = unlocked || data !== undefined
 
   useEffect(() => {
-    if (!data || unlocked) return
+    if (!data || unlocked || !isFetchedAfterMount) return
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     qc.invalidateQueries({ queryKey: keys.report(sessionId) })
-  }, [data, unlocked, qc, sessionId])
+  }, [data, unlocked, isFetchedAfterMount, qc, sessionId])
 
   if (!open) {
     if (!isUnlocked && balance?.paid === false) {

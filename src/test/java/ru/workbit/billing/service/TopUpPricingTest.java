@@ -19,13 +19,13 @@ class TopUpPricingTest {
     class Validate {
 
         @ParameterizedTest(name = "{0} лимитов проходит")
-        @ValueSource(ints = {50, 60, 490, 500, 5000})
+        @ValueSource(ints = {10, 20, 490, 500})
         void acceptsValidLimits(int limits) {
             assertThatCode(() -> TopUpPricing.validate(limits)).doesNotThrowAnyException();
         }
 
         @ParameterizedTest(name = "{0} лимитов — вне диапазона")
-        @ValueSource(ints = {0, 40, 5010, -50})
+        @ValueSource(ints = {0, 510, -10})
         void rejectsOutOfRange(int limits) {
             assertThatThrownBy(() -> TopUpPricing.validate(limits))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -33,7 +33,7 @@ class TopUpPricingTest {
         }
 
         @ParameterizedTest(name = "{0} лимитов — не кратно 10")
-        @ValueSource(ints = {55, 101, 4999})
+        @ValueSource(ints = {15, 101, 499})
         void rejectsNotMultipleOfStep(int limits) {
             assertThatThrownBy(() -> TopUpPricing.validate(limits))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -47,7 +47,8 @@ class TopUpPricingTest {
 
         @ParameterizedTest(name = "{0} лимитов: {1} ₽/лимит, итого {2} ₽")
         @CsvSource({
-                "50, 15.00, 750.00",
+                "10, 15.00, 150.00",
+                "40, 15.00, 600.00",
                 "90, 15.00, 1350.00",
                 "100, 13.50, 1350.00",
                 "190, 13.50, 2565.00",
@@ -55,7 +56,6 @@ class TopUpPricingTest {
                 "300, 11.00, 3300.00",
                 "490, 11.00, 5390.00",
                 "500, 10.00, 5000.00",
-                "5000, 10.00, 50000.00",
         })
         void appliesTierPriceToWholeVolume(int limits, String perLimit, String amount) {
             assertThat(TopUpPricing.pricePerLimit(limits)).isEqualByComparingTo(perLimit);
@@ -66,7 +66,7 @@ class TopUpPricingTest {
         @Test
         @DisplayName("Ниже минимума — IllegalArgumentException")
         void throwsBelowMinimum() {
-            assertThatThrownBy(() -> TopUpPricing.pricePerLimit(40))
+            assertThatThrownBy(() -> TopUpPricing.pricePerLimit(0))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }

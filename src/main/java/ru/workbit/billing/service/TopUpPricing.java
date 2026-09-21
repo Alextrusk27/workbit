@@ -6,8 +6,8 @@ import java.util.List;
 
 public final class TopUpPricing {
 
-    public static final int MIN_LIMITS = 50;
-    public static final int MAX_LIMITS = 5000;
+    public static final int MIN_LIMITS = 10;
+    public static final int MAX_LIMITS = 500;
     public static final int STEP = 10;
 
     public static final List<Tier> TIERS = List.of(
@@ -15,7 +15,7 @@ public final class TopUpPricing {
             new Tier(300, new BigDecimal("11.00")),
             new Tier(200, new BigDecimal("12.00")),
             new Tier(100, new BigDecimal("13.50")),
-            new Tier(50, new BigDecimal("15.00")));
+            new Tier(10, new BigDecimal("15.00")));
 
     private TopUpPricing() {
     }

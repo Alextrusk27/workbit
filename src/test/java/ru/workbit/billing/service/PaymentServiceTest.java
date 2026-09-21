@@ -103,7 +103,7 @@ class PaymentServiceTest {
         @DisplayName("Число лимитов ниже минимума — IllegalArgumentException, репозиторий и провайдер не трогаются")
         void throwsBelowMinimum() {
             // when / then
-            assertThatThrownBy(() -> paymentService.create(USER_ID, 40, EMAIL))
+            assertThatThrownBy(() -> paymentService.create(USER_ID, 0, EMAIL))
                     .isInstanceOf(IllegalArgumentException.class);
             verifyNoInteractions(paymentRepository, paymentProvider);
         }

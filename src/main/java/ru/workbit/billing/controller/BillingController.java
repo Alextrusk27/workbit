@@ -84,7 +84,7 @@ public class BillingController {
     @PostMapping("/payments")
     @Loggable(logArgs = true)
     @Operation(summary = "Создать платёж",
-            description = "Создаёт платёж за пополнение баланса на указанное число лимитов (50-5000, кратно 10) и "
+            description = "Создаёт платёж за пополнение баланса на указанное число лимитов (10-500, кратно 10) и "
                     + "возвращает URL платёжной страницы Робокассы для редиректа. Сумму считает сервер по сетке "
                     + "объёмных скидок.")
     @SecurityRequirement(name = "bearerAuth")

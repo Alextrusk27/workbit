@@ -11,7 +11,7 @@ UPDATE billing.usage_event
 SET delta = delta * CASE operation WHEN 'INTERVIEW' THEN 20 ELSE 10 END;
 
 UPDATE billing.usage_event
-SET operation = CASE WHEN label = 'Подарок за покупку' THEN 'GIFT' ELSE 'PACK' END
+SET operation = 'TOPUP'
 WHERE kind = 'CREDIT';
 
 CREATE TEMP TABLE pack_pairs AS
@@ -22,7 +22,7 @@ SELECT user_id,
        sum(delta)                     AS total
 FROM billing.usage_event
 WHERE kind = 'CREDIT'
-  AND operation = 'PACK'
+  AND operation = 'TOPUP'
 GROUP BY user_id, at, label
 HAVING count(*) > 1;
 
@@ -37,7 +37,7 @@ WHERE e.user_id = p.user_id
   AND e.at = p.at
   AND e.label = p.label
   AND e.kind = 'CREDIT'
-  AND e.operation = 'PACK'
+  AND e.operation = 'TOPUP'
   AND e.id <> p.keep_id;
 
 DROP TABLE pack_pairs;
@@ -45,7 +45,7 @@ DROP TABLE pack_pairs;
 ALTER TABLE billing.usage_event
     ADD CONSTRAINT chk_usage_event_operation
         CHECK (operation IN ('INTERVIEW', 'TRAINING', 'TRAINING_RESTART', 'TRAINING_MORE', 'REFERENCE_ANSWER',
-                             'PACK', 'WELCOME', 'GIFT', 'EXPIRE'));
+                             'TOPUP', 'WELCOME', 'EXPIRE'));
 
 ALTER TABLE billing.account
     ADD COLUMN limits           INT NOT NULL DEFAULT 0,
@@ -88,11 +88,16 @@ ALTER TABLE billing.account
         CHECK (limits >= 0 AND (limits = 0 OR limits_expire_at IS NOT NULL));
 
 ALTER TABLE billing.payment
-    DROP CONSTRAINT chk_payment_product;
+    ADD COLUMN limits INT;
+
+UPDATE billing.payment
+SET limits = CASE product WHEN 'PLAN_PRO' THEN 400 WHEN 'PLAN_MAX' THEN 1000 END;
 
 ALTER TABLE billing.payment
-    ADD CONSTRAINT chk_payment_product
-        CHECK (product IN ('PLAN_PRO', 'PLAN_MAX', 'PACK_50', 'PACK_200', 'PACK_500'));
+    ALTER COLUMN limits SET NOT NULL,
+    DROP CONSTRAINT chk_payment_product,
+    DROP COLUMN product,
+    ADD CONSTRAINT chk_payment_limits CHECK (limits > 0);
 
 ALTER TABLE training.question
     ADD COLUMN reference_answer_unlocked_at TIMESTAMPTZ;

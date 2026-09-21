@@ -33,12 +33,5 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
                 paid_at = COALESCE(paid_at, :now)
             WHERE user_id = :userId
             """, nativeQuery = true)
-    void creditPack(UUID userId, int limits, Instant now);
-
-    @Modifying
-    @Query(value = """
-            UPDATE billing.account SET limits = limits + :limits
-            WHERE user_id = :userId
-            """, nativeQuery = true)
-    void creditGift(UUID userId, int limits);
+    void creditTopUp(UUID userId, int limits, Instant now);
 }

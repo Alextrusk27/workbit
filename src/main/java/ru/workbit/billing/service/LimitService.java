@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.billing.dto.BalanceResponse;
 import ru.workbit.billing.dto.UsageResponse;
 import ru.workbit.billing.model.BillingAccount;
-import ru.workbit.billing.model.Payment;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.repository.BillingAccountRepository;
 import ru.workbit.billing.repository.UsageEventRepository;
@@ -68,7 +67,7 @@ public class LimitService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void creditPack(UUID userId, Payment.Product product, String label) {
+    public void creditTopUp(UUID userId, int limits, String label) {
         insertIfAbsent(userId);
         Instant now = Instant.now();
         BillingAccount account = load(userId);
@@ -76,16 +75,9 @@ public class LimitService {
             saveEvent(userId, UsageEvent.Kind.SPEND, UsageEvent.Operation.EXPIRE,
                     account.getLimits(), EXPIRE_LABEL, now);
         }
-        billingAccountRepository.creditPack(userId, product.getLimits(), now);
-        saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.PACK, product.getLimits(), label, now);
-        log.info("Credited {} ({} limits) to user {}", product, product.getLimits(), userId);
-    }
-
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void creditGift(UUID userId, int limits, String label) {
-        billingAccountRepository.creditGift(userId, limits);
-        saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.GIFT, limits, label, Instant.now());
-        log.info("Credited {} gift limits to user {}", limits, userId);
+        billingAccountRepository.creditTopUp(userId, limits, now);
+        saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.TOPUP, limits, label, now);
+        log.info("Credited {} limits to user {}", limits, userId);
     }
 
     @Transactional

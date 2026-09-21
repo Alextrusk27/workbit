@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,15 +44,11 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
     }
 
     private Payment aPayment(UUID userId, int invId, Payment.Status status) {
-        return aPayment(userId, invId, status, Payment.Product.PACK_50);
-    }
-
-    private Payment aPayment(UUID userId, int invId, Payment.Status status, Payment.Product product) {
         return Payment.builder()
                 .invId(invId)
                 .userId(userId)
-                .product(product)
-                .amount(product.getPrice())
+                .limits(50)
+                .amount(new BigDecimal("750.00"))
                 .status(status)
                 .build(); // created — @Builder.Default
     }
@@ -77,8 +74,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getId()).isNotNull();
             assertThat(saved.getInvId()).isEqualTo(invId);
             assertThat(saved.getUserId()).isEqualTo(user.getId());
-            assertThat(saved.getProduct()).isEqualTo(Payment.Product.PACK_50);
-            assertThat(saved.getAmount()).isEqualByComparingTo(Payment.Product.PACK_50.getPrice());
+            assertThat(saved.getLimits()).isEqualTo(50);
+            assertThat(saved.getAmount()).isEqualByComparingTo("750.00");
             assertThat(saved.getStatus()).isEqualTo(Payment.Status.PENDING);
             assertThat(saved.getCreated()).isNotNull();
             assertThat(saved.getPaidAt()).isNull();
@@ -198,21 +195,6 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             // when / then
             assertThatThrownBy(() -> repository.saveAndFlush(duplicate))
                     .isInstanceOf(DataIntegrityViolationException.class);
-        }
-
-        @Test
-        @DisplayName("chk_payment_product: legacy-значение PLAN_PRO по-прежнему проходит CHECK")
-        void acceptsLegacyPlanProProduct() {
-            // given
-            var user = em.persistAndFlush(aUser("payment-legacy-plan-pro@example.com"));
-            var payment = aPayment(user.getId(), repository.nextInvId(), Payment.Status.PENDING,
-                    Payment.Product.PLAN_PRO);
-
-            // when
-            var saved = em.persistFlushFind(payment);
-
-            // then
-            assertThat(saved.getProduct()).isEqualTo(Payment.Product.PLAN_PRO);
         }
     }
 

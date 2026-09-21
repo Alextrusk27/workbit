@@ -3,7 +3,6 @@ package ru.workbit.billing.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -27,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.billing.dto.BalanceResponse;
 import ru.workbit.billing.dto.UsageResponse;
 import ru.workbit.billing.model.BillingAccount;
-import ru.workbit.billing.model.Payment;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.repository.BillingAccountRepository;
 import ru.workbit.billing.repository.UsageEventRepository;
@@ -40,7 +38,8 @@ class LimitServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String INTERVIEW_LABEL = "Интервью — Java-разработчик";
-    private static final String PACK_LABEL = Payment.Product.PACK_50.getLabel();
+    private static final int TOPUP_LIMITS = 50;
+    private static final String TOPUP_LABEL = TopUpPricing.label(TOPUP_LIMITS);
 
     @Mock
     BillingAccountRepository billingAccountRepository;
@@ -284,12 +283,12 @@ class LimitServiceTest {
     }
 
     @Nested
-    @DisplayName("CreditPack")
-    class CreditPack {
+    @DisplayName("CreditTopUp")
+    class CreditTopUp {
 
         @Test
-        @DisplayName("Активный баланс - пишет только PACK, EXPIRE не пишет")
-        void writesOnlyPackWhenActive() {
+        @DisplayName("Активный баланс - пишет только TOPUP, EXPIRE не пишет")
+        void writesOnlyTopUpWhenActive() {
             // given
             stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
@@ -297,22 +296,22 @@ class LimitServiceTest {
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
-            limitService.creditPack(USER_ID, Payment.Product.PACK_50, PACK_LABEL);
+            limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);
 
             // then
-            verify(billingAccountRepository).creditPack(eq(USER_ID), eq(Payment.Product.PACK_50.getLimits()), any());
+            verify(billingAccountRepository).creditTopUp(eq(USER_ID), eq(TOPUP_LIMITS), any());
             ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
             verify(usageEventRepository).save(captor.capture());
             UsageEvent saved = captor.getValue();
             assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
-            assertThat(saved.getOperation()).isEqualTo(UsageEvent.Operation.PACK);
-            assertThat(saved.getDelta()).isEqualTo(Payment.Product.PACK_50.getLimits());
-            assertThat(saved.getLabel()).isEqualTo(PACK_LABEL);
+            assertThat(saved.getOperation()).isEqualTo(UsageEvent.Operation.TOPUP);
+            assertThat(saved.getDelta()).isEqualTo(TOPUP_LIMITS);
+            assertThat(saved.getLabel()).isEqualTo(TOPUP_LABEL);
         }
 
         @Test
-        @DisplayName("Просроченный баланс с ненулевым остатком - сначала EXPIRE на старый остаток, потом PACK")
-        void writesExpireThenPackWhenExpiredWithLimits() {
+        @DisplayName("Просроченный баланс с ненулевым остатком - сначала EXPIRE на старый остаток, потом TOPUP")
+        void writesExpireThenTopUpWhenExpiredWithLimits() {
             // given
             stubExistingUser();
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
@@ -320,14 +319,14 @@ class LimitServiceTest {
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
-            limitService.creditPack(USER_ID, Payment.Product.PACK_50, PACK_LABEL);
+            limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);
 
             // then
             InOrder inOrderCheck = inOrder(usageEventRepository, billingAccountRepository);
             ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
             inOrderCheck.verify(usageEventRepository).save(captor.capture());
             inOrderCheck.verify(billingAccountRepository)
-                    .creditPack(eq(USER_ID), eq(Payment.Product.PACK_50.getLimits()), any());
+                    .creditTopUp(eq(USER_ID), eq(TOPUP_LIMITS), any());
             inOrderCheck.verify(usageEventRepository).save(captor.capture());
 
             List<UsageEvent> saved = captor.getAllValues();
@@ -338,11 +337,11 @@ class LimitServiceTest {
             assertThat(expireEvent.getDelta()).isEqualTo(30);
             assertThat(expireEvent.getLabel()).isEqualTo(LimitService.EXPIRE_LABEL);
 
-            UsageEvent packEvent = saved.get(1);
-            assertThat(packEvent.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
-            assertThat(packEvent.getOperation()).isEqualTo(UsageEvent.Operation.PACK);
-            assertThat(packEvent.getDelta()).isEqualTo(Payment.Product.PACK_50.getLimits());
-            assertThat(packEvent.getLabel()).isEqualTo(PACK_LABEL);
+            UsageEvent topUpEvent = saved.get(1);
+            assertThat(topUpEvent.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(topUpEvent.getOperation()).isEqualTo(UsageEvent.Operation.TOPUP);
+            assertThat(topUpEvent.getDelta()).isEqualTo(TOPUP_LIMITS);
+            assertThat(topUpEvent.getLabel()).isEqualTo(TOPUP_LABEL);
         }
 
         @Test
@@ -354,39 +353,12 @@ class LimitServiceTest {
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
-            limitService.creditPack(USER_ID, Payment.Product.PACK_50, PACK_LABEL);
+            limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);
 
             // then
             ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
             verify(usageEventRepository).save(captor.capture());
-            assertThat(captor.getValue().getOperation()).isEqualTo(UsageEvent.Operation.PACK);
-        }
-    }
-
-    @Nested
-    @DisplayName("CreditGift")
-    class CreditGift {
-
-        private static final int GIFT_LIMITS = 10;
-        private static final String GIFT_LABEL = "Подарок за покупку";
-
-        @Test
-        @DisplayName("Пишет GIFT-событие с переданной суммой и меткой, insertIfAbsent не вызывается")
-        void writesGiftEventWithoutInsertIfAbsent() {
-            // when
-            limitService.creditGift(USER_ID, GIFT_LIMITS, GIFT_LABEL);
-
-            // then
-            verify(billingAccountRepository).creditGift(USER_ID, GIFT_LIMITS);
-            verify(billingAccountRepository, never()).insertIfAbsent(any(), anyInt(), any());
-            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
-            verify(usageEventRepository).save(captor.capture());
-            UsageEvent saved = captor.getValue();
-            assertThat(saved.getUserId()).isEqualTo(USER_ID);
-            assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
-            assertThat(saved.getOperation()).isEqualTo(UsageEvent.Operation.GIFT);
-            assertThat(saved.getDelta()).isEqualTo(GIFT_LIMITS);
-            assertThat(saved.getLabel()).isEqualTo(GIFT_LABEL);
+            assertThat(captor.getValue().getOperation()).isEqualTo(UsageEvent.Operation.TOPUP);
         }
     }
 

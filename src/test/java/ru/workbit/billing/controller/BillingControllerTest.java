@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -168,19 +169,19 @@ class BillingControllerTest {
             // given
             var paymentId = UUID.fromString("22222222-2222-2222-2222-222222222222");
             var response = new PaymentCreateResponse(paymentId, "https://auth.robokassa.ru/Merchant/Index/1");
-            when(paymentService.create(USER_ID, Payment.Product.PACK_200, "user@example.com"))
+            when(paymentService.create(USER_ID, 200, "user@example.com"))
                     .thenReturn(response);
 
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PACK_200))))
+                            .content(om.writeValueAsString(new PaymentCreateRequest(200))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.paymentId").value(paymentId.toString()))
                     .andExpect(jsonPath("$.paymentUrl").value("https://auth.robokassa.ru/Merchant/Index/1"));
 
-            verify(paymentService).create(USER_ID, Payment.Product.PACK_200, "user@example.com");
+            verify(paymentService).create(USER_ID, 200, "user@example.com");
         }
 
         @Test
@@ -189,15 +190,15 @@ class BillingControllerTest {
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PACK_200))))
+                            .content(om.writeValueAsString(new PaymentCreateRequest(200))))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(paymentService);
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда product не указан")
-        void returns400WhenProductMissing() throws Exception {
+        @DisplayName("Возвращает 400, когда limits не указан")
+        void returns400WhenLimitsMissing() throws Exception {
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .with(user(principal()))
@@ -209,33 +210,33 @@ class BillingControllerTest {
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда product невалиден")
-        void returns400WhenProductInvalid() throws Exception {
+        @DisplayName("Возвращает 400, когда limits не число")
+        void returns400WhenLimitsInvalid() throws Exception {
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"product\":\"INVALID\"}"))
+                            .content("{\"limits\":\"many\"}"))
                     .andExpect(status().isBadRequest());
 
             verifyNoInteractions(paymentService);
         }
 
         @Test
-        @DisplayName("Возвращает 400, когда product снят с продажи")
-        void returns400WhenProductNotPurchasable() throws Exception {
+        @DisplayName("Возвращает 400, когда сервис отверг число лимитов")
+        void returns400WhenLimitsRejected() throws Exception {
             // given
-            when(paymentService.create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com"))
-                    .thenThrow(new IllegalArgumentException("Product is not purchasable"));
+            when(paymentService.create(USER_ID, 55, "user@example.com"))
+                    .thenThrow(new IllegalArgumentException("Limits must be a multiple of 10"));
 
             // when / then
             mvc.perform(post(BASE + "/payments")
                             .with(user(principal()))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(om.writeValueAsString(new PaymentCreateRequest(Payment.Product.PLAN_PRO))))
+                            .content(om.writeValueAsString(new PaymentCreateRequest(55))))
                     .andExpect(status().isBadRequest());
 
-            verify(paymentService).create(USER_ID, Payment.Product.PLAN_PRO, "user@example.com");
+            verify(paymentService).create(USER_ID, 55, "user@example.com");
         }
     }
 
@@ -250,10 +251,10 @@ class BillingControllerTest {
         private final UUID paymentId = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
         @Test
-        @DisplayName("Возвращает 200 со статусом и продуктом платежа")
+        @DisplayName("Возвращает 200 со статусом, числом лимитов и суммой платежа")
         void returns200WithPaymentStatus() throws Exception {
             // given
-            var response = new PaymentStatusResponse(Payment.Status.PAID, Payment.Product.PACK_200);
+            var response = new PaymentStatusResponse(Payment.Status.PAID, 200, new BigDecimal("2400.00"));
             when(paymentService.get(paymentId, USER_ID)).thenReturn(response);
 
             // when / then
@@ -261,7 +262,8 @@ class BillingControllerTest {
                             .with(user(principal())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("PAID"))
-                    .andExpect(jsonPath("$.product").value("PACK_200"));
+                    .andExpect(jsonPath("$.limits").value(200))
+                    .andExpect(jsonPath("$.amount").value(2400.00));
         }
 
         @Test

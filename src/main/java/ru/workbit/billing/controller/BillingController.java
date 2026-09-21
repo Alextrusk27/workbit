@@ -37,7 +37,7 @@ import ru.workbit.util.annotation.Loggable;
 @RestController
 @RequestMapping("/api/v1/billing")
 @RequiredArgsConstructor
-@Tag(name = "Billing", description = "Баланс лимитов, история операций и оплата пакетов")
+@Tag(name = "Billing", description = "Баланс лимитов, история операций и пополнение баланса")
 public class BillingController {
 
     private final LimitService limitService;
@@ -84,14 +84,15 @@ public class BillingController {
     @PostMapping("/payments")
     @Loggable(logArgs = true)
     @Operation(summary = "Создать платёж",
-            description = "Создаёт платёж за пакет лимитов и возвращает URL платёжной страницы Робокассы для "
-                    + "редиректа. Цена определяется продуктом на сервере; снятые с продажи продукты отклоняются.")
+            description = "Создаёт платёж за пополнение баланса на указанное число лимитов (50-5000, кратно 10) и "
+                    + "возвращает URL платёжной страницы Робокассы для редиректа. Сумму считает сервер по сетке "
+                    + "объёмных скидок.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Платёж создан"),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Не указан продукт или продукт снят с продажи",
+                    description = "Число лимитов не указано, вне диапазона или не кратно 10",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(
                     responseCode = "401",
@@ -103,7 +104,7 @@ public class BillingController {
             @Valid @RequestBody PaymentCreateRequest request
     ) {
         return ResponseEntity.ok(paymentService.create(
-                userDetails.getId(), request.product(), userDetails.getEmail()));
+                userDetails.getId(), request.limits(), userDetails.getEmail()));
     }
 
     @GetMapping("/payments/{id}")
@@ -136,7 +137,7 @@ public class BillingController {
     @Loggable
     @Operation(summary = "Webhook Робокассы (ResultURL)",
             description = "Публичное уведомление Робокассы об оплате (form-urlencoded: OutSum, InvId, SignatureValue). "
-                    + "Проверяет подпись и сумму, идемпотентно подтверждает платёж, зачисляет пакет и подарок акции. "
+                    + "Проверяет подпись и сумму, идемпотентно подтверждает платёж и зачисляет лимиты. "
                     + "Ответ — текст "
                     + "OK{InvId}; на невалидное уведомление — 400, Робокасса повторит доставку.")
     @ApiResponses({

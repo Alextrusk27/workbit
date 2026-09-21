@@ -169,7 +169,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             em.persistAndFlush(anAccount(user.getId(), 15, now.plusSeconds(3600)));
 
             // when
-            repository.creditPack(user.getId(), 50, now);
+            repository.creditTopUp(user.getId(), 50, now);
 
             // then
             em.clear();
@@ -189,7 +189,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             em.persistAndFlush(anAccount(user.getId(), 15, now.minusSeconds(3600)));
 
             // when
-            repository.creditPack(user.getId(), 50, now);
+            repository.creditTopUp(user.getId(), 50, now);
 
             // then
             em.clear();
@@ -207,44 +207,18 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             var user = em.persistAndFlush(aUser("billing-pack-paid-at@example.com"));
             var firstNow = Instant.now().truncatedTo(ChronoUnit.MICROS);
             em.persistAndFlush(anAccount(user.getId(), 0, null));
-            repository.creditPack(user.getId(), 50, firstNow);
+            repository.creditTopUp(user.getId(), 50, firstNow);
             em.clear();
             var paidAtAfterFirstPurchase = repository.findById(user.getId()).orElseThrow().getPaidAt();
 
             // when — вторая покупка позже
             var secondNow = firstNow.plusSeconds(3600);
-            repository.creditPack(user.getId(), 50, secondNow);
+            repository.creditTopUp(user.getId(), 50, secondNow);
 
             // then
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
             assertThat(saved.getPaidAt()).isEqualTo(paidAtAfterFirstPurchase);
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("CreditGift")
-    class CreditGift {
-
-        @Test
-        @DisplayName("Прибавляет лимиты и не меняет срок действия")
-        void addsLimitsWithoutChangingExpiry() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-gift@example.com"));
-            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-            var expireAt = now.plusSeconds(3600);
-            em.persistAndFlush(anAccount(user.getId(), 10, expireAt));
-
-            // when
-            repository.creditGift(user.getId(), 5);
-
-            // then
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getLimits()).isEqualTo(15);
-            assertThat(saved.getLimitsExpireAt()).isEqualTo(expireAt);
         }
     }
 

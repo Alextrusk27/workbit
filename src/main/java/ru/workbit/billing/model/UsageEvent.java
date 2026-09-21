@@ -59,9 +59,8 @@ public class UsageEvent {
         TRAINING_RESTART(10),
         TRAINING_MORE(10),
         REFERENCE_ANSWER(1),
-        PACK(0),
+        TOPUP(0),
         WELCOME(0),
-        GIFT(0),
         EXPIRE(0);
 
         private final int cost;

@@ -32,7 +32,7 @@ import ru.workbit.billing.repository.PaymentRepository;
 class PaymentReconciliationServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
-    private static final BigDecimal AMOUNT = Payment.Product.PACK_50.getPrice();
+    private static final BigDecimal AMOUNT = new BigDecimal("750.00");
 
     @Mock
     PaymentRepository paymentRepository;
@@ -49,7 +49,7 @@ class PaymentReconciliationServiceTest {
                 .id(UUID.randomUUID())
                 .invId(invId)
                 .userId(USER_ID)
-                .product(Payment.Product.PACK_50)
+                .limits(50)
                 .amount(AMOUNT)
                 .status(Payment.Status.PENDING)
                 .build();

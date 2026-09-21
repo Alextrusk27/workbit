@@ -233,7 +233,7 @@ function LoginForm({
 
       <p className="bg-violet/13 border-violet/22 text-violet-strong mt-6 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-semibold">
         <LimitIcon className="size-4 shrink-0" />
-        Дарим {WELCOME_LIMITS} {limitsWord(WELCOME_LIMITS)} при первом входе!
+        {WELCOME_LIMITS} {limitsWord(WELCOME_LIMITS)} в подарок при первом входе
       </p>
     </>
   )

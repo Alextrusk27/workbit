@@ -287,7 +287,7 @@ export function BrandPage() {
           <PlanCard
             plan={freePack}
             features={freePack.previewFeatures}
-            to="/pricing"
+            to="/login"
           />
           <TopUpCard />
         </div>

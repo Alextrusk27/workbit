@@ -126,7 +126,7 @@ export const aiInterview: AiInterviewContent = {
   },
   cta: {
     title: 'Пробное собеседование — бесплатно',
-    body: 'Пробное AI-интервью или две тренировки — бесплатно.',
+    body: 'Пробное AI-интервью или первые тренировки — бесплатно.',
     primary: { label: 'Начать интервью', start: true },
     note: 'А для отдельных тем — [тренажёр навыков →](/skills-trainer)',
   },

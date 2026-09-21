@@ -239,7 +239,7 @@ export function TrainingConstructor() {
         </button>
       </form>
       <p className="text-dim mt-4 text-[13.5px]">
-        2 тренировки бесплатно ·{' '}
+        Первые тренировки бесплатно ·{' '}
         <Link
           to="/ai-interview"
           className="text-indigo hover:text-violet transition-colors"

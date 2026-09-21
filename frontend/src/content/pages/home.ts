@@ -1,3 +1,4 @@
+import { WELCOME_LIMITS } from '@/content/limits'
 import type { Cta, Hero, PageSeo } from '@/content/types'
 
 export type HomeIcon = 'role' | 'pencil' | 'chart' | 'clock'
@@ -174,6 +175,6 @@ export const home: HomeContent = {
     body: 'Вставь ссылку на вакансию с hh.ru — получи вопросы под требования работодателя и разбор каждого ответа.',
     primary: { label: 'Пройти первое интервью бесплатно', start: true },
     secondary: { label: 'Попробовать тренажёр навыков', to: '/skills-trainer' },
-    note: 'Доступно сразу после входа по email — без анкеты, без карты',
+    note: `${WELCOME_LIMITS} лимитов на старте, вход по email, без анкеты и без карты`,
   },
 }

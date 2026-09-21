@@ -3,7 +3,7 @@ import type { Cta, Hero, PageSeo } from '@/content/types'
 export type AiInterviewIcon = 'star' | 'pencil' | 'chart'
 
 export interface AiInterviewContent {
-  hero: Hero & { text: string; note: string; priceLink: string }
+  hero: Hero & { text: string; note: string }
   flow: {
     title: string
     lead: string
@@ -34,7 +34,7 @@ export interface AiInterviewContent {
       offer: { label: string; value: string; level: number }
     }
   }
-  cta: { title: string; body: string; primary: Cta; note: string }
+  cta: { title: string; primary: Cta; note: string }
 }
 
 export const seo: PageSeo = {
@@ -49,8 +49,7 @@ export const aiInterview: AiInterviewContent = {
     accent: 'по твоей вакансии',
     breakBeforeAccent: true,
     text: '**Пробное интервью по ссылке с hh.ru:** полная сессия из вопросов под требования вакансии.',
-    note: 'Первое интервью бесплатно · ',
-    priceLink: 'Смотреть цены',
+    note: 'Первое интервью бесплатно',
   },
   flow: {
     title: 'Собеседование с ИИ по шагам',
@@ -126,8 +125,7 @@ export const aiInterview: AiInterviewContent = {
   },
   cta: {
     title: 'Пробное собеседование — бесплатно',
-    body: 'Пробное AI-интервью или первые тренировки — бесплатно.',
     primary: { label: 'Начать интервью', start: true },
-    note: 'А для отдельных тем — [тренажёр навыков →](/skills-trainer)',
+    note: 'Для прокачки отдельной темы собеседования попробуй [тренажёр навыков →](/skills-trainer)',
   },
 }

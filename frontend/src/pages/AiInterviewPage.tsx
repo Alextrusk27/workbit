@@ -13,7 +13,6 @@ import { IconChart, IconPencil, IconStar } from '@/components/marketing/icons'
 import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 import { aiInterview, type AiInterviewIcon } from '@/content/pages/aiInterview'
 import { useAuth } from '@/features/auth/useAuth'
-import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
 
@@ -102,7 +101,6 @@ function ReportDemo() {
 
 export function AiInterviewPage() {
   const { isAuthenticated } = useAuth()
-  const openTopUp = useTopUpModal()
   const start = ctaLink(cta.primary, {
     start: '/app/interview/new',
     isAuthenticated,
@@ -115,16 +113,7 @@ export function AiInterviewPage() {
         actions={
           <div className="w-full">
             <VacancyUrlForm />
-            <p className="text-dim mt-4 text-[13.5px]">
-              {inline(hero.note)}
-              <button
-                type="button"
-                onClick={() => openTopUp()}
-                className="text-indigo hover:text-violet transition-colors"
-              >
-                {hero.priceLink}
-              </button>
-            </p>
+            <p className="text-dim mt-4 text-[13.5px]">{inline(hero.note)}</p>
           </div>
         }
       >
@@ -245,9 +234,7 @@ export function AiInterviewPage() {
                   </p>
                 </div>
               }
-            >
-              {inline(cta.body)}
-            </CtaPanel>
+            />
           </Reveal>
         </Container>
       </section>

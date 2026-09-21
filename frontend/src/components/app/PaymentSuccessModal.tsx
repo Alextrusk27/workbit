@@ -3,17 +3,12 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/useAuth'
-import type { UsageEvent, UsageTarget } from '@/features/billing/api'
-import { PLAN_LABELS } from '@/features/billing/labels'
-import { useQuota, useUsage } from '@/features/billing/useBilling'
+import type { UsageEvent } from '@/features/billing/api'
+import { useBalance, useUsage } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
 import { motionTokens } from '@/lib/motion'
+import { limitsWord } from '@/lib/plural'
 import { useModalA11y } from '@/lib/useModalA11y'
-
-const TARGET_LABELS: Record<UsageTarget, string> = {
-  INTERVIEW: 'AI-интервью',
-  TRAINING: 'Тренировки',
-}
 
 const BATCH_WINDOW_MS = 10_000
 
@@ -33,10 +28,9 @@ function latestCreditBatch(events: UsageEvent[] | undefined): UsageEvent[] {
 }
 
 function toCreditRows(batch: UsageEvent[]) {
-  const packLabel = batch[batch.length - 1]?.label
   return [...batch].reverse().map((event) => ({
-    key: `${event.label}-${event.target}`,
-    name: event.label === packLabel ? TARGET_LABELS[event.target] : event.label,
+    key: event.label,
+    name: event.label,
     delta: event.delta,
   }))
 }
@@ -70,9 +64,9 @@ function PendingCircle() {
   )
 }
 
-/** Модалка после возврата с оплаты: тариф и зачисления
- *  из последней CREDIT-пачки истории операций. Пока оплату
- *  не подтвердил webhook, показывает ожидание вместо тарифа. */
+/** Модалка после возврата с оплаты: зачисления из последней
+ *  CREDIT-пачки истории операций и срок действия баланса. Пока
+ *  оплату не подтвердил webhook, показывает ожидание. */
 export function PaymentSuccessModal({
   open,
   pending,
@@ -83,7 +77,7 @@ export function PaymentSuccessModal({
   onClose: () => void
 }) {
   const { user } = useAuth()
-  const { data: quota } = useQuota()
+  const { data: balance } = useBalance()
   const { data: usage } = useUsage()
   const panelRef = useModalA11y(open)
 
@@ -97,6 +91,7 @@ export function PaymentSuccessModal({
   }, [open, onClose])
 
   const credits = toCreditRows(latestCreditBatch(usage?.events))
+  const total = credits.reduce((sum, c) => sum + c.delta, 0)
 
   return (
     <AnimatePresence>
@@ -131,18 +126,18 @@ export function PaymentSuccessModal({
             </h3>
             {pending && (
               <p role="status" className="text-muted mt-2 text-[14.5px]">
-                Ждём подтверждения. Тариф активируется сам, обычно это занимает
+                Ждём подтверждения. Лимиты зачислятся сами, обычно это занимает
                 несколько секунд.
               </p>
             )}
-            {!pending && quota && (
+            {!pending && total > 0 && (
               <p className="text-muted mt-2 text-[14.5px]">
-                Тариф{' '}
-                <span className="text-ink font-semibold">
-                  {PLAN_LABELS[quota.plan]}
+                Зачислено{' '}
+                <span className="text-ink font-semibold tabular-nums">
+                  {total} {limitsWord(total)}
                 </span>
-                {quota.planExpiresAt &&
-                  ` активен до ${formatDate(quota.planExpiresAt)}`}
+                {balance?.expiresAt &&
+                  `, действуют до ${formatDate(balance.expiresAt)}`}
               </p>
             )}
             {!pending && credits.length > 0 && (
@@ -158,16 +153,6 @@ export function PaymentSuccessModal({
                     </span>
                   </div>
                 ))}
-                {quota?.plan === 'MAX' && (
-                  <div className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5">
-                    <span className="text-ink text-sm">
-                      {TARGET_LABELS.TRAINING}
-                    </span>
-                    <span className="text-ok text-sm font-semibold">
-                      Безлимит
-                    </span>
-                  </div>
-                )}
               </div>
             )}
             {!pending && user && (

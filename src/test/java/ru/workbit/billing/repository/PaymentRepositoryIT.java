@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,8 +47,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
         return Payment.builder()
                 .invId(invId)
                 .userId(userId)
-                .product(Payment.Product.PLAN_PRO)
-                .amount(Payment.Product.PLAN_PRO.getPrice())
+                .limits(50)
+                .amount(new BigDecimal("750.00"))
                 .status(status)
                 .build(); // created — @Builder.Default
     }
@@ -73,8 +74,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getId()).isNotNull();
             assertThat(saved.getInvId()).isEqualTo(invId);
             assertThat(saved.getUserId()).isEqualTo(user.getId());
-            assertThat(saved.getProduct()).isEqualTo(Payment.Product.PLAN_PRO);
-            assertThat(saved.getAmount()).isEqualByComparingTo(Payment.Product.PLAN_PRO.getPrice());
+            assertThat(saved.getLimits()).isEqualTo(50);
+            assertThat(saved.getAmount()).isEqualByComparingTo("750.00");
             assertThat(saved.getStatus()).isEqualTo(Payment.Status.PENDING);
             assertThat(saved.getCreated()).isNotNull();
             assertThat(saved.getPaidAt()).isNull();

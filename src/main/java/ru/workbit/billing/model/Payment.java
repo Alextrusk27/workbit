@@ -34,9 +34,8 @@ public class Payment {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
-    private Product product;
+    private int limits;
 
     @Column(nullable = false, updatable = false)
     private BigDecimal amount;
@@ -51,28 +50,6 @@ public class Payment {
 
     @Column(name = "paid_at")
     private Instant paidAt;
-
-    @Getter
-    public enum Product {
-        PLAN_PRO(BillingAccount.Plan.PRO, new BigDecimal("790.00"), "Тариф «Про» на 30 дней", 2),
-        PLAN_MAX(BillingAccount.Plan.MAX, new BigDecimal("1490.00"), "Тариф «Макс» на 30 дней", 5);
-
-        private final BillingAccount.Plan plan;
-        private final BigDecimal price;
-        private final String label;
-        private final int giftInterviews;
-
-        Product(BillingAccount.Plan plan, BigDecimal price, String label, int giftInterviews) {
-            this.plan = plan;
-            this.price = price;
-            this.label = label;
-            this.giftInterviews = giftInterviews;
-        }
-
-        public String getDescription() {
-            return label + " — Workbit";
-        }
-    }
 
     public enum Status {
         PENDING, PAID, FAILED

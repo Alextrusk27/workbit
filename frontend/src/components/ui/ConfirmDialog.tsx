@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
@@ -9,7 +10,7 @@ interface ConfirmDialogProps {
   open: boolean
   title: string
   text: string
-  confirmLabel?: string
+  confirmLabel?: ReactNode
   onConfirm: () => void
   onClose: () => void
 }

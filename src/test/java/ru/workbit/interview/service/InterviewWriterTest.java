@@ -28,7 +28,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
@@ -68,7 +69,7 @@ class InterviewWriterTest {
     @Mock
     VacancyService vacancyService;
     @Mock
-    QuotaService quotaService;
+    LimitService limitService;
     @Mock
     InterviewQuestionMapper interviewQuestionMapper;
     @Mock
@@ -133,8 +134,8 @@ class InterviewWriterTest {
             interviewWriter.createSession(VACANCY_DATA, userId, PLAN, null);
 
             // then
-            InOrder order = inOrder(quotaService, vacancyService, interviewSessionRepository);
-            order.verify(quotaService).debitInterview(userId, "Интервью — Java-разработчик");
+            InOrder order = inOrder(limitService, vacancyService, interviewSessionRepository);
+            order.verify(limitService).debit(userId, UsageEvent.Operation.INTERVIEW, "Интервью — Java-разработчик");
             order.verify(vacancyService).saveSnapshot(VACANCY_DATA);
             order.verify(interviewSessionRepository).save(any(InterviewSession.class));
         }

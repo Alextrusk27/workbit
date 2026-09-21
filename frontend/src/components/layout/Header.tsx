@@ -8,18 +8,18 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { UserMenu } from '@/components/layout/UserMenu'
 import { useAuth } from '@/features/auth/useAuth'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 const links = [
   { label: 'AI-интервью', to: '/ai-interview' },
   { label: 'Тренажёр навыков', to: '/skills-trainer' },
-  { label: 'Тарифы', to: '/pricing' },
   { label: 'FAQ', to: '/faq' },
   { label: 'Блог', to: '/blog' },
 ]
 
-function navLinkClass(isActive: boolean): string {
+function navLinkClass(isActive = false): string {
   return cn(
     'text-muted hover:text-ink text-[14.5px] font-medium whitespace-nowrap transition-colors',
     isActive && 'text-ink',
@@ -31,6 +31,7 @@ export function Header() {
   const location = useLocation()
   const { isAuthenticated, isLoading } = useAuth()
   const reduce = useReducedMotion()
+  const openTopUp = useTopUpModal()
 
   useEffect(() => setOpen(false), [location])
   useEffect(() => {
@@ -68,6 +69,13 @@ export function Header() {
                 {l.label}
               </NavLink>
             ))}
+            <button
+              type="button"
+              onClick={() => openTopUp()}
+              className={navLinkClass()}
+            >
+              Цены
+            </button>
           </nav>
 
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
@@ -146,6 +154,18 @@ export function Header() {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      openTopUp()
+                    }}
+                    className="text-ink block w-full py-3 text-left text-base"
+                  >
+                    Цены
+                  </button>
+                </li>
                 <li className="py-3">
                   {isLoading ? (
                     <Skeleton className="h-11 w-full rounded-lg" />

@@ -1,57 +1,44 @@
 package ru.workbit.billing.repository;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.billing.model.BillingAccount;
 
 public interface BillingAccountRepository extends JpaRepository<@NotNull BillingAccount, @NotNull UUID> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM BillingAccount a WHERE a.userId = :userId")
+    Optional<BillingAccount> findForUpdate(UUID userId);
+
     @Modifying
     @Query(value = """
-            INSERT INTO billing.account (user_id, plan, plan_interviews_left, plan_trainings_left)
-            VALUES (:userId, 'FREE', :freeInterviews, :freeTrainings)
+            INSERT INTO billing.account (user_id, limits, limits_expire_at)
+            VALUES (:userId, :limits, CAST(:now AS timestamptz) + INTERVAL '3 months')
             ON CONFLICT (user_id) DO NOTHING
             """, nativeQuery = true)
-    void insertIfAbsent(UUID userId, int freeInterviews, int freeTrainings);
+    int insertIfAbsent(UUID userId, int limits, Instant now);
 
     @Modifying
     @Query(value = """
-            UPDATE billing.account SET plan_interviews_left = plan_interviews_left - 1
-            WHERE user_id = :userId AND plan_interviews_left > 0
-              AND (plan = 'FREE' OR plan_expires_at > :now)
+            UPDATE billing.account SET limits = limits - :cost
+            WHERE user_id = :userId AND limits >= :cost AND limits_expire_at > :now
             """, nativeQuery = true)
-    int debitPlanInterview(UUID userId, Instant now);
-
-    @Modifying
-    @Query(value = """
-            UPDATE billing.account SET plan_trainings_left = plan_trainings_left - 1
-            WHERE user_id = :userId AND plan_trainings_left > 0
-              AND (plan = 'FREE' OR plan_expires_at > :now)
-            """, nativeQuery = true)
-    int debitPlanTraining(UUID userId, Instant now);
-
-    @Modifying
-    @Query(value = """
-            UPDATE billing.account SET plan_interviews_left = plan_interviews_left + :count
-            WHERE user_id = :userId
-            """, nativeQuery = true)
-    void creditInterviews(UUID userId, int count);
+    int debit(UUID userId, int cost, Instant now);
 
     @Modifying
     @Query(value = """
             UPDATE billing.account SET
-                plan = :plan,
-                plan_expires_at = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
-                    THEN plan_expires_at ELSE :now END) + INTERVAL '30 days',
-                plan_interviews_left = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
-                    THEN plan_interviews_left ELSE 0 END) + :interviews,
-                plan_trainings_left = (CASE WHEN plan <> 'FREE' AND plan_expires_at > :now
-                    THEN plan_trainings_left ELSE 0 END) + :trainings
+                limits = (CASE WHEN limits_expire_at > :now THEN limits ELSE 0 END) + :limits,
+                limits_expire_at = CAST(:now AS timestamptz) + INTERVAL '3 months',
+                paid_at = COALESCE(paid_at, :now)
             WHERE user_id = :userId
             """, nativeQuery = true)
-    void creditPlan(UUID userId, String plan, int interviews, int trainings, Instant now);
+    void creditTopUp(UUID userId, int limits, Instant now);
 }

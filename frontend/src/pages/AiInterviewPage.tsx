@@ -234,9 +234,7 @@ export function AiInterviewPage() {
                   </p>
                 </div>
               }
-            >
-              {inline(cta.body)}
-            </CtaPanel>
+            />
           </Reveal>
         </Container>
       </section>

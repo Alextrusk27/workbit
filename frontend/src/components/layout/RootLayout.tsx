@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { CookieConsent } from '@/components/CookieConsent'
+import { TopUpModalProvider } from '@/features/billing/TopUpModal'
 import { METRIKA_ID } from '@/lib/metrika'
 
 /** Корневая обёртка над всеми группами роутов: сюда вешаем то, что должно быть
@@ -18,9 +19,9 @@ export function RootLayout() {
   }, [location])
 
   return (
-    <>
+    <TopUpModalProvider>
       <Outlet />
       <CookieConsent />
-    </>
+    </TopUpModalProvider>
   )
 }

@@ -5,13 +5,14 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
-import { PLAN_LABELS, productPrice } from '@/features/billing/labels'
+import { Limits } from '@/components/ui/LimitIcon'
 import {
   PAYMENT_ID_KEY,
   billingKeys,
+  useBalance,
   usePayment,
-  useQuota,
 } from '@/features/billing/useBilling'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { formatDate } from '@/lib/dates'
 import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -43,33 +44,25 @@ function SectionCard({
   )
 }
 
-function PlanLine() {
-  const { data } = useQuota()
+function BalanceLine() {
+  const { data } = useBalance()
+  const openTopUp = useTopUpModal()
   if (!data) return null
-
-  const until = data.planExpiresAt
-    ? ` до ${formatDate(data.planExpiresAt)}`
-    : ''
 
   return (
     <p className="text-dim mt-10 text-[13.5px]">
-      Тариф:{' '}
-      <span className="text-ink font-semibold">
-        {PLAN_LABELS[data.plan]}
-        {until}
+      Лимиты:{' '}
+      <span className="text-ink font-semibold tabular-nums">
+        <Limits value={data.limits} />
       </span>
-      <span className="tabular-nums">
-        {' '}
-        · осталось интервью: {data.planInterviewsLeft}, тренировок:{' '}
-        {data.planTrainingsLeft ?? 'безлимит'}
-      </span>{' '}
-      ·{' '}
-      <Link
-        to="/pricing"
+      {data.expiresAt && ` · действуют до ${formatDate(data.expiresAt)}`} ·{' '}
+      <button
+        type="button"
+        onClick={() => openTopUp()}
         className="text-indigo hover:text-violet transition-colors"
       >
-        Тарифы
-      </Link>
+        Пополнить
+      </button>
     </p>
   )
 }
@@ -79,6 +72,7 @@ export function HubPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const openTopUp = useTopUpModal()
   const [paid] = useState(() => searchParams.get('payment') === 'ok')
   const [failed] = useState(() => searchParams.get('payment') === 'fail')
   const [paymentOpen, setPaymentOpen] = useState(paid)
@@ -105,14 +99,13 @@ export function HubPage() {
   useEffect(() => {
     if (payment?.status !== 'PAID') return
     sessionStorage.removeItem(PAYMENT_ID_KEY)
-    const price = productPrice(payment.product)
-    reachGoal(
-      'payment_success',
-      price !== undefined ? { order_price: price, currency: 'RUB' } : undefined,
-    )
+    reachGoal('payment_success', {
+      order_price: payment.amount,
+      currency: 'RUB',
+    })
     qc.invalidateQueries({ queryKey: billingKeys.quota })
     qc.invalidateQueries({ queryKey: billingKeys.usage })
-  }, [payment?.status, payment?.product, qc])
+  }, [payment?.status, payment?.amount, qc])
 
   return (
     <Container>
@@ -124,13 +117,14 @@ export function HubPage() {
       {showFailed && (
         <div className="mt-8 max-w-[560px]">
           <Alert>
-            Оплата не прошла, деньги не списаны. Попробуй ещё раз на{' '}
-            <Link
-              to="/pricing"
+            Оплата не прошла, деньги не списаны.{' '}
+            <button
+              type="button"
+              onClick={() => openTopUp()}
               className="underline underline-offset-2 transition-colors"
             >
-              странице тарифов
-            </Link>
+              Попробовать ещё раз
+            </button>
             .
           </Alert>
         </div>
@@ -151,7 +145,7 @@ export function HubPage() {
         />
       </div>
 
-      <PlanLine />
+      <BalanceLine />
 
       {paid && !paymentFailed && (
         <PaymentSuccessModal

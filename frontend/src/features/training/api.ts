@@ -52,6 +52,7 @@ export interface TrainingQuestion {
   answerText: string | null
   score: number | null
   feedback: string | null
+  referenceAnswerUnlocked: boolean
 }
 
 export interface TrainingReport {

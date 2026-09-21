@@ -20,20 +20,20 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentProvider paymentProvider;
-    private final QuotaService quotaService;
-    private final GiftService giftService;
+    private final LimitService limitService;
 
     @Transactional
-    public PaymentCreateResponse create(UUID userId, Payment.Product product, String email) {
+    public PaymentCreateResponse create(UUID userId, int limits, String email) {
+        TopUpPricing.validate(limits);
         Payment payment = paymentRepository.save(Payment.builder()
                 .invId(paymentRepository.nextInvId())
                 .userId(userId)
-                .product(product)
-                .amount(product.getPrice())
+                .limits(limits)
+                .amount(TopUpPricing.amount(limits))
                 .status(Payment.Status.PENDING)
                 .build());
-        log.info("Created payment {} (invId {}) for user {}: {}",
-                payment.getId(), payment.getInvId(), userId, product);
+        log.info("Created payment {} (invId {}) for user {}: {} limits for {}",
+                payment.getId(), payment.getInvId(), userId, limits, payment.getAmount());
         return new PaymentCreateResponse(payment.getId(), paymentProvider.paymentUrl(payment, email));
     }
 
@@ -62,9 +62,7 @@ public class PaymentService {
             return false;
         }
 
-        Payment.Product product = payment.getProduct();
-        quotaService.creditPlan(payment.getUserId(), product.getPlan(), product.getLabel());
-        giftService.grantPromoGift(payment, paidAt);
+        limitService.creditTopUp(payment.getUserId(), payment.getLimits(), TopUpPricing.label(payment.getLimits()));
         log.info("Payment {} (invId {}) confirmed for user {}",
                 payment.getId(), payment.getInvId(), payment.getUserId());
         return true;
@@ -74,6 +72,6 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(id)
                 .filter(p -> p.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Payment not found"));
-        return new PaymentStatusResponse(payment.getStatus(), payment.getProduct());
+        return new PaymentStatusResponse(payment.getStatus(), payment.getLimits(), payment.getAmount());
     }
 }

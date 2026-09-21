@@ -14,11 +14,11 @@ export function answersWord(count: number): string {
   return count % 10 === 1 ? 'ответа' : 'ответов'
 }
 
-/** «1 тренировка», «3 тренировки», «5 тренировок», «21 тренировка». */
-export function trainingsWord(count: number): string {
+/** «1 лимит», «3 лимита», «5 лимитов», «21 лимит». */
+export function limitsWord(count: number): string {
   const mod100 = count % 100
-  if (mod100 >= 11 && mod100 <= 14) return 'тренировок'
+  if (mod100 >= 11 && mod100 <= 14) return 'лимитов'
   const mod10 = count % 10
-  if (mod10 === 1) return 'тренировка'
-  return mod10 >= 2 && mod10 <= 4 ? 'тренировки' : 'тренировок'
+  if (mod10 === 1) return 'лимит'
+  return mod10 >= 2 && mod10 <= 4 ? 'лимита' : 'лимитов'
 }

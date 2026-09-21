@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react'
+import { OPERATION_COST } from '@/content/limits'
+import { TopUpLink } from '@/features/billing/TopUpLink'
 import { ApiRequestError, getErrorMessage } from '@/lib/api'
 
 /** Русское сообщение об ошибке создания интервью. Бэк отдаёт текст по-английски,
  *  поэтому маппим по HTTP-статусу: невалидная ссылка отсекается ещё превью, до
  *  create такие ошибки доходят редко. */
-export function interviewCreateErrorMessage(error: unknown): string {
+export function interviewCreateErrorMessage(error: unknown): ReactNode {
   if (error instanceof ApiRequestError) {
     if (error.status === 404)
       return 'Вакансия не найдена или снята с публикации. Проверь ссылку.'
@@ -12,7 +15,12 @@ export function interviewCreateErrorMessage(error: unknown): string {
     if (error.status === 409)
       return 'По этой вакансии уже есть незавершённое интервью. Заверши его, прежде чем начинать новое.'
     if (error.status === 402)
-      return 'Интервью на твоём тарифе закончились. Обнови или продли тариф на странице тарифов.'
+      return (
+        <>
+          Не хватает лимитов: интервью стоит {OPERATION_COST.interview}.{' '}
+          <TopUpLink />.
+        </>
+      )
     if (error.status === 503)
       return 'Сервис временно недоступен — попробуй ещё раз чуть позже.'
   }

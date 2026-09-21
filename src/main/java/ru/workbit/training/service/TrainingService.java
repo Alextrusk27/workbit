@@ -22,7 +22,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
@@ -91,7 +92,7 @@ public class TrainingService {
     private final QuestionBankRepository questionBankRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
-    private final QuotaService quotaService;
+    private final LimitService limitService;
     private final SingleFlight singleFlight;
 
     private final TrainingSessionMapper trainingSessionMapper;
@@ -109,7 +110,7 @@ public class TrainingService {
     }
 
     private TrainingSessionResponse createSession(CreateSessionRequest request, UUID userId) {
-        quotaService.checkTrainingAvailable(userId);
+        limitService.check(userId, UsageEvent.Operation.TRAINING);
 
         TrainingSession session = trainingSessionMapper.toEntity(request);
         session.setUserId(userId);
@@ -216,7 +217,7 @@ public class TrainingService {
                 .filter(s -> s.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
-        quotaService.checkPaidPlan(userId);
+        limitService.check(userId, UsageEvent.Operation.TRAINING_MORE);
 
         List<TrainingQuestion> questions = session.getQuestions();
         checkRoomForMoreQuestions(sessionId, questions);
@@ -294,22 +295,28 @@ public class TrainingService {
         checkQuestionOwnership(question, userId);
         checkQuestionSession(question, sessionId);
 
+        if (question.getReferenceAnswerUnlockedAt() == null) {
+            limitService.requirePaid(userId);
+            trainingWriter.unlockReferenceAnswer(questionId, userId);
+        }
         if (question.getReferenceAnswer() != null) {
             return new ReferenceAnswerResponse(question.getReferenceAnswer());
         }
+        String answer = generateReferenceAnswer(question);
+        trainingWriter.saveReferenceAnswer(questionId, answer);
+        return new ReferenceAnswerResponse(answer);
+    }
 
+    private String generateReferenceAnswer(TrainingQuestion question) {
         TrainingSession session = question.getTrainingSession();
         LlmTrainingReferenceAnswer generated = llmService.createReferenceAnswer(
                 new LlmTrainingReferenceAnswerRequest(
                         session.getSkill(), session.getProfession(), question.getText()));
         if (generated.answer() == null || generated.answer().isBlank()) {
-            log.error("LLM returned no usable reference answer for question {}", questionId);
+            log.error("LLM returned no usable reference answer for question {}", question.getId());
             throw new LlmException("Reference answer is not available");
         }
-
-        String answer = generated.answer().strip();
-        trainingWriter.saveReferenceAnswer(questionId, answer);
-        return new ReferenceAnswerResponse(answer);
+        return generated.answer().strip();
     }
 
     public TrainingReportResponse createReport(UUID sessionId, UUID userId) {
@@ -358,8 +365,12 @@ public class TrainingService {
      * и отчёт стираются.
      */
     public TrainingSessionResponse restart(UUID sessionId, UUID userId) {
-        checkUserSession(sessionId, userId);
-        return trainingWriter.restartSession(sessionId);
+        return singleFlight.run(
+                new SingleFlight.Key("training.restart", List.of(sessionId, userId)),
+                () -> {
+                    checkUserSession(sessionId, userId);
+                    return trainingWriter.restartSession(sessionId);
+                });
     }
 
     @Transactional
@@ -446,7 +457,7 @@ public class TrainingService {
         }
 
         LlmInputNormalization normalized = normalize(session.getSkill(), session.getProfession());
-        if (knownSkill.isEmpty() && !normalized.skillRecognized()) {
+        if (!normalized.skillRecognized()) {
             log.warn("Rejecting training session: skill not recognized [skill={}, profession={}]",
                     session.getSkill(), session.getProfession());
             throw new UnprocessableEntityException("Skill not recognized");
@@ -457,10 +468,8 @@ public class TrainingService {
             throw new UnprocessableEntityException("Profession not recognized");
         }
 
-        if (knownSkill.isEmpty()) {
-            session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
-                    skillDictRepository::findNameByMatchKey));
-        }
+        session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
+                skillDictRepository::findNameByMatchKey));
         if (knownProfession.isEmpty()) {
             session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions(),
                     key -> professionDictRepository.findByMatchKey(key).map(ProfessionDict::getName)));

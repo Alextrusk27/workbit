@@ -51,7 +51,7 @@ public class RobokassaService implements PaymentProvider {
                 .queryParam("MerchantLogin", properties.merchantLogin())
                 .queryParam("OutSum", outSum)
                 .queryParam("InvId", invId)
-                .queryParam("Description", payment.getProduct().getDescription())
+                .queryParam("Description", TopUpPricing.label(payment.getLimits()) + " — Workbit")
                 .queryParam("Receipt", receipt)
                 .queryParam("SignatureValue", signature)
                 .queryParam("Culture", "ru")
@@ -158,7 +158,7 @@ public class RobokassaService implements PaymentProvider {
 
     private String encodedReceipt(Payment payment) {
         Receipt receipt = new Receipt(List.of(new ReceiptItem(
-                payment.getProduct().getLabel(), 1, payment.getAmount(), TAX_NONE)));
+                TopUpPricing.label(payment.getLimits()), 1, payment.getAmount(), TAX_NONE)));
         return URLEncoder.encode(objectMapper.writeValueAsString(receipt), StandardCharsets.UTF_8)
                 .replace("+", "%20");
     }

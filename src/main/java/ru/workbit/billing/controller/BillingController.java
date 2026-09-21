@@ -23,13 +23,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.workbit.billing.dto.BalanceResponse;
 import ru.workbit.billing.dto.PaymentCreateRequest;
 import ru.workbit.billing.dto.PaymentCreateResponse;
 import ru.workbit.billing.dto.PaymentStatusResponse;
-import ru.workbit.billing.dto.QuotaResponse;
 import ru.workbit.billing.dto.UsageResponse;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.billing.service.PaymentService;
-import ru.workbit.billing.service.QuotaService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
@@ -37,41 +37,39 @@ import ru.workbit.util.annotation.Loggable;
 @RestController
 @RequestMapping("/api/v1/billing")
 @RequiredArgsConstructor
-@Tag(name = "Billing", description = "Тариф, остатки квот и оплата")
+@Tag(name = "Billing", description = "Баланс лимитов, история операций и пополнение баланса")
 public class BillingController {
 
-    private final QuotaService quotaService;
+    private final LimitService limitService;
     private final PaymentService paymentService;
 
     @GetMapping("/quota")
     @Loggable(logResult = true)
-    @Operation(summary = "Текущий тариф и остатки квот",
-            description = "Возвращает эффективное состояние тарифа пользователя: план, окончание оплаченного периода и "
-                    + "остатки интервью/тренировок раздельно по подписке и докупленным пакетам. Истёкший платный тариф "
-                    + "отдаётся как FREE с нулевыми подписочными остатками; пакетные остатки не сгорают.")
+    @Operation(summary = "Баланс лимитов",
+            description = "Возвращает остаток лимитов, срок их действия и признак хотя бы одной покупки. Просроченный "
+                    + "баланс отдаётся нулём без срока. Первое обращение к биллингу зачисляет приветственные лимиты.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Тариф и остатки квот"),
+            @ApiResponse(responseCode = "200", description = "Баланс лимитов"),
             @ApiResponse(
                     responseCode = "401",
                     description = "Нет токена или токен недействителен",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull QuotaResponse> getQuota(
+    public ResponseEntity<@NotNull BalanceResponse> getBalance(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(quotaService.getQuota(userDetails.getId()));
+        return ResponseEntity.ok(limitService.getBalance(userDetails.getId()));
     }
 
     @GetMapping("/usage")
     @Loggable
-    @Operation(summary = "Статистика лимитов и история операций",
-            description = "Возвращает счётчики остатков раздельно по подписке и пакетам (остаток и сколько выдано "
-                    + "всего) и историю списаний и зачислений, новые первыми. Подписочные счётчики истёкшего платного "
-                    + "тарифа отдаются нулями; пакетные не сгорают.")
+    @Operation(summary = "Баланс и история операций",
+            description = "Возвращает баланс лимитов (как /quota) и историю списаний и зачислений в лимитах, новые "
+                    + "первыми. Величина операции всегда положительная, знак задаёт kind.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Статистика лимитов"),
+            @ApiResponse(responseCode = "200", description = "Баланс и история операций"),
             @ApiResponse(
                     responseCode = "401",
                     description = "Нет токена или токен недействителен",
@@ -80,20 +78,21 @@ public class BillingController {
     public ResponseEntity<@NotNull UsageResponse> getUsage(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(quotaService.getUsage(userDetails.getId()));
+        return ResponseEntity.ok(limitService.getUsage(userDetails.getId()));
     }
 
     @PostMapping("/payments")
     @Loggable(logArgs = true)
     @Operation(summary = "Создать платёж",
-            description = "Создаёт платёж за тариф и возвращает URL платёжной страницы Робокассы для редиректа. Цена "
-                    + "определяется продуктом на сервере.")
+            description = "Создаёт платёж за пополнение баланса на указанное число лимитов (10-500, кратно 10) и "
+                    + "возвращает URL платёжной страницы Робокассы для редиректа. Сумму считает сервер по сетке "
+                    + "объёмных скидок.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Платёж создан"),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Не указан продукт",
+                    description = "Число лимитов не указано, вне диапазона или не кратно 10",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(
                     responseCode = "401",
@@ -105,7 +104,7 @@ public class BillingController {
             @Valid @RequestBody PaymentCreateRequest request
     ) {
         return ResponseEntity.ok(paymentService.create(
-                userDetails.getId(), request.product(), userDetails.getEmail()));
+                userDetails.getId(), request.limits(), userDetails.getEmail()));
     }
 
     @GetMapping("/payments/{id}")
@@ -138,7 +137,8 @@ public class BillingController {
     @Loggable
     @Operation(summary = "Webhook Робокассы (ResultURL)",
             description = "Публичное уведомление Робокассы об оплате (form-urlencoded: OutSum, InvId, SignatureValue). "
-                    + "Проверяет подпись и сумму, идемпотентно подтверждает платёж и начисляет тариф. Ответ — текст "
+                    + "Проверяет подпись и сумму, идемпотентно подтверждает платёж и зачисляет лимиты. "
+                    + "Ответ — текст "
                     + "OK{InvId}; на невалидное уведомление — 400, Робокасса повторит доставку.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Платёж подтверждён"),

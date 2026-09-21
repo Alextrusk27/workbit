@@ -665,7 +665,8 @@ class TrainingControllerTest {
             var sessionId = UUID.randomUUID();
             var questionId = UUID.randomUUID();
             var question = new TrainingQuestionResponse(
-                    questionId, 1, "Что такое индекс в PostgreSQL?", "Структура для ускорения поиска", null, null);
+                    questionId, 1, "Что такое индекс в PostgreSQL?", "Структура для ускорения поиска", null, null,
+                    true);
             when(trainingService.getAnsweredQuestions(sessionId, USER_ID)).thenReturn(List.of(question));
 
             // when / then
@@ -674,6 +675,7 @@ class TrainingControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].questionId").value(questionId.toString()))
                     .andExpect(jsonPath("$[0].answerText").value("Структура для ускорения поиска"))
+                    .andExpect(jsonPath("$[0].referenceAnswerUnlocked").value(true))
                     .andExpect(jsonPath("$[1]").doesNotExist());
         }
 
@@ -772,6 +774,34 @@ class TrainingControllerTest {
             mvc.perform(get(uri())
                             .with(user(principal())))
                     .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Возвращает 403 с деталью \"Purchase required\", когда пакет ещё не покупался")
+        void returns403WhenPurchaseRequired() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new ForbiddenException("Purchase required"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errors[0]").value("Purchase required"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 402, когда не хватает лимитов")
+        void returns402WhenNotEnoughLimits() throws Exception {
+            // given
+            when(trainingService.getReferenceAnswer(sessionId, questionId, USER_ID))
+                    .thenThrow(new PaymentRequiredException("Not enough limits"));
+
+            // when / then
+            mvc.perform(get(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isPaymentRequired())
+                    .andExpect(jsonPath("$.errors[0]").value("Not enough limits"));
         }
 
         @Test
@@ -899,6 +929,20 @@ class TrainingControllerTest {
         }
 
         @Test
+        @DisplayName("Возвращает 402, когда не хватает лимитов")
+        void returns402WhenNotEnoughLimits() throws Exception {
+            // given
+            when(trainingService.addQuestions(sessionId, USER_ID))
+                    .thenThrow(new PaymentRequiredException("Not enough limits"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isPaymentRequired())
+                    .andExpect(jsonPath("$.errors[0]").value("Not enough limits"));
+        }
+
+        @Test
         @DisplayName("Возвращает 503, когда AI-сервис недоступен")
         void returns503WhenLlmUnavailable() throws Exception {
             // given
@@ -993,6 +1037,20 @@ class TrainingControllerTest {
             mvc.perform(post(uri())
                             .with(user(principal())))
                     .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("Возвращает 402, когда не хватает лимитов")
+        void returns402WhenNotEnoughLimits() throws Exception {
+            // given
+            when(trainingService.restart(sessionId, USER_ID))
+                    .thenThrow(new PaymentRequiredException("Not enough limits"));
+
+            // when / then
+            mvc.perform(post(uri())
+                            .with(user(principal())))
+                    .andExpect(status().isPaymentRequired())
+                    .andExpect(jsonPath("$.errors[0]").value("Not enough limits"));
         }
 
         @Test

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
-import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ChatBubble } from '@/components/chat/ChatBubble'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
@@ -23,7 +22,6 @@ import {
 } from '@/components/marketing/icons'
 import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
-import { plans, promo } from '@/content/plans'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/cn'
@@ -37,7 +35,7 @@ const icons: Record<HomeIcon, typeof IconRole> = {
   clock: IconClock,
 }
 
-const { hero, simulator, demo, trainer, pricing, faq, cta } = home
+const { hero, simulator, demo, trainer, faq, cta } = home
 const { progress } = demo
 
 const chartYs = [
@@ -95,7 +93,6 @@ function StepCard({
 
 export function HomePage() {
   const { isAuthenticated } = useAuth()
-  const startTo = isAuthenticated ? '/app' : '/login'
   const link = (c: Cta) => ctaLink(c, { start: '/app', isAuthenticated })
 
   return (
@@ -426,29 +423,6 @@ export function HomePage() {
               </div>
             </div>
           </Reveal>
-        </Container>
-      </section>
-
-      <section id="pricing" className="scroll-mt-20 py-10 sm:py-16">
-        <Container>
-          <Reveal>
-            <SectionHead title={pricing.title}>
-              {inline(
-                promo.active ? `${pricing.lead} ${promo.home}` : pricing.lead,
-              )}
-            </SectionHead>
-          </Reveal>
-          <div className="grid justify-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.map((p, i) => (
-              <Reveal key={p.name} delay={i * 0.05}>
-                <PlanCard
-                  plan={p}
-                  features={p.previewFeatures}
-                  to={p.featured ? '/pricing' : startTo}
-                />
-              </Reveal>
-            ))}
-          </div>
         </Container>
       </section>
 

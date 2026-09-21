@@ -4,7 +4,6 @@ import { HomePage } from '@/pages/HomePage'
 import { AiInterviewPage } from '@/pages/AiInterviewPage'
 import { SkillsTrainerPage } from '@/pages/SkillsTrainerPage'
 import { FaqPage } from '@/pages/FaqPage'
-import { PricingPage } from '@/pages/PricingPage'
 import { BlogPage } from '@/pages/BlogPage'
 import { ArticlePage } from '@/pages/ArticlePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -20,7 +19,6 @@ export const marketingRoute: RouteObject = {
     { path: 'ai-interview', element: <AiInterviewPage /> },
     { path: 'skills-trainer', element: <SkillsTrainerPage /> },
     { path: 'faq', element: <FaqPage /> },
-    { path: 'pricing', element: <PricingPage /> },
     { path: 'blog', element: <BlogPage /> },
     {
       path: 'blog/:rubric/:slug',

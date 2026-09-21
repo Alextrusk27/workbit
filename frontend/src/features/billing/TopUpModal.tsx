@@ -6,7 +6,11 @@ import { Alert } from '@/components/ui/Alert'
 import { Limits } from '@/components/ui/LimitIcon'
 import { operations } from '@/content/limits'
 import { useAuth } from '@/features/auth/useAuth'
-import { TopUpModalContext } from '@/features/billing/useTopUpModal'
+import { useLoginModal } from '@/features/auth/useLoginModal'
+import {
+  TopUpModalContext,
+  useTopUpModal,
+} from '@/features/billing/useTopUpModal'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
 import { motionTokens } from '@/lib/motion'
@@ -50,6 +54,8 @@ function TopUpModal({
   onClose: () => void
 }) {
   const { isAuthenticated } = useAuth()
+  const openLogin = useLoginModal()
+  const openTopUp = useTopUpModal()
   const createPayment = useCreatePayment()
   const [error, setError] = useState<string | null>(null)
   const panelRef = useModalA11y(open)
@@ -73,6 +79,11 @@ function TopUpModal({
       },
       onError: (e) => setError(getErrorMessage(e)),
     })
+  }
+
+  const login = (limits: number) => {
+    onClose()
+    openLogin({ onSuccess: () => openTopUp(limits) })
   }
 
   return (
@@ -110,7 +121,7 @@ function TopUpModal({
               <TopUpCard
                 initialLimits={initialLimits}
                 onBuy={isAuthenticated ? buy : undefined}
-                to="/login"
+                onLogin={isAuthenticated ? undefined : login}
                 ctaLabel={
                   isAuthenticated ? undefined : 'Войти, чтобы пополнить'
                 }

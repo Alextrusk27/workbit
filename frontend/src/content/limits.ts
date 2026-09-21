@@ -23,38 +23,18 @@ export const OPERATION_COST = {
 
 export const WELCOME_LIMITS = 20
 
-export const operations: { name: string; cost: number; note: string }[] = [
-  {
-    name: 'AI-интервью по вакансии',
-    cost: OPERATION_COST.interview,
-    note: 'Списывается при старте, голосом или текстом — одинаково',
-  },
-  {
-    name: 'Тренировка навыка',
-    cost: OPERATION_COST.training,
-    note: '10 вопросов и разбор; перезапуск стоит столько же',
-  },
-  {
-    name: 'Ещё 10 вопросов в тренировке',
-    cost: OPERATION_COST.more,
-    note: 'До 50 вопросов в одной тренировке',
-  },
-  {
-    name: 'Эталонный ответ',
-    cost: OPERATION_COST.reference,
-    note: 'Один раз на вопрос, повторный просмотр бесплатен. Доступен после первого пополнения',
-  },
+export const operations: { name: string; cost: number }[] = [
+  { name: 'AI-интервью по вакансии', cost: OPERATION_COST.interview },
+  { name: 'Тренировка навыка, 10 вопросов', cost: OPERATION_COST.training },
 ]
 
 /** Зеркало `TopUpPricing` на бэке: границы, шаг и ступени цены за лимит. */
 export const TOPUP = {
-  min: 50,
-  max: 5000,
-  sliderMax: 500,
+  min: 10,
+  max: 500,
   step: 10,
-  presets: [50, 100, 200, 300, 500],
   tiers: [
-    { from: 50, price: 15 },
+    { from: 10, price: 15 },
     { from: 100, price: 13.5 },
     { from: 200, price: 12 },
     { from: 300, price: 11 },
@@ -108,6 +88,5 @@ export const freePack: Pack = {
 
 export const topUp = {
   name: 'Пополнение баланса',
-  lead: 'Сколько нужно — столько и покупаешь. Чем больше, тем дешевле лимит.',
   cta: 'Пополнить',
 }

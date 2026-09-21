@@ -289,7 +289,7 @@ export function BrandPage() {
             features={freePack.previewFeatures}
             to="/pricing"
           />
-          <TopUpCard to="/pricing" />
+          <TopUpCard />
         </div>
       </Section>
     </Container>

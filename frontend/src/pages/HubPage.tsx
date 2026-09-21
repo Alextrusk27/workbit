@@ -12,6 +12,7 @@ import {
   useBalance,
   usePayment,
 } from '@/features/billing/useBilling'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { formatDate } from '@/lib/dates'
 import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -45,6 +46,7 @@ function SectionCard({
 
 function BalanceLine() {
   const { data } = useBalance()
+  const openTopUp = useTopUpModal()
   if (!data) return null
 
   return (
@@ -54,12 +56,13 @@ function BalanceLine() {
         <Limits value={data.limits} />
       </span>
       {data.expiresAt && ` · действуют до ${formatDate(data.expiresAt)}`} ·{' '}
-      <Link
-        to="/pricing"
+      <button
+        type="button"
+        onClick={() => openTopUp()}
         className="text-indigo hover:text-violet transition-colors"
       >
-        Тарифы
-      </Link>
+        Пополнить
+      </button>
     </p>
   )
 }
@@ -69,6 +72,7 @@ export function HubPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const openTopUp = useTopUpModal()
   const [paid] = useState(() => searchParams.get('payment') === 'ok')
   const [failed] = useState(() => searchParams.get('payment') === 'fail')
   const [paymentOpen, setPaymentOpen] = useState(paid)
@@ -113,13 +117,14 @@ export function HubPage() {
       {showFailed && (
         <div className="mt-8 max-w-[560px]">
           <Alert>
-            Оплата не прошла, деньги не списаны. Попробуй ещё раз на{' '}
-            <Link
-              to="/pricing"
+            Оплата не прошла, деньги не списаны.{' '}
+            <button
+              type="button"
+              onClick={() => openTopUp()}
               className="underline underline-offset-2 transition-colors"
             >
-              странице тарифов
-            </Link>
+              Попробовать ещё раз
+            </button>
             .
           </Alert>
         </div>

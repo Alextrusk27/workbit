@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { OPERATION_COST } from '@/content/limits'
 import { useAuth, useDeleteAccount } from '@/features/auth/useAuth'
 import type { Balance, UsageEvent } from '@/features/billing/api'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { useBalance, useUsage } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -60,6 +61,7 @@ export function SettingsPage() {
 function BalanceSection() {
   const { data: balance, isLoading } = useBalance()
   const usage = useUsage()
+  const openTopUp = useTopUpModal()
 
   return (
     <section>
@@ -84,14 +86,13 @@ function BalanceSection() {
       )}
 
       <p className="text-dim mt-5 text-sm">
-        Пополнить баланс можно на странице{' '}
-        <Link
-          to="/pricing"
+        <button
+          type="button"
+          onClick={() => openTopUp()}
           className="text-indigo hover:text-violet transition-colors"
         >
-          тарифов
-        </Link>
-        .
+          Пополнить баланс
+        </button>
       </p>
     </section>
   )

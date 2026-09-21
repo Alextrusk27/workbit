@@ -25,6 +25,7 @@ import { faq as faqItems } from '@/content/faq'
 import { home, type HomeIcon } from '@/content/pages/home'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { cn } from '@/lib/cn'
 import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
@@ -94,6 +95,7 @@ function StepCard({
 
 export function HomePage() {
   const { isAuthenticated } = useAuth()
+  const openTopUp = useTopUpModal()
   const link = (c: Cta) => ctaLink(c, { start: '/app', isAuthenticated })
 
   return (
@@ -436,7 +438,7 @@ export function HomePage() {
           </Reveal>
           <Reveal>
             <div className="mx-auto max-w-[560px]">
-              <TopUpCard to="/pricing" />
+              <TopUpCard onBuy={openTopUp} />
             </div>
           </Reveal>
         </Container>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { FeedbackWidget } from '@/components/app/FeedbackWidget'
 import { Alert } from '@/components/ui/Alert'
@@ -9,6 +8,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
 import { OPERATION_COST } from '@/content/limits'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { billingKeys, useBalance } from '@/features/billing/useBilling'
 import { trainingApi, type TrainingQuestion } from '@/features/training/api'
 import { trainingErrorMessage } from '@/features/training/errors'
@@ -81,6 +81,7 @@ export function ReferenceAnswer({
   const [open, setOpen] = useState(false)
   const qc = useQueryClient()
   const { data: balance } = useBalance()
+  const openTopUp = useTopUpModal()
   const { data, isFetching, isError, error } = useReferenceAnswer(
     sessionId,
     questionId,
@@ -97,14 +98,15 @@ export function ReferenceAnswer({
   if (!open) {
     if (!isUnlocked && balance?.paid === false) {
       return (
-        <Link
-          to="/pricing"
+        <button
+          type="button"
+          onClick={() => openTopUp()}
           title="Доступно после первого пополнения"
           className={`${REFERENCE_LINK_CLASS} inline-flex items-center gap-1.5`}
         >
           <LockIcon />
           Эталонный ответ — после первого пополнения
-        </Link>
+        </button>
       )
     }
     return (

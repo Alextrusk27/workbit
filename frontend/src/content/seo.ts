@@ -4,9 +4,7 @@ import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as blogSeo } from '@/content/pages/blog'
 import { seo as faqSeo } from '@/content/pages/faq'
 import { seo as homeSeo } from '@/content/pages/home'
-import { seo as pricingSeo } from '@/content/pages/pricing'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
-import { TOPUP, topUpQuote } from '@/content/limits'
 import type { PageSeo } from '@/content/types'
 
 export const SITE = 'https://workbit.ru'
@@ -69,31 +67,6 @@ export const seoPages: SeoPage[] = [
           '@type': 'Question',
           name: item.q,
           acceptedAnswer: { '@type': 'Answer', text: item.a },
-        })),
-      },
-    ],
-  },
-  {
-    path: '/pricing',
-    ...pricingSeo,
-    sources: [
-      'frontend/src/content/pages/pricing.ts',
-      'frontend/src/content/limits.ts',
-    ],
-    jsonLd: () => [
-      {
-        '@context': 'https://schema.org',
-        '@type': 'SoftwareApplication',
-        name: 'Workbit',
-        url: SITE,
-        applicationCategory: 'EducationalApplication',
-        operatingSystem: 'Web',
-        offers: TOPUP.tiers.map((tier) => ({
-          '@type': 'Offer',
-          name: `Пополнение на ${tier.from} лимитов`,
-          price: topUpQuote(tier.from).amount,
-          priceCurrency: 'RUB',
-          url: `${SITE}/pricing`,
         })),
       },
     ],

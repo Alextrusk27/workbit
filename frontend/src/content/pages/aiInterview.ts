@@ -3,7 +3,7 @@ import type { Cta, Hero, PageSeo } from '@/content/types'
 export type AiInterviewIcon = 'star' | 'pencil' | 'chart'
 
 export interface AiInterviewContent {
-  hero: Hero & { text: string; note: string }
+  hero: Hero & { text: string; note: string; priceLink: string }
   flow: {
     title: string
     lead: string
@@ -49,7 +49,8 @@ export const aiInterview: AiInterviewContent = {
     accent: 'по твоей вакансии',
     breakBeforeAccent: true,
     text: '**Пробное интервью по ссылке с hh.ru:** полная сессия из вопросов под требования вакансии.',
-    note: 'Первое интервью бесплатно · [Смотреть тарифы](/pricing)',
+    note: 'Первое интервью бесплатно · ',
+    priceLink: 'Смотреть цены',
   },
   flow: {
     title: 'Собеседование с ИИ по шагам',

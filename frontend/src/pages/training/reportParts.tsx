@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { FeedbackWidget } from '@/components/app/FeedbackWidget'
 import { Alert } from '@/components/ui/Alert'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { Limits } from '@/components/ui/LimitIcon'
 import { MarginNote } from '@/components/ui/MarginNote'
 import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
@@ -113,7 +114,12 @@ export function ReferenceAnswer({
         className={REFERENCE_LINK_CLASS}
       >
         Посмотреть эталонный ответ
-        {!isUnlocked && balance?.paid && ` · ${OPERATION_COST.reference} лимит`}
+        {!isUnlocked && balance?.paid && (
+          <>
+            {' · '}
+            <Limits value={OPERATION_COST.reference} />
+          </>
+        )}
       </button>
     )
   }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { Container } from '@/components/ui/Container'
+import { Limits } from '@/components/ui/LimitIcon'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { PageHero } from '@/components/marketing/PageHero'
@@ -15,7 +16,6 @@ import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
 import { ctaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
-import { limitsWord } from '@/lib/plural'
 
 const { hero, operations: operationsCopy, note, cta } = pricing
 
@@ -79,7 +79,7 @@ export function PricingPage() {
                         <p className="text-dim mt-1 text-[13px]">{op.note}</p>
                       </div>
                       <p className="text-ink shrink-0 text-[15px] font-bold whitespace-nowrap tabular-nums">
-                        {op.cost} {limitsWord(op.cost)}
+                        <Limits value={op.cost} />
                       </p>
                     </li>
                   ))}

@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import { Textarea } from '@/components/ui/Textarea'
@@ -387,7 +388,10 @@ function FinishBar({
                 Подбираем вопросы…
               </>
             ) : (
-              `Ещё ${batch} ${questionsWord(batch)} · ${OPERATION_COST.more} лимитов`
+              <>
+                Ещё {batch} {questionsWord(batch)} ·{' '}
+                <Limits value={OPERATION_COST.more} />
+              </>
             )}
           </Button>
         )}

@@ -28,6 +28,7 @@ export const TOPUP = {
     { from: 100, price: 13.5 },
     { from: 200, price: 12 },
     { from: 300, price: 11 },
+    { from: 400, price: 10.5 },
     { from: 500, price: 10 },
   ],
 } as const
@@ -44,8 +45,21 @@ export function normalizeLimits(value: number): number {
 }
 
 export function topUpQuote(limits: number): TopUpQuote {
-  const tier = [...TOPUP.tiers].reverse().find((t) => limits >= t.from)!
-  const amount = Math.floor(limits * tier.price)
+  const i = TOPUP.tiers.findLastIndex((t) => limits >= t.from)
+  const lower = TOPUP.tiers[i]
+  const upper = TOPUP.tiers[i + 1]
+  const lowerAmount = lower.from * lower.price
+  const amount =
+    i === 0
+      ? limits * lower.price
+      : upper
+        ? Math.floor(
+            lowerAmount +
+              ((upper.from * upper.price - lowerAmount) *
+                (limits - lower.from)) /
+                (upper.from - lower.from),
+          )
+        : lowerAmount
   return { amount, saving: limits * TOPUP.tiers[0].price - amount }
 }
 

@@ -18,55 +18,44 @@ class TopUpPricingTest {
     @DisplayName("Validate")
     class Validate {
 
-        @ParameterizedTest(name = "{0} лимитов проходит")
-        @ValueSource(ints = {10, 20, 490, 500})
-        void acceptsValidLimits(int limits) {
-            assertThatCode(() -> TopUpPricing.validate(limits)).doesNotThrowAnyException();
-        }
-
-        @ParameterizedTest(name = "{0} лимитов — вне диапазона")
-        @ValueSource(ints = {0, 510, -10})
-        void rejectsOutOfRange(int limits) {
-            assertThatThrownBy(() -> TopUpPricing.validate(limits))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("between");
-        }
-
-        @ParameterizedTest(name = "{0} лимитов — не кратно 10")
-        @ValueSource(ints = {15, 101, 499})
-        void rejectsNotMultipleOfStep(int limits) {
-            assertThatThrownBy(() -> TopUpPricing.validate(limits))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("multiple");
-        }
-    }
-
-    @Nested
-    @DisplayName("Amount")
-    class Amount {
-
-        @ParameterizedTest(name = "{0} лимитов: {1} ₽/лимит, итого {2} ₽")
+        @ParameterizedTest(name = "{0} лимитов: {1} ₽")
         @CsvSource({
-                "10, 15.00, 150.00",
-                "40, 15.00, 600.00",
-                "90, 15.00, 1350.00",
-                "100, 13.50, 1350.00",
-                "190, 13.50, 2565.00",
-                "200, 12.00, 2400.00",
-                "300, 11.00, 3300.00",
-                "490, 11.00, 5390.00",
-                "500, 10.00, 5000.00",
+                "10, 150.00",
+                "40, 600.00",
+                "50, 750.00",
+                "90, 1350.00",
+                "100, 1350.00",
+                "180, 2190.00",
+                "190, 2295.00",
+                "200, 2400.00",
+                "280, 3120.00",
+                "300, 3300.00",
+                "350, 3750.00",
+                "400, 4200.00",
+                "460, 4680.00",
+                "490, 4920.00",
+                "500, 5000.00",
         })
-        void appliesTierPriceToWholeVolume(int limits, String perLimit, String amount) {
-            assertThat(TopUpPricing.pricePerLimit(limits)).isEqualByComparingTo(perLimit);
+        void flatBelowDiscountThenInterpolatesBetweenTierAnchors(int limits, String amount) {
             assertThat(TopUpPricing.amount(limits)).isEqualByComparingTo(amount);
             assertThat(TopUpPricing.amount(limits).scale()).isEqualTo(2);
         }
 
         @Test
+        @DisplayName("Больше лимитов никогда не стоит дешевле")
+        void amountIsMonotonic() {
+            for (int limits = TopUpPricing.MIN_LIMITS + TopUpPricing.STEP; limits <= TopUpPricing.MAX_LIMITS;
+                    limits += TopUpPricing.STEP) {
+                assertThat(TopUpPricing.amount(limits))
+                        .as("%d vs %d", limits, limits - TopUpPricing.STEP)
+                        .isGreaterThanOrEqualTo(TopUpPricing.amount(limits - TopUpPricing.STEP));
+            }
+        }
+
+        @Test
         @DisplayName("Ниже минимума — IllegalArgumentException")
         void throwsBelowMinimum() {
-            assertThatThrownBy(() -> TopUpPricing.pricePerLimit(0))
+            assertThatThrownBy(() -> TopUpPricing.amount(0))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }

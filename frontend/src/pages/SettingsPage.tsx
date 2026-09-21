@@ -27,22 +27,13 @@ const DELETE_WARNING =
 export function SettingsPage() {
   usePageTitle('Аккаунт')
   const { user } = useAuth()
-  const { data: balance } = useBalance()
 
   return (
     <Container className="max-w-160">
       <AppPageHeader title="Аккаунт">
         {user && (
-          <span className="flex flex-wrap items-center gap-2.5">
-            <span>
-              Ты вошёл как <span className="text-ink">{user.email}</span>
-            </span>
-            {balance && (
-              <span className="border-indigo/40 bg-indigo/12 text-indigo inline-flex rounded-full border px-3 py-0.5 text-[12.5px] font-semibold tabular-nums">
-                <Limits value={balance.limits} />
-                {balance.expiresAt && ` · до ${formatDate(balance.expiresAt)}`}
-              </span>
-            )}
+          <span>
+            Ты вошёл как <span className="text-ink">{user.email}</span>
           </span>
         )}
       </AppPageHeader>
@@ -65,10 +56,8 @@ function BalanceSection() {
 
   return (
     <section>
-      <h2 className="text-ink text-[21px] font-bold">Лимиты</h2>
-
       {isLoading && (
-        <div role="status" className="mt-4">
+        <div role="status">
           <span className="sr-only">Загрузка баланса…</span>
           <Skeleton className="h-5 w-40" />
           <Skeleton className="mt-3 h-4 w-64" />
@@ -101,7 +90,7 @@ function BalanceSection() {
 function BalanceCard({ balance }: { balance: Balance }) {
   const low = balance.limits < OPERATION_COST.interview
   return (
-    <div className="border-line bg-card mt-5 rounded-xl border p-5">
+    <div className="border-line bg-card rounded-xl border p-5">
       <Eyebrow>Баланс</Eyebrow>
       <p className="mt-2">
         <span
@@ -115,10 +104,8 @@ function BalanceCard({ balance }: { balance: Balance }) {
       </p>
       <p className="text-dim mt-2.5 text-[12.5px]">
         {balance.expiresAt
-          ? `Действуют до ${formatDate(balance.expiresAt)}`
+          ? `Лимиты действуют до ${formatDate(balance.expiresAt)}`
           : 'Лимитов нет'}
-        {' · '}интервью {OPERATION_COST.interview}, тренировка{' '}
-        {OPERATION_COST.training}, эталонный ответ {OPERATION_COST.reference}
       </p>
     </div>
   )

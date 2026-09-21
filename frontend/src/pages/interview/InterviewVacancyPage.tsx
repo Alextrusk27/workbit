@@ -5,9 +5,11 @@ import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { OPERATION_COST } from '@/content/limits'
 import type {
   InterviewAttempt,
   InterviewVacancyDetail,
@@ -220,7 +222,13 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
               disabled={create.isPending}
               className={buttonClasses()}
             >
-              {create.isPending ? 'Готовим вопросы…' : 'Пройти ещё раз'}
+              {create.isPending ? (
+                'Готовим вопросы…'
+              ) : (
+                <>
+                  Пройти ещё раз · <Limits value={OPERATION_COST.interview} />
+                </>
+              )}
             </button>
           )}
           <button

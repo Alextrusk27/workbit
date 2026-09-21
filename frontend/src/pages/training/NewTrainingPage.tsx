@@ -6,6 +6,8 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { Field } from '@/components/ui/Field'
+import { Limits } from '@/components/ui/LimitIcon'
+import { OPERATION_COST } from '@/content/limits'
 import type {
   NormalizeInputResponse,
   TrainingOptions,
@@ -401,11 +403,15 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
       )}
 
       <Button type="submit" disabled={!ready || blocked || pending}>
-        {create.isPending
-          ? 'Создаём…'
-          : normalize.isPending
-            ? 'Проверяем…'
-            : 'Начать тренировку'}
+        {create.isPending ? (
+          'Создаём…'
+        ) : normalize.isPending ? (
+          'Проверяем…'
+        ) : (
+          <>
+            Начать тренировку · <Limits value={OPERATION_COST.training} />
+          </>
+        )}
       </Button>
     </form>
   )

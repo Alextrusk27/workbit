@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
-import { QuotaBadge } from '@/components/app/QuotaBadge'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
-import { OPERATION_COST } from '@/content/limits'
 import type { InterviewVacancy } from '@/features/interview/api'
 import {
   OFFER_TONE,
@@ -58,12 +56,9 @@ export function InterviewListPage() {
         eyebrow="Интервью"
         title="Мои интервью"
         actions={
-          <div className="flex items-center gap-4">
-            <QuotaBadge lowBelow={OPERATION_COST.interview} />
-            <Link to="/app/interview/new" className={buttonClasses()}>
-              Новое интервью
-            </Link>
-          </div>
+          <Link to="/app/interview/new" className={buttonClasses()}>
+            Новое интервью
+          </Link>
         }
       />
 

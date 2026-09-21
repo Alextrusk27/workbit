@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Field } from '@/components/ui/Field'
+import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { OPERATION_COST } from '@/content/limits'
 import type { VacancyPreview } from '@/features/vacancy/api'
 import { takePendingVacancyUrl } from '@/features/vacancy/pendingVacancy'
 import {
@@ -174,7 +176,13 @@ function InterviewForm() {
             conflictVacancyId !== ''
           }
         >
-          {create.isPending ? 'Готовим вопросы…' : 'Начать интервью'}
+          {create.isPending ? (
+            'Готовим вопросы…'
+          ) : (
+            <>
+              Начать интервью · <Limits value={OPERATION_COST.interview} />
+            </>
+          )}
         </Button>
         <p className="text-dim mt-3 text-[12.5px]">
           Рецензент прочитает вакансию и составит вопросы под неё — это займёт

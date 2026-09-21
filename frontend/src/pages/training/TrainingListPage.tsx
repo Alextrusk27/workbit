@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
-import { QuotaBadge } from '@/components/app/QuotaBadge'
 import { StatusTag } from '@/components/app/StatusTag'
 import { Alert } from '@/components/ui/Alert'
 import { Chip } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
+import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
@@ -50,12 +50,9 @@ export function TrainingListPage() {
         eyebrow="Тренажёр"
         title="Мои тренировки"
         actions={
-          <div className="flex items-center gap-4">
-            <QuotaBadge lowBelow={OPERATION_COST.training} />
-            <Link to="/app/training/new" className={buttonClasses()}>
-              Новая тренировка
-            </Link>
-          </div>
+          <Link to="/app/training/new" className={buttonClasses()}>
+            Новая тренировка
+          </Link>
         }
       />
 
@@ -231,7 +228,13 @@ function SessionCard({ session }: { session: TrainingSession }) {
             disabled={restart.isPending}
             className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
           >
-            {restart.isPending ? 'Готовим…' : 'Пройти заново'}
+            {restart.isPending ? (
+              'Готовим…'
+            ) : (
+              <>
+                Пройти заново · <Limits value={OPERATION_COST.training} />
+              </>
+            )}
           </button>
         )}
         <button
@@ -261,7 +264,11 @@ function SessionCard({ session }: { session: TrainingSession }) {
         open={confirming === 'restart'}
         title="Пройти заново?"
         text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты. Действие необратимо.`}
-        confirmLabel="Пройти заново"
+        confirmLabel={
+          <>
+            Пройти заново · <Limits value={OPERATION_COST.training} />
+          </>
+        }
         onConfirm={onRestart}
         onClose={() => setConfirming(null)}
       />

@@ -1,7 +1,7 @@
 import { OPERATION_COST } from '@/content/limits'
 import { useBalance } from '@/features/billing/useBilling'
-import { Limits } from '@/components/ui/LimitIcon'
 import { cn } from '@/lib/cn'
+import { limitsWord } from '@/lib/plural'
 
 /** Баланс лимитов; при загрузке или ошибке не рендерится. */
 export function QuotaBadge() {
@@ -15,7 +15,7 @@ export function QuotaBadge() {
         low ? 'text-star font-semibold' : 'text-dim',
       )}
     >
-      <Limits value={data.limits} />
+      {data.limits} {limitsWord(data.limits)}
     </span>
   )
 }

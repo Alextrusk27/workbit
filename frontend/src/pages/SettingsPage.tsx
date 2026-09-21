@@ -7,7 +7,6 @@ import { Chip } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
-import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { OPERATION_COST } from '@/content/limits'
 import { useAuth, useDeleteAccount } from '@/features/auth/useAuth'
@@ -16,6 +15,7 @@ import { useBalance, useUsage } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDay } from '@/lib/dates'
+import { limitsWord } from '@/lib/plural'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const DELETE_WARNING =
@@ -38,7 +38,7 @@ export function SettingsPage() {
             </span>
             {balance && (
               <span className="border-indigo/40 bg-indigo/12 text-indigo inline-flex rounded-full border px-3 py-0.5 text-[12.5px] font-semibold tabular-nums">
-                <Limits value={balance.limits} />
+                {balance.limits} {limitsWord(balance.limits)}
                 {balance.expiresAt && ` · до ${formatDate(balance.expiresAt)}`}
               </span>
             )}
@@ -109,7 +109,11 @@ function BalanceCard({ balance }: { balance: Balance }) {
             low ? 'text-star' : 'text-ink',
           )}
         >
-          <Limits value={balance.limits} />
+          {balance.limits}
+        </span>
+        <span className="text-muted text-sm">
+          {' '}
+          {limitsWord(balance.limits)}
         </span>
       </p>
       <p className="text-dim mt-2.5 text-[12.5px]">
@@ -123,9 +127,9 @@ function BalanceCard({ balance }: { balance: Balance }) {
   )
 }
 
-function deltaText(event: UsageEvent) {
+function deltaText(event: UsageEvent): string {
   const sign = event.kind === 'SPEND' ? '−' : '+'
-  return <Limits value={event.delta} prefix={sign} />
+  return `${sign}${event.delta} ${limitsWord(event.delta)}`
 }
 
 function formatEventDate(iso: string): string {

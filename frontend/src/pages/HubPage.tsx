@@ -5,7 +5,6 @@ import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
-import { Limits } from '@/components/ui/LimitIcon'
 import {
   PAYMENT_ID_KEY,
   billingKeys,
@@ -13,6 +12,7 @@ import {
   usePayment,
 } from '@/features/billing/useBilling'
 import { formatDate } from '@/lib/dates'
+import { limitsWord } from '@/lib/plural'
 import { reachGoal } from '@/lib/metrika'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -51,7 +51,7 @@ function BalanceLine() {
     <p className="text-dim mt-10 text-[13.5px]">
       Лимиты:{' '}
       <span className="text-ink font-semibold tabular-nums">
-        <Limits value={data.limits} />
+        {data.limits} {limitsWord(data.limits)}
       </span>
       {data.expiresAt && ` · действуют до ${formatDate(data.expiresAt)}`} ·{' '}
       <Link

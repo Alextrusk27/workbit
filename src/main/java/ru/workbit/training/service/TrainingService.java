@@ -295,24 +295,15 @@ public class TrainingService {
         checkQuestionOwnership(question, userId);
         checkQuestionSession(question, sessionId);
 
-        if (question.getReferenceAnswerUnlockedAt() != null) {
-            if (question.getReferenceAnswer() != null) {
-                return new ReferenceAnswerResponse(question.getReferenceAnswer());
-            }
-            String answer = generateReferenceAnswer(question);
-            trainingWriter.saveReferenceAnswer(questionId, answer);
-            return new ReferenceAnswerResponse(answer);
+        if (question.getReferenceAnswerUnlockedAt() == null) {
+            limitService.requirePaid(userId);
+            trainingWriter.unlockReferenceAnswer(questionId, userId);
         }
-
-        limitService.requirePaid(userId);
-        limitService.check(userId, UsageEvent.Operation.REFERENCE_ANSWER);
-
         if (question.getReferenceAnswer() != null) {
-            trainingWriter.unlockReferenceAnswer(questionId, null, userId);
             return new ReferenceAnswerResponse(question.getReferenceAnswer());
         }
         String answer = generateReferenceAnswer(question);
-        trainingWriter.unlockReferenceAnswer(questionId, answer, userId);
+        trainingWriter.saveReferenceAnswer(questionId, answer);
         return new ReferenceAnswerResponse(answer);
     }
 
@@ -466,7 +457,7 @@ public class TrainingService {
         }
 
         LlmInputNormalization normalized = normalize(session.getSkill(), session.getProfession());
-        if (knownSkill.isEmpty() && !normalized.skillRecognized()) {
+        if (!normalized.skillRecognized()) {
             log.warn("Rejecting training session: skill not recognized [skill={}, profession={}]",
                     session.getSkill(), session.getProfession());
             throw new UnprocessableEntityException("Skill not recognized");
@@ -477,10 +468,8 @@ public class TrainingService {
             throw new UnprocessableEntityException("Profession not recognized");
         }
 
-        if (knownSkill.isEmpty()) {
-            session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
-                    skillDictRepository::findNameByMatchKey));
-        }
+        session.setSkill(canonical(session.getSkill(), normalized.skillSuggestions(),
+                skillDictRepository::findNameByMatchKey));
         if (knownProfession.isEmpty()) {
             session.setProfession(canonical(session.getProfession(), normalized.professionSuggestions(),
                     key -> professionDictRepository.findByMatchKey(key).map(ProfessionDict::getName)));

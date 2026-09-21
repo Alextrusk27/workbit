@@ -416,30 +416,8 @@ class TrainingWriterTest {
     class UnlockReferenceAnswer {
 
         @Test
-        @DisplayName("Передан сгенерированный ответ - выставляет referenceAnswer, списывает лимит и ставит unlockedAt")
-        void setsAnswerDebitsAndSetsUnlockedAt() {
-            // given
-            UUID questionId = UUID.randomUUID();
-            UUID userId = UUID.randomUUID();
-            TrainingSession session = TrainingSession.builder()
-                    .skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
-            TrainingQuestion question = TrainingQuestion.builder()
-                    .id(questionId).trainingSession(session).text("Что такое JVM?").orderIndex(3).build();
-            when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
-
-            // when
-            trainingWriter.unlockReferenceAnswer(questionId, "Сгенерированный эталонный ответ", userId);
-
-            // then
-            assertThat(question.getReferenceAnswer()).isEqualTo("Сгенерированный эталонный ответ");
-            assertThat(question.getReferenceAnswerUnlockedAt()).isNotNull();
-            verify(limitService).debit(userId, UsageEvent.Operation.REFERENCE_ANSWER,
-                    "Эталонный ответ — " + SKILL + ", вопрос 3");
-        }
-
-        @Test
-        @DisplayName("Ответ не передан (банковый вопрос) - referenceAnswer не трогается, но списание и unlockedAt происходят")
-        void keepsExistingAnswerWhenAnswerIsNullButStillDebitsAndUnlocks() {
+        @DisplayName("Списывает лимит и ставит unlockedAt, referenceAnswer не трогает")
+        void debitsAndSetsUnlockedAt() {
             // given
             UUID questionId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
@@ -447,17 +425,17 @@ class TrainingWriterTest {
                     .skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
             TrainingQuestion question = TrainingQuestion.builder()
                     .id(questionId).trainingSession(session).text("Что такое JVM?")
-                    .referenceAnswer("Готовый ответ из банка").orderIndex(1).build();
+                    .referenceAnswer("Готовый ответ из банка").orderIndex(3).build();
             when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
 
             // when
-            trainingWriter.unlockReferenceAnswer(questionId, null, userId);
+            trainingWriter.unlockReferenceAnswer(questionId, userId);
 
             // then
             assertThat(question.getReferenceAnswer()).isEqualTo("Готовый ответ из банка");
             assertThat(question.getReferenceAnswerUnlockedAt()).isNotNull();
             verify(limitService).debit(userId, UsageEvent.Operation.REFERENCE_ANSWER,
-                    "Эталонный ответ — " + SKILL + ", вопрос 1");
+                    "Эталонный ответ — " + SKILL + ", вопрос 3");
         }
 
         @Test
@@ -468,7 +446,7 @@ class TrainingWriterTest {
             when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> trainingWriter.unlockReferenceAnswer(questionId, "ответ", UUID.randomUUID()))
+            assertThatThrownBy(() -> trainingWriter.unlockReferenceAnswer(questionId, UUID.randomUUID()))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Question not found");
             verifyNoInteractions(limitService);

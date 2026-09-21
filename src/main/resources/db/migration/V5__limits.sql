@@ -103,4 +103,5 @@ ALTER TABLE training.question
     ADD COLUMN reference_answer_unlocked_at TIMESTAMPTZ;
 
 UPDATE training.question
-SET reference_answer_unlocked_at = now();
+SET reference_answer_unlocked_at = now()
+WHERE reference_answer IS NOT NULL;

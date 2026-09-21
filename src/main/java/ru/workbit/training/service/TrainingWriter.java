@@ -165,13 +165,10 @@ class TrainingWriter {
     }
 
     @Transactional
-    public void unlockReferenceAnswer(UUID questionId, String answer, UUID userId) {
+    public void unlockReferenceAnswer(UUID questionId, UUID userId) {
         TrainingQuestion question = trainingQuestionRepository.findWithSessionById(questionId)
                 .orElseThrow(() -> new NotFoundException("Question not found"));
         limitService.debit(userId, UsageEvent.Operation.REFERENCE_ANSWER, referenceAnswerLabel(question));
-        if (answer != null) {
-            question.setReferenceAnswer(answer);
-        }
         question.setReferenceAnswerUnlockedAt(Instant.now());
     }
 

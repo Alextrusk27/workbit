@@ -70,7 +70,7 @@ public class LimitService {
     public void creditTopUp(UUID userId, int limits, String label) {
         insertIfAbsent(userId);
         Instant now = Instant.now();
-        BillingAccount account = load(userId);
+        BillingAccount account = billingAccountRepository.findForUpdate(userId).orElseThrow();
         if (account.getLimits() > 0 && !isActive(account, now)) {
             saveEvent(userId, UsageEvent.Kind.SPEND, UsageEvent.Operation.EXPIRE,
                     account.getLimits(), EXPIRE_LABEL, now);

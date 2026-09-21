@@ -293,7 +293,7 @@ class LimitServiceTest {
             stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(15, future, null);
-            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
 
             // when
             limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);
@@ -316,7 +316,7 @@ class LimitServiceTest {
             stubExistingUser();
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
             BillingAccount account = anAccount(30, past, null);
-            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
 
             // when
             limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);
@@ -350,7 +350,7 @@ class LimitServiceTest {
             // given
             stubExistingUser();
             BillingAccount account = anAccount(0, null, null);
-            when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
 
             // when
             limitService.creditTopUp(USER_ID, TOPUP_LIMITS, TOPUP_LABEL);

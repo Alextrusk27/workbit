@@ -9,11 +9,9 @@ import {
 } from '@/components/ui/modalStyles'
 import { Spinner } from '@/components/ui/Spinner'
 import type { UsageEvent } from '@/features/billing/api'
-import { useBalance, useUsage } from '@/features/billing/useBilling'
+import { useUsage } from '@/features/billing/useBilling'
 import { cn } from '@/lib/cn'
-import { formatDate } from '@/lib/dates'
 import { motionTokens } from '@/lib/motion'
-import { limitsWord } from '@/lib/plural'
 import { useModalA11y } from '@/lib/useModalA11y'
 
 const BATCH_WINDOW_MS = 10_000
@@ -140,23 +138,11 @@ export function LimitsCreditedModal({
 }
 
 function CreditedSummary({ footnote }: { footnote?: ReactNode }) {
-  const { data: balance } = useBalance()
   const { data: usage } = useUsage()
   const credits = toCreditRows(latestCreditBatch(usage?.events))
-  const total = credits.reduce((sum, c) => sum + c.delta, 0)
 
   return (
     <>
-      {total > 0 && (
-        <p className="text-muted mt-2 text-[14.5px]">
-          Зачислено{' '}
-          <span className="text-ink font-semibold tabular-nums">
-            {total} {limitsWord(total)}
-          </span>
-          {balance?.expiresAt &&
-            `, действуют до ${formatDate(balance.expiresAt)}`}
-        </p>
-      )}
       {credits.length > 0 && (
         <div className="mt-5 flex flex-col gap-2">
           {credits.map((credit) => (

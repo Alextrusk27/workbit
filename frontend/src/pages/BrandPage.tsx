@@ -5,6 +5,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
+import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Field } from '@/components/ui/Field'
@@ -12,7 +13,7 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { PlanCard } from '@/components/ui/PlanCard'
 import { Stars } from '@/components/ui/Stars'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { plans } from '@/content/plans'
+import { freePack } from '@/content/limits'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useTheme, type Theme } from '@/lib/useTheme'
 
@@ -203,6 +204,7 @@ export function BrandPage() {
             <Button variant="secondary">Secondary</Button>
             <Button variant="ghost">Ghost</Button>
             <Button variant="danger">Danger</Button>
+            <Button variant="danger-solid">Danger solid</Button>
             <Button disabled>Disabled</Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -281,16 +283,10 @@ export function BrandPage() {
         </div>
       </Section>
 
-      <Section title="Карточка тарифа">
+      <Section title="Карточки тарифов">
         <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
-          {plans.slice(0, 2).map((p) => (
-            <PlanCard
-              key={p.name}
-              plan={p}
-              features={p.previewFeatures}
-              to="/pricing"
-            />
-          ))}
+          <PlanCard plan={freePack} to="/login" />
+          <TopUpCard />
         </div>
       </Section>
     </Container>

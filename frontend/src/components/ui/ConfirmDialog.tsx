@@ -1,6 +1,11 @@
+import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import {
+  modalOverlayClasses,
+  modalPanelClasses,
+} from '@/components/ui/modalStyles'
 import { motionTokens } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 import { useModalA11y } from '@/lib/useModalA11y'
@@ -9,7 +14,7 @@ interface ConfirmDialogProps {
   open: boolean
   title: string
   text: string
-  confirmLabel?: string
+  confirmLabel?: ReactNode
   onConfirm: () => void
   onClose: () => void
 }
@@ -43,7 +48,10 @@ export function ConfirmDialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: motionTokens.duration.fast }}
-          className="fixed inset-0 z-100 flex items-center justify-center bg-[rgba(6,9,20,0.65)] p-5 backdrop-blur-[6px]"
+          className={cn(
+            modalOverlayClasses,
+            'flex items-center justify-center',
+          )}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose()
           }}
@@ -60,7 +68,7 @@ export function ConfirmDialog({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="border-line bg-pop shadow-chat w-full max-w-[420px] rounded-2xl border p-7"
+            className={cn(modalPanelClasses, 'w-full max-w-[420px]')}
           >
             <h3 className="text-ink text-[17px] font-bold">{title}</h3>
             <p className="text-dim mt-2.5 text-[13.5px] leading-[1.55]">
@@ -78,10 +86,10 @@ export function ConfirmDialog({
               <button
                 type="button"
                 onClick={onConfirm}
-                className={cn(
-                  buttonClasses({ size: 'sm' }),
-                  'bg-[linear-gradient(135deg,#f87171,#ef4444)] shadow-none hover:shadow-none',
-                )}
+                className={buttonClasses({
+                  variant: 'danger-solid',
+                  size: 'sm',
+                })}
               >
                 {confirmLabel}
               </button>

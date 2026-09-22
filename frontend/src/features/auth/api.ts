@@ -6,9 +6,12 @@ export interface UserResponse {
   created: string
 }
 
-/** Ответ `POST /auth/verify-code`: `newUser` — первая авторизация (регистрация). */
+/** Ответ `POST /auth/verify-code`: `newUser` — первая авторизация (регистрация),
+ *  `welcomeGranted` — начислены ли приветственные лимиты. Они выдаются один раз на
+ *  адрес, поэтому у вернувшегося после удаления аккаунта `newUser` без `welcomeGranted`. */
 export interface VerifyCodeResponse {
   newUser: boolean
+  welcomeGranted: boolean
 }
 
 export const authApi = {

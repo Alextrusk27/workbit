@@ -13,7 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.LlmException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
@@ -47,7 +48,7 @@ public class InterviewWriter {
     private final InterviewQuestionRepository interviewQuestionRepository;
 
     private final VacancyService vacancyService;
-    private final QuotaService quotaService;
+    private final LimitService limitService;
 
     private final InterviewQuestionMapper interviewQuestionMapper;
     private final InterviewReportMapper interviewReportMapper;
@@ -56,7 +57,7 @@ public class InterviewWriter {
     @Transactional
     public InterviewSession createSession(VacancyData vacancyData, UUID userId, LlmInterviewPlan plan,
                                           String askedBefore) {
-        quotaService.debitInterview(userId, "Интервью — " + vacancyData.name());
+        limitService.debit(userId, UsageEvent.Operation.INTERVIEW, "Интервью — " + vacancyData.name());
 
         UUID vacancySnapshotId = vacancyService.saveSnapshot(vacancyData);
         InterviewSession session = saveNewSession(userId, plan, vacancySnapshotId, askedBefore);

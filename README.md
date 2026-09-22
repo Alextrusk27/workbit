@@ -54,7 +54,7 @@ based on real hh.ru job postings, answering by text or voice.
 
 - 🎯 **AI interview for a job posting** — paste an hh.ru vacancy link: the interviewer (Claude) drafts a plan for it and runs an adaptive conversation where every question depends on your previous answers. The session ends with a report: a score, offer probability, recommendations, and your weakest skill (with a shortcut to the trainer).
 - 📚 **Skills trainer** — practice on a "skill + profession" pair at a chosen difficulty level: questions from a curated bank topped up by the LLM, a reference answer on demand, and a final review with a score. Free-form input is canonicalized via dictionaries and an LLM normalizer.
-- 💳 **Subscription plans** — Start / Pro / Max with monthly quotas for interviews and trainings (unlimited trainings on Max); one-time payments via Robokassa, usage history in the settings.
+- 💳 **Limit packs** — one shared balance per user, limits valid for 3 months from the last purchase, a flat price per operation (interview, training, reference answer); one-time payments via Robokassa, usage history in the settings.
 
 ## 📸 Screenshots
 
@@ -80,7 +80,7 @@ based on real hh.ru job postings, answering by text or voice.
 | LLM | Claude Opus 5 via the Messages API (`anthropic-java`) for the prompt agents, gpt-5.4-mini via an OpenAI-compatible route (`openai-java`) for the input normalizer |
 | Speech | Yandex SpeechKit STT v3 — bidirectional gRPC streaming, stubs generated from proto at build time (`protobuf-maven-plugin`) |
 | Email | Spring Mail + Thymeleaf templates, Spring domain events (AFTER_COMMIT) |
-| Billing | Plan quotas with atomic debits; Robokassa one-time payments — signed URLs and webhooks (SHA-256), a per-minute reconciliation job |
+| Billing | Limit balance with atomic debits; Robokassa one-time payments — signed URLs and webhooks (SHA-256), a per-minute reconciliation job |
 | Tooling | Lombok, MapStruct, jsoup, ULID, springdoc-openapi (Swagger UI in dev) |
 
 ### Frontend
@@ -160,7 +160,7 @@ sequenceDiagram
 - **Free-form input canonicalization** — Unicode normalization (NFKC, typographic hyphens), comparison keys built from significant words, dictionaries with upsert, and an LLM normalizer as a barrier against garbage input.
 - **Privacy under Russian law (152-FZ)** — physical account deletion via DB cascades, auto-deletion of inactive accounts, user content banned from logs (`@Sensitive`, a logging aspect with MDC), only anonymized answer texts reach the LLM provider.
 - **Graceful LLM degradation** — a precheck for degenerate model responses, a fallback parser for structured output wrapped in markdown fences, a single retry, extended SDK retries against gateway blips, meaningful HTTP statuses (409 "out of questions" vs 503 "AI service unavailable").
-- **Idempotent payments** — the Robokassa webhook confirms a payment with a conditional `UPDATE` (concurrent retries can't double-credit), the plan is credited in the same transaction, and a per-minute reconciliation job picks up lost webhooks via the provider's status API.
+- **Idempotent payments** — the Robokassa webhook confirms a payment with a conditional `UPDATE` (concurrent retries can't double-credit), the limit pack is credited in the same transaction, and a per-minute reconciliation job picks up lost webhooks via the provider's status API.
 
 ## 🗂 Repository Structure
 
@@ -256,7 +256,7 @@ REST contracts (human-readable API descriptions, in Russian):
 - [Authentication](docs/auth-api.md) — code-based login, refresh, logout, account deletion
 - [Skills trainer](docs/training-api.md) — sessions, questions, dictionary suggestions, report
 - [AI interview](docs/interview-api.md) — adaptive vacancy-based dialog, report, per-vacancy aggregation
-- [Billing](docs/billing-api.md) — plan quotas, usage history, Robokassa payments
+- [Billing](docs/billing-api.md) — limit balance, usage history, Robokassa payments
 - [Speech recognition](docs/speech-api.md) — the STT WebSocket protocol
 
 Legal documents (in Russian; the frontend renders them at `/privacy`, `/user-agreement`, `/offer`, these files are the single source of the text):

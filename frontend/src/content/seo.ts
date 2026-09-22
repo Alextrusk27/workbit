@@ -4,9 +4,7 @@ import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as blogSeo } from '@/content/pages/blog'
 import { seo as faqSeo } from '@/content/pages/faq'
 import { seo as homeSeo } from '@/content/pages/home'
-import { seo as pricingSeo } from '@/content/pages/pricing'
 import { seo as skillsTrainerSeo } from '@/content/pages/skillsTrainer'
-import { plans } from '@/content/plans'
 import type { PageSeo } from '@/content/types'
 
 export const SITE = 'https://workbit.ru'
@@ -17,12 +15,6 @@ export interface SeoPage extends PageSeo {
   jsonLd?: () => object[]
 }
 
-function price(value: string): string {
-  const match = /^(\d+) ₽$/.exec(value)
-  if (!match) throw new Error(`Unexpected plan price format: ${value}`)
-  return match[1]
-}
-
 export const seoPages: SeoPage[] = [
   {
     path: '/',
@@ -30,7 +22,7 @@ export const seoPages: SeoPage[] = [
     sources: [
       'frontend/src/content/pages/home.ts',
       'frontend/src/content/demo/heroChat.ts',
-      'frontend/src/content/plans.ts',
+      'frontend/src/content/limits.ts',
       'frontend/src/content/faq.ts',
     ],
     jsonLd: () => [
@@ -75,31 +67,6 @@ export const seoPages: SeoPage[] = [
           '@type': 'Question',
           name: item.q,
           acceptedAnswer: { '@type': 'Answer', text: item.a },
-        })),
-      },
-    ],
-  },
-  {
-    path: '/pricing',
-    ...pricingSeo,
-    sources: [
-      'frontend/src/content/pages/pricing.ts',
-      'frontend/src/content/plans.ts',
-    ],
-    jsonLd: () => [
-      {
-        '@context': 'https://schema.org',
-        '@type': 'SoftwareApplication',
-        name: 'Workbit',
-        url: SITE,
-        applicationCategory: 'EducationalApplication',
-        operatingSystem: 'Web',
-        offers: plans.map((p) => ({
-          '@type': 'Offer',
-          name: `Тариф «${p.name}»`,
-          price: price(p.price),
-          priceCurrency: 'RUB',
-          url: `${SITE}/pricing`,
         })),
       },
     ],

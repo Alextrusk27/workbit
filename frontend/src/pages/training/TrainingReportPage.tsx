@@ -5,8 +5,10 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
+import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { OPERATION_COST } from '@/content/limits'
 import { trainingErrorMessage } from '@/features/training/errors'
 import { sessionSubtitle } from '@/features/training/labels'
 import { useReport, useRestartSession } from '@/features/training/useTraining'
@@ -112,7 +114,13 @@ export function TrainingReportPage() {
           onClick={() => setConfirming(true)}
           disabled={restart.isPending}
         >
-          {restart.isPending ? 'Готовим тренировку…' : 'Пройти заново'}
+          {restart.isPending ? (
+            'Готовим тренировку…'
+          ) : (
+            <>
+              Пройти заново · <Limits value={OPERATION_COST.training} />
+            </>
+          )}
         </Button>
         <Link
           to="/app/training"
@@ -129,7 +137,11 @@ export function TrainingReportPage() {
         open={confirming}
         title="Пройти заново?"
         text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты. Действие необратимо."
-        confirmLabel="Пройти заново"
+        confirmLabel={
+          <>
+            Пройти заново · <Limits value={OPERATION_COST.training} />
+          </>
+        }
         onConfirm={onRestart}
         onClose={() => setConfirming(false)}
       />

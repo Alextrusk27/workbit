@@ -11,7 +11,7 @@ import {
 
 const MIN_SUGGEST_QUERY = 2
 
-const keys = {
+export const keys = {
   options: ['training', 'options'] as const,
   sessions: ['training', 'sessions'] as const,
   session: (id: string) => ['training', 'session', id] as const,
@@ -120,6 +120,7 @@ export function useAddQuestions() {
     onSuccess: (session) => {
       qc.setQueryData(keys.session(session.id), session)
       qc.invalidateQueries({ queryKey: keys.sessions })
+      qc.invalidateQueries({ queryKey: billingKeys.quota })
     },
   })
 }

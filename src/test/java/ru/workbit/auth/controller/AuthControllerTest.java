@@ -215,7 +215,7 @@ class AuthControllerTest {
             // given
             var request = new VerifyCodeRequest(EMAIL, CODE);
             when(authService.verifyCode(request))
-                    .thenReturn(new AuthService.VerifyCodeResult(tokenResponse(), true));
+                    .thenReturn(new AuthService.VerifyCodeResult(tokenResponse(), true, true));
 
             // when
             var result = mvc.perform(post(BASE + "/verify-code")
@@ -223,6 +223,7 @@ class AuthControllerTest {
                             .content(om.writeValueAsString(request)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.newUser").value(true))
+                    .andExpect(jsonPath("$.welcomeGranted").value(true))
                     .andExpect(cookie().value(AuthCookieService.ACCESS_COOKIE_NAME, ACCESS_TOKEN))
                     .andExpect(cookie().httpOnly(AuthCookieService.ACCESS_COOKIE_NAME, true))
                     .andExpect(cookie().secure(AuthCookieService.ACCESS_COOKIE_NAME, true))
@@ -236,6 +237,23 @@ class AuthControllerTest {
             // then
             var setCookieHeaders = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
             assertThat(setCookieHeaders).allMatch(h -> h.contains("SameSite=Lax"));
+        }
+
+        @Test
+        @DisplayName("Вернувшийся после удаления аккаунта - newUser true, welcomeGranted false")
+        void returnsWelcomeGrantedFalseForReturningUser() throws Exception {
+            // given
+            var request = new VerifyCodeRequest(EMAIL, CODE);
+            when(authService.verifyCode(request))
+                    .thenReturn(new AuthService.VerifyCodeResult(tokenResponse(), true, false));
+
+            // when / then
+            mvc.perform(post(BASE + "/verify-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.newUser").value(true))
+                    .andExpect(jsonPath("$.welcomeGranted").value(false));
         }
 
         @Test

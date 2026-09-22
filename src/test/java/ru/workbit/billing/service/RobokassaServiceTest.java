@@ -44,11 +44,11 @@ class RobokassaServiceTest {
     private static final int INV_ID = 42;
     private static final BigDecimal AMOUNT = new BigDecimal("790.00");
     private static final String ENCODED_RECEIPT =
-            "%7B%22items%22%3A%5B%7B%22name%22%3A%22%D0%A2%D0%B0%D1%80%D0%B8%D1%84%20%C2%AB%D0"
-                    + "%9F%D1%80%D0%BE%C2%BB%20%D0%BD%D0%B0%2030%20%D0%B4%D0%BD%D0%B5%D0%B9%22%2C"
+            "%7B%22items%22%3A%5B%7B%22name%22%3A%22%D0%9F%D0%BE%D0%BF%D0%BE%D0%BB%D0%BD%D0%B5%D0%BD%D0%B8"
+                    + "%D0%B5%20%D0%BD%D0%B0%2050%20%D0%BB%D0%B8%D0%BC%D0%B8%D1%82%D0%BE%D0%B2%22%2C"
                     + "%22quantity%22%3A1%2C%22sum%22%3A790.00%2C%22tax%22%3A%22none%22%7D%5D%7D";
     private static final String INIT_SIGNATURE =
-            "696df59d3889776905f0505047f12b337e28cbd2e223e7f3b1103ce015a31e71";
+            "683e87b67b0d1cc50c04758b0d89850806fb6006ea08aaafde934e614c4cd95b";
     private static final String RESULT_SIGNATURE =
             "60836e51c173fb0e9179ef1a469437cb64de341713330ed03783aa4e44cb4305";
     private static final String NON_NUMERIC_INV_ID_SIGNATURE =
@@ -73,7 +73,7 @@ class RobokassaServiceTest {
         return Payment.builder()
                 .invId(INV_ID)
                 .userId(UUID.randomUUID())
-                .product(Payment.Product.PLAN_PRO)
+                .limits(50)
                 .amount(AMOUNT)
                 .status(Payment.Status.PENDING)
                 .build();
@@ -117,7 +117,7 @@ class RobokassaServiceTest {
             assertThat(params.get("MerchantLogin")).isEqualTo(MERCHANT_LOGIN);
             assertThat(params.get("OutSum")).isEqualTo("790.00");
             assertThat(params.get("InvId")).isEqualTo(String.valueOf(INV_ID));
-            assertThat(params.get("Description")).isEqualTo(Payment.Product.PLAN_PRO.getDescription());
+            assertThat(params.get("Description")).isEqualTo("Пополнение на 50 лимитов — Workbit");
             assertThat(params.get("Receipt")).isEqualTo(ENCODED_RECEIPT);
             assertThat(params.get("SignatureValue")).isEqualTo(INIT_SIGNATURE);
             assertThat(params.get("Culture")).isEqualTo("ru");
@@ -145,7 +145,7 @@ class RobokassaServiceTest {
             JsonNode items = new ObjectMapper().readTree(json).get("items");
             assertThat(items).hasSize(1);
             JsonNode item = items.get(0);
-            assertThat(item.get("name").asString()).isEqualTo(Payment.Product.PLAN_PRO.getLabel());
+            assertThat(item.get("name").asString()).isEqualTo("Пополнение на 50 лимитов");
             assertThat(item.get("quantity").asInt()).isEqualTo(1);
             assertThat(item.get("sum").decimalValue()).isEqualByComparingTo(AMOUNT);
             assertThat(item.get("tax").asString()).isEqualTo("none");

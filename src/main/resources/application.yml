@@ -27,6 +27,8 @@ app:
     from-name: Workbit
     from-mail: noreply@workbit.ru
     base-url: https://workbit.ru
+  email:
+    hash-secret: ${EMAIL_HASH_SECRET}
 
 server:
   shutdown: graceful
@@ -39,6 +41,7 @@ spring:
   flyway:
     placeholders:
       payment_inv_id_start: ${PAYMENT_INV_ID_START:1000000}
+      email_hash_secret: ${EMAIL_HASH_SECRET}
   http:
     client:
       connect-timeout: 5s

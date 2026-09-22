@@ -46,6 +46,9 @@ public class TrainingQuestion {
     @Column(name = "reference_answer")
     private String referenceAnswer;
 
+    @Column(name = "reference_answer_unlocked_at")
+    private Instant referenceAnswerUnlockedAt;
+
     @Column(nullable = false, updatable = false)
     private int orderIndex;
 

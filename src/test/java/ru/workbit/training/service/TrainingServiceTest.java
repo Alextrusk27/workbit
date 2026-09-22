@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +42,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
@@ -113,7 +115,7 @@ class TrainingServiceTest {
     @Mock
     LlmService llmService;
     @Mock
-    QuotaService quotaService;
+    LimitService limitService;
     @Mock
     TrainingSessionMapper trainingSessionMapper;
     @Mock
@@ -1020,23 +1022,23 @@ class TrainingServiceTest {
             trainingService.create(request, userId);
 
             // then
-            InOrder order = inOrder(quotaService, llmService);
-            order.verify(quotaService).checkTrainingAvailable(userId);
+            InOrder order = inOrder(limitService, llmService);
+            order.verify(limitService).check(userId, UsageEvent.Operation.TRAINING);
             order.verify(llmService).generateTrainingQuestions(any());
         }
 
         @Test
-        @DisplayName("Квота тренировок исчерпана - PaymentRequiredException пробрасывается, LLM и словари не вызываются, сессия не создаётся")
+        @DisplayName("Не хватает лимитов - PaymentRequiredException пробрасывается, LLM и словари не вызываются, сессия не создаётся")
         void throwsWhenTrainingQuotaExhausted() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
-            doThrow(new PaymentRequiredException("Training quota exhausted"))
-                    .when(quotaService).checkTrainingAvailable(userId);
+            doThrow(new PaymentRequiredException("Not enough limits"))
+                    .when(limitService).check(userId, UsageEvent.Operation.TRAINING);
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(PaymentRequiredException.class)
-                    .hasMessage("Training quota exhausted");
+                    .hasMessage("Not enough limits");
             verifyNoInteractions(trainingSessionMapper, llmService, trainingWriter, questionBankRepository,
                     professionDictRepository, skillDictRepository);
         }
@@ -1047,8 +1049,8 @@ class TrainingServiceTest {
             // given
             CreateSessionRequest request = new CreateSessionRequest(
                     "  Spring   Boot ", "Java‑разработчик", TrainingSession.Level.MEDIUM);
-            doThrow(new PaymentRequiredException("Training quota exhausted"))
-                    .when(quotaService).checkTrainingAvailable(userId);
+            doThrow(new PaymentRequiredException("Not enough limits"))
+                    .when(limitService).check(userId, UsageEvent.Operation.TRAINING);
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
@@ -1275,7 +1277,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.findNextUnanswered(sessionId)).thenReturn(Optional.of(nextQuestion));
 
             TrainingQuestionResponse expectedResponse = new TrainingQuestionResponse(
-                    nextQuestion.getId(), 2, nextQuestion.getText(), null, null, null);
+                    nextQuestion.getId(), 2, nextQuestion.getText(), null, null, null, false);
             when(trainingQuestionMapper.toDto(nextQuestion)).thenReturn(expectedResponse);
 
             // when
@@ -1662,19 +1664,46 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Тариф FREE (checkPaidPlan бросает ForbiddenException) - пробрасывается, LLM и writer не вызываются")
-        void throwsWhenPaidPlanRequired() {
+        @DisplayName("Не хватает лимитов на добор вопросов - PaymentRequiredException пробрасывается, LLM и writer не вызываются")
+        void throwsWhenNotEnoughLimitsForMoreQuestions() {
             // given
             List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            doThrow(new ForbiddenException("Paid plan required")).when(quotaService).checkPaidPlan(userId);
+            doThrow(new PaymentRequiredException("Not enough limits"))
+                    .when(limitService).check(userId, UsageEvent.Operation.TRAINING_MORE);
 
             // when / then
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
-                    .isInstanceOf(ForbiddenException.class)
-                    .hasMessage("Paid plan required");
+                    .isInstanceOf(PaymentRequiredException.class)
+                    .hasMessage("Not enough limits");
             verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+        }
+
+        @Test
+        @DisplayName("Проверка лимитов на добор вопросов выполняется до LLM")
+        void checksLimitsBeforeGeneratingMoreQuestions() {
+            // given
+            List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
+            TrainingSession session = sessionWithQuestions(existing);
+            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+            stubProfessionAndSkillFound();
+            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
+                    .thenReturn(List.of());
+            List<String> generated = IntStream.rangeClosed(1, TrainingService.QUESTION_CAP)
+                    .mapToObj(i -> "Сгенерированный " + i)
+                    .toList();
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
+            when(trainingWriter.appendQuestions(sessionId, List.of(), generated))
+                    .thenReturn(mock(TrainingSessionResponse.class));
+
+            // when
+            trainingService.addQuestions(sessionId, userId);
+
+            // then
+            InOrder order = inOrder(limitService, llmService);
+            order.verify(limitService).check(userId, UsageEvent.Operation.TRAINING_MORE);
+            order.verify(llmService).generateTrainingQuestions(any());
         }
 
         @Test
@@ -1979,14 +2008,20 @@ class TrainingServiceTest {
     @DisplayName("GetReferenceAnswer")
     class GetReferenceAnswer {
 
-        private TrainingQuestion aQuestionWithSession(TrainingSession session, String referenceAnswer) {
+        private TrainingQuestion aQuestionWithSession(TrainingSession session, String referenceAnswer,
+                                                       Instant unlockedAt) {
             return TrainingQuestion.builder()
                     .id(UUID.randomUUID())
                     .trainingSession(session)
                     .text("Что такое JVM?")
                     .orderIndex(1)
                     .referenceAnswer(referenceAnswer)
+                    .referenceAnswerUnlockedAt(unlockedAt)
                     .build();
+        }
+
+        private TrainingQuestion aQuestionWithSession(TrainingSession session, String referenceAnswer) {
+            return aQuestionWithSession(session, referenceAnswer, null);
         }
 
         @Test
@@ -2038,13 +2073,14 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Эталонный ответ уже сохранён у вопроса - возвращает его без обращения к LLM")
-        void returnsCachedAnswerWithoutCallingLlm() {
+        @DisplayName("Уже разблокирован и ответ сохранён - возвращает его без списания и без LLM")
+        void returnsUnlockedAnswerWithoutSpendingOrLlm() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            TrainingQuestion question = aQuestionWithSession(session, "Кешированный эталонный ответ");
+            TrainingQuestion question = aQuestionWithSession(
+                    session, "Кешированный эталонный ответ", Instant.now().minusSeconds(60));
             when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
 
             // when
@@ -2052,12 +2088,101 @@ class TrainingServiceTest {
 
             // then
             assertThat(result).isEqualTo(new ReferenceAnswerResponse("Кешированный эталонный ответ"));
+            verifyNoInteractions(llmService, trainingWriter, limitService);
+        }
+
+        @Test
+        @DisplayName("Разблокирован, но ответа ещё нет (старый вопрос) - генерирует и сохраняет без requirePaid/unlock")
+        void generatesAndSavesWhenUnlockedWithoutCachedAnswer() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null, Instant.now().minusSeconds(60));
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+            when(llmService.createReferenceAnswer(any()))
+                    .thenReturn(new LlmTrainingReferenceAnswer("  Сгенерированный эталонный ответ  "));
+
+            // when
+            ReferenceAnswerResponse result = trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
+
+            // then
+            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Сгенерированный эталонный ответ"));
+
+            ArgumentCaptor<LlmTrainingReferenceAnswerRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingReferenceAnswerRequest.class);
+            verify(llmService).createReferenceAnswer(captor.capture());
+            assertThat(captor.getValue().skill()).isEqualTo(SKILL);
+            assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
+            assertThat(captor.getValue().question()).isEqualTo(question.getText());
+
+            verify(trainingWriter).saveReferenceAnswer(question.getId(), "Сгенерированный эталонный ответ");
+            verify(trainingWriter, never()).unlockReferenceAnswer(any(), any());
+            verifyNoInteractions(limitService);
+        }
+
+        @Test
+        @DisplayName("Не разблокирован, покупки не было - ForbiddenException, LLM не вызывается")
+        void throwsForbiddenWhenPurchaseRequired() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+            doThrow(new ForbiddenException("Purchase required")).when(limitService).requirePaid(userId);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(sessionId, question.getId(), userId))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessage("Purchase required");
             verifyNoInteractions(llmService, trainingWriter);
         }
 
         @Test
-        @DisplayName("Эталонного ответа ещё нет - запрашивает LLM по навыку/профессии/тексту вопроса, стрипает и сохраняет через writer")
-        void generatesAndSavesWhenNoCachedAnswer() {
+        @DisplayName("Не разблокирован, не хватает лимитов (списание при unlock упало) - PaymentRequiredException, LLM не вызывается")
+        void throwsPaymentRequiredWhenNotEnoughLimits() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, null);
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+            doThrow(new PaymentRequiredException("Not enough limits"))
+                    .when(trainingWriter).unlockReferenceAnswer(question.getId(), userId);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.getReferenceAnswer(sessionId, question.getId(), userId))
+                    .isInstanceOf(PaymentRequiredException.class)
+                    .hasMessage("Not enough limits");
+            verifyNoInteractions(llmService);
+            verify(trainingWriter, never()).saveReferenceAnswer(any(), any());
+        }
+
+        @Test
+        @DisplayName("Не разблокирован, банковый вопрос (есть готовый ответ) - разблокирует без LLM")
+        void unlocksBankQuestionAnswerWithoutLlm() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            TrainingSession session = aSession(sessionId, userId, PROFESSION);
+            TrainingQuestion question = aQuestionWithSession(session, "Готовый ответ из банка");
+            when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
+
+            // when
+            ReferenceAnswerResponse result = trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
+
+            // then
+            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Готовый ответ из банка"));
+            verify(limitService).requirePaid(userId);
+            verify(trainingWriter).unlockReferenceAnswer(question.getId(), userId);
+            verify(trainingWriter, never()).saveReferenceAnswer(any(), any());
+            verifyNoInteractions(llmService);
+        }
+
+        @Test
+        @DisplayName("Не разблокирован, ответа ещё нет - сначала разблокирует (списание), потом генерирует через LLM и сохраняет")
+        void unlocksThenGeneratesAndSavesWhenNoCachedAnswer() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
@@ -2080,13 +2205,17 @@ class TrainingServiceTest {
             assertThat(captor.getValue().profession()).isEqualTo(PROFESSION);
             assertThat(captor.getValue().question()).isEqualTo(question.getText());
 
-            verify(trainingWriter).saveReferenceAnswer(question.getId(), "Сгенерированный эталонный ответ");
+            InOrder order = inOrder(limitService, trainingWriter, llmService);
+            order.verify(limitService).requirePaid(userId);
+            order.verify(trainingWriter).unlockReferenceAnswer(question.getId(), userId);
+            order.verify(llmService).createReferenceAnswer(any());
+            order.verify(trainingWriter).saveReferenceAnswer(question.getId(), "Сгенерированный эталонный ответ");
         }
 
         @ParameterizedTest
         @NullSource
         @ValueSource(strings = {"   "})
-        @DisplayName("LLM вернул null/blank ответ - LlmException, сохранение не происходит")
+        @DisplayName("LLM вернул null/blank ответ - LlmException, вопрос уже разблокирован, ответ не сохраняется")
         void throwsLlmExceptionWhenGeneratedAnswerBlank(String answer) {
             // given
             UUID userId = UUID.randomUUID();
@@ -2100,7 +2229,8 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.getReferenceAnswer(sessionId, question.getId(), userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Reference answer is not available");
-            verifyNoInteractions(trainingWriter);
+            verify(trainingWriter).unlockReferenceAnswer(question.getId(), userId);
+            verify(trainingWriter, never()).saveReferenceAnswer(any(), any());
         }
 
         @Test
@@ -2110,7 +2240,8 @@ class TrainingServiceTest {
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            TrainingQuestion question = aQuestionWithSession(session, "Кешированный эталонный ответ");
+            TrainingQuestion question = aQuestionWithSession(
+                    session, "Кешированный эталонный ответ", Instant.now().minusSeconds(60));
             when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
 
             // when
@@ -2461,6 +2592,21 @@ class TrainingServiceTest {
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
             verifyNoInteractions(trainingWriter);
+        }
+
+        @Test
+        @DisplayName("Идёт через SingleFlight с ключом training.restart (sessionId, userId)")
+        void goesThroughSingleFlightWithSessionAndUserKey() {
+            // given
+            UUID sessionId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            when(trainingSessionRepository.existsByIdAndUserId(sessionId, userId)).thenReturn(false);
+
+            // when / then
+            assertThatThrownBy(() -> trainingService.restart(sessionId, userId))
+                    .isInstanceOf(NotFoundException.class);
+
+            verify(singleFlight).run(eq(new SingleFlight.Key("training.restart", List.of(sessionId, userId))), any());
         }
     }
 

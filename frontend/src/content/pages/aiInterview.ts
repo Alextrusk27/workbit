@@ -34,7 +34,7 @@ export interface AiInterviewContent {
       offer: { label: string; value: string; level: number }
     }
   }
-  cta: { title: string; body: string; primary: Cta; note: string }
+  cta: { title: string; primary: Cta; note: string }
 }
 
 export const seo: PageSeo = {
@@ -49,7 +49,7 @@ export const aiInterview: AiInterviewContent = {
     accent: 'по твоей вакансии',
     breakBeforeAccent: true,
     text: '**Пробное интервью по ссылке с hh.ru:** полная сессия из вопросов под требования вакансии.',
-    note: 'Первое интервью бесплатно · [Смотреть тарифы](/pricing)',
+    note: 'Первое интервью бесплатно',
   },
   flow: {
     title: 'Собеседование с ИИ по шагам',
@@ -125,8 +125,7 @@ export const aiInterview: AiInterviewContent = {
   },
   cta: {
     title: 'Пробное собеседование — бесплатно',
-    body: '3 тренировки и пробное AI-интервью бесплатно.',
     primary: { label: 'Начать интервью', start: true },
-    note: 'А для отдельных тем — [тренажёр навыков →](/skills-trainer)',
+    note: 'Для прокачки отдельной темы собеседования попробуй [тренажёр навыков →](/skills-trainer)',
   },
 }

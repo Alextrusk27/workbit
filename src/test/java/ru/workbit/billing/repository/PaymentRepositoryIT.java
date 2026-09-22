@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,8 +47,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
         return Payment.builder()
                 .invId(invId)
                 .userId(userId)
-                .product(Payment.Product.PLAN_PRO)
-                .amount(Payment.Product.PLAN_PRO.getPrice())
+                .limits(50)
+                .amount(new BigDecimal("750.00"))
                 .status(status)
                 .build(); // created — @Builder.Default
     }
@@ -73,8 +74,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             assertThat(saved.getId()).isNotNull();
             assertThat(saved.getInvId()).isEqualTo(invId);
             assertThat(saved.getUserId()).isEqualTo(user.getId());
-            assertThat(saved.getProduct()).isEqualTo(Payment.Product.PLAN_PRO);
-            assertThat(saved.getAmount()).isEqualByComparingTo(Payment.Product.PLAN_PRO.getPrice());
+            assertThat(saved.getLimits()).isEqualTo(50);
+            assertThat(saved.getAmount()).isEqualByComparingTo("750.00");
             assertThat(saved.getStatus()).isEqualTo(Payment.Status.PENDING);
             assertThat(saved.getCreated()).isNotNull();
             assertThat(saved.getPaidAt()).isNull();
@@ -200,21 +201,19 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
-    @DisplayName("Cascade")
-    class Cascade {
+    @DisplayName("UserDeletion")
+    class UserDeletion {
 
         @Test
-        @DisplayName("ON DELETE CASCADE: удаление пользователя из auth.users удаляет его платежи")
-        void cascadeDeleteRemovesPaymentsOnUserDelete() {
+        @DisplayName("Платёж переживает удаление пользователя: история расчётов нужна бухгалтерии и спорам с Робокассой")
+        void paymentSurvivesUserDelete() {
             // given
-            var user = em.persistAndFlush(aUser("payment-cascade-del@example.com"));
+            var user = em.persistAndFlush(aUser("payment-user-delete@example.com"));
             var userId = user.getId();
             var payment = em.persistAndFlush(aPayment(userId, repository.nextInvId()));
             var paymentId = payment.getId();
 
-            // when — физическое удаление пользователя через managed-ссылку.
-            // em.clear() перед remove: иначе managed Payment в контексте персистентности
-            // при flush может выбросить TransientPropertyValueException.
+            // when — физическое удаление пользователя через managed-ссылку
             em.flush();
             em.clear();
             var managed = requireNonNull(em.find(User.class, userId));
@@ -223,7 +222,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             em.clear();
 
             // then
-            assertThat(repository.findById(paymentId)).isEmpty();
+            var saved = repository.findById(paymentId).orElseThrow();
+            assertThat(saved.getUserId()).isEqualTo(userId);
         }
     }
 }

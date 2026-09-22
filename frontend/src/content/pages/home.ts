@@ -1,3 +1,4 @@
+import { WELCOME_LIMITS } from '@/content/limits'
 import type { Cta, Hero, PageSeo } from '@/content/types'
 
 export type HomeIcon = 'role' | 'pencil' | 'chart' | 'clock'
@@ -38,7 +39,6 @@ export interface HomeContent {
     cta: Cta
     steps: { label: string; value: string }[]
   }
-  pricing: { title: string; lead: string }
   faq: { title: string; lead: string }
   cta: {
     title: string
@@ -166,10 +166,6 @@ export const home: HomeContent = {
       { label: 'Уровень', value: 'Средний' },
     ],
   },
-  pricing: {
-    title: 'Тарифы',
-    lead: 'Без автоплатежей.',
-  },
   faq: {
     title: 'Частые вопросы',
     lead: 'Коротко о формате, оценке ответов и оплате. [Все вопросы →](/faq)',
@@ -179,6 +175,6 @@ export const home: HomeContent = {
     body: 'Вставь ссылку на вакансию с hh.ru — получи вопросы под требования работодателя и разбор каждого ответа.',
     primary: { label: 'Пройти первое интервью бесплатно', start: true },
     secondary: { label: 'Попробовать тренажёр навыков', to: '/skills-trainer' },
-    note: 'Доступно сразу после входа по email — без анкеты, без карты',
+    note: `${WELCOME_LIMITS} лимитов на старте, вход по email, без анкеты и без карты`,
   },
 }

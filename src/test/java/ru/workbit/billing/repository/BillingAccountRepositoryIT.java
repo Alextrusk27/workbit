@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,9 +24,7 @@ import ru.workbit.billing.model.BillingAccount;
 @DisplayName("BillingAccountRepositoryIT")
 class BillingAccountRepositoryIT extends AbstractPostgresIT {
 
-    private static final int FREE_INTERVIEWS = BillingAccount.Plan.FREE.getInterviews();
-    private static final int FREE_TRAININGS = BillingAccount.Plan.FREE.getTrainings();
-    private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
+    private static final int WELCOME_LIMITS = 20;
 
     @Autowired
     private BillingAccountRepository repository;
@@ -41,23 +40,11 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
                 .build(); // emailVerified=false, created=now() — @Builder.Default
     }
 
-    private BillingAccount aFreeAccount(UUID userId, int planInterviewsLeft, int planTrainingsLeft) {
+    private BillingAccount anAccount(UUID userId, int limits, Instant limitsExpireAt) {
         return BillingAccount.builder()
                 .userId(userId)
-                .plan(BillingAccount.Plan.FREE)
-                .planInterviewsLeft(planInterviewsLeft)
-                .planTrainingsLeft(planTrainingsLeft)
-                .build();
-    }
-
-    private BillingAccount aProAccount(UUID userId, Instant planExpiresAt, int planInterviewsLeft,
-                                        int planTrainingsLeft) {
-        return BillingAccount.builder()
-                .userId(userId)
-                .plan(BillingAccount.Plan.PRO)
-                .planExpiresAt(planExpiresAt)
-                .planInterviewsLeft(planInterviewsLeft)
-                .planTrainingsLeft(planTrainingsLeft)
+                .limits(limits)
+                .limitsExpireAt(limitsExpireAt)
                 .build();
     }
 
@@ -68,316 +55,212 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
     class InsertIfAbsent {
 
         @Test
-        @DisplayName("Создаёт FREE-строку с дефолтными остатками, если её ещё нет")
-        void createsFreeRowWhenAbsent() {
+        @DisplayName("Создаёт нулевую строку без срока, если её ещё нет, и не нарушает chk_account_limits")
+        void createsZeroRowWhenAbsent() {
             // given
             var user = em.persistAndFlush(aUser("billing-insert-new@example.com"));
 
             // when
-            repository.insertIfAbsent(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS);
+            int inserted = repository.insertIfAbsent(user.getId());
 
             // then
+            assertThat(inserted).isEqualTo(1);
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.FREE);
-            assertThat(saved.getPlanExpiresAt()).isNull();
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(FREE_INTERVIEWS);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(FREE_TRAININGS);
+            assertThat(saved.getLimits()).isZero();
+            assertThat(saved.getLimitsExpireAt()).isNull();
+            assertThat(saved.getPaidAt()).isNull();
         }
 
         @Test
-        @DisplayName("Идемпотентен: повторный вызов не падает и не меняет уже существующую строку")
+        @DisplayName("Идемпотентен: повторный вызов возвращает 0 и не меняет уже существующую строку")
         void idempotentOnUnchangedRow() {
             // given
             var user = em.persistAndFlush(aUser("billing-insert-idempotent@example.com"));
-            repository.insertIfAbsent(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS);
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), WELCOME_LIMITS, now.plusSeconds(3600)));
+            em.clear();
 
-            // when — повторный вызов с другими значениями (как будто для другого тарифа)
-            repository.insertIfAbsent(user.getId(), 25, 50);
+            // when
+            int inserted = repository.insertIfAbsent(user.getId());
 
             // then — исходные значения сохранились
+            assertThat(inserted).isZero();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(FREE_INTERVIEWS);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(FREE_TRAININGS);
-        }
-
-        @Test
-        @DisplayName("Идемпотентен: повторный вызов не восстанавливает уже списанный остаток")
-        void idempotentOnDebitedRow() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-insert-idempotent-debited@example.com"));
-            repository.insertIfAbsent(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS);
-            repository.debitPlanInterview(user.getId(), Instant.now());
-
-            // when — повторный вызов после того, как остаток уже списан
-            repository.insertIfAbsent(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS);
-
-            // then — списанный остаток не восстановлен
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isZero();
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(FREE_TRAININGS);
+            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
+            assertThat(saved.getLimitsExpireAt()).isEqualTo(now.plusSeconds(3600));
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("DebitPlanInterview")
-    class DebitPlanInterview {
+    @DisplayName("CreditWelcome")
+    class CreditWelcome {
 
         @Test
-        @DisplayName("Списывает 1 и возвращает 1 при активном FREE-плане (без даты истечения)")
-        void debitsOnActiveFreePlan() {
+        @DisplayName("На нулевом счёте: 20 лимитов со сроком ≈ now + 3 месяца, paid_at остаётся пустым")
+        void creditsWelcomeWithoutMarkingPaid() {
             // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-interview-free@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 1, 3));
+            var user = em.persistAndFlush(aUser("billing-welcome-zero@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 0, null));
 
             // when
-            int updated = repository.debitPlanInterview(user.getId(), Instant.now());
+            repository.creditWelcome(user.getId(), WELCOME_LIMITS, now);
 
             // then
-            assertThat(updated).isEqualTo(1);
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isZero();
+            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
+            assertThat(saved.getLimitsExpireAt())
+                    .isBetween(now.plus(Duration.ofDays(89)), now.plus(Duration.ofDays(93)));
+            assertThat(saved.getPaidAt()).isNull();
         }
 
         @Test
-        @DisplayName("Списывает 1 и возвращает 1 при активном PRO-плане с датой истечения в будущем")
-        void debitsOnActiveProPlan() {
+        @DisplayName("На просроченном балансе: старый остаток сгорает, остаются только приветственные")
+        void burnsExpiredBalance() {
             // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-interview-pro@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5));
+            var user = em.persistAndFlush(aUser("billing-welcome-expired@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 15, now.minusSeconds(3600)));
 
             // when
-            int updated = repository.debitPlanInterview(user.getId(), Instant.now());
+            repository.creditWelcome(user.getId(), WELCOME_LIMITS, now);
 
             // then
-            assertThat(updated).isEqualTo(1);
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(4);
-        }
-
-        @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при нулевом plan_interviews_left")
-        void returnsZeroWhenNoInterviewsLeft() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-interview-zero@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 0, 3));
-
-            // when
-            int updated = repository.debitPlanInterview(user.getId(), Instant.now());
-
-            // then
-            assertThat(updated).isZero();
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isZero();
-        }
-
-        @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при истёкшем PRO-плане")
-        void returnsZeroWhenProPlanExpired() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-interview-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5));
-
-            // when
-            int updated = repository.debitPlanInterview(user.getId(), Instant.now());
-
-            // then
-            assertThat(updated).isZero();
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(5);
+            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("DebitPlanTraining")
-    class DebitPlanTraining {
+    @DisplayName("Debit")
+    class Debit {
 
         @Test
-        @DisplayName("Списывает 1 и возвращает 1 при активном FREE-плане (без даты истечения)")
-        void debitsOnActiveFreePlan() {
+        @DisplayName("Списывает и возвращает 1 при достаточном балансе и не истёкшем сроке")
+        void debitsWhenBalanceSufficient() {
             // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-training-free@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 1, 3));
+            var user = em.persistAndFlush(aUser("billing-debit-sufficient@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 100, now.plusSeconds(3600)));
 
             // when
-            int updated = repository.debitPlanTraining(user.getId(), Instant.now());
+            int updated = repository.debit(user.getId(), 30, now);
 
             // then
             assertThat(updated).isEqualTo(1);
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(2);
+            assertThat(saved.getLimits()).isEqualTo(70);
         }
 
         @Test
-        @DisplayName("Списывает 1 и возвращает 1 при активном PRO-плане с датой истечения в будущем")
-        void debitsOnActiveProPlan() {
+        @DisplayName("Возвращает 0 и не меняет баланс при недостаточном балансе")
+        void returnsZeroWhenBalanceInsufficient() {
             // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-training-pro@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().plusSeconds(3600), 5, 5));
+            var user = em.persistAndFlush(aUser("billing-debit-insufficient@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 10, now.plusSeconds(3600)));
 
             // when
-            int updated = repository.debitPlanTraining(user.getId(), Instant.now());
-
-            // then
-            assertThat(updated).isEqualTo(1);
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(4);
-        }
-
-        @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при нулевом plan_trainings_left")
-        void returnsZeroWhenNoTrainingsLeft() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-training-zero@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), 1, 0));
-
-            // when
-            int updated = repository.debitPlanTraining(user.getId(), Instant.now());
+            int updated = repository.debit(user.getId(), 30, now);
 
             // then
             assertThat(updated).isZero();
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanTrainingsLeft()).isZero();
+            assertThat(saved.getLimits()).isEqualTo(10);
         }
 
         @Test
-        @DisplayName("Возвращает 0 и не меняет остаток при истёкшем PRO-плане")
-        void returnsZeroWhenProPlanExpired() {
+        @DisplayName("Возвращает 0 и не меняет баланс при истёкшем сроке лимитов")
+        void returnsZeroWhenExpired() {
             // given
-            var user = em.persistAndFlush(aUser("billing-debit-plan-training-expired@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), Instant.now().minusSeconds(3600), 5, 5));
+            var user = em.persistAndFlush(aUser("billing-debit-expired@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 100, now.minusSeconds(3600)));
 
             // when
-            int updated = repository.debitPlanTraining(user.getId(), Instant.now());
+            int updated = repository.debit(user.getId(), 30, now);
 
             // then
             assertThat(updated).isZero();
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(5);
+            assertThat(saved.getLimits()).isEqualTo(100);
         }
     }
 
     // =========================================================================
 
     @Nested
-    @DisplayName("CreditInterviews")
-    class CreditInterviews {
+    @DisplayName("CreditPack")
+    class CreditPack {
 
         @Test
-        @DisplayName("Прибавляет к остатку интервью, остальные поля строки не трогает")
-        void addsToInterviewsLeftWithoutAffectingOtherFields() {
+        @DisplayName("На активном балансе: остаток + пакет, срок = now + 3 месяца, paid_at проставлен")
+        void addsPackToActiveBalance() {
             // given
-            var user = em.persistAndFlush(aUser("billing-credit-interviews@example.com"));
-            var expiresAt = NOW.plusSeconds(3600);
-            em.persistAndFlush(aProAccount(user.getId(), expiresAt, 5, 7));
+            var user = em.persistAndFlush(aUser("billing-pack-active@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 15, now.plusSeconds(3600)));
 
             // when
-            repository.creditInterviews(user.getId(), 3);
+            repository.creditTopUp(user.getId(), 50, now);
 
             // then
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(8);
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
-            assertThat(saved.getPlanExpiresAt()).isEqualTo(expiresAt);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(7);
-        }
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("CreditPlan")
-    class CreditPlan {
-
-        @Test
-        @DisplayName("FREE-аккаунт: план и остатки задаются с нуля, срок = now + 30 дней")
-        void startsFreshFromFreeAccount() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-credit-from-free@example.com"));
-            em.persistAndFlush(aFreeAccount(user.getId(), FREE_INTERVIEWS, FREE_TRAININGS));
-
-            // when
-            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
-
-            // then — остаток FREE не суммируется, срок отсчитывается от now
-            em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
-            assertThat(saved.getPlanExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(10);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(20);
+            assertThat(saved.getLimits()).isEqualTo(65);
+            assertThat(saved.getLimitsExpireAt())
+                    .isBetween(now.plus(Duration.ofDays(89)), now.plus(Duration.ofDays(93)));
+            assertThat(saved.getPaidAt()).isEqualTo(now);
         }
 
         @Test
-        @DisplayName("Активный платный тариф: срок продлевается от старого, остатки суммируются")
-        void extendsActivePaidPlan() {
+        @DisplayName("На просроченном балансе: старый остаток сгорает, остаётся только пакет")
+        void burnsExpiredBalanceAndKeepsOnlyPack() {
             // given
-            var user = em.persistAndFlush(aUser("billing-credit-active-paid@example.com"));
-            var oldExpiresAt = NOW.plusSeconds(3600);
-            em.persistAndFlush(aProAccount(user.getId(), oldExpiresAt, 3, 5));
+            var user = em.persistAndFlush(aUser("billing-pack-expired@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 15, now.minusSeconds(3600)));
 
             // when
-            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
+            repository.creditTopUp(user.getId(), 50, now);
 
             // then
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
-            assertThat(saved.getPlanExpiresAt()).isEqualTo(oldExpiresAt.plus(Duration.ofDays(30)));
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(13);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(25);
+            assertThat(saved.getLimits()).isEqualTo(50);
+            assertThat(saved.getLimitsExpireAt())
+                    .isBetween(now.plus(Duration.ofDays(89)), now.plus(Duration.ofDays(93)));
+            assertThat(saved.getPaidAt()).isEqualTo(now);
         }
 
         @Test
-        @DisplayName("Истёкший платный тариф: считается как FREE — срок и остатки задаются с нуля")
-        void resetsExpiredPaidPlan() {
+        @DisplayName("paid_at не перезаписывается повторной покупкой")
+        void doesNotOverwritePaidAtOnRepeatedPurchase() {
             // given
-            var user = em.persistAndFlush(aUser("billing-credit-expired-paid@example.com"));
-            em.persistAndFlush(aProAccount(user.getId(), NOW.minusSeconds(3600), 3, 5));
-
-            // when
-            repository.creditPlan(user.getId(), "PRO", 10, 20, NOW);
-
-            // then — старые остатки отброшены, срок отсчитывается от now
+            var user = em.persistAndFlush(aUser("billing-pack-paid-at@example.com"));
+            var firstNow = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 0, null));
+            repository.creditTopUp(user.getId(), 50, firstNow);
             em.clear();
-            var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.PRO);
-            assertThat(saved.getPlanExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(10);
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(20);
-        }
+            var paidAtAfterFirstPurchase = repository.findById(user.getId()).orElseThrow().getPaidAt();
 
-        @Test
-        @DisplayName("Смена плана при активном тарифе (PRO -> MAX): срок продлевается, остатки суммируются")
-        void upgradesPlanWhileActive() {
-            // given
-            var user = em.persistAndFlush(aUser("billing-credit-upgrade@example.com"));
-            var oldExpiresAt = NOW.plusSeconds(3600);
-            em.persistAndFlush(aProAccount(user.getId(), oldExpiresAt, 3, 5));
-
-            // when
-            repository.creditPlan(user.getId(), "MAX", BillingAccount.Plan.MAX.getInterviews(),
-                    BillingAccount.Plan.MAX.getTrainings(), NOW);
+            // when — вторая покупка позже
+            var secondNow = firstNow.plusSeconds(3600);
+            repository.creditTopUp(user.getId(), 50, secondNow);
 
             // then
             em.clear();
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getPlan()).isEqualTo(BillingAccount.Plan.MAX);
-            assertThat(saved.getPlanExpiresAt()).isEqualTo(oldExpiresAt.plus(Duration.ofDays(30)));
-            assertThat(saved.getPlanInterviewsLeft()).isEqualTo(3 + BillingAccount.Plan.MAX.getInterviews());
-            assertThat(saved.getPlanTrainingsLeft()).isEqualTo(5 + BillingAccount.Plan.MAX.getTrainings());
+            assertThat(saved.getPaidAt()).isEqualTo(paidAtAfterFirstPurchase);
         }
     }
 
@@ -388,30 +271,11 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
     class Constraints {
 
         @Test
-        @DisplayName("chk_account_plan: недопустимое значение plan бросает исключение при вставке")
-        void throwsOnInvalidPlanValue() {
-            // given — валидный user_id, chk_account_paid_plan_expires обойдён датой истечения,
-            // чтобы упасть именно на chk_account_plan, а не на другом констрейнте
-            var user = em.persistAndFlush(aUser("billing-constraint-invalid-plan@example.com"));
-
-            // when / then
-            assertThatThrownBy(() -> em.getEntityManager()
-                    .createNativeQuery("""
-                            INSERT INTO billing.account
-                                (user_id, plan, plan_expires_at, plan_interviews_left, plan_trainings_left)
-                            VALUES (:userId, 'BAD_PLAN', now() + interval '1 hour', 1, 3)
-                            """)
-                    .setParameter("userId", user.getId())
-                    .executeUpdate())
-                    .isInstanceOf(Exception.class);
-        }
-
-        @Test
-        @DisplayName("chk_account_left_non_negative: отрицательный остаток бросает исключение при flush")
-        void throwsOnNegativeLeft() {
+        @DisplayName("chk_account_limits: отрицательный баланс бросает исключение при flush")
+        void throwsOnNegativeLimits() {
             // given
             var user = em.persistAndFlush(aUser("billing-constraint-negative@example.com"));
-            var bad = aFreeAccount(user.getId(), -1, 3);
+            var bad = anAccount(user.getId(), -1, Instant.now().plusSeconds(3600));
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))
@@ -419,11 +283,11 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
         }
 
         @Test
-        @DisplayName("chk_account_paid_plan_expires: платный план без даты истечения бросает исключение при flush")
-        void throwsOnPaidPlanWithoutExpiry() {
+        @DisplayName("chk_account_limits: положительный баланс без срока действия бросает исключение при flush")
+        void throwsOnPositiveLimitsWithoutExpiry() {
             // given
             var user = em.persistAndFlush(aUser("billing-constraint-no-expiry@example.com"));
-            var bad = aProAccount(user.getId(), null, 5, 5);
+            var bad = anAccount(user.getId(), 10, null);
 
             // when / then
             assertThatThrownBy(() -> em.persistAndFlush(bad))
@@ -443,7 +307,7 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             // given
             var user = em.persistAndFlush(aUser("billing-cascade-del@example.com"));
             var userId = user.getId();
-            em.persistAndFlush(aFreeAccount(userId, 1, 3));
+            em.persistAndFlush(anAccount(userId, 10, Instant.now().plusSeconds(3600)));
 
             // when — физическое удаление пользователя через managed-ссылку.
             // em.clear() перед remove: иначе managed BillingAccount в контексте персистентности

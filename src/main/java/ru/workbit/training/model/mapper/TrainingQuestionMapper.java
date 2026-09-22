@@ -12,5 +12,6 @@ public interface TrainingQuestionMapper {
     @Mapping(target = "questionText", source = "text")
     @Mapping(target = "score", source = "feedback.score")
     @Mapping(target = "feedback", source = "feedback.text")
+    @Mapping(target = "referenceAnswerUnlocked", expression = "java(question.getReferenceAnswerUnlockedAt() != null)")
     TrainingQuestionResponse toDto(TrainingQuestion question);
 }

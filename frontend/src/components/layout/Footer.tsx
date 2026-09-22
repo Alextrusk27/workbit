@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
 import { rubrics } from '@/content/articles'
+import { useTopUpModal } from '@/features/billing/useTopUpModal'
 
 const columns = [
   {
@@ -13,10 +14,7 @@ const columns = [
   },
   {
     title: 'Помощь',
-    links: [
-      { label: 'Тарифы', to: '/pricing' },
-      { label: 'FAQ', to: '/faq' },
-    ],
+    links: [{ label: 'FAQ', to: '/faq' }],
   },
   {
     title: 'Блог',
@@ -38,7 +36,10 @@ const columns = [
   },
 ]
 
+const linkClass = 'text-muted hover:text-ink text-[13.5px] transition-colors'
+
 export function Footer() {
+  const openTopUp = useTopUpModal()
   return (
     <footer className="border-divider mt-8 border-t sm:mt-12">
       <Container className="pt-7 pb-5 sm:pb-6">
@@ -71,12 +72,20 @@ export function Footer() {
                 {col.title}
               </p>
               <ul className="flex flex-col gap-[7px]">
+                {col.title === 'Помощь' && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => openTopUp()}
+                      className={linkClass}
+                    >
+                      Цены
+                    </button>
+                  </li>
+                )}
                 {col.links.map((l) => (
                   <li key={l.to}>
-                    <Link
-                      to={l.to}
-                      className="text-muted hover:text-ink text-[13.5px] transition-colors"
-                    >
+                    <Link to={l.to} className={linkClass}>
                       {l.label}
                     </Link>
                   </li>

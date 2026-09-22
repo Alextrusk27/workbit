@@ -40,7 +40,7 @@ public class UsageEvent {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
-    private Target target;
+    private Operation operation;
 
     @Column(nullable = false, updatable = false)
     private int delta;
@@ -52,7 +52,21 @@ public class UsageEvent {
         SPEND, CREDIT
     }
 
-    public enum Target {
-        INTERVIEW, TRAINING
+    @Getter
+    public enum Operation {
+        INTERVIEW(20),
+        TRAINING(10),
+        TRAINING_RESTART(10),
+        TRAINING_MORE(10),
+        REFERENCE_ANSWER(1),
+        TOPUP(0),
+        WELCOME(0),
+        EXPIRE(0);
+
+        private final int cost;
+
+        Operation(int cost) {
+            this.cost = cost;
+        }
     }
 }

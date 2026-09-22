@@ -84,7 +84,9 @@ public class AuthController {
     @Operation(summary = "Вход по коду",
             description = "Проверяет код из письма и выдаёт токены в HttpOnly-cookie access_token и refresh_token. "
                     + "Успешный ввод кода подтверждает email. В теле ответа newUser — признак первой авторизации "
-                    + "(регистрации).")
+                    + "(регистрации), welcomeGranted — признак начисления приветственных лимитов: на один адрес они "
+                    + "выдаются один раз, поэтому после удаления и повторной регистрации newUser = true, а "
+                    + "welcomeGranted = false.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -108,7 +110,7 @@ public class AuthController {
         rateLimiter.check("verify-code:" + ClientIp.from(httpRequest), rateLimitProperties.verifyCode());
         var result = authService.verifyCode(request);
         return withAuthCookies(ResponseEntity.ok(), result.tokens())
-                .body(new VerifyCodeResponse(result.newUser()));
+                .body(new VerifyCodeResponse(result.newUser(), result.welcomeGranted()));
     }
 
     @PostMapping("/refresh")
@@ -163,13 +165,15 @@ public class AuthController {
     @DeleteMapping("/delete")
     @Loggable
     @Operation(summary = "Удаление аккаунта",
-            description = "Безвозвратно удаляет текущего пользователя вместе со всеми его данными: сессиями интервью, "
-                    + "ответами, отчётами и токенами. Гасит cookie access_token и refresh_token. Штатно аутентификация "
+            description = "Безвозвратно удаляет текущего пользователя вместе с его данными: сессиями интервью, "
+                    + "ответами, отчётами и токенами. Переживают удаление только необратимый хеш адреса (по нему "
+                    + "приветственные лимиты на этот адрес больше не выдаются) и сведения о платежах. Гасит cookie "
+                    + "access_token и refresh_token. Штатно аутентификация "
                     + "идёт по access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для "
                     + "Swagger UI.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Аккаунт и все данные удалены"),
+            @ApiResponse(responseCode = "204", description = "Аккаунт удалён"),
             @ApiResponse(
                     responseCode = "401",
                     description = "Нет токена или токен недействителен",

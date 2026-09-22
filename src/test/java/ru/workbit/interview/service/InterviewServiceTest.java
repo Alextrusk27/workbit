@@ -33,7 +33,8 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import ru.workbit.billing.service.QuotaService;
+import ru.workbit.billing.model.UsageEvent;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
@@ -97,7 +98,7 @@ class InterviewServiceTest {
     @Mock
     LlmService llmService;
     @Mock
-    QuotaService quotaService;
+    LimitService limitService;
     @Mock
     InterviewSessionMapper interviewSessionMapper;
     @Mock
@@ -710,8 +711,8 @@ class InterviewServiceTest {
             interviewService.createSession(vacancyUrl, userId);
 
             // then
-            InOrder order = inOrder(quotaService, llmService);
-            order.verify(quotaService).checkInterviewAvailable(userId);
+            InOrder order = inOrder(limitService, llmService);
+            order.verify(limitService).check(userId, UsageEvent.Operation.INTERVIEW);
             order.verify(llmService).planInterview(any(), any());
         }
 
@@ -721,13 +722,13 @@ class InterviewServiceTest {
             // given
             VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
             when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
-            doThrow(new PaymentRequiredException("Interview quota exhausted"))
-                    .when(quotaService).checkInterviewAvailable(userId);
+            doThrow(new PaymentRequiredException("Not enough limits"))
+                    .when(limitService).check(userId, UsageEvent.Operation.INTERVIEW);
 
             // when / then
             assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
                     .isInstanceOf(PaymentRequiredException.class)
-                    .hasMessage("Interview quota exhausted");
+                    .hasMessage("Not enough limits");
             verifyNoInteractions(llmService, interviewWriter);
         }
 

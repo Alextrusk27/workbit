@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,8 +24,12 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.dto.RequestCodeRequest;
 import ru.workbit.auth.dto.UserResponse;
 import ru.workbit.auth.dto.VerifyCodeRequest;
+import ru.workbit.auth.dto.VerifyCodeResponse;
 import ru.workbit.auth.repository.LoginCodeJPARepository;
 import ru.workbit.auth.repository.UserJPARepository;
+import ru.workbit.billing.dto.BalanceResponse;
+import ru.workbit.billing.dto.UsageResponse;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.dto.ApiError;
 import ru.workbit.security.service.JWTService;
 
@@ -48,6 +53,8 @@ class AuthFlowIT extends AbstractPostgresIT {
 
     private static final String BASE = "/api/v1/auth";
     private static final String TRAINING_SESSIONS = "/api/v1/training/sessions";
+    private static final String BILLING_QUOTA = "/api/v1/billing/quota";
+    private static final String BILLING_USAGE = "/api/v1/billing/usage";
     private static final String ACCESS_COOKIE = "access_token";
     private static final String REFRESH_COOKIE = "refresh_token";
 
@@ -698,6 +705,82 @@ class AuthFlowIT extends AbstractPostgresIT {
     // =========================================================================
     // Сквозные сценарии: полный цикл жизни пользователя
     // =========================================================================
+
+    @Nested
+    @DisplayName("WelcomeLimits")
+    class WelcomeLimits {
+
+        @Test
+        @DisplayName("Приветственные лимиты выдаются один раз на адрес: после удаления аккаунта повторная регистрация их не даёт")
+        void welcomeLimitsGrantedOncePerEmail() {
+            // given — регистрация: приветственные лимиты начислены
+            var email = uniqueEmail();
+            requestCode(email);
+            var firstVerify = rest.postForEntity(
+                    BASE + "/verify-code",
+                    new VerifyCodeRequest(email, codeFor(email)),
+                    VerifyCodeResponse.class);
+            assertThat(firstVerify.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(firstVerify.getBody().newUser()).isTrue();
+            assertThat(firstVerify.getBody().welcomeGranted()).isTrue();
+
+            var cookies = extractAuthCookies(firstVerify);
+            var balance = rest.exchange(
+                    BILLING_QUOTA,
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    BalanceResponse.class);
+            assertThat(balance.getBody().limits()).isEqualTo(LimitService.WELCOME_LIMITS);
+
+            // when — аккаунт удалён и заведён заново на тот же адрес
+            rest.exchange(
+                    BASE + "/delete",
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(accessCookieHeaders(cookies.access())),
+                    Void.class);
+            requestCode(email);
+            var secondVerify = rest.postForEntity(
+                    BASE + "/verify-code",
+                    new VerifyCodeRequest(email, codeFor(email)),
+                    VerifyCodeResponse.class);
+
+            // then — вход состоялся, но приветственных лимитов больше нет
+            assertThat(secondVerify.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(secondVerify.getBody().newUser()).isTrue();
+            assertThat(secondVerify.getBody().welcomeGranted()).isFalse();
+
+            var newCookies = extractAuthCookies(secondVerify);
+            var newBalance = rest.exchange(
+                    BILLING_USAGE,
+                    HttpMethod.GET,
+                    new HttpEntity<>(accessCookieHeaders(newCookies.access())),
+                    UsageResponse.class);
+            assertThat(newBalance.getBody().limits()).isZero();
+            assertThat(newBalance.getBody().events()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Регистр адреса не заводит второго пользователя")
+        void emailCaseDoesNotCreateSecondUser() {
+            // given
+            var email = uniqueEmail();
+            login(email);
+
+            // when — вход по тому же адресу в другом регистре
+            var upperCased = email.toUpperCase(Locale.ROOT);
+            requestCode(upperCased);
+            var verify = rest.postForEntity(
+                    BASE + "/verify-code",
+                    new VerifyCodeRequest(upperCased, codeFor(email)),
+                    VerifyCodeResponse.class);
+
+            // then — это тот же пользователь: не регистрация и без второй выдачи приветственных
+            assertThat(verify.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(verify.getBody().newUser()).isFalse();
+            assertThat(verify.getBody().welcomeGranted()).isFalse();
+            assertThat(userRepository.findByEmail(upperCased)).isEmpty();
+        }
+    }
 
     @Nested
     @DisplayName("FullLifecycleFlow")

@@ -31,6 +31,7 @@ import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.auth.service.AuthService;
 import ru.workbit.auth.service.LoginCodeService;
 import ru.workbit.auth.service.RefreshTokenService;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
@@ -54,6 +55,8 @@ class AuthServiceTest {
     LoginCodeService loginCodeService;
     @Mock
     JWTService jwtService;
+    @Mock
+    LimitService limitService;
     @Mock
     ApplicationEventPublisher eventPublisher;
 
@@ -214,6 +217,22 @@ class AuthServiceTest {
         }
 
         @Test
+        @DisplayName("Нормализует регистр адреса: User@Example.com ищется как user@example.com")
+        void normalizesEmailCase() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(loginCodeService.issue(user)).thenReturn(RAW_CODE);
+
+            // when
+            authService.requestCode(new RequestCodeRequest("  User@Example.com  ", true, null));
+
+            // then
+            verify(userRepository).findByEmail(EMAIL);
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Не перезаписывает дату согласия, если она уже проставлена")
         void doesNotOverwriteExistingPersonalDataConsentAt() {
             // given
@@ -279,6 +298,58 @@ class AuthServiceTest {
             verify(loginCodeService).consume(user, RAW_CODE);
             assertThat(result.newUser()).isFalse();
             assertThat(user.isEmailVerified()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Возвращает welcomeGranted из LimitService.grantWelcome")
+        void returnsWelcomeGrantedFromLimitService() {
+            // given
+            var user = unverifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(limitService.grantWelcome(USER_ID, EMAIL)).thenReturn(true);
+            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
+            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
+
+            // when
+            var result = authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE));
+
+            // then
+            assertThat(result.welcomeGranted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Вернувшийся после удаления аккаунта: newUser=true, welcomeGranted=false")
+        void returnsWelcomeGrantedFalseForReturningUser() {
+            // given
+            var user = unverifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(limitService.grantWelcome(USER_ID, EMAIL)).thenReturn(false);
+            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
+            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
+
+            // when
+            var result = authService.verifyCode(new VerifyCodeRequest(EMAIL, RAW_CODE));
+
+            // then
+            assertThat(result.newUser()).isTrue();
+            assertThat(result.welcomeGranted()).isFalse();
+        }
+
+        @Test
+        @DisplayName("Нормализует регистр адреса: User@Example.com ищется как user@example.com")
+        void normalizesEmailCase() {
+            // given
+            var user = verifiedUser();
+            when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+            when(jwtService.generateToken(any())).thenReturn(ACCESS_TOKEN);
+            when(refreshTokenService.issue(any())).thenReturn(REFRESH_TOKEN);
+
+            // when
+            authService.verifyCode(new VerifyCodeRequest("User@Example.com", RAW_CODE));
+
+            // then
+            verify(userRepository).findByEmail(EMAIL);
+            verify(loginCodeService).consume(user, RAW_CODE);
         }
 
         @Test

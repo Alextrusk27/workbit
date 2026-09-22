@@ -47,7 +47,7 @@ public class BillingController {
     @Loggable(logResult = true)
     @Operation(summary = "Баланс лимитов",
             description = "Возвращает остаток лимитов, срок их действия и признак хотя бы одной покупки. Просроченный "
-                    + "баланс отдаётся нулём без срока. Первое обращение к биллингу зачисляет приветственные лимиты.")
+                    + "баланс отдаётся нулём без срока.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Баланс лимитов"),

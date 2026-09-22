@@ -19,11 +19,11 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
 
     @Modifying
     @Query(value = """
-            INSERT INTO billing.account (user_id, limits, limits_expire_at)
-            VALUES (:userId, :limits, CAST(:now AS timestamptz) + INTERVAL '3 months')
+            INSERT INTO billing.account (user_id, limits)
+            VALUES (:userId, 0)
             ON CONFLICT (user_id) DO NOTHING
             """, nativeQuery = true)
-    int insertIfAbsent(UUID userId, int limits, Instant now);
+    int insertIfAbsent(UUID userId);
 
     @Modifying
     @Query(value = """
@@ -41,4 +41,13 @@ public interface BillingAccountRepository extends JpaRepository<@NotNull Billing
             WHERE user_id = :userId
             """, nativeQuery = true)
     void creditTopUp(UUID userId, int limits, Instant now);
+
+    @Modifying
+    @Query(value = """
+            UPDATE billing.account SET
+                limits = (CASE WHEN limits_expire_at > :now THEN limits ELSE 0 END) + :limits,
+                limits_expire_at = CAST(:now AS timestamptz) + INTERVAL '3 months'
+            WHERE user_id = :userId
+            """, nativeQuery = true)
+    void creditWelcome(UUID userId, int limits, Instant now);
 }

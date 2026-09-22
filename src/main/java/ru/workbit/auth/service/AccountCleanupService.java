@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.email.AccountDeletionWarningEmailEvent;
 
 @Service
@@ -21,6 +22,7 @@ public class AccountCleanupService {
     private static final Duration DELETE_AFTER_WARN = Duration.ofDays(30);
 
     private final UserJPARepository userRepository;
+    private final LimitService limitService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Scheduled(cron = "0 0 3 * * *")
@@ -44,6 +46,11 @@ public class AccountCleanupService {
     }
 
     private void deleteExpired(Instant threshold) {
+        List<User> expired = userRepository.findByDeletionWarnedAtBefore(threshold);
+        if (!expired.isEmpty()) {
+            limitService.revokeWelcome(expired.stream().map(User::getEmail).toList());
+        }
+
         int deleted = userRepository.deleteByDeletionWarnedAtBefore(threshold);
         if (deleted > 0) {
             log.info("Inactive accounts deleted: {}", deleted);

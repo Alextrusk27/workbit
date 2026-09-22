@@ -3,6 +3,7 @@ package ru.workbit.billing.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -29,6 +30,7 @@ import ru.workbit.billing.model.BillingAccount;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.repository.BillingAccountRepository;
 import ru.workbit.billing.repository.UsageEventRepository;
+import ru.workbit.billing.repository.WelcomeGrantRepository;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.PaymentRequiredException;
 
@@ -40,11 +42,17 @@ class LimitServiceTest {
     private static final String INTERVIEW_LABEL = "Интервью — Java-разработчик";
     private static final int TOPUP_LIMITS = 50;
     private static final String TOPUP_LABEL = TopUpPricing.label(TOPUP_LIMITS);
+    private static final String EMAIL = "user@example.com";
+    private static final String EMAIL_HASH = "email-hash";
 
     @Mock
     BillingAccountRepository billingAccountRepository;
     @Mock
     UsageEventRepository usageEventRepository;
+    @Mock
+    WelcomeGrantRepository welcomeGrantRepository;
+    @Mock
+    EmailHasher emailHasher;
 
     @InjectMocks
     LimitService limitService;
@@ -58,14 +66,130 @@ class LimitServiceTest {
                 .build();
     }
 
-    private void stubExistingUser() {
-        when(billingAccountRepository.insertIfAbsent(eq(USER_ID), eq(LimitService.WELCOME_LIMITS), any()))
-                .thenReturn(0);
+    @Nested
+    @DisplayName("GrantWelcome")
+    class GrantWelcome {
+
+        private void stubFreshHash() {
+            when(emailHasher.hash(EMAIL)).thenReturn(EMAIL_HASH);
+            when(welcomeGrantRepository.insertIfAbsent(eq(EMAIL_HASH), any())).thenReturn(1);
+        }
+
+        @Test
+        @DisplayName("Адрес встретился впервые - начисляет 20 лимитов, пишет CREDIT WELCOME, возвращает true")
+        void grantsOnFirstHash() {
+            // given
+            stubFreshHash();
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(anAccount(0, null, null)));
+
+            // when
+            boolean granted = limitService.grantWelcome(USER_ID, EMAIL);
+
+            // then
+            assertThat(granted).isTrue();
+            verify(billingAccountRepository).creditWelcome(eq(USER_ID), eq(LimitService.WELCOME_LIMITS), any());
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            verify(usageEventRepository).save(captor.capture());
+            UsageEvent saved = captor.getValue();
+            assertThat(saved.getUserId()).isEqualTo(USER_ID);
+            assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
+            assertThat(saved.getOperation()).isEqualTo(UsageEvent.Operation.WELCOME);
+            assertThat(saved.getDelta()).isEqualTo(LimitService.WELCOME_LIMITS);
+            assertThat(saved.getLabel()).isEqualTo(LimitService.WELCOME_LABEL);
+        }
+
+        @Test
+        @DisplayName("Приветствие не открывает эталонные ответы - идёт creditWelcome, не creditTopUp")
+        void doesNotMarkAccountPaid() {
+            // given
+            stubFreshHash();
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(anAccount(0, null, null)));
+
+            // when
+            limitService.grantWelcome(USER_ID, EMAIL);
+
+            // then
+            verify(billingAccountRepository, never()).creditTopUp(any(), anyInt(), any());
+        }
+
+        @Test
+        @DisplayName("На адрес уже выдавали - ничего не начисляет и возвращает false")
+        void skipsWhenHashAlreadyStored() {
+            // given
+            when(emailHasher.hash(EMAIL)).thenReturn(EMAIL_HASH);
+            when(welcomeGrantRepository.insertIfAbsent(eq(EMAIL_HASH), any())).thenReturn(0);
+
+            // when
+            boolean granted = limitService.grantWelcome(USER_ID, EMAIL);
+
+            // then
+            assertThat(granted).isFalse();
+            verify(billingAccountRepository, never()).creditWelcome(any(), anyInt(), any());
+            verify(usageEventRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Хеш новый, но событие WELCOME у пользователя есть (окно отката) - не начисляет, false")
+        void skipsWhenWelcomeEventAlreadyExists() {
+            // given
+            stubFreshHash();
+            when(usageEventRepository.existsByUserIdAndOperation(USER_ID, UsageEvent.Operation.WELCOME))
+                    .thenReturn(true);
+
+            // when
+            boolean granted = limitService.grantWelcome(USER_ID, EMAIL);
+
+            // then
+            assertThat(granted).isFalse();
+            verify(billingAccountRepository, never()).creditWelcome(any(), anyInt(), any());
+            verify(usageEventRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Просроченный ненулевой остаток - сначала EXPIRE, потом приветственные")
+        void writesExpireBeforeCredit() {
+            // given
+            stubFreshHash();
+            Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
+            when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(anAccount(30, past, null)));
+
+            // when
+            limitService.grantWelcome(USER_ID, EMAIL);
+
+            // then
+            InOrder inOrderCheck = inOrder(usageEventRepository, billingAccountRepository);
+            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
+            inOrderCheck.verify(usageEventRepository).save(captor.capture());
+            inOrderCheck.verify(billingAccountRepository)
+                    .creditWelcome(eq(USER_ID), eq(LimitService.WELCOME_LIMITS), any());
+            inOrderCheck.verify(usageEventRepository).save(captor.capture());
+
+            List<UsageEvent> saved = captor.getAllValues();
+            assertThat(saved).hasSize(2);
+            assertThat(saved.get(0).getOperation()).isEqualTo(UsageEvent.Operation.EXPIRE);
+            assertThat(saved.get(0).getDelta()).isEqualTo(30);
+            assertThat(saved.get(1).getOperation()).isEqualTo(UsageEvent.Operation.WELCOME);
+        }
     }
 
-    private void stubNewUser() {
-        when(billingAccountRepository.insertIfAbsent(eq(USER_ID), eq(LimitService.WELCOME_LIMITS), any()))
-                .thenReturn(1);
+    @Nested
+    @DisplayName("RevokeWelcome")
+    class RevokeWelcome {
+
+        @Test
+        @DisplayName("Удаляет гранты по хешам переданных адресов")
+        void deletesGrantsByHashes() {
+            // given
+            String otherEmail = "other@example.com";
+            when(emailHasher.hash(EMAIL)).thenReturn(EMAIL_HASH);
+            when(emailHasher.hash(otherEmail)).thenReturn("other-hash");
+
+            // when
+            limitService.revokeWelcome(List.of(EMAIL, otherEmail));
+
+            // then
+            verify(welcomeGrantRepository).deleteAllById(List.of(EMAIL_HASH, "other-hash"));
+        }
     }
 
     @Nested
@@ -76,7 +200,6 @@ class LimitServiceTest {
         @DisplayName("Активный баланс - остаток и срок возвращаются из аккаунта как есть")
         void returnsAccountAsIsWhenActive() {
             // given
-            stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(15, future, Instant.now());
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -93,7 +216,6 @@ class LimitServiceTest {
         @DisplayName("Просроченный срок - остаток и срок обнуляются, paid сохраняется")
         void zeroesOutWhenExpired() {
             // given
-            stubExistingUser();
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
             BillingAccount account = anAccount(15, past, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -109,7 +231,6 @@ class LimitServiceTest {
         @DisplayName("Аккаунт после миграции с истёкшим тарифом (0 лимитов, срок null) - остаток нулевой, paid сохраняется")
         void zeroesOutForMigratedExpiredPlan() {
             // given
-            stubExistingUser();
             BillingAccount account = anAccount(0, null, Instant.now());
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
@@ -121,26 +242,19 @@ class LimitServiceTest {
         }
 
         @Test
-        @DisplayName("Новый пользователь (insertIfAbsent вернул 1) - пишет CREDIT WELCOME на 20 лимитов")
-        void writesWelcomeEventForNewUser() {
+        @DisplayName("Пользователь без счёта - счёт заводится нулевым, событие WELCOME не пишется")
+        void createsZeroAccountWithoutWelcomeEvent() {
             // given
-            stubNewUser();
-            Instant future = Instant.now().plus(90, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(20, future, null);
+            BillingAccount account = anAccount(0, null, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
             // when
-            limitService.getBalance(USER_ID);
+            BalanceResponse result = limitService.getBalance(USER_ID);
 
             // then
-            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
-            verify(usageEventRepository).save(captor.capture());
-            UsageEvent saved = captor.getValue();
-            assertThat(saved.getUserId()).isEqualTo(USER_ID);
-            assertThat(saved.getKind()).isEqualTo(UsageEvent.Kind.CREDIT);
-            assertThat(saved.getOperation()).isEqualTo(UsageEvent.Operation.WELCOME);
-            assertThat(saved.getDelta()).isEqualTo(LimitService.WELCOME_LIMITS);
-            assertThat(saved.getLabel()).isEqualTo(LimitService.WELCOME_LABEL);
+            assertThat(result).isEqualTo(new BalanceResponse(0, null, false));
+            verify(billingAccountRepository).insertIfAbsent(USER_ID);
+            verify(usageEventRepository, never()).save(any());
         }
     }
 
@@ -152,7 +266,6 @@ class LimitServiceTest {
         @DisplayName("Отдаёт баланс и события с полем operation, порядок из репозитория сохраняется")
         void mapsBalanceAndEvents() {
             // given
-            stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(15, future, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -182,7 +295,6 @@ class LimitServiceTest {
         @DisplayName("Достаточно лимитов - проходит без исключения")
         void passesWhenEnoughLimits() {
             // given
-            stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(20, future, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -195,7 +307,6 @@ class LimitServiceTest {
         @DisplayName("Недостаточно лимитов - PaymentRequiredException")
         void throwsWhenNotEnoughLimits() {
             // given
-            stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(5, future, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -210,7 +321,6 @@ class LimitServiceTest {
         @DisplayName("Срок лимитов истёк - эффективный остаток нулевой - PaymentRequiredException")
         void throwsWhenExpired() {
             // given
-            stubExistingUser();
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
             BillingAccount account = anAccount(30, past, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
@@ -222,21 +332,16 @@ class LimitServiceTest {
         }
 
         @Test
-        @DisplayName("Пользователь без строки - приветственных 20 лимитов хватает на интервью")
-        void passesForNewUserOnWelcomeLimits() {
+        @DisplayName("Пользователь без счёта - нулевой баланс, PaymentRequiredException")
+        void throwsForUserWithoutAccount() {
             // given
-            stubNewUser();
-            Instant future = Instant.now().plus(90, ChronoUnit.DAYS);
-            BillingAccount account = anAccount(20, future, null);
+            BillingAccount account = anAccount(0, null, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
-            // when
-            limitService.check(USER_ID, UsageEvent.Operation.INTERVIEW);
-
-            // then
-            ArgumentCaptor<UsageEvent> captor = ArgumentCaptor.forClass(UsageEvent.class);
-            verify(usageEventRepository).save(captor.capture());
-            assertThat(captor.getValue().getOperation()).isEqualTo(UsageEvent.Operation.WELCOME);
+            // when / then
+            assertThatThrownBy(() -> limitService.check(USER_ID, UsageEvent.Operation.INTERVIEW))
+                    .isInstanceOf(PaymentRequiredException.class)
+                    .hasMessage("Not enough limits");
         }
     }
 
@@ -248,7 +353,6 @@ class LimitServiceTest {
         @DisplayName("Успешное списание - сохраняет SPEND-событие с ценой операции и меткой")
         void savesSpendEventWithLimitsAndLabel() {
             // given
-            stubExistingUser();
             when(billingAccountRepository.debit(eq(USER_ID), eq(UsageEvent.Operation.INTERVIEW.getCost()), any()))
                     .thenReturn(1);
 
@@ -270,7 +374,6 @@ class LimitServiceTest {
         @DisplayName("Репозиторий вернул 0 (лимитов не хватило) - PaymentRequiredException, событие не сохраняется")
         void throwsWhenRepositoryDebitsZero() {
             // given
-            stubExistingUser();
             when(billingAccountRepository.debit(eq(USER_ID), eq(UsageEvent.Operation.INTERVIEW.getCost()), any()))
                     .thenReturn(0);
 
@@ -290,7 +393,6 @@ class LimitServiceTest {
         @DisplayName("Активный баланс - пишет только TOPUP, EXPIRE не пишет")
         void writesOnlyTopUpWhenActive() {
             // given
-            stubExistingUser();
             Instant future = Instant.now().plus(10, ChronoUnit.DAYS);
             BillingAccount account = anAccount(15, future, null);
             when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
@@ -313,7 +415,6 @@ class LimitServiceTest {
         @DisplayName("Просроченный баланс с ненулевым остатком - сначала EXPIRE на старый остаток, потом TOPUP")
         void writesExpireThenTopUpWhenExpiredWithLimits() {
             // given
-            stubExistingUser();
             Instant past = Instant.now().minus(1, ChronoUnit.DAYS);
             BillingAccount account = anAccount(30, past, null);
             when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
@@ -348,7 +449,6 @@ class LimitServiceTest {
         @DisplayName("Аккаунт после миграции с истёкшим тарифом (0 лимитов, срок null) - EXPIRE не пишется")
         void doesNotWriteExpireForMigratedZeroBalance() {
             // given
-            stubExistingUser();
             BillingAccount account = anAccount(0, null, null);
             when(billingAccountRepository.findForUpdate(USER_ID)).thenReturn(Optional.of(account));
 
@@ -370,7 +470,6 @@ class LimitServiceTest {
         @DisplayName("Без покупок - ForbiddenException")
         void throwsWhenNeverPaid() {
             // given
-            stubExistingUser();
             BillingAccount account = anAccount(0, null, null);
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 
@@ -384,7 +483,6 @@ class LimitServiceTest {
         @DisplayName("Была покупка - проходит без исключения")
         void passesWhenPaid() {
             // given
-            stubExistingUser();
             BillingAccount account = anAccount(15, Instant.now().plus(10, ChronoUnit.DAYS), Instant.now());
             when(billingAccountRepository.findById(USER_ID)).thenReturn(Optional.of(account));
 

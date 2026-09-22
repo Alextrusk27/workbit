@@ -65,11 +65,9 @@ export function useVerifyCode() {
   return useMutation({
     mutationFn: (vars: { email: string; code: string }) =>
       authApi.verifyCode(vars.email, vars.code),
-    onSuccess: ({ newUser }) => {
-      if (newUser) {
-        reachGoal('registration')
-        welcome.show()
-      }
+    onSuccess: ({ newUser, welcomeGranted }) => {
+      if (newUser) reachGoal('registration')
+      if (welcomeGranted) welcome.show()
       return refreshMe(qc).catch(() => {
         void qc.invalidateQueries({ queryKey: ME_KEY })
       })

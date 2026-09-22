@@ -5,7 +5,6 @@ import { accentCardClasses } from '@/components/ui/cardStyles'
 import { LimitIcon, Limits } from '@/components/ui/LimitIcon'
 import { TOPUP, normalizeLimits, topUp, topUpQuote } from '@/content/limits'
 import { cn } from '@/lib/cn'
-import { limitsWord } from '@/lib/plural'
 
 const DEFAULT_LIMITS = 200
 const DISCOUNT_FROM = TOPUP.tiers[1].from
@@ -219,14 +218,7 @@ export function TopUpCard({
           disabled={disabled}
           className={buttonClasses({ className: 'mt-6 w-full' })}
         >
-          <span>
-            {ctaLabel}{' '}
-            <span className="max-sm:hidden">
-              {limits} {limitsWord(limits)} —{' '}
-            </span>
-            <span className="sm:hidden">за </span>
-            {rub(quote.amount)} ₽
-          </span>
+          {ctaLabel}
         </button>
       ) : onLogin ? (
         <button

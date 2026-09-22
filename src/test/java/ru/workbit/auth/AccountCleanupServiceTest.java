@@ -3,6 +3,7 @@ package ru.workbit.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.auth.service.AccountCleanupService;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.email.AccountDeletionWarningEmailEvent;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,8 @@ class AccountCleanupServiceTest {
 
     @Mock
     UserJPARepository userRepository;
+    @Mock
+    LimitService limitService;
     @Mock
     ApplicationEventPublisher eventPublisher;
 
@@ -126,8 +130,26 @@ class AccountCleanupServiceTest {
             service.cleanupInactiveAccounts();
 
             // then
-            verifyNoInteractions(eventPublisher);
+            verifyNoInteractions(eventPublisher, limitService);
             verify(userRepository).deleteByDeletionWarnedAtBefore(any());
+        }
+
+        @Test
+        @DisplayName("Снимает гранты приветственных лимитов по адресам истёкших аккаунтов до их удаления")
+        void revokesWelcomeGrantsBeforeDeletingExpiredUsers() {
+            // given
+            when(userRepository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(any())).thenReturn(List.of());
+            when(userRepository.findByDeletionWarnedAtBefore(any()))
+                    .thenReturn(List.of(aUser("expired1@example.com"), aUser("expired2@example.com")));
+
+            // when
+            service.cleanupInactiveAccounts();
+
+            // then
+            var inOrderCheck = inOrder(limitService, userRepository);
+            inOrderCheck.verify(limitService)
+                    .revokeWelcome(List.of("expired1@example.com", "expired2@example.com"));
+            inOrderCheck.verify(userRepository).deleteByDeletionWarnedAtBefore(any());
         }
     }
 }

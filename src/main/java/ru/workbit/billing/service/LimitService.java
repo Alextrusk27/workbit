@@ -1,6 +1,7 @@
 package ru.workbit.billing.service;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import ru.workbit.billing.model.BillingAccount;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.repository.BillingAccountRepository;
 import ru.workbit.billing.repository.UsageEventRepository;
+import ru.workbit.billing.repository.WelcomeGrantRepository;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.PaymentRequiredException;
 
@@ -28,16 +30,54 @@ public class LimitService {
 
     private final BillingAccountRepository billingAccountRepository;
     private final UsageEventRepository usageEventRepository;
+    private final WelcomeGrantRepository welcomeGrantRepository;
+    private final EmailHasher emailHasher;
+
+    /**
+     * Начисляет приветственные лимиты, если на этот адрес их ещё не выдавали.
+     * Признак выдачи живёт вне пользователя ({@code billing.welcome_grant}), поэтому удаление
+     * аккаунта и повторная регистрация на тот же адрес второй выдачи не дают.
+     *
+     * @return true, если лимиты начислены в этом вызове
+     */
+    @Transactional
+    public boolean grantWelcome(UUID userId, String email) {
+        billingAccountRepository.insertIfAbsent(userId);
+        Instant now = Instant.now();
+        if (welcomeGrantRepository.insertIfAbsent(emailHasher.hash(email), now) == 0) {
+            return false;
+        }
+        if (usageEventRepository.existsByUserIdAndOperation(userId, UsageEvent.Operation.WELCOME)) {
+            log.info("Welcome limits already granted to user {}", userId);
+            return false;
+        }
+
+        expireStaleLimits(userId, now);
+        billingAccountRepository.creditWelcome(userId, WELCOME_LIMITS, now);
+        saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.WELCOME,
+                WELCOME_LIMITS, WELCOME_LABEL, now);
+        log.info("Granted welcome limits to user {}", userId);
+        return true;
+    }
+
+    /**
+     * Снимает признак выдачи приветственных лимитов: аккаунт, удалённый за неактивность,
+     * при возвращении получает приветствие заново.
+     */
+    @Transactional
+    public void revokeWelcome(Collection<String> emails) {
+        welcomeGrantRepository.deleteAllById(emails.stream().map(emailHasher::hash).toList());
+    }
 
     @Transactional
     public BalanceResponse getBalance(UUID userId) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         return toBalance(load(userId));
     }
 
     @Transactional
     public UsageResponse getUsage(UUID userId) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         BalanceResponse balance = toBalance(load(userId));
         List<UsageResponse.UsageEventResponse> events = usageEventRepository
                 .findAllByUserIdOrderByAtDesc(userId).stream()
@@ -49,7 +89,7 @@ public class LimitService {
 
     @Transactional
     public void check(UUID userId, UsageEvent.Operation operation) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         if (toBalance(load(userId)).limits() < operation.getCost()) {
             log.warn("Not enough limits for {} for user {}", operation, userId);
             throw new PaymentRequiredException("Not enough limits");
@@ -58,7 +98,7 @@ public class LimitService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void debit(UUID userId, UsageEvent.Operation operation, String label) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         if (billingAccountRepository.debit(userId, operation.getCost(), Instant.now()) == 0) {
             log.warn("Not enough limits for {} for user {}", operation, userId);
             throw new PaymentRequiredException("Not enough limits");
@@ -68,13 +108,9 @@ public class LimitService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void creditTopUp(UUID userId, int limits, String label) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         Instant now = Instant.now();
-        BillingAccount account = billingAccountRepository.findForUpdate(userId).orElseThrow();
-        if (account.getLimits() > 0 && !isActive(account, now)) {
-            saveEvent(userId, UsageEvent.Kind.SPEND, UsageEvent.Operation.EXPIRE,
-                    account.getLimits(), EXPIRE_LABEL, now);
-        }
+        expireStaleLimits(userId, now);
         billingAccountRepository.creditTopUp(userId, limits, now);
         saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.TOPUP, limits, label, now);
         log.info("Credited {} limits to user {}", limits, userId);
@@ -82,7 +118,7 @@ public class LimitService {
 
     @Transactional
     public void requirePaid(UUID userId) {
-        insertIfAbsent(userId);
+        billingAccountRepository.insertIfAbsent(userId);
         if (load(userId).getPaidAt() == null) {
             log.warn("Purchase required for user {}", userId);
             throw new ForbiddenException("Purchase required");
@@ -100,12 +136,15 @@ public class LimitService {
         return account.getLimitsExpireAt() != null && account.getLimitsExpireAt().isAfter(now);
     }
 
-    private void insertIfAbsent(UUID userId) {
-        Instant now = Instant.now();
-        if (billingAccountRepository.insertIfAbsent(userId, WELCOME_LIMITS, now) == 1) {
-            saveEvent(userId, UsageEvent.Kind.CREDIT, UsageEvent.Operation.WELCOME,
-                    WELCOME_LIMITS, WELCOME_LABEL, now);
-            log.info("Granted welcome limits to user {}", userId);
+    /**
+     * Пишет в историю сгорание ненулевого остатка с истёкшим сроком: начисление затирает его
+     * в балансе, и без события история разошлась бы с балансом.
+     */
+    private void expireStaleLimits(UUID userId, Instant now) {
+        BillingAccount account = billingAccountRepository.findForUpdate(userId).orElseThrow();
+        if (account.getLimits() > 0 && !isActive(account, now)) {
+            saveEvent(userId, UsageEvent.Kind.SPEND, UsageEvent.Operation.EXPIRE,
+                    account.getLimits(), EXPIRE_LABEL, now);
         }
     }
 

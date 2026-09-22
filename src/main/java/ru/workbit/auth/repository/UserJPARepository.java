@@ -17,6 +17,8 @@ public interface UserJPARepository extends JpaRepository<@NotNull User, @NotNull
 
     List<User> findByLastSeenBeforeAndDeletionWarnedAtIsNull(Instant threshold);
 
+    List<User> findByDeletionWarnedAtBefore(Instant threshold);
+
     @Modifying
     @Query("DELETE FROM User u WHERE u.deletionWarnedAt < :threshold")
     int deleteByDeletionWarnedAtBefore(@Param("threshold") Instant threshold);

@@ -13,7 +13,7 @@ export function WelcomeProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** Модалка о приветственных лимитах после первого входа (`newUser` из
+/** Модалка о приветственных лимитах после их начисления (`welcomeGranted` из
  *  `/auth/verify-code`): та же, что после оплаты, зачисление берёт из истории. */
 export function WelcomeModal() {
   const { open, dismiss } = useWelcome()

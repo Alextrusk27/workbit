@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.billing.dto.PaymentCreateResponse;
 import ru.workbit.billing.dto.PaymentStatusResponse;
 import ru.workbit.billing.model.Payment;
@@ -21,6 +22,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentProvider paymentProvider;
     private final LimitService limitService;
+    private final UserJPARepository userRepository;
 
     @Transactional
     public PaymentCreateResponse create(UUID userId, int limits, String email) {
@@ -60,6 +62,11 @@ public class PaymentService {
         Instant paidAt = Instant.now();
         if (paymentRepository.markPaid(payment.getId(), paidAt) != 1) {
             return false;
+        }
+        if (!userRepository.existsById(payment.getUserId())) {
+            log.warn("Payment {} (invId {}) confirmed for deleted user {}, limits not credited",
+                    payment.getId(), payment.getInvId(), payment.getUserId());
+            return true;
         }
 
         limitService.creditTopUp(payment.getUserId(), payment.getLimits(), TopUpPricing.label(payment.getLimits()));

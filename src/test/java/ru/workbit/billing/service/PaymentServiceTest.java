@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.billing.dto.PaymentCreateResponse;
 import ru.workbit.billing.dto.PaymentStatusResponse;
 import ru.workbit.billing.model.Payment;
@@ -50,6 +51,8 @@ class PaymentServiceTest {
     PaymentProvider paymentProvider;
     @Mock
     LimitService limitService;
+    @Mock
+    UserJPARepository userRepository;
 
     @InjectMocks
     PaymentService paymentService;
@@ -178,6 +181,7 @@ class PaymentServiceTest {
             Payment payment = aPayment(Payment.Status.PENDING);
             when(paymentRepository.findByInvId(INV_ID)).thenReturn(Optional.of(payment));
             when(paymentRepository.markPaid(eq(PAYMENT_ID), any(Instant.class))).thenReturn(1);
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
             when(paymentProvider.notificationResponse(INV_ID)).thenReturn(NOTIFICATION_RESPONSE);
 
             // when
@@ -218,6 +222,7 @@ class PaymentServiceTest {
             // given
             Payment payment = aPayment(Payment.Status.PENDING);
             when(paymentRepository.markPaid(eq(PAYMENT_ID), any(Instant.class))).thenReturn(1);
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
 
             // when
             boolean result = paymentService.confirmPaid(payment);
@@ -225,6 +230,22 @@ class PaymentServiceTest {
             // then
             assertThat(result).isTrue();
             verify(limitService).creditTopUp(USER_ID, LIMITS, LABEL);
+        }
+
+        @Test
+        @DisplayName("Пользователь удалён — платёж помечен PAID, лимиты не начисляются, возвращает true")
+        void marksPaidWithoutCreditingWhenUserDeleted() {
+            // given
+            Payment payment = aPayment(Payment.Status.PENDING);
+            when(paymentRepository.markPaid(eq(PAYMENT_ID), any(Instant.class))).thenReturn(1);
+            when(userRepository.existsById(USER_ID)).thenReturn(false);
+
+            // when
+            boolean result = paymentService.confirmPaid(payment);
+
+            // then
+            assertThat(result).isTrue();
+            verifyNoInteractions(limitService);
         }
 
         @Test

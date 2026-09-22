@@ -16,10 +16,17 @@ public abstract class AbstractPostgresIT {
         POSTGRES.start();
     }
 
+    // Секрет хеша email без дефолта в application.yml — иначе прод при забытой
+    // переменной молча засеет хеши известным ключом. Значение здесь общее для Flyway и
+    // EmailHasher: SQL и Java должны давать один хеш на одном адресе.
+    protected static final String EMAIL_HASH_SECRET = "test-email-hash-secret-not-used-in-production";
+
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         r.add("spring.datasource.username", POSTGRES::getUsername);
         r.add("spring.datasource.password", POSTGRES::getPassword);
+        r.add("spring.flyway.placeholders.email_hash_secret", () -> EMAIL_HASH_SECRET);
+        r.add("app.email.hash-secret", () -> EMAIL_HASH_SECRET);
     }
 }

@@ -201,21 +201,19 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
     // =========================================================================
 
     @Nested
-    @DisplayName("Cascade")
-    class Cascade {
+    @DisplayName("UserDeletion")
+    class UserDeletion {
 
         @Test
-        @DisplayName("ON DELETE CASCADE: удаление пользователя из auth.users удаляет его платежи")
-        void cascadeDeleteRemovesPaymentsOnUserDelete() {
+        @DisplayName("Платёж переживает удаление пользователя: история расчётов нужна бухгалтерии и спорам с Робокассой")
+        void paymentSurvivesUserDelete() {
             // given
-            var user = em.persistAndFlush(aUser("payment-cascade-del@example.com"));
+            var user = em.persistAndFlush(aUser("payment-user-delete@example.com"));
             var userId = user.getId();
             var payment = em.persistAndFlush(aPayment(userId, repository.nextInvId()));
             var paymentId = payment.getId();
 
-            // when — физическое удаление пользователя через managed-ссылку.
-            // em.clear() перед remove: иначе managed Payment в контексте персистентности
-            // при flush может выбросить TransientPropertyValueException.
+            // when — физическое удаление пользователя через managed-ссылку
             em.flush();
             em.clear();
             var managed = requireNonNull(em.find(User.class, userId));
@@ -224,7 +222,8 @@ class PaymentRepositoryIT extends AbstractPostgresIT {
             em.clear();
 
             // then
-            assertThat(repository.findById(paymentId)).isEmpty();
+            var saved = repository.findById(paymentId).orElseThrow();
+            assertThat(saved.getUserId()).isEqualTo(userId);
         }
     }
 }

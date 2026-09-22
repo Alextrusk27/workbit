@@ -30,7 +30,7 @@ public class PaymentReconciliationService {
 
         for (Payment payment : pending) {
             if (paymentProvider.isPaid(payment) && paymentService.confirmPaid(payment)) {
-                log.warn("Payment {} (invId {}) credited by reconciliation, notification never arrived",
+                log.warn("Payment {} (invId {}) confirmed by reconciliation, notification never arrived",
                         payment.getId(), payment.getInvId());
             }
         }

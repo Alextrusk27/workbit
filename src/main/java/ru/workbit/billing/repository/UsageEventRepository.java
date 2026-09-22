@@ -9,4 +9,6 @@ import ru.workbit.billing.model.UsageEvent;
 public interface UsageEventRepository extends JpaRepository<@NotNull UsageEvent, @NotNull UUID> {
 
     List<UsageEvent> findAllByUserIdOrderByAtDesc(UUID userId);
+
+    boolean existsByUserIdAndOperation(UUID userId, UsageEvent.Operation operation);
 }

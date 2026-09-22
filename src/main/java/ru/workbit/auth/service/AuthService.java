@@ -13,10 +13,12 @@ import ru.workbit.auth.dto.UserResponse;
 import ru.workbit.auth.dto.VerifyCodeRequest;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
+import ru.workbit.billing.service.LimitService;
 import ru.workbit.email.LoginCodeEmailEvent;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.security.service.JWTService;
+import ru.workbit.util.EmailNormalizer;
 
 @Service
 @Slf4j
@@ -26,6 +28,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final LoginCodeService loginCodeService;
     private final JWTService jwtService;
+    private final LimitService limitService;
     private final ApplicationEventPublisher eventPublisher;
 
     public void logout(String refreshToken) {
@@ -42,8 +45,9 @@ public class AuthService {
 
     @Transactional
     public void requestCode(RequestCodeRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseGet(() -> createUser(request.email()));
+        String email = EmailNormalizer.normalize(request.email());
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> createUser(email));
         if (user.getPersonalDataConsentAt() == null) {
             user.setPersonalDataConsentAt(Instant.now());
         }
@@ -54,19 +58,23 @@ public class AuthService {
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
     public VerifyCodeResult verifyCode(VerifyCodeRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByEmail(EmailNormalizer.normalize(request.email()))
                 .orElseThrow(() -> new BadCredentialsException("Invalid code"));
         loginCodeService.consume(user, request.code());
 
         boolean newUser = !user.isEmailVerified();
         user.setEmailVerified(true);
+        boolean welcomeGranted = limitService.grantWelcome(user.getId(), user.getEmail());
         TokenResponse tokens = issueTokens(user);
         log.info("Login success uid={} newUser={}", user.getId(), newUser);
-        return new VerifyCodeResult(tokens, newUser);
+        return new VerifyCodeResult(tokens, newUser, welcomeGranted);
     }
 
-    /** Результат входа по коду: токены для cookie и признак первой авторизации (регистрации). */
-    public record VerifyCodeResult(TokenResponse tokens, boolean newUser) {
+    /**
+     * Результат входа по коду: токены для cookie, признак первой авторизации (регистрации)
+     * и факт начисления приветственных лимитов в этом входе.
+     */
+    public record VerifyCodeResult(TokenResponse tokens, boolean newUser, boolean welcomeGranted) {
     }
 
     @Transactional

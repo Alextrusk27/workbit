@@ -55,21 +55,19 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
     class InsertIfAbsent {
 
         @Test
-        @DisplayName("Создаёт строку с приветственными лимитами и сроком ≈ now + 3 месяца, если её ещё нет")
-        void createsRowWithWelcomeLimitsWhenAbsent() {
+        @DisplayName("Создаёт нулевую строку без срока, если её ещё нет, и не нарушает chk_account_limits")
+        void createsZeroRowWhenAbsent() {
             // given
             var user = em.persistAndFlush(aUser("billing-insert-new@example.com"));
-            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
             // when
-            int inserted = repository.insertIfAbsent(user.getId(), WELCOME_LIMITS, now);
+            int inserted = repository.insertIfAbsent(user.getId());
 
             // then
             assertThat(inserted).isEqualTo(1);
             var saved = repository.findById(user.getId()).orElseThrow();
-            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
-            assertThat(saved.getLimitsExpireAt())
-                    .isBetween(now.plus(Duration.ofDays(89)), now.plus(Duration.ofDays(93)));
+            assertThat(saved.getLimits()).isZero();
+            assertThat(saved.getLimitsExpireAt()).isNull();
             assertThat(saved.getPaidAt()).isNull();
         }
 
@@ -79,17 +77,61 @@ class BillingAccountRepositoryIT extends AbstractPostgresIT {
             // given
             var user = em.persistAndFlush(aUser("billing-insert-idempotent@example.com"));
             var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-            repository.insertIfAbsent(user.getId(), WELCOME_LIMITS, now);
-            var firstExpireAt = repository.findById(user.getId()).orElseThrow().getLimitsExpireAt();
+            em.persistAndFlush(anAccount(user.getId(), WELCOME_LIMITS, now.plusSeconds(3600)));
+            em.clear();
 
-            // when — повторный вызов с другими значениями
-            int inserted = repository.insertIfAbsent(user.getId(), 999, now.plusSeconds(3600));
+            // when
+            int inserted = repository.insertIfAbsent(user.getId());
 
             // then — исходные значения сохранились
             assertThat(inserted).isZero();
             var saved = repository.findById(user.getId()).orElseThrow();
             assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
-            assertThat(saved.getLimitsExpireAt()).isEqualTo(firstExpireAt);
+            assertThat(saved.getLimitsExpireAt()).isEqualTo(now.plusSeconds(3600));
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("CreditWelcome")
+    class CreditWelcome {
+
+        @Test
+        @DisplayName("На нулевом счёте: 20 лимитов со сроком ≈ now + 3 месяца, paid_at остаётся пустым")
+        void creditsWelcomeWithoutMarkingPaid() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-welcome-zero@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 0, null));
+
+            // when
+            repository.creditWelcome(user.getId(), WELCOME_LIMITS, now);
+
+            // then
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
+            assertThat(saved.getLimitsExpireAt())
+                    .isBetween(now.plus(Duration.ofDays(89)), now.plus(Duration.ofDays(93)));
+            assertThat(saved.getPaidAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("На просроченном балансе: старый остаток сгорает, остаются только приветственные")
+        void burnsExpiredBalance() {
+            // given
+            var user = em.persistAndFlush(aUser("billing-welcome-expired@example.com"));
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            em.persistAndFlush(anAccount(user.getId(), 15, now.minusSeconds(3600)));
+
+            // when
+            repository.creditWelcome(user.getId(), WELCOME_LIMITS, now);
+
+            // then
+            em.clear();
+            var saved = repository.findById(user.getId()).orElseThrow();
+            assertThat(saved.getLimits()).isEqualTo(WELCOME_LIMITS);
         }
     }
 

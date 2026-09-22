@@ -6,11 +6,14 @@ app:
       allowed-origins: http://localhost:5173
   mail:
     base-url: http://localhost:5173
+  email:
+    hash-secret: dev-email-hash-secret-not-used-in-production
 
 spring:
   flyway:
     placeholders:
       payment_inv_id_start: 1000
+      email_hash_secret: dev-email-hash-secret-not-used-in-production
   jpa:
     properties:
       hibernate:

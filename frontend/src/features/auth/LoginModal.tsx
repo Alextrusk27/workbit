@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useBlocker, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { CodeForm } from '@/components/auth/CodeForm'
 import { IconClose } from '@/components/marketing/icons'
@@ -13,7 +13,7 @@ import { LimitIcon } from '@/components/ui/LimitIcon'
 import { captchaEnabled } from '@/features/auth/captcha'
 import { authErrorMessage } from '@/features/auth/errors'
 import { WELCOME_LIMITS } from '@/content/limits'
-import { useRequestCode } from '@/features/auth/useAuth'
+import { useAuth, useRequestCode } from '@/features/auth/useAuth'
 import {
   LoginModalContext,
   type LoginModalOptions,
@@ -48,6 +48,26 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
     previousPathname.current = pathname
     if (from !== '/login' && pathname !== '/login') close()
   }, [pathname, close])
+
+  const { isAuthenticated, isLoading } = useAuth()
+  const blocker = useBlocker(
+    useCallback(
+      ({ nextLocation, historyAction }) =>
+        historyAction === 'PUSH' &&
+        nextLocation.pathname === '/login' &&
+        !isLoading &&
+        !isAuthenticated,
+      [isLoading, isAuthenticated],
+    ),
+  )
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    const from = (
+      blocker.location.state as { from?: { pathname: string } } | null
+    )?.from?.pathname
+    open({ from })
+    blocker.reset()
+  }, [blocker, open])
 
   return (
     <LoginModalContext.Provider value={open}>

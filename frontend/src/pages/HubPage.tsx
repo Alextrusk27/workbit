@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
-import { PaymentSuccessModal } from '@/components/app/PaymentSuccessModal'
+import { LimitsCreditedModal } from '@/components/app/LimitsCreditedModal'
 import { Alert } from '@/components/ui/Alert'
 import { Container } from '@/components/ui/Container'
 import { Limits } from '@/components/ui/LimitIcon'
@@ -12,6 +12,7 @@ import {
   useBalance,
   usePayment,
 } from '@/features/billing/useBilling'
+import { useAuth } from '@/features/auth/useAuth'
 import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { formatDate } from '@/lib/dates'
 import { reachGoal } from '@/lib/metrika'
@@ -73,6 +74,7 @@ export function HubPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const openTopUp = useTopUpModal()
+  const { user } = useAuth()
   const [paid] = useState(() => searchParams.get('payment') === 'ok')
   const [failed] = useState(() => searchParams.get('payment') === 'fail')
   const [paymentOpen, setPaymentOpen] = useState(paid)
@@ -148,9 +150,11 @@ export function HubPage() {
       <BalanceLine />
 
       {paid && !paymentFailed && (
-        <PaymentSuccessModal
+        <LimitsCreditedModal
           open={paymentOpen}
+          title="Оплата прошла"
           pending={!!paymentId && payment?.status !== 'PAID'}
+          footnote={user && `Чек отправили на ${user.email}`}
           onClose={() => setPaymentOpen(false)}
         />
       )}

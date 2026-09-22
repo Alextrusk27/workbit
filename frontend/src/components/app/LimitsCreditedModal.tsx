@@ -1,10 +1,16 @@
+import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/Button'
+import { CheckCircle } from '@/components/ui/CheckCircle'
+import {
+  modalOverlayClasses,
+  modalPanelClasses,
+} from '@/components/ui/modalStyles'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAuth } from '@/features/auth/useAuth'
 import type { UsageEvent } from '@/features/billing/api'
 import { useBalance, useUsage } from '@/features/billing/useBilling'
+import { cn } from '@/lib/cn'
 import { formatDate } from '@/lib/dates'
 import { motionTokens } from '@/lib/motion'
 import { limitsWord } from '@/lib/plural'
@@ -35,27 +41,6 @@ function toCreditRows(batch: UsageEvent[]) {
   }))
 }
 
-function CheckCircle() {
-  return (
-    <span className="bg-ok/14 mx-auto flex size-14 items-center justify-center rounded-full">
-      <svg
-        viewBox="0 0 24 24"
-        width={26}
-        height={26}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-ok"
-        aria-hidden="true"
-      >
-        <path d="M20 6 9 17l-5-5" />
-      </svg>
-    </span>
-  )
-}
-
 function PendingCircle() {
   return (
     <span className="bg-indigo/14 mx-auto flex size-14 items-center justify-center rounded-full">
@@ -64,21 +49,22 @@ function PendingCircle() {
   )
 }
 
-/** Модалка после возврата с оплаты: зачисления из последней
- *  CREDIT-пачки истории операций и срок действия баланса. Пока
- *  оплату не подтвердил webhook, показывает ожидание. */
-export function PaymentSuccessModal({
+/** Модалка о зачислении лимитов (оплата, приветственные, в будущем промокоды):
+ *  зачисления из последней CREDIT-пачки истории операций и срок действия
+ *  баланса. `pending` — оплату ещё не подтвердил webhook, показываем ожидание. */
+export function LimitsCreditedModal({
   open,
-  pending,
+  title,
+  pending = false,
+  footnote,
   onClose,
 }: {
   open: boolean
-  pending: boolean
+  title: string
+  pending?: boolean
+  footnote?: ReactNode
   onClose: () => void
 }) {
-  const { user } = useAuth()
-  const { data: balance } = useBalance()
-  const { data: usage } = useUsage()
   const panelRef = useModalA11y(open)
 
   useEffect(() => {
@@ -90,9 +76,6 @@ export function PaymentSuccessModal({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  const credits = toCreditRows(latestCreditBatch(usage?.events))
-  const total = credits.reduce((sum, c) => sum + c.delta, 0)
-
   return (
     <AnimatePresence>
       {open && (
@@ -101,7 +84,10 @@ export function PaymentSuccessModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: motionTokens.duration.fast }}
-          className="fixed inset-0 z-100 flex items-center justify-center bg-[rgba(6,9,20,0.65)] p-5 backdrop-blur-[6px]"
+          className={cn(
+            modalOverlayClasses,
+            'flex items-center justify-center',
+          )}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose()
           }}
@@ -117,48 +103,31 @@ export function PaymentSuccessModal({
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label={pending ? 'Проверяем оплату' : 'Оплата прошла'}
-            className="border-line bg-pop shadow-chat w-full max-w-[440px] rounded-2xl border p-7 text-center"
+            aria-label={pending ? 'Проверяем оплату' : title}
+            className={cn(
+              modalPanelClasses,
+              'w-full max-w-[440px] text-center',
+            )}
           >
-            {pending ? <PendingCircle /> : <CheckCircle />}
-            <h3 className="text-ink mt-[18px] text-[20px] font-bold">
-              {pending ? 'Проверяем оплату' : 'Оплата прошла'}
-            </h3>
-            {pending && (
-              <p role="status" className="text-muted mt-2 text-[14.5px]">
-                Ждём подтверждения. Лимиты зачислятся сами, обычно это занимает
-                несколько секунд.
-              </p>
-            )}
-            {!pending && total > 0 && (
-              <p className="text-muted mt-2 text-[14.5px]">
-                Зачислено{' '}
-                <span className="text-ink font-semibold tabular-nums">
-                  {total} {limitsWord(total)}
-                </span>
-                {balance?.expiresAt &&
-                  `, действуют до ${formatDate(balance.expiresAt)}`}
-              </p>
-            )}
-            {!pending && credits.length > 0 && (
-              <div className="mt-5 flex flex-col gap-2">
-                {credits.map((credit) => (
-                  <div
-                    key={credit.key}
-                    className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
-                  >
-                    <span className="text-ink text-sm">{credit.name}</span>
-                    <span className="text-ok text-sm font-semibold tabular-nums">
-                      +{credit.delta}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!pending && user && (
-              <p className="text-dim mt-3.5 text-[12.5px]">
-                Чек отправили на {user.email}
-              </p>
+            {pending ? (
+              <>
+                <PendingCircle />
+                <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+                  Проверяем оплату
+                </h3>
+                <p role="status" className="text-muted mt-2 text-[14.5px]">
+                  Ждём подтверждения. Лимиты зачислятся сами, обычно это
+                  занимает несколько секунд.
+                </p>
+              </>
+            ) : (
+              <>
+                <CheckCircle />
+                <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+                  {title}
+                </h3>
+                <CreditedSummary footnote={footnote} />
+              </>
             )}
             <Button autoFocus className="mt-5 w-full" onClick={onClose}>
               Продолжить
@@ -167,5 +136,43 @@ export function PaymentSuccessModal({
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+function CreditedSummary({ footnote }: { footnote?: ReactNode }) {
+  const { data: balance } = useBalance()
+  const { data: usage } = useUsage()
+  const credits = toCreditRows(latestCreditBatch(usage?.events))
+  const total = credits.reduce((sum, c) => sum + c.delta, 0)
+
+  return (
+    <>
+      {total > 0 && (
+        <p className="text-muted mt-2 text-[14.5px]">
+          Зачислено{' '}
+          <span className="text-ink font-semibold tabular-nums">
+            {total} {limitsWord(total)}
+          </span>
+          {balance?.expiresAt &&
+            `, действуют до ${formatDate(balance.expiresAt)}`}
+        </p>
+      )}
+      {credits.length > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          {credits.map((credit) => (
+            <div
+              key={credit.key}
+              className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
+            >
+              <span className="text-ink text-sm">{credit.name}</span>
+              <span className="text-ok text-sm font-semibold tabular-nums">
+                +{credit.delta}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {footnote && <p className="text-dim mt-3.5 text-[12.5px]">{footnote}</p>}
+    </>
   )
 }

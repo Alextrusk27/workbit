@@ -5,11 +5,14 @@ import { AnimatePresence, motion } from 'motion/react'
 import { CodeForm } from '@/components/auth/CodeForm'
 import { IconClose } from '@/components/marketing/icons'
 import { Alert } from '@/components/ui/Alert'
-import { accentCardClasses } from '@/components/ui/cardStyles'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Field } from '@/components/ui/Field'
 import { LimitIcon } from '@/components/ui/LimitIcon'
+import {
+  modalOverlayClasses,
+  modalPanelClasses,
+} from '@/components/ui/modalStyles'
 import { captchaEnabled } from '@/features/auth/captcha'
 import { authErrorMessage } from '@/features/auth/errors'
 import { WELCOME_LIMITS } from '@/content/limits'
@@ -18,6 +21,7 @@ import {
   LoginModalContext,
   type LoginModalOptions,
 } from '@/features/auth/useLoginModal'
+import { cn } from '@/lib/cn'
 import { motionTokens } from '@/lib/motion'
 import { limitsWord } from '@/lib/plural'
 import { useModalA11y } from '@/lib/useModalA11y'
@@ -110,7 +114,7 @@ function LoginModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: motionTokens.duration.fast }}
-          className="fixed inset-0 z-100 overflow-y-auto bg-[rgba(6,9,20,0.65)] p-5 backdrop-blur-[6px]"
+          className={cn(modalOverlayClasses, 'overflow-y-auto')}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose()
           }}
@@ -132,10 +136,8 @@ function LoginModal({
               if (e.target === e.currentTarget) onClose()
             }}
           >
-            <div className="bg-pop shadow-chat relative rounded-2xl">
-              <div className={accentCardClasses}>
-                <LoginForm options={options} onClose={onClose} />
-              </div>
+            <div className={modalPanelClasses}>
+              <LoginForm options={options} onClose={onClose} />
               <button
                 type="button"
                 onClick={onClose}

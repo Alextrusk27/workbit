@@ -204,6 +204,7 @@ export function BrandPage() {
             <Button variant="secondary">Secondary</Button>
             <Button variant="ghost">Ghost</Button>
             <Button variant="danger">Danger</Button>
+            <Button variant="danger-solid">Danger solid</Button>
             <Button disabled>Disabled</Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">

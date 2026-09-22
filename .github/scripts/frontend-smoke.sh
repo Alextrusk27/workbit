@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Смок прод-фронта после заливки: #root, версия и сборка из meta, content-type бандла,
-# canonical, JSON-LD на /pricing, честный 404, sitemap.xml равен залитому и каждый его
+# canonical, JSON-LD на /faq, честный 404, sitemap.xml равен залитому и каждый его
 # URL отвечает 200 с canonical.
 # Вход: $1 ожидаемая app-version, $2 ожидаемый app-build;
 # опционально BASE (default https://workbit.ru), DIST (default dist).
@@ -32,8 +32,8 @@ case "$ctype" in
   *) echo "bundle $asset served as '$ctype' instead of javascript"; exit 1 ;;
 esac
 [[ $html == *'rel="canonical"'* ]] || { echo "no canonical on /"; exit 1; }
-pricing=$(curl -s "$BASE/pricing")
-[[ $pricing == *'application/ld+json'* ]] || { echo "no json-ld on /pricing"; exit 1; }
+faq=$(curl -s "$BASE/faq")
+[[ $faq == *'application/ld+json'* ]] || { echo "no json-ld on /faq"; exit 1; }
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/definitely-missing")
 [ "$code" = "404" ] || { echo "soft 404: /definitely-missing answered $code"; exit 1; }
 curl -sf "$BASE/sitemap.xml" | cmp -s - "$DIST/sitemap.xml" \

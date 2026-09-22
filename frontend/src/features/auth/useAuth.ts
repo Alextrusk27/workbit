@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { ApiRequestError } from '@/lib/api'
 import { reachGoal } from '@/lib/metrika'
 import { authApi, type UserResponse } from './api'
 import { getCaptchaToken } from './captcha'
+import { useWelcome } from './useWelcome'
 
 const ME_KEY = ['me'] as const
 
@@ -59,11 +61,15 @@ export function useRequestCode() {
 
 export function useVerifyCode() {
   const qc = useQueryClient()
+  const welcome = useWelcome()
   return useMutation({
     mutationFn: (vars: { email: string; code: string }) =>
       authApi.verifyCode(vars.email, vars.code),
     onSuccess: ({ newUser }) => {
-      if (newUser) reachGoal('registration')
+      if (newUser) {
+        reachGoal('registration')
+        welcome.show()
+      }
       return refreshMe(qc).catch(() => {
         void qc.invalidateQueries({ queryKey: ME_KEY })
       })
@@ -79,12 +85,21 @@ export function useLogout() {
   })
 }
 
-/** Удаление аккаунта: бэк чистит куки, сбрасываем `['me']`. Навигацию прочь с
- *  защищённого роута делает страница (иначе `RequireAuth` успеет кинуть на /login). */
+/** Удаление аккаунта: бэк чистит куки. Сначала синхронно (`flushSync`) уходим с
+ *  защищённого роута на главную и только потом сбрасываем `['me']` — иначе
+ *  `RequireAuth` успевает кинуть на /login раньше отложенного перехода. */
 export function useDeleteAccount() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   return useMutation({
     mutationFn: () => authApi.deleteAccount(),
-    onSuccess: () => qc.setQueryData(ME_KEY, null),
+    onSuccess: async () => {
+      await navigate('/', {
+        replace: true,
+        flushSync: true,
+        state: { accountDeleted: true },
+      })
+      qc.setQueryData(ME_KEY, null)
+    },
   })
 }

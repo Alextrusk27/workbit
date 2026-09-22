@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -20,9 +19,8 @@ import { formatDate, formatDay } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const DELETE_WARNING =
-  'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. Все ' +
-  'неиспользованные лимиты сгорают без возврата. Восстановить их будет ' +
-  'нельзя.'
+  'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. ' +
+  'Неиспользованные лимиты сгорают.'
 
 export function SettingsPage() {
   usePageTitle('Аккаунт')
@@ -213,15 +211,12 @@ function UsageHistory({ events }: { events: UsageEvent[] }) {
 }
 
 function DeleteAccountSection() {
-  const navigate = useNavigate()
   const del = useDeleteAccount()
   const [confirming, setConfirming] = useState(false)
 
   const onDelete = () => {
     setConfirming(false)
-    del.mutate(undefined, {
-      onSuccess: () => navigate('/', { replace: true }),
-    })
+    del.mutate()
   }
 
   return (

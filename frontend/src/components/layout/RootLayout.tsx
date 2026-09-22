@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { AccountDeletedModal } from '@/components/AccountDeletedModal'
 import { CookieConsent } from '@/components/CookieConsent'
+import { LoginModalProvider } from '@/features/auth/LoginModal'
 import { TopUpModalProvider } from '@/features/billing/TopUpModal'
+import { WelcomeProvider } from '@/features/auth/WelcomeModal'
 import { METRIKA_ID } from '@/lib/metrika'
 
 /** Корневая обёртка над всеми группами роутов: сюда вешаем то, что должно быть
@@ -19,9 +22,14 @@ export function RootLayout() {
   }, [location])
 
   return (
-    <TopUpModalProvider>
-      <Outlet />
-      <CookieConsent />
-    </TopUpModalProvider>
+    <WelcomeProvider>
+      <LoginModalProvider>
+        <TopUpModalProvider>
+          <Outlet />
+          <CookieConsent />
+          <AccountDeletedModal />
+        </TopUpModalProvider>
+      </LoginModalProvider>
+    </WelcomeProvider>
   )
 }

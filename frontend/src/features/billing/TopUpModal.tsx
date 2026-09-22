@@ -4,11 +4,20 @@ import { IconClose } from '@/components/marketing/icons'
 import { TopUpCard } from '@/components/marketing/TopUpCard'
 import { Alert } from '@/components/ui/Alert'
 import { Limits } from '@/components/ui/LimitIcon'
+import {
+  modalOverlayClasses,
+  modalShellClasses,
+} from '@/components/ui/modalStyles'
 import { operations } from '@/content/limits'
 import { useAuth } from '@/features/auth/useAuth'
-import { TopUpModalContext } from '@/features/billing/useTopUpModal'
+import { useLoginModal } from '@/features/auth/useLoginModal'
+import {
+  TopUpModalContext,
+  useTopUpModal,
+} from '@/features/billing/useTopUpModal'
 import { PAYMENT_ID_KEY, useCreatePayment } from '@/features/billing/useBilling'
 import { getErrorMessage } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { motionTokens } from '@/lib/motion'
 import { useModalA11y } from '@/lib/useModalA11y'
 
@@ -50,6 +59,8 @@ function TopUpModal({
   onClose: () => void
 }) {
   const { isAuthenticated } = useAuth()
+  const openLogin = useLoginModal()
+  const openTopUp = useTopUpModal()
   const createPayment = useCreatePayment()
   const [error, setError] = useState<string | null>(null)
   const panelRef = useModalA11y(open)
@@ -75,6 +86,11 @@ function TopUpModal({
     })
   }
 
+  const login = (limits: number) => {
+    onClose()
+    openLogin({ onSuccess: () => openTopUp(limits) })
+  }
+
   return (
     <AnimatePresence>
       {open && (
@@ -83,7 +99,7 @@ function TopUpModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: motionTokens.duration.fast }}
-          className="fixed inset-0 z-100 overflow-y-auto bg-[rgba(6,9,20,0.65)] p-5 backdrop-blur-[6px]"
+          className={cn(modalOverlayClasses, 'overflow-y-auto')}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose()
           }}
@@ -106,11 +122,11 @@ function TopUpModal({
             }}
           >
             {error && <Alert>{error}</Alert>}
-            <div className="bg-pop shadow-chat relative rounded-2xl">
+            <div className={modalShellClasses}>
               <TopUpCard
                 initialLimits={initialLimits}
                 onBuy={isAuthenticated ? buy : undefined}
-                to="/login"
+                onLogin={isAuthenticated ? undefined : login}
                 ctaLabel={
                   isAuthenticated ? undefined : 'Войти, чтобы пополнить'
                 }

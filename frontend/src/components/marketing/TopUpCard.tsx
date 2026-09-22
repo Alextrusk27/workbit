@@ -1,10 +1,10 @@
 import { useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonStyles'
+import { accentCardClasses } from '@/components/ui/cardStyles'
 import { LimitIcon, Limits } from '@/components/ui/LimitIcon'
 import { TOPUP, normalizeLimits, topUp, topUpQuote } from '@/content/limits'
 import { cn } from '@/lib/cn'
-import { limitsWord } from '@/lib/plural'
 
 const DEFAULT_LIMITS = 200
 const DISCOUNT_FROM = TOPUP.tiers[1].from
@@ -44,6 +44,7 @@ function stopLeft(i: number): string {
 
 interface TopUpCardProps {
   onBuy?: (limits: number) => void
+  onLogin?: (limits: number) => void
   to?: string
   initialLimits?: number
   ctaLabel?: string
@@ -55,6 +56,7 @@ interface TopUpCardProps {
 
 export function TopUpCard({
   onBuy,
+  onLogin,
   to = '/login',
   initialLimits = DEFAULT_LIMITS,
   ctaLabel = topUp.cta,
@@ -80,7 +82,8 @@ export function TopUpCard({
   return (
     <div
       className={cn(
-        'border-violet/50 bg-grad-plan shadow-plan relative flex h-full flex-col rounded-2xl border p-8 sm:px-[30px]',
+        accentCardClasses,
+        'relative flex h-full flex-col',
         className,
       )}
     >
@@ -215,14 +218,15 @@ export function TopUpCard({
           disabled={disabled}
           className={buttonClasses({ className: 'mt-6 w-full' })}
         >
-          <span>
-            {ctaLabel}{' '}
-            <span className="max-sm:hidden">
-              {limits} {limitsWord(limits)} —{' '}
-            </span>
-            <span className="sm:hidden">за </span>
-            {rub(quote.amount)} ₽
-          </span>
+          {ctaLabel}
+        </button>
+      ) : onLogin ? (
+        <button
+          type="button"
+          onClick={() => onLogin(limits)}
+          className={buttonClasses({ className: 'mt-6 w-full' })}
+        >
+          {ctaLabel}
         </button>
       ) : (
         <Link to={to} className={buttonClasses({ className: 'mt-6 w-full' })}>

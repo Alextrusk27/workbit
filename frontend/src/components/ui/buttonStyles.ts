@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonVariant =
+  'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-solid'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 const base =
@@ -15,6 +16,7 @@ const variants: Record<ButtonVariant, string> = {
     'border border-line bg-glass text-ink hover:bg-glass-hover hover:border-glass-line',
   ghost: 'bg-transparent text-muted hover:bg-glass hover:text-ink',
   danger: 'border border-danger/40 text-danger hover:bg-danger/8',
+  'danger-solid': 'bg-grad-danger text-white hover:-translate-y-px',
 }
 
 const sizes: Record<ButtonSize, string> = {
@@ -24,7 +26,9 @@ const sizes: Record<ButtonSize, string> = {
 }
 
 /** Классы кнопки без элемента — чтобы одинаково оформлять `<button>` и ссылки
- *  (`<Link>`): кнопка внутри ссылки — невалидный HTML. */
+ *  (`<Link>`): кнопка внутри ссылки — невалидный HTML. Новый вид кнопки — только
+ *  новый вариант здесь: `cn` классы не сливает, и `bg-*`/`shadow-*` из
+ *  `className` проигрывают варианту по порядку CSS, а не по порядку классов. */
 export function buttonClasses({
   variant = 'primary',
   size = 'md',

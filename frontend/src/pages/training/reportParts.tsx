@@ -58,7 +58,7 @@ function LockIcon() {
 }
 
 const REFERENCE_LINK_CLASS =
-  'text-dim hover:text-ink focus-visible:outline-indigo mt-4 rounded-sm text-[13px] underline underline-offset-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2'
+  'text-dim hover:text-ink focus-visible:outline-indigo mt-4 rounded-sm text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2'
 
 /** Эталонный ответ по кнопке: до первого клика запрос не уходит, дальше
  *  ответ живёт в кэше — у сгенерированного вопроса его пишет LLM.
@@ -96,7 +96,7 @@ export function ReferenceAnswer({
           type="button"
           onClick={() => openTopUp()}
           title="Доступно после первого пополнения"
-          className={`${REFERENCE_LINK_CLASS} inline-flex items-center gap-1.5`}
+          className={`${REFERENCE_LINK_CLASS} inline-flex items-center gap-1.5 underline underline-offset-4`}
         >
           <LockIcon />
           Эталонный ответ
@@ -109,7 +109,9 @@ export function ReferenceAnswer({
         onClick={() => setOpen(true)}
         className={REFERENCE_LINK_CLASS}
       >
-        Посмотреть эталонный ответ
+        <span className="underline underline-offset-4">
+          Посмотреть эталонный ответ
+        </span>
         {!isUnlocked && balance?.paid && (
           <>
             {' · '}

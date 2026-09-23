@@ -180,7 +180,9 @@ function LoginForm({
   if (requestCode.isSuccess) {
     return (
       <>
-        <h2 className="text-ink pr-9 text-[22px] font-bold">Введи код</h2>
+        <h2 className="text-ink pr-9 text-[20px] font-bold sm:text-[22px]">
+          Введи код
+        </h2>
         <p className="text-muted mt-3 text-[15px] leading-relaxed break-words">
           Мы отправили код на <span className="text-ink">{email}</span>.
         </p>
@@ -191,7 +193,9 @@ function LoginForm({
 
   return (
     <>
-      <h2 className="text-ink pr-9 text-[22px] font-bold">Войти</h2>
+      <h2 className="text-ink pr-9 text-[20px] font-bold sm:text-[22px]">
+        Войти
+      </h2>
       <form onSubmit={onSubmit} className="mt-6 space-y-5">
         {requestCode.isError && (
           <Alert>{authErrorMessage(requestCode.error)}</Alert>

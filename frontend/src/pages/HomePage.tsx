@@ -99,11 +99,11 @@ export function HomePage() {
     <>
       <header className="glow-hero relative overflow-hidden pt-10 pb-12 sm:pt-24 sm:pb-20">
         <Container className="relative grid grid-cols-[minmax(0,1fr)] items-center gap-9 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
-          <div>
+          <div className="max-sm:text-center">
             <h1 className="text-ink text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
               <HeroTitle hero={hero} />
             </h1>
-            <p className="text-muted mt-5.5 max-w-[48ch] text-lg">
+            <p className="text-muted mt-5.5 max-w-[48ch] text-lg max-sm:mx-auto">
               {inline(hero.text)}
             </p>
             <div className="mt-8">
@@ -389,11 +389,11 @@ export function HomePage() {
         <Container>
           <Reveal>
             <div className="border-line bg-card grid grid-cols-[minmax(0,1fr)] items-center gap-9 rounded-[20px] border px-6 py-8 sm:px-12 sm:py-11 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-12">
-              <div>
+              <div className="max-sm:text-center">
                 <h2 className="text-ink text-[clamp(26px,3vw,32px)]">
                   {trainer.title}
                 </h2>
-                <p className="text-muted mt-3 max-w-[52ch] text-base">
+                <p className="text-muted mt-3 max-w-[52ch] text-base max-sm:mx-auto">
                   {inline(trainer.body)}
                 </p>
                 <div className="mt-6">

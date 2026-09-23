@@ -46,7 +46,7 @@ export function TrainingListPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app', label: 'Рабочий стол' }}
+        back={{ to: '/', label: 'Главная' }}
         eyebrow="Тренажёр"
         title="Мои тренировки"
         actions={
@@ -54,7 +54,14 @@ export function TrainingListPage() {
             Новая тренировка
           </Link>
         }
-      />
+      >
+        <Link
+          to="/skills-trainer"
+          className="text-indigo hover:text-violet text-sm transition-colors"
+        >
+          Как это работает →
+        </Link>
+      </AppPageHeader>
 
       <div className="mt-8">
         {isLoading && <SessionListSkeleton />}

@@ -28,19 +28,20 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
+              { index: true, element: <Navigate to="interview" replace /> },
               {
-                index: true,
+                path: 'balance',
                 lazy: async () => ({
-                  Component: (await import('@/pages/HubPage')).HubPage,
+                  Component: (await import('@/pages/BalancePage')).BalancePage,
                 }),
               },
               {
                 path: 'billing/success',
-                element: <Navigate to="/app?payment=ok" replace />,
+                element: <Navigate to="/app/balance?payment=ok" replace />,
               },
               {
                 path: 'billing/fail',
-                element: <Navigate to="/app?payment=fail" replace />,
+                element: <Navigate to="/app/balance?payment=fail" replace />,
               },
               {
                 path: 'settings',

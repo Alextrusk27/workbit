@@ -6,6 +6,7 @@ import { Container } from '@/components/ui/Container'
 import { Logo } from '@/components/ui/Logo'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { HeaderBalance } from '@/components/layout/HeaderBalance'
 import { UserMenu } from '@/components/layout/UserMenu'
 import { useAuth } from '@/features/auth/useAuth'
 import { useTopUpModal } from '@/features/billing/useTopUpModal'
@@ -53,7 +54,7 @@ export function Header() {
             className="shrink-0 rounded-sm"
             aria-label="Workbit — на главную"
           >
-            <Logo />
+            <Logo className="max-sm:text-[22px]" />
           </Link>
 
           <nav
@@ -69,13 +70,15 @@ export function Header() {
                 {l.label}
               </NavLink>
             ))}
-            <button
-              type="button"
-              onClick={() => openTopUp()}
-              className={navLinkClass()}
-            >
-              Цены
-            </button>
+            {!isAuthenticated && (
+              <button
+                type="button"
+                onClick={() => openTopUp()}
+                className={navLinkClass()}
+              >
+                Цены
+              </button>
+            )}
           </nav>
 
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
@@ -83,7 +86,10 @@ export function Header() {
             {isLoading ? (
               <Skeleton className="h-7 w-[110px] rounded-md" />
             ) : isAuthenticated ? (
-              <UserMenu />
+              <>
+                <HeaderBalance />
+                <UserMenu />
+              </>
             ) : (
               <Link to="/login" className={buttonClasses({ size: 'sm' })}>
                 Войти
@@ -97,23 +103,23 @@ export function Header() {
               aria-controls="mobile-nav"
               onClick={() => setOpen((v) => !v)}
             >
-              <span aria-hidden className="relative block h-4 w-5">
+              <span aria-hidden className="relative block h-[18px] w-6">
                 <span
                   className={cn(
-                    'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
-                    open ? 'top-1.5 rotate-45' : 'top-0',
+                    'bg-ink absolute left-0 block h-0.5 w-6 transition-transform duration-200',
+                    open ? 'top-2 rotate-45' : 'top-0',
                   )}
                 />
                 <span
                   className={cn(
-                    'bg-ink absolute top-1.5 left-0 block h-0.5 w-5 transition-opacity duration-200',
+                    'bg-ink absolute top-2 left-0 block h-0.5 w-6 transition-opacity duration-200',
                     open && 'opacity-0',
                   )}
                 />
                 <span
                   className={cn(
-                    'bg-ink absolute left-0 block h-0.5 w-5 transition-transform duration-200',
-                    open ? 'top-1.5 -rotate-45' : 'top-3',
+                    'bg-ink absolute left-0 block h-0.5 w-6 transition-transform duration-200',
+                    open ? 'top-2 -rotate-45' : 'top-4',
                   )}
                 />
               </span>
@@ -154,33 +160,37 @@ export function Header() {
                     </Link>
                   </li>
                 ))}
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false)
-                      openTopUp()
-                    }}
-                    className="text-ink block w-full py-3 text-left text-base"
-                  >
-                    Цены
-                  </button>
-                </li>
-                <li className="py-3">
-                  {isLoading ? (
-                    <Skeleton className="h-11 w-full rounded-lg" />
-                  ) : (
-                    <Link
-                      to={isAuthenticated ? '/app' : '/login'}
-                      className={buttonClasses({
-                        variant: 'secondary',
-                        className: 'w-full',
-                      })}
-                    >
-                      {isAuthenticated ? 'Рабочий стол' : 'Войти'}
-                    </Link>
-                  )}
-                </li>
+                {!isAuthenticated && (
+                  <>
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpen(false)
+                          openTopUp()
+                        }}
+                        className="text-ink block w-full py-3 text-left text-base"
+                      >
+                        Цены
+                      </button>
+                    </li>
+                    <li className="py-3">
+                      {isLoading ? (
+                        <Skeleton className="h-11 w-full rounded-lg" />
+                      ) : (
+                        <Link
+                          to="/login"
+                          className={buttonClasses({
+                            variant: 'secondary',
+                            className: 'w-full',
+                          })}
+                        >
+                          Войти
+                        </Link>
+                      )}
+                    </li>
+                  </>
+                )}
               </ul>
             </Container>
           </motion.nav>

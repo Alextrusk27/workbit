@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { IconRole } from '@/components/marketing/icons'
 import { useAuth, useLogout } from '@/features/auth/useAuth'
 import { motionTokens, springs } from '@/lib/motion'
 
@@ -41,32 +42,23 @@ export function UserMenu() {
   }
 
   return (
-    <div ref={ref} className="relative max-w-[50vw] min-w-0 sm:max-w-55">
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="text-muted hover:bg-glass hover:text-ink flex max-w-full touch-manipulation items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors"
+        aria-label="Меню пользователя"
+        className="text-muted hover:bg-glass hover:text-ink border-line flex size-10 touch-manipulation items-center justify-center rounded-full border transition-colors sm:size-9"
       >
-        <span className="min-w-0 truncate">{user.email}</span>
-        <svg
-          viewBox="0 0 12 12"
-          className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" />
-        </svg>
+        <IconRole className="size-[22px] sm:size-[18px]" />
       </button>
 
       <AnimatePresence>
         {open && (
           <motion.div
             key="user-menu"
-            className="border-line bg-pop shadow-pop absolute right-0 z-50 mt-2 w-50 rounded-lg border p-1.5"
+            className="border-line bg-pop shadow-pop absolute right-0 z-50 mt-2 w-56 rounded-lg border p-1.5"
             initial={
               reduce
                 ? { opacity: 0 }
@@ -80,19 +72,30 @@ export function UserMenu() {
             }
             transition={springs.instant}
           >
+            <p className="text-dim truncate px-3 pt-1.5 pb-2 text-xs">
+              {user.email}
+            </p>
             <Link
-              to="/app"
+              to="/app/interview"
               onClick={() => setOpen(false)}
               className={itemClass}
             >
-              Рабочий стол
+              Мои интервью
             </Link>
+            <Link
+              to="/app/training"
+              onClick={() => setOpen(false)}
+              className={itemClass}
+            >
+              Мои тренировки
+            </Link>
+            <div className="border-divider my-1.5 border-t" />
             <Link
               to="/app/settings"
               onClick={() => setOpen(false)}
               className={itemClass}
             >
-              Аккаунт
+              Настройки
             </Link>
             <button
               type="button"

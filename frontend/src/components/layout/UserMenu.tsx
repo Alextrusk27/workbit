@@ -1,72 +1,76 @@
-import { useEffect, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import {
+  IconChat,
+  IconChevronRight,
+  IconLogout,
+  IconPencil,
+  IconUser,
+  IconSettings,
+} from '@/components/marketing/icons'
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch'
 import { useAuth, useLogout } from '@/features/auth/useAuth'
+import { cn } from '@/lib/cn'
 import { motionTokens, springs } from '@/lib/motion'
 
-const itemClass =
-  'text-ink hover:bg-glass block w-full rounded-sm px-3 py-2.5 text-left text-sm transition-colors'
+const rowClass =
+  'text-ink hover:bg-glass flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] transition-colors lg:min-h-10 lg:text-sm'
 
-export function UserMenu() {
+const links: {
+  to: string
+  label: string
+  Icon: ComponentType<{ className?: string }>
+}[] = [
+  { to: '/app/interview', label: 'Мои интервью', Icon: IconChat },
+  { to: '/app/training', label: 'Мои тренировки', Icon: IconPencil },
+  { to: '/app/settings', label: 'Настройки', Icon: IconSettings },
+]
+
+interface UserMenuProps {
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+}
+
+export function UserMenu({ open, onToggle, onClose }: UserMenuProps) {
   const { user } = useAuth()
   const logout = useLogout()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
-
-  useEffect(() => {
-    if (!open) return
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
 
   if (!user) return null
 
   // Навигация ДО logout: сброс ['me'] иначе перекинет RequireAuth на /login.
   const onLogout = () => {
-    setOpen(false)
+    onClose()
     navigate('/', { replace: true })
     logout.mutate()
   }
 
   return (
-    <div ref={ref} className="relative max-w-[50vw] min-w-0 sm:max-w-55">
+    <div className="shrink-0 lg:relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={onToggle}
         aria-haspopup="true"
         aria-expanded={open}
-        className="text-muted hover:bg-glass hover:text-ink flex max-w-full touch-manipulation items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors"
+        aria-controls="user-menu"
+        aria-label="Меню пользователя"
+        className={cn(
+          'avatar flex size-11 touch-manipulation items-center justify-center rounded-full transition hover:brightness-110 sm:size-9',
+          open && 'ring-violet/35 ring-4',
+        )}
       >
-        <span className="min-w-0 truncate">{user.email}</span>
-        <svg
-          viewBox="0 0 12 12"
-          className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" />
-        </svg>
+        <IconUser className="size-5 sm:size-4" />
       </button>
 
       <AnimatePresence>
         {open && (
           <motion.div
             key="user-menu"
-            className="border-line bg-pop shadow-pop absolute right-0 z-50 mt-2 w-50 rounded-lg border p-1.5"
+            id="user-menu"
+            className="border-line bg-pop shadow-pop absolute inset-x-0 top-full z-50 mt-2 rounded-2xl border p-2 lg:inset-x-auto lg:right-0 lg:w-72"
             initial={
               reduce
                 ? { opacity: 0 }
@@ -80,28 +84,36 @@ export function UserMenu() {
             }
             transition={springs.instant}
           >
-            <Link
-              to="/app"
-              onClick={() => setOpen(false)}
-              className={itemClass}
-            >
-              Рабочий стол
-            </Link>
-            <Link
-              to="/app/settings"
-              onClick={() => setOpen(false)}
-              className={itemClass}
-            >
-              Аккаунт
-            </Link>
+            <div className="flex items-center gap-3 px-3 pt-2 pb-3">
+              <span className="avatar flex size-10 shrink-0 items-center justify-center rounded-full">
+                <IconUser className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="text-dim block text-xs">Ты вошёл как</span>
+                <span className="text-ink block truncate text-sm font-medium">
+                  {user.email}
+                </span>
+              </span>
+            </div>
+
+            {links.map(({ to, label, Icon }) => (
+              <Link key={to} to={to} onClick={onClose} className={rowClass}>
+                <Icon className="text-muted size-5 shrink-0" />
+                <span className="flex-1">{label}</span>
+                <IconChevronRight className="text-dim size-4 shrink-0" />
+              </Link>
+            ))}
             <button
               type="button"
               onClick={onLogout}
               disabled={logout.isPending}
-              className={`${itemClass} disabled:opacity-50`}
+              className={cn(rowClass, 'disabled:opacity-50')}
             >
+              <IconLogout className="text-muted size-5 shrink-0" />
               {logout.isPending ? 'Выходим…' : 'Выйти'}
             </button>
+
+            <ThemeSwitch className="mt-2" />
           </motion.div>
         )}
       </AnimatePresence>

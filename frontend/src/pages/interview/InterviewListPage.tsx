@@ -52,7 +52,7 @@ export function InterviewListPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app', label: 'Рабочий стол' }}
+        back={{ to: '/', label: 'Главная' }}
         eyebrow="Интервью"
         title="Мои интервью"
         actions={
@@ -60,7 +60,14 @@ export function InterviewListPage() {
             Новое интервью
           </Link>
         }
-      />
+      >
+        <Link
+          to="/ai-interview"
+          className="text-indigo hover:text-violet -my-3 inline-block py-3 text-sm transition-colors"
+        >
+          Как это работает →
+        </Link>
+      </AppPageHeader>
 
       <div className="mt-8">
         {isLoading && <VacancyListSkeleton />}

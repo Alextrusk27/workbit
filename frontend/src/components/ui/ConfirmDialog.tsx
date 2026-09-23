@@ -15,17 +15,20 @@ interface ConfirmDialogProps {
   title: string
   text: string
   confirmLabel?: ReactNode
+  confirmVariant?: 'danger-solid' | 'primary'
   onConfirm: () => void
   onClose: () => void
 }
 
-/** Модалка подтверждения опасного действия: стеклянный блюр-фон, «Отмена» и
- *  красная градиентная кнопка. Замена нативного confirm(). */
+/** Модалка подтверждения действия: стеклянный блюр-фон, «Отмена» и кнопка
+ *  подтверждения — красная для удаления, фиолетовая для прочего. Замена
+ *  нативного confirm(). */
 export function ConfirmDialog({
   open,
   title,
   text,
   confirmLabel = 'Удалить',
+  confirmVariant = 'danger-solid',
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -74,7 +77,7 @@ export function ConfirmDialog({
             <p className="text-dim mt-2.5 text-[13.5px] leading-[1.55]">
               {text}
             </p>
-            <div className="mt-[22px] flex justify-end gap-2.5">
+            <div className="mt-[22px] flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 autoFocus
@@ -87,7 +90,7 @@ export function ConfirmDialog({
                 type="button"
                 onClick={onConfirm}
                 className={buttonClasses({
-                  variant: 'danger-solid',
+                  variant: confirmVariant,
                   size: 'sm',
                 })}
               >

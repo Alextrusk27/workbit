@@ -148,17 +148,21 @@ function CreditedSummary({ footnote }: { footnote?: ReactNode }) {
           {credits.map((credit) => (
             <div
               key={credit.key}
-              className="bg-glass border-line flex justify-between rounded-lg border px-4 py-2.5"
+              className="bg-glass border-line flex justify-between gap-4 rounded-lg border px-4 py-2.5"
             >
-              <span className="text-ink text-sm">{credit.name}</span>
-              <span className="text-ok text-sm font-semibold tabular-nums">
+              <span className="text-ink min-w-0 text-left text-sm">
+                {credit.name}
+              </span>
+              <span className="text-ok shrink-0 text-sm font-semibold tabular-nums">
                 +{credit.delta}
               </span>
             </div>
           ))}
         </div>
       )}
-      {footnote && <p className="text-dim mt-3.5 text-[12.5px]">{footnote}</p>}
+      {footnote && (
+        <p className="text-dim mt-3.5 text-[12.5px] break-words">{footnote}</p>
+      )}
     </>
   )
 }

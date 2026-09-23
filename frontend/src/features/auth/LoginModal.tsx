@@ -181,7 +181,7 @@ function LoginForm({
     return (
       <>
         <h2 className="text-ink pr-9 text-[22px] font-bold">Введи код</h2>
-        <p className="text-muted mt-3 text-[15px] leading-relaxed">
+        <p className="text-muted mt-3 text-[15px] leading-relaxed break-words">
           Мы отправили код на <span className="text-ink">{email}</span>.
         </p>
         <CodeForm email={email} onSuccess={onLoggedIn} />

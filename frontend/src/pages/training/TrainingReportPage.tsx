@@ -136,7 +136,7 @@ export function TrainingReportPage() {
       <ConfirmDialog
         open={confirming}
         title="Пройти заново?"
-        text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты. Действие необратимо."
+        text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты."
         confirmLabel={
           <>
             Пройти заново · <Limits value={OPERATION_COST.training} />

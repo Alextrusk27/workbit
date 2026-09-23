@@ -237,14 +237,14 @@ export function TopUpCard({
       )}
 
       <p className="text-dim mt-3 text-[13px] leading-relaxed">
-        Условия оплаты определяет{' '}
+        Условия оплаты в{' '}
         <Link
           to="/offer"
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted hover:text-ink whitespace-nowrap underline underline-offset-2"
         >
-          Публичная оферта
+          Публичной оферте
         </Link>
         .
       </p>

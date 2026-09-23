@@ -34,7 +34,7 @@ function latestCreditBatch(events: UsageEvent[] | undefined): UsageEvent[] {
 function toCreditRows(batch: UsageEvent[]) {
   return [...batch].reverse().map((event) => ({
     key: event.label,
-    name: event.label,
+    name: event.operation === 'TOPUP' ? 'Пополнение лимитов' : event.label,
     delta: event.delta,
   }))
 }

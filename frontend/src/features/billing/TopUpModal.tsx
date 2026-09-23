@@ -146,7 +146,7 @@ function TopUpModal({
                   ))}
                 </ul>
                 <p className="text-dim mt-3 text-[12.5px]">
-                  Лимиты действуют 3 месяца с момента последней покупки.
+                  Лимиты действуют 3 месяца.
                 </p>
               </TopUpCard>
               <button

@@ -255,7 +255,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
       <ConfirmDialog
         open={confirming === 'delete'}
         title="Удалить тренировку?"
-        text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором. Действие необратимо.`}
+        text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором.`}
         onConfirm={onDelete}
         onClose={() => setConfirming(null)}
       />
@@ -263,7 +263,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
       <ConfirmDialog
         open={confirming === 'restart'}
         title="Пройти заново?"
-        text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты. Действие необратимо.`}
+        text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты.`}
         confirmLabel={
           <>
             Пройти заново · <Limits value={OPERATION_COST.training} />

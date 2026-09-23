@@ -1,6 +1,6 @@
 package ru.workbit.billing.service;
 
-import java.io.StringReader;
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +21,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
 import ru.workbit.billing.config.RobokassaProperties;
 import ru.workbit.billing.model.Payment;
 import tools.jackson.databind.ObjectMapper;
@@ -97,14 +96,14 @@ public class RobokassaService implements PaymentProvider {
         String signature = sha256Hex(String.join(":",
                 properties.merchantLogin(), invId, properties.password2()));
         try {
-            String xml = robokassaRestClient.get()
+            byte[] xml = robokassaRestClient.get()
                     .uri(builder -> builder
                             .queryParam("MerchantLogin", properties.merchantLogin())
                             .queryParam("InvoiceID", invId)
                             .queryParam("Signature", signature)
                             .build())
                     .retrieve()
-                    .body(String.class);
+                    .body(byte[].class);
             return isPaidState(xml, payment.getInvId());
         } catch (RestClientException e) {
             log.warn("Robokassa state request failed for invId {}", payment.getInvId(), e);
@@ -112,7 +111,7 @@ public class RobokassaService implements PaymentProvider {
         }
     }
 
-    private static boolean isPaidState(String xml, int invId) {
+    private static boolean isPaidState(byte[] xml, int invId) {
         Document document = parseXml(xml, invId);
         if (document == null) {
             return false;
@@ -126,12 +125,12 @@ public class RobokassaService implements PaymentProvider {
         return STATE_PAID.equals(code(document, "State"));
     }
 
-    private static Document parseXml(String xml, int invId) {
+    private static Document parseXml(byte[] xml, int invId) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            return factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+            return factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
         } catch (Exception e) {
             log.warn("Unreadable Robokassa state response for invId {}", invId, e);
             return null;

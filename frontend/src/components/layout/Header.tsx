@@ -64,13 +64,13 @@ export function Header() {
       style={{ backgroundColor: 'var(--nav-bg)' }}
     >
       <Container>
-        <div className="relative flex h-17 items-center gap-4 sm:gap-8">
+        <div className="relative flex h-17 items-center gap-3 sm:gap-8">
           <Link
             to="/"
             className="shrink-0 rounded-sm"
             aria-label="Workbit — на главную"
           >
-            <Logo className="max-sm:text-[22px]" />
+            <Logo className="max-sm:text-[22px] min-[360px]:max-sm:text-[24px]" />
           </Link>
 
           <nav
@@ -97,7 +97,7 @@ export function Header() {
             )}
           </nav>
 
-          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-3">
             <ThemeToggle className="shrink-0 max-sm:hidden" />
             {isLoading ? (
               <Skeleton className="h-7 w-[110px] rounded-md" />

@@ -2,11 +2,14 @@ package ru.workbit.billing.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -23,6 +26,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriBuilder;
@@ -331,7 +336,7 @@ class RobokassaServiceTest {
             when(restClient.get()).thenReturn(uriSpec);
             when(uriSpec.uri(any(Function.class))).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.body(String.class)).thenReturn(xml);
+            when(responseSpec.body(byte[].class)).thenReturn(xml.getBytes(StandardCharsets.UTF_8));
             return uriSpec;
         }
 
@@ -343,7 +348,7 @@ class RobokassaServiceTest {
             when(restClient.get()).thenReturn(uriSpec);
             when(uriSpec.uri(any(Function.class))).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.body(String.class)).thenThrow(exception);
+            when(responseSpec.body(byte[].class)).thenThrow(exception);
         }
 
         @SuppressWarnings("unchecked")
@@ -433,6 +438,22 @@ class RobokassaServiceTest {
 
             // when / then
             assertThat(service.isPaid(aPayment())).isFalse();
+        }
+
+        @Test
+        @DisplayName("Ответ с UTF-8 BOM в начале (как отдаёт Робокасса) — читается, оплата распознаётся")
+        void handlesUtf8BomInResponseBody() {
+            // given
+            RestClient.Builder builder = RestClient.builder().baseUrl(STATE_URL);
+            MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+            byte[] bytes = ("\uFEFF" + PAID_XML).getBytes(StandardCharsets.UTF_8);
+            server.expect(requestTo(startsWith(STATE_URL)))
+                    .andRespond(withSuccess(bytes, MediaType.TEXT_XML));
+            RobokassaService bomService = aService(false, builder.build());
+
+            // when / then
+            assertThat(bomService.isPaid(aPayment())).isTrue();
+            server.verify();
         }
     }
 }

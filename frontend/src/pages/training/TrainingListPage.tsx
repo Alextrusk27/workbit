@@ -46,7 +46,7 @@ export function TrainingListPage() {
   return (
     <Container>
       <AppPageHeader
-        back={{ to: '/app', label: 'Рабочий стол' }}
+        back={{ to: '/', label: 'Главная' }}
         eyebrow="Тренажёр"
         title="Мои тренировки"
         actions={
@@ -54,7 +54,14 @@ export function TrainingListPage() {
             Новая тренировка
           </Link>
         }
-      />
+      >
+        <Link
+          to="/skills-trainer"
+          className="text-indigo hover:text-violet -my-3 inline-block py-3 text-sm transition-colors"
+        >
+          Как это работает →
+        </Link>
+      </AppPageHeader>
 
       <div className="mt-8">
         {isLoading && <SessionListSkeleton />}
@@ -255,7 +262,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
       <ConfirmDialog
         open={confirming === 'delete'}
         title="Удалить тренировку?"
-        text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором. Действие необратимо.`}
+        text={`Тренировка «${sessionHeadline(session)}» будет удалена вместе с разбором.`}
         onConfirm={onDelete}
         onClose={() => setConfirming(null)}
       />
@@ -263,12 +270,13 @@ function SessionCard({ session }: { session: TrainingSession }) {
       <ConfirmDialog
         open={confirming === 'restart'}
         title="Пройти заново?"
-        text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты. Действие необратимо.`}
+        text={`Тренировка «${sessionHeadline(session)}» начнётся с теми же вопросами, а прошлые ответы и разбор будут стёрты.`}
         confirmLabel={
           <>
             Пройти заново · <Limits value={OPERATION_COST.training} />
           </>
         }
+        confirmVariant="primary"
         onConfirm={onRestart}
         onClose={() => setConfirming(null)}
       />

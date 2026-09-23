@@ -287,9 +287,7 @@ function ChatMessages({ item, items }: { item: LiveItem; items: LiveItem[] }) {
     <>
       <ChatBubble
         role="bot"
-        who={
-          item.q.followUp ? 'Уточняющий вопрос' : `Вопрос ${item.q.orderIndex}`
-        }
+        who={item.q.followUp ? undefined : `Вопрос ${item.q.orderIndex}`}
         quote={
           item.q.followUp && previousAnswer
             ? { name: 'Ты', text: previousAnswer }
@@ -299,9 +297,7 @@ function ChatMessages({ item, items }: { item: LiveItem; items: LiveItem[] }) {
         {item.q.questionText}
       </ChatBubble>
       {item.answer !== null && (
-        <ChatBubble role="user" who="Ты">
-          {item.answer}
-        </ChatBubble>
+        <ChatBubble role="user">{item.answer}</ChatBubble>
       )}
     </>
   )

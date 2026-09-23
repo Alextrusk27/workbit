@@ -87,7 +87,7 @@ export function TrainingReportPage() {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-ink text-[21px] font-bold tracking-[-0.015em]">
+        <h2 className="text-ink text-lg font-bold tracking-[-0.015em] sm:text-[21px]">
           Ответы с пометками
         </h2>
         <ol className="mt-6">
@@ -136,12 +136,13 @@ export function TrainingReportPage() {
       <ConfirmDialog
         open={confirming}
         title="Пройти заново?"
-        text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты. Действие необратимо."
+        text="Вопросы останутся те же, а твои ответы и этот разбор будут стёрты."
         confirmLabel={
           <>
             Пройти заново · <Limits value={OPERATION_COST.training} />
           </>
         }
+        confirmVariant="primary"
         onConfirm={onRestart}
         onClose={() => setConfirming(false)}
       />

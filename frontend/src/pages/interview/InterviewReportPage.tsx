@@ -88,7 +88,7 @@ export function InterviewReportPage() {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-ink text-[21px] font-bold tracking-[-0.015em]">
+        <h2 className="text-ink text-lg font-bold tracking-[-0.015em] sm:text-[21px]">
           Ответы с пометками
         </h2>
         <ol className="mt-6">

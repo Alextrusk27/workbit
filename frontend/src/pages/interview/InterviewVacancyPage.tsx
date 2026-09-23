@@ -175,7 +175,7 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <Eyebrow>Интервью · Вакансия</Eyebrow>
-          <h1 className="text-ink mt-2.5 text-[clamp(28px,3.6vw,38px)] font-extrabold break-words">
+          <h1 className="text-ink mt-2.5 text-[24px] font-extrabold break-words sm:text-[clamp(28px,3.6vw,38px)]">
             {detail.vacancyName}
           </h1>
           <div className="text-dim mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px]">

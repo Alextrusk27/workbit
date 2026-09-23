@@ -25,7 +25,7 @@ export function AppPageHeader({
       {back && (
         <Link
           to={back.to}
-          className="text-indigo hover:text-violet mb-7 inline-block text-sm transition-colors"
+          className="text-indigo hover:text-violet -mt-3 mb-4 inline-block py-3 text-sm transition-colors"
         >
           ← {back.label}
         </Link>
@@ -35,7 +35,7 @@ export function AppPageHeader({
           {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <h1
             className={cn(
-              'text-ink text-[clamp(28px,3.6vw,38px)] font-extrabold',
+              'text-ink text-[24px] font-extrabold sm:text-[clamp(28px,3.6vw,38px)]',
               eyebrow && 'mt-2.5',
             )}
           >

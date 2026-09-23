@@ -57,6 +57,10 @@
     color-scheme: light;
     --grad-brand: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #0891b2);
     --grad-btn: linear-gradient(135deg, #6366f1, #8b5cf6);
+    --avatar-bg: var(--grad-btn);
+    --avatar-border: transparent;
+    --avatar-fg: #fff;
+    --avatar-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
     --grad-danger: linear-gradient(135deg, #f87171, #ef4444);
     --grad-plan: linear-gradient(
       180deg,
@@ -94,6 +98,13 @@
     --color-danger: #f87171;
 
     --grad-brand: linear-gradient(135deg, #818cf8, #a78bfa 55%, #67e8f9);
+    --avatar-bg: linear-gradient(
+      rgba(129, 140, 248, 0.1),
+      rgba(129, 140, 248, 0.1)
+    );
+    --avatar-border: rgba(167, 139, 250, 0.55);
+    --avatar-fg: var(--color-violet);
+    --avatar-shadow: none;
     --grad-plan: linear-gradient(
       180deg,
       rgba(139, 92, 246, 0.08),
@@ -167,6 +178,13 @@
 
 @utility bg-grad {
   background-image: var(--grad-btn);
+}
+
+@utility avatar {
+  background-image: var(--avatar-bg);
+  border: 1.5px solid var(--avatar-border);
+  color: var(--avatar-fg);
+  box-shadow: var(--avatar-shadow);
 }
 
 @utility bg-grad-plan {

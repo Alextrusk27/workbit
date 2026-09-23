@@ -87,9 +87,11 @@ export function TopUpCard({
         className,
       )}
     >
-      <Heading className="text-ink text-[22px] font-bold">{topUp.name}</Heading>
+      <Heading className="text-ink pr-9 text-[20px] font-bold sm:text-[22px]">
+        {topUp.name}
+      </Heading>
 
-      <div className="mt-5 flex items-end justify-between gap-x-4 sm:gap-x-6">
+      <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] items-end gap-x-4 sm:flex sm:justify-between sm:gap-x-6">
         <div>
           <label
             htmlFor={inputId}
@@ -124,13 +126,13 @@ export function TopUpCard({
           </div>
         </div>
 
-        <div className="min-w-0 text-right">
-          <p className="text-ink text-[28px] leading-none font-extrabold tracking-[-0.03em] tabular-nums sm:text-[36px]">
+        <div className="contents sm:block sm:min-w-0 sm:text-right">
+          <p className="text-ink min-w-0 text-right text-[28px] leading-none font-extrabold tracking-[-0.03em] tabular-nums sm:text-[36px]">
             {rub(quote.amount)} ₽
           </p>
           <p
             className={cn(
-              'text-muted mt-2 flex items-center justify-end gap-2 text-[13.5px] whitespace-nowrap tabular-nums',
+              'text-muted col-span-2 mt-2 flex items-center justify-end gap-2 text-[13.5px] whitespace-nowrap tabular-nums',
               quote.saving === 0 && 'invisible',
             )}
           >
@@ -235,14 +237,14 @@ export function TopUpCard({
       )}
 
       <p className="text-dim mt-3 text-[13px] leading-relaxed">
-        Условия оплаты определяет{' '}
+        Условия оплаты в{' '}
         <Link
           to="/offer"
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted hover:text-ink whitespace-nowrap underline underline-offset-2"
         >
-          Публичная оферта
+          Публичной оферте
         </Link>
         .
       </p>

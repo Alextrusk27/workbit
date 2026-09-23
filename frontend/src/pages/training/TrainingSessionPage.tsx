@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DictationHints } from '@/components/speech/DictationHints'
 import { MicButton } from '@/components/speech/MicButton'
 import { Alert } from '@/components/ui/Alert'
@@ -182,6 +182,13 @@ function SessionRun({ session }: { session: TrainingSession }) {
 
   return (
     <Container>
+      <Link
+        to="/app/training"
+        className="text-indigo hover:text-violet -mt-3 mb-4 inline-block py-3 text-sm transition-colors"
+      >
+        ← Тренажёр
+      </Link>
+
       <div className="flex items-baseline justify-between gap-4">
         <Eyebrow>{session.skill}</Eyebrow>
         <p

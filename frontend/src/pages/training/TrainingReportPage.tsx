@@ -142,6 +142,7 @@ export function TrainingReportPage() {
             Пройти заново · <Limits value={OPERATION_COST.training} />
           </>
         }
+        confirmVariant="primary"
         onConfirm={onRestart}
         onClose={() => setConfirming(false)}
       />

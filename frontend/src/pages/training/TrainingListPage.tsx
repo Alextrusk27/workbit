@@ -269,6 +269,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
             Пройти заново · <Limits value={OPERATION_COST.training} />
           </>
         }
+        confirmVariant="primary"
         onConfirm={onRestart}
         onClose={() => setConfirming(null)}
       />

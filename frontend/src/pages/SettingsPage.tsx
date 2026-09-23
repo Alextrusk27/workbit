@@ -4,6 +4,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch'
 import { useAuth, useDeleteAccount } from '@/features/auth/useAuth'
 import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -25,6 +26,14 @@ export function SettingsPage() {
           </span>
         )}
       </AppPageHeader>
+
+      <section className="mt-10">
+        <h2 className="text-ink text-[21px] font-bold">Оформление</h2>
+        <p className="text-muted mt-2 text-sm">
+          Тема сохраняется в этом браузере.
+        </p>
+        <ThemeSwitch className="mt-5 max-w-80" />
+      </section>
 
       <div className="mt-10">
         <DeleteAccountSection />

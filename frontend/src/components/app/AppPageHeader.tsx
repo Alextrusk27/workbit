@@ -25,7 +25,7 @@ export function AppPageHeader({
       {back && (
         <Link
           to={back.to}
-          className="text-indigo hover:text-violet mb-7 inline-block text-sm transition-colors"
+          className="text-indigo hover:text-violet -mt-3 mb-4 inline-block py-3 text-sm transition-colors"
         >
           ← {back.label}
         </Link>

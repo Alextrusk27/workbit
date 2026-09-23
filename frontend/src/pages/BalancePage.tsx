@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { LimitsCreditedModal } from '@/components/app/LimitsCreditedModal'
 import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { Container } from '@/components/ui/Container'
 import { Eyebrow } from '@/components/ui/Eyebrow'
@@ -106,7 +107,6 @@ export function BalancePage() {
 function BalanceSection() {
   const { data: balance, isLoading } = useBalance()
   const usage = useUsage()
-  const openTopUp = useTopUpModal()
 
   return (
     <section>
@@ -127,40 +127,36 @@ function BalanceSection() {
           История операций временно недоступна.
         </p>
       )}
-
-      <p className="text-dim mt-5 text-sm">
-        <button
-          type="button"
-          onClick={() => openTopUp()}
-          className="text-indigo hover:text-violet transition-colors"
-        >
-          Пополнить баланс
-        </button>
-      </p>
     </section>
   )
 }
 
 function BalanceCard({ balance }: { balance: Balance }) {
+  const openTopUp = useTopUpModal()
   const low = balance.limits < OPERATION_COST.interview
   return (
-    <div className="border-line bg-card rounded-xl border p-5">
-      <Eyebrow>Остаток</Eyebrow>
-      <p className="mt-2">
-        <span
-          className={cn(
-            'text-[28px] font-extrabold tracking-[-0.02em] tabular-nums',
-            low ? 'text-star' : 'text-ink',
-          )}
-        >
-          <Limits value={balance.limits} />
-        </span>
-      </p>
-      <p className="text-dim mt-2.5 text-[12.5px]">
-        {balance.expiresAt
-          ? `Лимиты действуют до ${formatDate(balance.expiresAt)}`
-          : 'Лимитов нет'}
-      </p>
+    <div className="border-line bg-card flex flex-wrap items-end justify-between gap-4 rounded-xl border p-5">
+      <div>
+        <Eyebrow>Остаток</Eyebrow>
+        <p className="mt-2">
+          <span
+            className={cn(
+              'text-[28px] font-extrabold tracking-[-0.02em] tabular-nums',
+              low ? 'text-star' : 'text-ink',
+            )}
+          >
+            <Limits value={balance.limits} />
+          </span>
+        </p>
+        <p className="text-dim mt-2.5 text-[12.5px]">
+          {balance.expiresAt
+            ? `Лимиты действуют до ${formatDate(balance.expiresAt)}`
+            : 'Лимитов нет'}
+        </p>
+      </div>
+      <Button onClick={() => openTopUp()} className="max-sm:w-full">
+        Пополнить баланс
+      </Button>
     </div>
   )
 }

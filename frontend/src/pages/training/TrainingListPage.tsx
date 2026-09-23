@@ -57,7 +57,7 @@ export function TrainingListPage() {
       >
         <Link
           to="/skills-trainer"
-          className="text-indigo hover:text-violet text-sm transition-colors"
+          className="text-indigo hover:text-violet -my-3 inline-block py-3 text-sm transition-colors"
         >
           Как это работает →
         </Link>

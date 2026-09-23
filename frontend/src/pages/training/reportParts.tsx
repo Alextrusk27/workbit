@@ -99,7 +99,7 @@ export function ReferenceAnswer({
           className={`${REFERENCE_LINK_CLASS} inline-flex items-center gap-1.5`}
         >
           <LockIcon />
-          Эталонный ответ — после первого пополнения
+          Эталонный ответ
         </button>
       )
     }

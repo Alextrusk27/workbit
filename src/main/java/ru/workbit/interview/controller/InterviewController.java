@@ -317,7 +317,7 @@ public class InterviewController {
     }
 
     @GetMapping("/vacancies")
-    @Loggable(logArgs = true)
+    @Loggable
     @Operation(
             summary = "Список вакансий пользователя",
             description = "Группирует интервью текущего пользователя по вакансиям и возвращает сводку по каждой: "

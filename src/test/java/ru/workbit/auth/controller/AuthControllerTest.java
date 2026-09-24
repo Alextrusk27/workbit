@@ -420,16 +420,18 @@ class AuthControllerTest {
         }
 
         @Test
-        @DisplayName("Вызывает сервис с null, когда cookie refresh_token отсутствует")
-        void callsServiceWithNullWhenCookieMissing() throws Exception {
-            // given
-            when(authService.refresh(null)).thenThrow(new BadCredentialsException("Token revoked"));
-
-            // when / then — cookie не обязательна (required=false), сервис сам решает, что делать с null
+        @DisplayName("Возвращает 401 и не зовёт сервис, когда cookie refresh_token отсутствует")
+        void returns401WhenCookieMissing() throws Exception {
+            // when / then — cookie не обязательна (required=false); отсутствие cookie не доходит до сервиса
             mvc.perform(post(BASE + "/refresh"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value("UNAUTHORIZED"))
+                    .andExpect(jsonPath("$.message").value("Bad credentials"))
+                    .andExpect(jsonPath("$.errors[0]").value("Refresh token missing"))
+                    .andExpect(cookie().doesNotExist(AuthCookieService.ACCESS_COOKIE_NAME))
+                    .andExpect(cookie().doesNotExist(AuthCookieService.REFRESH_COOKIE_NAME));
 
-            verify(authService).refresh(null);
+            verifyNoInteractions(authService);
         }
     }
 

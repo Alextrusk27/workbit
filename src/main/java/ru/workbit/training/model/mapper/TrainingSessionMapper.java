@@ -20,5 +20,6 @@ public interface TrainingSessionMapper {
 
     @Mapping(target = "answeredCount", source = "answeredCount")
     @Mapping(target = "totalQuestions", source = "totalQuestions")
+    @Mapping(target = "avgScore", source = "session.report.avgScore")
     TrainingSessionResponse toResponse(TrainingSession session, int answeredCount, int totalQuestions);
 }

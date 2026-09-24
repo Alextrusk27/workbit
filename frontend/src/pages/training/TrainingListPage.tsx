@@ -21,7 +21,6 @@ import {
 } from '@/features/training/labels'
 import {
   useDeleteSession,
-  useReport,
   useRestartSession,
   useSessions,
 } from '@/features/training/useTraining'
@@ -152,15 +151,13 @@ function EmptyState() {
   )
 }
 
-function CardScore({ sessionId }: { sessionId: string }) {
-  const { data, isLoading } = useReport(sessionId)
-  if (isLoading) return <Skeleton className="mt-2 h-4 w-28" />
-  if (!data || data.avgScore == null) return null
+function CardScore({ avgScore }: { avgScore: number | null }) {
+  if (avgScore == null) return null
   return (
     <div className="mt-2 flex items-center gap-2 text-xs">
-      <Stars value={Math.round(data.avgScore * 2) / 2} />
+      <Stars value={Math.round(avgScore * 2) / 2} />
       <span className="text-dim tabular-nums">
-        {data.avgScore.toFixed(1).replace('.', ',')} из 5
+        {avgScore.toFixed(1).replace('.', ',')} из 5
       </span>
     </div>
   )
@@ -213,7 +210,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
           <span>{formatDate(session.created)}</span>
         </div>
         {completed ? (
-          <CardScore sessionId={session.id} />
+          <CardScore avgScore={session.avgScore} />
         ) : (
           <p className="text-dim mt-2 text-[12.5px] italic">
             Заверши тренировку и узнай оценку

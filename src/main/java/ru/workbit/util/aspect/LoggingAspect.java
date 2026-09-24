@@ -12,7 +12,6 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
-import ru.workbit.exception.ConflictException;
 import ru.workbit.util.annotation.Loggable;
 import ru.workbit.util.annotation.Sensitive;
 
@@ -21,43 +20,25 @@ import ru.workbit.util.annotation.Sensitive;
 @Component
 public class LoggingAspect {
 
-    private static final String DOMAIN_EXCEPTIONS = ConflictException.class.getPackageName();
-
     @Around("@annotation(loggable)")
     public Object logMethod(ProceedingJoinPoint pjp, Loggable loggable) throws Throwable {
         Signature sig = pjp.getSignature();
         String method = sig.getDeclaringType().getSimpleName() + "." + sig.getName();
         String level = loggable.level();
 
-        if (loggable.logArgs()) {
-            logAt(level, "→ {} | args: {}", method, formatArgs(pjp, sig));
-        } else {
-            logAt(level, "→ {}", method);
-        }
+        String args = loggable.logArgs() ? " | args: " + formatArgs(pjp, sig) : "";
+
+        log.debug("→ {}{}", method, args);
         long start = System.currentTimeMillis();
 
-        try {
-            Object result = pjp.proceed();
-            long duration = System.currentTimeMillis() - start;
-            if (loggable.logResult()) {
-                logAt(level, "← {} | result: {} | {}ms", method, result, duration);
-            } else {
-                logAt(level, "← {} | {}ms", method, duration);
-            }
-            return result;
-
-        } catch (Throwable ex) {
-            if (isExpected(ex)) {
-                log.warn("✗ {} | {}: {}", method, ex.getClass().getSimpleName(), ex.getMessage());
-            } else {
-                log.error("✗ {} | exception: {}", method, ex.getMessage(), ex);
-            }
-            throw ex;
+        Object result = pjp.proceed();
+        long duration = System.currentTimeMillis() - start;
+        if (loggable.logResult()) {
+            logAt(level, "← {}{} | result: {} | {}ms", method, args, result, duration);
+        } else {
+            logAt(level, "← {}{} | {}ms", method, args, duration);
         }
-    }
-
-    private static boolean isExpected(Throwable ex) {
-        return DOMAIN_EXCEPTIONS.equals(ex.getClass().getPackageName());
+        return result;
     }
 
     private String formatArgs(ProceedingJoinPoint pjp, Signature sig) {

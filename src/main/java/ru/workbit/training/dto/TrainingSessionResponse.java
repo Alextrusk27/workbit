@@ -31,7 +31,10 @@ public record TrainingSessionResponse(
         Instant created,
 
         @Schema(description = "Момент завершения сессии, null пока сессия не завершена")
-        Instant completedAt
+        Instant completedAt,
+
+        @Schema(description = "Средняя оценка из отчёта, null пока отчёта нет", example = "4.2")
+        Double avgScore
 
 ) {
 }

@@ -285,7 +285,7 @@ record TrainingOptionsResponse(
 record TrainingSessionResponse(
     UUID id, String skill, String profession, TrainingSession.Level level,
     TrainingSession.Status status, int answeredCount, int totalQuestions,
-    Instant created, Instant completedAt)
+    Instant created, Instant completedAt, Double avgScore)
 
 record TrainingQuestionResponse(
     UUID questionId, int orderIndex, String questionText,
@@ -333,7 +333,9 @@ record NormalizeInputResponse(
 - **`GET /sessions`** - `200`, `PagedModel<TrainingSessionResponse>` (страница Spring
   Data: поле `content` с массивом сессий плюс метаданные страницы). Поддерживаются
   стандартные query-параметры Spring Pageable - `page`, `size`, `sort`; по умолчанию
-  сортировка `created,desc` (новые сессии первыми).
+  сортировка `created,desc` (новые сессии первыми). `avgScore` — средняя оценка из отчёта
+  сессии, `null`, пока отчёта нет: по ней список показывает оценку завершённых тренировок, не
+  запрашивая отчёт каждой.
 - **`GET /sessions/{sessionId}`** - `200`, `TrainingSessionResponse` с актуальным
   `answeredCount`.
 - **`GET .../questions`** - `200`, массив `TrainingQuestionResponse` с уже отвеченными

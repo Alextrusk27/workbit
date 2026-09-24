@@ -208,7 +208,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -242,7 +242,7 @@ class TrainingServiceTest {
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
 
             // when
@@ -316,7 +316,7 @@ class TrainingServiceTest {
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, List.of(), generated)).thenReturn(expectedResponse);
 
             // when
@@ -355,7 +355,7 @@ class TrainingServiceTest {
 
             List<String> expectedGenerated = List.of("Годный вопрос 1", "Годный вопрос 2");
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, expectedGenerated)).thenReturn(expectedResponse);
 
             // when
@@ -386,7 +386,7 @@ class TrainingServiceTest {
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 9, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 9, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
 
             // when
@@ -511,7 +511,7 @@ class TrainingServiceTest {
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -539,7 +539,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -577,7 +577,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, "Spring JPA", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, "Spring JPA", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -611,7 +611,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -649,7 +649,7 @@ class TrainingServiceTest {
                     professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
                     .thenReturn(bank);
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -742,7 +742,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, dictionaryName, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, dictionaryName, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -812,7 +812,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, "Java-инженер", TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, "Java-инженер", TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -844,7 +844,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, "Spring Framework", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, "Spring Framework", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -877,7 +877,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -918,7 +918,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, atLimit, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, atLimit, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -952,7 +952,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -986,7 +986,7 @@ class TrainingServiceTest {
                     .thenReturn(bank);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, strippedSuggestion, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null);
+                    null, SKILL, strippedSuggestion, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
             when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
 
             // when
@@ -1077,7 +1077,7 @@ class TrainingServiceTest {
             when(trainingQuestionRepository.countByTrainingSessionId(sessionId)).thenReturn(10L);
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 3, 10, null, null);
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 3, 10, null, null, null);
             when(trainingSessionMapper.toResponse(session, 3, 10)).thenReturn(expectedResponse);
 
             // when
@@ -1128,9 +1128,9 @@ class TrainingServiceTest {
                     .thenReturn(List.of(counts));
 
             TrainingSessionResponse firstResponse = new TrainingSessionResponse(
-                    sessionWithCounts, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 5, 10, null, null);
+                    sessionWithCounts, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 5, 10, null, null, null);
             TrainingSessionResponse secondResponse = new TrainingSessionResponse(
-                    sessionWithoutCounts, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 0, null, null);
+                    sessionWithoutCounts, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 0, null, null, null);
             when(trainingSessionMapper.toResponse(first, 5, 10)).thenReturn(firstResponse);
             when(trainingSessionMapper.toResponse(second, 0, 0)).thenReturn(secondResponse);
 

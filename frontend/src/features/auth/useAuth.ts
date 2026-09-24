@@ -24,6 +24,10 @@ function refreshMe(qc: ReturnType<typeof useQueryClient>) {
   return qc.fetchQuery({ queryKey: ME_KEY, queryFn: fetchMe, staleTime: 0 })
 }
 
+function removeUserData(qc: ReturnType<typeof useQueryClient>) {
+  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] })
+}
+
 export function useAuth() {
   const query = useQuery<UserResponse | null>({
     queryKey: ME_KEY,
@@ -68,6 +72,7 @@ export function useVerifyCode() {
     onSuccess: ({ newUser, welcomeGranted }) => {
       if (newUser) reachGoal('registration')
       if (welcomeGranted) welcome.show()
+      removeUserData(qc)
       return refreshMe(qc).catch(() => {
         void qc.invalidateQueries({ queryKey: ME_KEY })
       })
@@ -79,7 +84,11 @@ export function useLogout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => authApi.logout(),
-    onSettled: () => qc.setQueryData(ME_KEY, null),
+    onSettled: async () => {
+      await qc.cancelQueries({ queryKey: ME_KEY })
+      removeUserData(qc)
+      qc.setQueryData(ME_KEY, null)
+    },
   })
 }
 
@@ -97,6 +106,7 @@ export function useDeleteAccount() {
         flushSync: true,
         state: { accountDeleted: true },
       })
+      removeUserData(qc)
       qc.setQueryData(ME_KEY, null)
     },
   })

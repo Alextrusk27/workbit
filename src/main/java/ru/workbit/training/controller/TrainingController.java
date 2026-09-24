@@ -59,7 +59,7 @@ public class TrainingController {
     private final RateLimitProperties rateLimitProperties;
 
     @GetMapping("/options")
-    @Loggable(logResult = true)
+    @Loggable
     @Operation(
             summary = "Справочник значений для создания тренировки",
             description = "Возвращает популярные навыки и профессии из словаря (подсказки для быстрого выбора, "
@@ -74,7 +74,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/professions")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Подсказки профессий",
             description = "Возвращает до 7 профессий из словаря по подстроке: сначала совпадения по началу названия, "
@@ -96,7 +96,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/skills")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Подсказки навыков",
             description = "Возвращает до 7 навыков словаря по подстроке: сначала совпадения по началу названия, затем "
@@ -151,7 +151,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Создать тренировочную сессию",
             description = "Создаёт новую тренировочную сессию по указанному навыку и профессии (свободный ввод) и "
@@ -179,7 +179,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Список тренировочных сессий пользователя",
             description = "Возвращает страницу тренировочных сессий текущего пользователя, по умолчанию новые первыми.")
@@ -195,7 +195,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Получить сессию по id",
             description = "Возвращает тренировочную сессию текущего пользователя.")
@@ -237,7 +237,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions/{sessionId}/questions/next")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Получить следующий вопрос",
             description = "Возвращает первый неотвеченный вопрос сессии. Вызов идемпотентен: повторный запрос "
@@ -262,7 +262,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions/{sessionId}/questions/more")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Добавить ещё пачку вопросов",
             description = "Добавляет в незавершённую сессию следующие 10 вопросов - альтернатива разбору, когда все "
@@ -490,7 +490,7 @@ public class TrainingController {
     }
 
     @PostMapping("/sessions/{sessionId}/restart")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Пройти тренировку заново",
             description = "Возвращает завершённую тренировку в исходное состояние: вопросы и эталонные ответы остаются "

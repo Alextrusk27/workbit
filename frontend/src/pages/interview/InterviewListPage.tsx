@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Stars } from '@/components/ui/Stars'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import type { InterviewVacancy } from '@/features/interview/api'
+import type { VacancyStatus } from '@/features/vacancy/api'
 import {
   OFFER_TONE,
   STATUS_LABELS,
@@ -15,7 +16,7 @@ import {
   VACANCY_STATUS_LABELS,
 } from '@/features/interview/labels'
 import { useInterviewVacancies } from '@/features/interview/useInterview'
-import { useVacancyStatus } from '@/features/vacancy/useVacancy'
+import { useVacancyStatuses } from '@/features/vacancy/useVacancy'
 import { getErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { formatDate } from '@/lib/dates'
@@ -87,6 +88,7 @@ export function InterviewListPage() {
 function VacancyBrowser({ vacancies }: { vacancies: InterviewVacancy[] }) {
   const [status, setStatus] = useState<StatusFilter>('ALL')
   const shown = vacancies.filter((v) => matches(v, status))
+  const { data: live } = useVacancyStatuses(vacancies.map((v) => v.vacancyUrl))
 
   return (
     <div>
@@ -111,7 +113,11 @@ function VacancyBrowser({ vacancies }: { vacancies: InterviewVacancy[] }) {
         ) : (
           <ul key={status} className="flex flex-col gap-4">
             {shown.map((v) => (
-              <VacancyCard key={v.vacancyId} vacancy={v} />
+              <VacancyCard
+                key={v.vacancyId}
+                vacancy={v}
+                liveStatus={live?.statuses[(v.vacancyUrl ?? '').trim()]}
+              />
             ))}
           </ul>
         )}
@@ -153,8 +159,13 @@ function EmptyState() {
   )
 }
 
-function VacancyLine({ vacancy }: { vacancy: InterviewVacancy }) {
-  const { data } = useVacancyStatus(vacancy.vacancyUrl)
+function VacancyLine({
+  vacancy,
+  liveStatus,
+}: {
+  vacancy: InterviewVacancy
+  liveStatus?: VacancyStatus
+}) {
   if (!vacancy.vacancyUrl) return null
   return (
     <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px]">
@@ -166,14 +177,14 @@ function VacancyLine({ vacancy }: { vacancy: InterviewVacancy }) {
       >
         Вакансия на hh.ru ↗
       </a>
-      {data && (
+      {liveStatus && (
         <span
           className={cn(
             'font-semibold',
-            data.status === 'ACTIVE' ? 'text-ok' : 'text-danger',
+            liveStatus === 'ACTIVE' ? 'text-ok' : 'text-danger',
           )}
         >
-          {VACANCY_STATUS_LABELS[data.status]}
+          {VACANCY_STATUS_LABELS[liveStatus]}
         </span>
       )}
       {vacancy.experience && <span>Опыт: {vacancy.experience}</span>}
@@ -181,7 +192,13 @@ function VacancyLine({ vacancy }: { vacancy: InterviewVacancy }) {
   )
 }
 
-function VacancyCard({ vacancy }: { vacancy: InterviewVacancy }) {
+function VacancyCard({
+  vacancy,
+  liveStatus,
+}: {
+  vacancy: InterviewVacancy
+  liveStatus?: VacancyStatus
+}) {
   const navigate = useNavigate()
   const to = `/app/interview/vacancy/${vacancy.vacancyId}`
 
@@ -235,7 +252,7 @@ function VacancyCard({ vacancy }: { vacancy: InterviewVacancy }) {
           )}
           <span>{formatDate(vacancy.lastActivity)}</span>
         </div>
-        <VacancyLine vacancy={vacancy} />
+        <VacancyLine vacancy={vacancy} liveStatus={liveStatus} />
         {vacancy.bestScore == null && (
           <p className="text-dim mt-2 text-[12.5px] italic">
             Заверши интервью и узнай оценку и шансы на оффер

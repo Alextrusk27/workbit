@@ -43,6 +43,23 @@ class RefreshTokenJPARepositoryIT extends AbstractPostgresIT {
                 .build(); // expiresAt, revoked, created — @Builder.Default
     }
 
+    private RefreshToken aToken(User user, String hash, Instant expiresAt) {
+        return RefreshToken.builder()
+                .user(user)
+                .tokenHash(hash)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    private RefreshToken aRevokedToken(User user, String hash, Instant expiresAt) {
+        return RefreshToken.builder()
+                .user(user)
+                .tokenHash(hash)
+                .expiresAt(expiresAt)
+                .revoked(true)
+                .build();
+    }
+
     // =========================================================================
 
     @Nested
@@ -167,6 +184,71 @@ class RefreshTokenJPARepositoryIT extends AbstractPostgresIT {
             var other = repository.findByTokenHash("hash-other2");
             assertThat(other).isPresent();
             assertThat(other.get().isRevoked()).isFalse();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteByExpiresAtBefore")
+    class DeleteByExpiresAtBefore {
+
+        // Порог из далёкого прошлого: остальные IT-классы делят с этим тестом один контейнер
+        // Postgres и коммитят свои refresh_token, поэтому Instant.now() в качестве порога
+        // подцепляет чужие строки.
+        private static final Instant THRESHOLD = Instant.parse("2000-01-01T00:00:00Z");
+
+        @Test
+        @DisplayName("Удаляет и отозванные, и неотозванные токены с expiresAt раньше порога")
+        void deletesBothRevokedAndNonRevokedTokensExpiredBeforeThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-expired@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aToken(user, "hash-expired-active", threshold.minusSeconds(60)));
+            em.persistAndFlush(aRevokedToken(user, "hash-expired-revoked", threshold.minusSeconds(120)));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear(); // bulk-delete идёт мимо persistence context
+
+            // then
+            assertThat(deleted).isEqualTo(2);
+            assertThat(repository.findByTokenHash("hash-expired-active")).isEmpty();
+            assertThat(repository.findByTokenHash("hash-expired-revoked")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не трогает токены с expiresAt позже порога")
+        void doesNotDeleteTokensExpiringAfterThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-future@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aToken(user, "hash-still-valid", threshold.plusSeconds(3600)));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByTokenHash("hash-still-valid")).isPresent();
+        }
+
+        @Test
+        @DisplayName("Токен с expiresAt ровно равным порогу не удаляется (строгое <)")
+        void doesNotDeleteTokenWithExpiresAtEqualToThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-boundary@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aToken(user, "hash-boundary", threshold));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(repository.findByTokenHash("hash-boundary")).isPresent();
         }
     }
 

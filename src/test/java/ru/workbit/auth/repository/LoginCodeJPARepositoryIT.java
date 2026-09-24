@@ -62,6 +62,23 @@ class LoginCodeJPARepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
+    private LoginCode aLoginCodeExpiringAt(User user, String hash, Instant expiresAt) {
+        return LoginCode.builder()
+                .user(user)
+                .codeHash(hash)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    private LoginCode aUsedLoginCodeExpiringAt(User user, String hash, Instant expiresAt) {
+        return LoginCode.builder()
+                .user(user)
+                .codeHash(hash)
+                .expiresAt(expiresAt)
+                .usedAt(Instant.now())
+                .build();
+    }
+
     // =========================================================================
 
     @Nested
@@ -163,6 +180,79 @@ class LoginCodeJPARepositoryIT extends AbstractPostgresIT {
 
             // then
             assertThat(result).isEmpty();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("DeleteByExpiresAtBefore")
+    class DeleteByExpiresAtBefore {
+
+        // Порог из далёкого прошлого: остальные IT-классы делят с этим тестом один контейнер
+        // Postgres и коммитят свои login_code (в т.ч. истёкшие относительно текущего момента),
+        // поэтому Instant.now() в качестве порога подцепляет чужие строки.
+        private static final Instant THRESHOLD = Instant.parse("2000-01-01T00:00:00Z");
+
+        @Test
+        @DisplayName("Удаляет и использованные, и неиспользованные коды с expiresAt раньше порога")
+        void deletesBothUsedAndUnusedCodesExpiredBeforeThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-expired-codes@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aLoginCodeExpiringAt(user, "hash-expired-unused", threshold.minusSeconds(60)));
+            em.persistAndFlush(aUsedLoginCodeExpiringAt(user, "hash-expired-used", threshold.minusSeconds(120)));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear(); // bulk-delete идёт мимо persistence context
+
+            // then
+            assertThat(deleted).isEqualTo(2);
+            assertThat(countByHash("hash-expired-unused")).isZero();
+            assertThat(countByHash("hash-expired-used")).isZero();
+        }
+
+        @Test
+        @DisplayName("Не трогает коды с expiresAt позже порога")
+        void doesNotDeleteCodesExpiringAfterThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-future-codes@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aLoginCodeExpiringAt(user, "hash-still-valid", threshold.plusSeconds(3600)));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(countByHash("hash-still-valid")).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Код с expiresAt ровно равным порогу не удаляется (строгое <)")
+        void doesNotDeleteCodeWithExpiresAtEqualToThreshold() {
+            // given
+            var user = em.persistAndFlush(aUser("cleanup-boundary-codes@example.com"));
+            var threshold = THRESHOLD;
+            em.persistAndFlush(aLoginCodeExpiringAt(user, "hash-boundary", threshold));
+
+            // when
+            int deleted = repository.deleteByExpiresAtBefore(threshold);
+            em.clear();
+
+            // then
+            assertThat(deleted).isZero();
+            assertThat(countByHash("hash-boundary")).isEqualTo(1);
+        }
+
+        private long countByHash(String hash) {
+            return ((Number) em.getEntityManager()
+                    .createNativeQuery("SELECT COUNT(*) FROM auth.login_code WHERE code_hash = :hash")
+                    .setParameter("hash", hash)
+                    .getSingleResult())
+                    .longValue();
         }
     }
 

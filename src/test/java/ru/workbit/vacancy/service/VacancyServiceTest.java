@@ -31,6 +31,7 @@ import ru.workbit.vacancy.dto.VacancyData;
 import ru.workbit.vacancy.dto.VacancyPreviewResponse;
 import ru.workbit.vacancy.dto.VacancySnapshotView;
 import ru.workbit.vacancy.dto.VacancyStatusResponse;
+import ru.workbit.vacancy.dto.VacancyStatusesResponse;
 import ru.workbit.vacancy.model.VacancySnapshot;
 import ru.workbit.vacancy.model.mapper.VacancyMapper;
 import ru.workbit.vacancy.repository.VacancySnapshotRepository;
@@ -393,6 +394,79 @@ class VacancyServiceTest {
             Field field = VacancyService.class.getDeclaredField("STATUS_TTL");
             field.setAccessible(true);
             return (Duration) field.get(null);
+        }
+    }
+
+    @Nested
+    @DisplayName("GetStatuses")
+    class GetStatuses {
+
+        private static final String ACTIVE_URL = "https://hh.ru/vacancy/1";
+        private static final String ARCHIVED_URL = "https://spb.hh.ru/vacancy/2";
+        private static final String MISSING_URL = "https://hh.ru/vacancy/3";
+
+        @Test
+        @DisplayName("Возвращает статус по каждой ссылке, ключ - ссылка как в запросе")
+        void returnsStatusPerUrl() {
+            // given
+            when(hhClient.getHhVacancy("1")).thenReturn(anHhVacancyResponse(false));
+            when(hhClient.getHhVacancy("2")).thenReturn(anHhVacancyResponse(true));
+            when(hhClient.getHhVacancy("3")).thenThrow(new NotFoundException("Vacancy 3 not found"));
+
+            // when
+            var result = vacancyService.getStatuses(List.of(ACTIVE_URL, ARCHIVED_URL, MISSING_URL));
+
+            // then
+            assertThat(result).isEqualTo(new VacancyStatusesResponse(Map.of(
+                    ACTIVE_URL, VacancyStatusResponse.Status.ACTIVE,
+                    ARCHIVED_URL, VacancyStatusResponse.Status.ARCHIVED,
+                    MISSING_URL, VacancyStatusResponse.Status.NOT_FOUND)));
+        }
+
+        @Test
+        @DisplayName("Делит кеш с одиночной проверкой: закешированную вакансию не запрашивает у hh")
+        void sharesCacheWithSingleStatus() {
+            // given
+            when(hhClient.getHhVacancy("1")).thenReturn(anHhVacancyResponse(false));
+            vacancyService.getStatus(ACTIVE_URL);
+
+            // when
+            var result = vacancyService.getStatuses(List.of(ACTIVE_URL));
+
+            // then
+            assertThat(result.statuses()).containsEntry(ACTIVE_URL, VacancyStatusResponse.Status.ACTIVE);
+            verify(hhClient, times(1)).getHhVacancy("1");
+        }
+
+        @Test
+        @DisplayName("После сбоя hh больше не ходит в него, но отдаёт закешированные статусы")
+        void stopsCallingHhAfterFailureButKeepsCached() {
+            // given
+            when(hhClient.getHhVacancy("2")).thenReturn(anHhVacancyResponse(true));
+            vacancyService.getStatus(ARCHIVED_URL);
+            when(hhClient.getHhVacancy("1")).thenThrow(
+                    new VacancyFetchException("Failed to fetch vacancy 1 from hh.ru",
+                            new RuntimeException("connection refused")));
+
+            // when
+            var result = vacancyService.getStatuses(List.of(ACTIVE_URL, MISSING_URL, ARCHIVED_URL));
+
+            // then
+            assertThat(result).isEqualTo(new VacancyStatusesResponse(Map.of(
+                    ARCHIVED_URL, VacancyStatusResponse.Status.ARCHIVED)));
+            verify(hhClient, never()).getHhVacancy("3");
+        }
+
+        @Test
+        @DisplayName("Бросает IllegalArgumentException до обращения к hh, если среди ссылок есть не hh.ru")
+        void throwsBeforeCallingHhWhenAnyUrlIsInvalid() {
+            // when / then
+            assertThatThrownBy(() -> vacancyService.getStatuses(
+                    List.of(ACTIVE_URL, "https://example.com/not-a-vacancy")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("URL is not a hh.ru vacancy link: https://example.com/not-a-vacancy");
+
+            verifyNoInteractions(hhClient);
         }
     }
 }

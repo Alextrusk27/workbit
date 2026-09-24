@@ -14,10 +14,20 @@ export interface VacancyStatusResponse {
   status: VacancyStatus
 }
 
+export interface VacancyStatusesResponse {
+  statuses: Record<string, VacancyStatus>
+}
+
 export const vacancyApi = {
   preview: (url: string) =>
     apiFetch<VacancyPreview>('/vacancies/preview', { query: { url } }),
 
   status: (url: string) =>
     apiFetch<VacancyStatusResponse>('/vacancies/status', { query: { url } }),
+
+  statuses: (urls: string[]) =>
+    apiFetch<VacancyStatusesResponse>('/vacancies/statuses', {
+      method: 'POST',
+      body: { urls },
+    }),
 }

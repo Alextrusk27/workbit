@@ -37,3 +37,18 @@ export function useVacancyStatus(url: string | null) {
     staleTime: 30 * 60_000,
   })
 }
+
+/** Статусы всех вакансий списка одним запросом. Ключ результата - ссылка
+ *  после trim; ссылки не на hh.ru не отправляются. */
+export function useVacancyStatuses(urls: (string | null)[]) {
+  const valid = [
+    ...new Set(urls.map((u) => (u ?? '').trim()).filter(isHhVacancyUrl)),
+  ].sort()
+  return useQuery({
+    queryKey: ['vacancy', 'statuses', valid],
+    queryFn: () => vacancyApi.statuses(valid),
+    enabled: valid.length > 0,
+    retry: false,
+    staleTime: 30 * 60_000,
+  })
+}

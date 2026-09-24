@@ -22,7 +22,7 @@ public class PaymentReconciliationService {
     private final PaymentProvider paymentProvider;
     private final PaymentService paymentService;
 
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = 300_000)
     public void reconcilePending() {
         Instant now = Instant.now();
         List<Payment> pending = paymentRepository.findByStatusAndCreatedBetween(

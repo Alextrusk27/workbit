@@ -212,8 +212,8 @@ class InterviewWriterTest {
         }
 
         @Test
-        @DisplayName("Ответ дан на основной вопрос - уточнение становится его ребёнком, orderIndex по числу детей кейса")
-        void savesChildOfAnsweredMain() {
+        @DisplayName("Ответ дан на основной вопрос - уточнение привязывается к нему, orderIndex по числу уточнений кейса")
+        void savesFollowUpOfAnsweredMain() {
             // given
             InterviewSession session = activeSession();
             InterviewQuestion answered = answeredMain(session);
@@ -243,16 +243,16 @@ class InterviewWriterTest {
         }
 
         @Test
-        @DisplayName("Ответ дан на уточнение - новый ребёнок вешается на тот же основной вопрос, а не на уточнение")
-        void savesChildOfSameCaseWhenAnsweredIsChild() {
+        @DisplayName("Ответ дан на уточнение - новое уточнение привязывается к тому же основному вопросу, а не к уточнению")
+        void savesFollowUpOfSameCaseWhenAnsweredIsFollowUp() {
             // given
             UUID mainId = UUID.randomUUID();
             InterviewSession session = activeSession();
-            InterviewQuestion answeredChild = InterviewQuestion.builder()
+            InterviewQuestion answeredFollowUp = InterviewQuestion.builder()
                     .id(answeredId).session(session).parentQuestionId(mainId).text("Переспрос")
                     .kind(InterviewQuestion.Kind.CLARIFICATION).orderIndex(1).followUp(true)
                     .answered(true).followUpChecked(false).build();
-            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answeredChild));
+            when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answeredFollowUp));
             when(interviewQuestionRepository.countByParentQuestionId(mainId)).thenReturn(1L);
             when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
             when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(mock(InterviewQuestionResponse.class));

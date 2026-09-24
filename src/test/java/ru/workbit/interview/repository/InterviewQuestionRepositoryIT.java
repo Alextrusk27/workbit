@@ -235,10 +235,10 @@ class InterviewQuestionRepositoryIT extends AbstractPostgresIT {
     class CountByParentQuestionId {
 
         @Test
-        @DisplayName("Считает только детей переданного основного вопроса")
-        void countsOnlyChildrenOfGivenParent() {
+        @DisplayName("Считает только уточнения переданного основного вопроса")
+        void countsOnlyFollowUpsOfGivenMain() {
             // given
-            var user = em.persistAndFlush(User.builder().email("count-children@example.com").build());
+            var user = em.persistAndFlush(User.builder().email("count-follow-ups@example.com").build());
             var snapshot = em.persistAndFlush(aVacancySnapshot("Java-разработчик"));
             var session = em.persistAndFlush(aSession(user.getId(), snapshot.getId(),
                     InterviewSession.Status.IN_PROGRESS, Instant.now()));

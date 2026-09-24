@@ -31,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 public class RobokassaService implements PaymentProvider {
 
     private static final String RESULT_OK = "0";
+    private static final String RESULT_NOT_FOUND = "3";
     private static final String STATE_PAID = "100";
     private static final String TAX_NONE = "none";
 
@@ -118,6 +119,10 @@ public class RobokassaService implements PaymentProvider {
         }
 
         String resultCode = code(document, "Result");
+        if (RESULT_NOT_FOUND.equals(resultCode)) {
+            log.debug("Robokassa has no operation for invId {} yet", invId);
+            return false;
+        }
         if (!RESULT_OK.equals(resultCode)) {
             log.warn("Robokassa state request rejected for invId {}: result code {}", invId, resultCode);
             return false;

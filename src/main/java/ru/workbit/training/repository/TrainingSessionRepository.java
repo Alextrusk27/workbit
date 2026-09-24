@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.training.model.TrainingSession;
@@ -15,10 +16,12 @@ public interface TrainingSessionRepository extends JpaRepository<@NotNull Traini
 
     boolean existsByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
 
+    @EntityGraph(attributePaths = "report")
     Page<@NotNull TrainingSession> findAllByUserId(@NotNull UUID userId, Pageable pageable);
 
     Optional<TrainingSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
 
+    @EntityGraph(attributePaths = "report")
     @Query("""
             SELECT ts FROM TrainingSession ts
             WHERE ts.userId = :userId AND LOWER(ts.skill) IN :skills

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import ru.workbit.training.dto.CreateSessionRequest;
 import ru.workbit.training.dto.TrainingSessionResponse;
+import ru.workbit.training.model.TrainingReport;
 import ru.workbit.training.model.TrainingSession;
 
 @DisplayName("TrainingSessionMapperTest")
@@ -81,6 +82,26 @@ class TrainingSessionMapperTest {
             assertThat(dto.totalQuestions()).isEqualTo(10);
             assertThat(dto.created()).isEqualTo(created);
             assertThat(dto.completedAt()).isEqualTo(completedAt);
+            assertThat(dto.avgScore()).isNull();
+        }
+
+        @Test
+        @DisplayName("Берёт avgScore из отчёта сессии")
+        void mapsAvgScoreFromReport() {
+            // given
+            var session = TrainingSession.builder()
+                    .status(TrainingSession.Status.COMPLETED)
+                    .build();
+            session.setReport(TrainingReport.builder()
+                    .trainingSession(session)
+                    .avgScore(4.5)
+                    .build());
+
+            // when
+            TrainingSessionResponse dto = mapper.toResponse(session, 3, 3);
+
+            // then
+            assertThat(dto.avgScore()).isEqualTo(4.5);
         }
     }
 }

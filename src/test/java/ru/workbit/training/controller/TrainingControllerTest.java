@@ -92,7 +92,7 @@ class TrainingControllerTest {
     private TrainingSessionResponse sessionResponse(String skill, String profession) {
         return new TrainingSessionResponse(
                 UUID.randomUUID(), skill, profession, TrainingSession.Level.MEDIUM, TrainingSession.Status.IN_PROGRESS,
-                0, 10, Instant.now(), null);
+                0, 10, Instant.now(), null, null);
     }
 
     // -------------------------------------------------------------------------
@@ -874,7 +874,7 @@ class TrainingControllerTest {
             // given
             var response = new TrainingSessionResponse(
                     sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM,
-                    TrainingSession.Status.IN_PROGRESS, 10, 20, Instant.now(), null);
+                    TrainingSession.Status.IN_PROGRESS, 10, 20, Instant.now(), null, null);
             when(trainingService.addQuestions(sessionId, USER_ID)).thenReturn(response);
 
             // when / then
@@ -986,7 +986,7 @@ class TrainingControllerTest {
             // given
             var response = new TrainingSessionResponse(
                     sessionId, "Spring Boot", "Java-разработчик", TrainingSession.Level.MEDIUM,
-                    TrainingSession.Status.CREATED, 0, 10, Instant.now(), null);
+                    TrainingSession.Status.CREATED, 0, 10, Instant.now(), null, null);
             when(trainingService.restart(sessionId, USER_ID)).thenReturn(response);
 
             // when / then

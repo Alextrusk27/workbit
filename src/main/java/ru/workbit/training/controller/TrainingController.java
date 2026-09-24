@@ -59,7 +59,7 @@ public class TrainingController {
     private final RateLimitProperties rateLimitProperties;
 
     @GetMapping("/options")
-    @Loggable
+    @Loggable(level = "DEBUG")
     @Operation(
             summary = "Справочник значений для создания тренировки",
             description = "Возвращает популярные навыки и профессии из словаря (подсказки для быстрого выбора, "
@@ -74,7 +74,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/professions")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Подсказки профессий",
             description = "Возвращает до 7 профессий из словаря по подстроке: сначала совпадения по началу названия, "
@@ -96,7 +96,7 @@ public class TrainingController {
     }
 
     @GetMapping("/suggest/skills")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Подсказки навыков",
             description = "Возвращает до 7 навыков словаря по подстроке: сначала совпадения по началу названия, затем "
@@ -179,7 +179,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Список тренировочных сессий пользователя",
             description = "Возвращает страницу тренировочных сессий текущего пользователя, по умолчанию новые первыми.")
@@ -195,7 +195,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Получить сессию по id",
             description = "Возвращает тренировочную сессию текущего пользователя.")
@@ -215,7 +215,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}/questions")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "История отвеченных вопросов",
             description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя, по порядку. Нужна, "
@@ -469,7 +469,7 @@ public class TrainingController {
     }
 
     @GetMapping("/sessions/{sessionId}/report")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Получить отчёт по тренировке",
             description = "Возвращает ранее сформированный отчёт по завершённой тренировке, включая поразборный фидбэк "

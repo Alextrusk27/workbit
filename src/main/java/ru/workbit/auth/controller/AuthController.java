@@ -194,7 +194,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @Loggable
+    @Loggable(level = "DEBUG")
     @Operation(summary = "Текущий пользователь",
             description = "Возвращает профиль аутентифицированного пользователя. Штатно аутентификация идёт по "
                     + "access-cookie access_token; заголовок Authorization: Bearer поддержан как fallback для Swagger "

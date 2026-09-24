@@ -87,7 +87,7 @@ public class InterviewController {
     }
 
     @GetMapping("/sessions/{sessionId}")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(summary = "Получить сессию по id", description = "Возвращает сессию интервью текущего пользователя.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -105,7 +105,7 @@ public class InterviewController {
     }
 
     @GetMapping("/sessions/{sessionId}/questions")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "История отвеченных вопросов",
             description = "Возвращает уже отвеченные вопросы сессии вместе с ответами пользователя - основные и "
@@ -296,7 +296,7 @@ public class InterviewController {
     }
 
     @GetMapping("/sessions/{sessionId}/report")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Получить отчёт по интервью",
             description = "Возвращает ранее сформированный отчёт по завершённому интервью, включая поразборный фидбэк "
@@ -317,7 +317,7 @@ public class InterviewController {
     }
 
     @GetMapping("/vacancies")
-    @Loggable
+    @Loggable(level = "DEBUG")
     @Operation(
             summary = "Список вакансий пользователя",
             description = "Группирует интервью текущего пользователя по вакансиям и возвращает сводку по каждой: "
@@ -334,7 +334,7 @@ public class InterviewController {
     }
 
     @GetMapping("/vacancies/{vacancyId}")
-    @Loggable(logArgs = true)
+    @Loggable(level = "DEBUG", logArgs = true)
     @Operation(
             summary = "Детали вакансии",
             description = "Возвращает вакансию с интервью по ней (старые первыми, у завершённых — оценка и вероятность "

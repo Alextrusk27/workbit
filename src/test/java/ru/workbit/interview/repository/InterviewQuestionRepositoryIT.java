@@ -229,4 +229,29 @@ class InterviewQuestionRepositoryIT extends AbstractPostgresIT {
             assertThat(result).isEmpty();
         }
     }
+
+    @Nested
+    @DisplayName("CountByParentQuestionId")
+    class CountByParentQuestionId {
+
+        @Test
+        @DisplayName("Считает только детей переданного основного вопроса")
+        void countsOnlyChildrenOfGivenParent() {
+            // given
+            var user = em.persistAndFlush(User.builder().email("count-children@example.com").build());
+            var snapshot = em.persistAndFlush(aVacancySnapshot("Java-разработчик"));
+            var session = em.persistAndFlush(aSession(user.getId(), snapshot.getId(),
+                    InterviewSession.Status.IN_PROGRESS, Instant.now()));
+            var main = em.persistAndFlush(aMainQuestion(session, 1, "Основной 1"));
+            var otherMain = em.persistAndFlush(aMainQuestion(session, 2, "Основной 2"));
+            em.persistAndFlush(aFollowUp(session, 1, main.getId(), InterviewQuestion.Kind.FOLLOW_UP, "Уточнение 1"));
+            em.persistAndFlush(aFollowUp(session, 2, main.getId(), InterviewQuestion.Kind.CLARIFICATION, "Уточнение 2"));
+            em.persistAndFlush(aFollowUp(session, 1, otherMain.getId(), InterviewQuestion.Kind.FOLLOW_UP, "Чужое"));
+            em.clear();
+
+            // when / then
+            assertThat(repository.countByParentQuestionId(main.getId())).isEqualTo(2);
+            assertThat(repository.countByParentQuestionId(UUID.randomUUID())).isZero();
+        }
+    }
 }

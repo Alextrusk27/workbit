@@ -218,10 +218,7 @@ class InterviewWriterTest {
             InterviewSession session = activeSession();
             InterviewQuestion answered = answeredMain(session);
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answered));
-            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(answeredId))
-                    .thenReturn(List.of(InterviewQuestion.builder()
-                            .id(UUID.randomUUID()).parentQuestionId(answeredId).text("Переспрос")
-                            .kind(InterviewQuestion.Kind.CLARIFICATION).orderIndex(1).followUp(true).build()));
+            when(interviewQuestionRepository.countByParentQuestionId(answeredId)).thenReturn(1L);
             when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
             InterviewQuestionResponse expectedResponse = new InterviewQuestionResponse(
@@ -256,8 +253,7 @@ class InterviewWriterTest {
                     .kind(InterviewQuestion.Kind.CLARIFICATION).orderIndex(1).followUp(true)
                     .answered(true).followUpChecked(false).build();
             when(interviewQuestionRepository.findWithSessionById(answeredId)).thenReturn(Optional.of(answeredChild));
-            when(interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(mainId))
-                    .thenReturn(List.of(answeredChild));
+            when(interviewQuestionRepository.countByParentQuestionId(mainId)).thenReturn(1L);
             when(interviewQuestionRepository.save(any(InterviewQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
             when(interviewQuestionMapper.toDto(any(InterviewQuestion.class))).thenReturn(mock(InterviewQuestionResponse.class));
 

@@ -162,7 +162,7 @@ public class InterviewWriter {
     private int nextOrderIndex(UUID sessionId, UUID parentQuestionId) {
         return parentQuestionId == null
                 ? (int) interviewQuestionRepository.countBySessionIdAndKind(sessionId, InterviewQuestion.Kind.MAIN) + 1
-                : interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(parentQuestionId).size() + 1;
+                : (int) interviewQuestionRepository.countByParentQuestionId(parentQuestionId) + 1;
     }
 
     private InterviewSession saveNewSession(UUID userId, LlmInterviewPlan plan, UUID vacancySnapshotId,

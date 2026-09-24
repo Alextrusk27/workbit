@@ -26,19 +26,17 @@ public class LoggingAspect {
         String method = sig.getDeclaringType().getSimpleName() + "." + sig.getName();
         String level = loggable.level();
 
-        if (loggable.logArgs()) {
-            logAt(level, "→ {} | args: {}", method, formatArgs(pjp, sig));
-        } else {
-            logAt(level, "→ {}", method);
-        }
+        String args = loggable.logArgs() ? " | args: " + formatArgs(pjp, sig) : "";
+
+        log.debug("→ {}{}", method, args);
         long start = System.currentTimeMillis();
 
         Object result = pjp.proceed();
         long duration = System.currentTimeMillis() - start;
         if (loggable.logResult()) {
-            logAt(level, "← {} | result: {} | {}ms", method, result, duration);
+            logAt(level, "← {}{} | result: {} | {}ms", method, args, result, duration);
         } else {
-            logAt(level, "← {} | {}ms", method, duration);
+            logAt(level, "← {}{} | {}ms", method, args, duration);
         }
         return result;
     }

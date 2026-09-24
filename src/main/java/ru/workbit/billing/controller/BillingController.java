@@ -44,7 +44,7 @@ public class BillingController {
     private final PaymentService paymentService;
 
     @GetMapping("/quota")
-    @Loggable(logResult = true)
+    @Loggable
     @Operation(summary = "Баланс лимитов",
             description = "Возвращает остаток лимитов, срок их действия и признак хотя бы одной покупки. Просроченный "
                     + "баланс отдаётся нулём без срока.")

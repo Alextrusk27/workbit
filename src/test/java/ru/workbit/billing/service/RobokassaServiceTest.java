@@ -122,7 +122,7 @@ class RobokassaServiceTest {
             assertThat(params.get("MerchantLogin")).isEqualTo(MERCHANT_LOGIN);
             assertThat(params.get("OutSum")).isEqualTo("790.00");
             assertThat(params.get("InvId")).isEqualTo(String.valueOf(INV_ID));
-            assertThat(params.get("Description")).isEqualTo("Пополнение на 50 лимитов — Workbit");
+            assertThat(params.get("Description")).isEqualTo("Workbit");
             assertThat(params.get("Receipt")).isEqualTo(ENCODED_RECEIPT);
             assertThat(params.get("SignatureValue")).isEqualTo(INIT_SIGNATURE);
             assertThat(params.get("Culture")).isEqualTo("ru");

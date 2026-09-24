@@ -51,7 +51,7 @@ public class RobokassaService implements PaymentProvider {
                 .queryParam("MerchantLogin", properties.merchantLogin())
                 .queryParam("OutSum", outSum)
                 .queryParam("InvId", invId)
-                .queryParam("Description", TopUpPricing.label(payment.getLimits()) + " — Workbit")
+                .queryParam("Description", "Workbit")
                 .queryParam("Receipt", receipt)
                 .queryParam("SignatureValue", signature)
                 .queryParam("Culture", "ru")

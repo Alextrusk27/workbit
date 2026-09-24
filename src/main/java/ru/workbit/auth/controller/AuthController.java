@@ -12,9 +12,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -114,7 +116,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    @Loggable
+    @Loggable(level = "DEBUG")
     @Operation(
             summary = "Обновление токенов",
             description = "Обменивает валидный refresh-токен из cookie refresh_token на новую пару токенов, выдаваемых "
@@ -132,10 +134,14 @@ public class AuthController {
                     description = "Refresh-токен недействителен или отозван",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<@NotNull Void> refresh(
+    public ResponseEntity<?> refresh(
             @Parameter(description = "Refresh-токен из HttpOnly-cookie refresh_token", required = false)
             @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refreshToken
     ) {
+        if (refreshToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiError.of(HttpStatus.UNAUTHORIZED, "Bad credentials", List.of("Refresh token missing")));
+        }
         var tokens = authService.refresh(refreshToken);
         return withAuthCookies(ResponseEntity.ok(), tokens).build();
     }

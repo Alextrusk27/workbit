@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,10 +18,11 @@ import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.interview.model.InterviewFeedback;
 import ru.workbit.interview.model.InterviewQuestion;
+import ru.workbit.interview.model.InterviewReport;
 import ru.workbit.interview.model.InterviewSession;
 import ru.workbit.vacancy.model.VacancySnapshot;
 
-@DataJpaTest
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @DisplayName("InterviewSessionRepositoryIT")
 class InterviewSessionRepositoryIT extends AbstractPostgresIT {
@@ -72,6 +75,19 @@ class InterviewSessionRepositoryIT extends AbstractPostgresIT {
                 .score(score)
                 .text("Фидбэк")
                 .build();
+    }
+
+    private InterviewReport aReport(InterviewSession session) {
+        return InterviewReport.builder()
+                .session(session)
+                .avgScore(4.0)
+                .offerProbability(InterviewReport.OfferProbability.MEDIUM)
+                .overallFeedback("Хороший результат")
+                .build();
+    }
+
+    private Statistics statistics() {
+        return em.getEntityManager().getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
     }
 
     // =========================================================================
@@ -206,4 +222,53 @@ class InterviewSessionRepositoryIT extends AbstractPostgresIT {
         }
     }
 
+    @Nested
+    @DisplayName("Списки сессий подгружают отчёты одним запросом")
+    class ListsFetchReports {
+
+        @Test
+        @DisplayName("findAllByUserIdOrderByCreatedDesc: один SQL-запрос вместе с отчётами")
+        void findAllByUserIdOrderByCreatedDescLoadsReportsInSingleQuery() {
+            // given
+            var user = em.persistAndFlush(aUser("list-reports@example.com"));
+            var snapshot = em.persistAndFlush(aVacancySnapshot());
+            for (int i = 0; i < 3; i++) {
+                em.persistAndFlush(aReport(em.persistAndFlush(aSession(user.getId(), snapshot.getId()))));
+            }
+            em.clear();
+            Statistics statistics = statistics();
+            statistics.clear();
+
+            // when
+            var sessions = repository.findAllByUserIdOrderByCreatedDesc(user.getId());
+
+            // then
+            assertThat(sessions).hasSize(3)
+                    .allSatisfy(s -> assertThat(s.getReport().getAvgScore()).isEqualTo(4.0));
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc: один SQL-запрос вместе с отчётами")
+        void findAllByUserIdAndVacancySnapshotIdInLoadsReportsInSingleQuery() {
+            // given
+            var user = em.persistAndFlush(aUser("vacancy-reports@example.com"));
+            var snapshot = em.persistAndFlush(aVacancySnapshot());
+            for (int i = 0; i < 3; i++) {
+                em.persistAndFlush(aReport(em.persistAndFlush(aSession(user.getId(), snapshot.getId()))));
+            }
+            em.clear();
+            Statistics statistics = statistics();
+            statistics.clear();
+
+            // when
+            var sessions = repository.findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(
+                    user.getId(), List.of(snapshot.getId()));
+
+            // then
+            assertThat(sessions).hasSize(3)
+                    .allSatisfy(s -> assertThat(s.getReport().getAvgScore()).isEqualTo(4.0));
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+        }
+    }
 }

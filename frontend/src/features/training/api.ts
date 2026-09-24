@@ -43,6 +43,7 @@ export interface TrainingSession {
   totalQuestions: number
   created: string
   completedAt: string | null
+  avgScore: number | null
 }
 
 export interface TrainingQuestion {

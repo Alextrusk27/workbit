@@ -120,7 +120,7 @@ class TrainingWriterTest {
             List<String> generated = List.of("Сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 3)).thenReturn(expectedResponse);
 
             // when
@@ -161,7 +161,7 @@ class TrainingWriterTest {
             // given
             TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 0, null, null);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 0, null, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(expectedResponse);
 
             // when
@@ -202,7 +202,7 @@ class TrainingWriterTest {
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.IN_PROGRESS,
-                    1, 4, null, null);
+                    1, 4, null, null, null);
             when(trainingSessionMapper.toResponse(session, 1, 4)).thenReturn(expectedResponse);
 
             // when
@@ -298,7 +298,7 @@ class TrainingWriterTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 1, null, null);
+                    sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 1, null, null, null);
             when(trainingSessionMapper.toResponse(session, 0, 1)).thenReturn(expectedResponse);
 
             // when
@@ -333,7 +333,7 @@ class TrainingWriterTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
             when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(
                     new TrainingSessionResponse(sessionId, "Java", PROFESSION, TrainingSession.Level.MEDIUM,
-                            TrainingSession.Status.CREATED, 0, 0, null, null));
+                            TrainingSession.Status.CREATED, 0, 0, null, null, null));
 
             // when
             trainingWriter.restartSession(sessionId);

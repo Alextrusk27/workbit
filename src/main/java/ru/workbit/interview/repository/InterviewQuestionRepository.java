@@ -31,7 +31,7 @@ public interface InterviewQuestionRepository extends JpaRepository<@NotNull Inte
             """)
     Optional<InterviewQuestion> findNextUnanswered(UUID sessionId);
 
-    List<InterviewQuestion> findAllByParentQuestionIdOrderByOrderIndex(UUID parentQuestionId);
+    long countByParentQuestionId(UUID parentQuestionId);
 
     /** Тексты основных вопросов, уже заданных этому пользователю в завершённых интервью по этой вакансии. */
     @Query("""

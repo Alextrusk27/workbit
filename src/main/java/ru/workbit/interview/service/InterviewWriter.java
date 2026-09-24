@@ -67,8 +67,8 @@ public class InterviewWriter {
     }
 
     /**
-     * Сохраняет очередной вопрос беседы: {@code MAIN} со следующим порядковым номером либо ребёнка
-     * текущего основного вопроса. Отвеченный вопрос помечается проверенным - по нему модель уже сходила.
+     * Сохраняет очередной вопрос беседы: {@code MAIN} со следующим порядковым номером либо
+     * уточнение к текущему основному вопросу. Отвеченный вопрос помечается проверенным - по нему модель уже сходила.
      */
     @Transactional
     public Optional<InterviewQuestionResponse> saveStep(UUID answeredQuestionId, InterviewQuestion.Kind kind,
@@ -162,7 +162,7 @@ public class InterviewWriter {
     private int nextOrderIndex(UUID sessionId, UUID parentQuestionId) {
         return parentQuestionId == null
                 ? (int) interviewQuestionRepository.countBySessionIdAndKind(sessionId, InterviewQuestion.Kind.MAIN) + 1
-                : interviewQuestionRepository.findAllByParentQuestionIdOrderByOrderIndex(parentQuestionId).size() + 1;
+                : (int) interviewQuestionRepository.countByParentQuestionId(parentQuestionId) + 1;
     }
 
     private InterviewSession saveNewSession(UUID userId, LlmInterviewPlan plan, UUID vacancySnapshotId,

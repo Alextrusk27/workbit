@@ -830,8 +830,8 @@ class InterviewServiceTest {
                     .build();
         }
 
-        private static InterviewQuestion aChild(UUID id, UUID parentId, InterviewQuestion.Kind kind, int orderIndex,
-                                                  boolean answered, boolean followUpChecked) {
+        private static InterviewQuestion aFollowUp(UUID id, UUID parentId, InterviewQuestion.Kind kind, int orderIndex,
+                                                     boolean answered, boolean followUpChecked) {
             return InterviewQuestion.builder()
                     .id(id)
                     .parentQuestionId(parentId)
@@ -1071,7 +1071,7 @@ class InterviewServiceTest {
             InterviewSession session = activeSession(5);
             UUID mainId = UUID.randomUUID();
             InterviewQuestion main = aMain(mainId, 1, true, false);
-            InterviewQuestion existingFollowUp = aChild(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
+            InterviewQuestion existingFollowUp = aFollowUp(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
                     1, true, false);
             session.setQuestions(List.of(main, existingFollowUp));
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
@@ -1100,7 +1100,7 @@ class InterviewServiceTest {
             InterviewSession session = activeSession(1);
             UUID mainId = UUID.randomUUID();
             InterviewQuestion main = aMain(mainId, 1, true, false);
-            InterviewQuestion existingFollowUp = aChild(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
+            InterviewQuestion existingFollowUp = aFollowUp(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
                     1, true, false);
             session.setQuestions(List.of(main, existingFollowUp));
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
@@ -1126,7 +1126,7 @@ class InterviewServiceTest {
             InterviewSession session = activeSession(5);
             UUID mainId = UUID.randomUUID();
             InterviewQuestion main = aMain(mainId, 1, true, false);
-            InterviewQuestion existingClarification = aChild(UUID.randomUUID(), mainId,
+            InterviewQuestion existingClarification = aFollowUp(UUID.randomUUID(), mainId,
                     InterviewQuestion.Kind.CLARIFICATION, 1, true, false);
             session.setQuestions(List.of(main, existingClarification));
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
@@ -1156,7 +1156,7 @@ class InterviewServiceTest {
             InterviewSession session = activeSession(5);
             UUID mainId = UUID.randomUUID();
             InterviewQuestion main = aMain(mainId, 1, true, false);
-            InterviewQuestion redirect1 = aChild(UUID.randomUUID(), mainId, InterviewQuestion.Kind.REDIRECT,
+            InterviewQuestion redirect1 = aFollowUp(UUID.randomUUID(), mainId, InterviewQuestion.Kind.REDIRECT,
                     1, true, false);
             session.setQuestions(List.of(main, redirect1));
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
@@ -1235,7 +1235,7 @@ class InterviewServiceTest {
             UUID mainId = UUID.randomUUID();
             InterviewQuestion main = aMain(mainId, 1, true, false);
             List<InterviewQuestion> questions = new ArrayList<>(List.of(main));
-            IntStream.rangeClosed(1, 5).forEach(i -> questions.add(aChild(UUID.randomUUID(), mainId,
+            IntStream.rangeClosed(1, 5).forEach(i -> questions.add(aFollowUp(UUID.randomUUID(), mainId,
                     InterviewQuestion.Kind.REDIRECT, i, true, false)));
             session.setQuestions(questions);
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
@@ -1341,7 +1341,7 @@ class InterviewServiceTest {
             main.setText("Расскажите про SOLID");
             main.setTopic("SOLID");
             main.setAnswerText("Мой ответ про SOLID");
-            InterviewQuestion followUp = aChild(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
+            InterviewQuestion followUp = aFollowUp(UUID.randomUUID(), mainId, InterviewQuestion.Kind.FOLLOW_UP,
                     1, true, false);
             followUp.setText("А что такое OCP?");
             followUp.setTopic("SOLID");

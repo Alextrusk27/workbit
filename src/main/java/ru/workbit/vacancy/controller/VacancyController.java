@@ -32,7 +32,7 @@ public class VacancyController {
     private final VacancyService vacancyService;
 
     @GetMapping("/preview")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Предпросмотр вакансии",
             description = "По ссылке на вакансию hh.ru возвращает краткую сводку: название, работодателя, зарплату и "
@@ -64,7 +64,7 @@ public class VacancyController {
     }
 
     @GetMapping("/status")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Текущий статус вакансии",
             description = "Проверяет по ссылке, доступна ли вакансия на hh.ru: активна, в архиве или удалена. "
@@ -92,7 +92,7 @@ public class VacancyController {
     }
 
     @PostMapping("/statuses")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Текущие статусы нескольких вакансий",
             description = "Пакетный вариант /status: по списку ссылок (до 100) возвращает статус каждой вакансии на "

@@ -50,7 +50,7 @@ public class InterviewController {
     private final InterviewVacancyService interviewVacancyService;
 
     @PostMapping("/sessions")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Создать сессию интервью",
             description = "По ссылке на вакансию hh.ru загружает её данные, просит LLM составить план собеседования - "
@@ -87,7 +87,7 @@ public class InterviewController {
     }
 
     @GetMapping("/sessions/{sessionId}")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(summary = "Получить сессию по id", description = "Возвращает сессию интервью текущего пользователя.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -128,7 +128,7 @@ public class InterviewController {
     }
 
     @PostMapping("/sessions/{sessionId}/questions/next")
-    @Loggable(logArgs = true, logResult = true)
+    @Loggable(logArgs = true)
     @Operation(
             summary = "Получить следующий вопрос",
             description = "Возвращает уже заданный неотвеченный вопрос, а если такого нет - просит LLM продолжить "

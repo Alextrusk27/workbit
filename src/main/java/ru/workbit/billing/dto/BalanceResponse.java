@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
 public record BalanceResponse(
-        @Schema(description = "Остаток лимитов; просроченный баланс отдаётся нулём", example = "20")
+        @Schema(description = "Остаток лимитов", example = "20")
         int limits,
 
         @Schema(description = "Срок действия лимитов (UTC); null, если лимитов нет")

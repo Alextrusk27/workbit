@@ -7,8 +7,8 @@ public record InterviewQuestionResponse(
         @Schema(description = "Идентификатор вопроса")
         UUID questionId,
 
-        @Schema(description = "Порядковый номер (1-based): у основного вопроса — в сессии, "
-                + "у уточняющего — внутри своего вопроса", example = "1")
+        @Schema(description = "Порядковый номер (1-based): у основного вопроса - в сессии, "
+                + "у уточняющего - внутри своего вопроса", example = "1")
         int orderIndex,
 
         @Schema(description = "Текст вопроса")
@@ -20,12 +20,10 @@ public record InterviewQuestionResponse(
         @Schema(description = "Текст ответа пользователя, null пока не отвечен")
         String answerText,
 
-        @Schema(description = "Оценка ответа от LLM (1-5) с учётом уточнений; у уточняющих вопросов всегда null, "
-                + "до формирования отчёта null", example = "4")
+        @Schema(description = "Оценка ответа от LLM (1-5); null у уточняющих вопросов и до отчёта", example = "4")
         Integer score,
 
-        @Schema(description = "Текстовый фидбэк по ответу от LLM с учётом уточнений; у уточняющих вопросов "
-                + "всегда null, до формирования отчёта null")
+        @Schema(description = "Текстовый фидбэк по ответу от LLM; null у уточняющих вопросов и до отчёта")
         String feedback
 ) {
 }

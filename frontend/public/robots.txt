@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
 
+Clean-param: etext&ybaip
+
 Sitemap: https://workbit.ru/sitemap.xml

@@ -22,6 +22,8 @@ import {
   useCreateInterview,
   useInterviewVacancy,
 } from '@/features/interview/useInterview'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { interviewCreateErrorMessage } from '@/features/interview/errors'
 import { ApiRequestError } from '@/lib/api'
 import { useDebounced } from '@/lib/useDebounced'
@@ -116,80 +118,84 @@ function InterviewForm() {
       : null
 
   return (
-    <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-4.5">
-      {conflictVacancyId ? (
-        <UnfinishedInterviewNotice
-          to={
-            unfinished
-              ? `/app/interview/${unfinished.sessionId}`
-              : `/app/interview/vacancy/${conflictVacancyId}`
-          }
+    <>
+      <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-4.5">
+        {conflictVacancyId ? (
+          <UnfinishedInterviewNotice
+            to={
+              unfinished
+                ? `/app/interview/${unfinished.sessionId}`
+                : `/app/interview/vacancy/${conflictVacancyId}`
+            }
+          />
+        ) : (
+          create.isError &&
+          !isNotEnoughLimits(create.error) && (
+            <Alert>{interviewCreateErrorMessage(create.error)}</Alert>
+          )
+        )}
+
+        <Field
+          label="Ссылка на вакансию hh.ru"
+          hint="Например: https://hh.ru/vacancy/123456"
+          placeholder="https://hh.ru/vacancy/123456"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          value={url}
+          onChange={(e) => onUrlChange(e.target.value)}
+          required
         />
-      ) : (
-        create.isError && (
-          <Alert>{interviewCreateErrorMessage(create.error)}</Alert>
-        )
-      )}
 
-      <Field
-        label="Ссылка на вакансию hh.ru"
-        hint="Например: https://hh.ru/vacancy/123456"
-        placeholder="https://hh.ru/vacancy/123456"
-        type="url"
-        inputMode="url"
-        autoComplete="off"
-        value={url}
-        onChange={(e) => onUrlChange(e.target.value)}
-        required
-      />
+        {trimmed !== '' && !validUrl && (
+          <p className="text-dim text-[12.5px]">
+            Вставь прямую ссылку на вакансию hh.ru вида
+            https://hh.ru/vacancy/123456.
+          </p>
+        )}
 
-      {trimmed !== '' && !validUrl && (
-        <p className="text-dim text-[12.5px]">
-          Вставь прямую ссылку на вакансию hh.ru вида
-          https://hh.ru/vacancy/123456.
-        </p>
-      )}
+        {validUrl && preview.isLoading && (
+          <div
+            role="status"
+            className="border-line bg-card rounded-xl border px-6 py-5.5"
+          >
+            <span className="sr-only">Загрузка вакансии…</span>
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-3 h-6 w-2/3" />
+            <Skeleton className="mt-4 h-4 w-40" />
+          </div>
+        )}
 
-      {validUrl && preview.isLoading && (
-        <div
-          role="status"
-          className="border-line bg-card rounded-xl border px-6 py-5.5"
-        >
-          <span className="sr-only">Загрузка вакансии…</span>
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="mt-3 h-6 w-2/3" />
-          <Skeleton className="mt-4 h-4 w-40" />
+        {previewErrorText && <Alert>{previewErrorText}</Alert>}
+
+        {preview.data && <PreviewCard preview={preview.data} />}
+
+        <div>
+          <Button
+            type="submit"
+            disabled={
+              !validUrl ||
+              preview.isError ||
+              create.isPending ||
+              conflictVacancyId !== ''
+            }
+          >
+            {create.isPending ? (
+              'Готовим вопросы…'
+            ) : (
+              <>
+                Начать интервью · <Limits value={OPERATION_COST.interview} />
+              </>
+            )}
+          </Button>
+          <p className="text-dim mt-3 text-[12.5px]">
+            Рецензент прочитает вакансию и составит вопросы под неё — это займёт
+            несколько секунд.
+          </p>
         </div>
-      )}
-
-      {previewErrorText && <Alert>{previewErrorText}</Alert>}
-
-      {preview.data && <PreviewCard preview={preview.data} />}
-
-      <div>
-        <Button
-          type="submit"
-          disabled={
-            !validUrl ||
-            preview.isError ||
-            create.isPending ||
-            conflictVacancyId !== ''
-          }
-        >
-          {create.isPending ? (
-            'Готовим вопросы…'
-          ) : (
-            <>
-              Начать интервью · <Limits value={OPERATION_COST.interview} />
-            </>
-          )}
-        </Button>
-        <p className="text-dim mt-3 text-[12.5px]">
-          Рецензент прочитает вакансию и составит вопросы под неё — это займёт
-          несколько секунд.
-        </p>
-      </div>
-    </form>
+      </form>
+      <NotEnoughLimitsDialog error={create.error} onClose={create.reset} />
+    </>
   )
 }
 

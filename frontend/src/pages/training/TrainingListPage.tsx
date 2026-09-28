@@ -13,6 +13,8 @@ import { buttonClasses } from '@/components/ui/buttonStyles'
 import { OPERATION_COST } from '@/content/limits'
 import type { SessionStatus, TrainingSession } from '@/features/training/api'
 import { formatDate } from '@/lib/dates'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { trainingErrorMessage } from '@/features/training/errors'
 import {
   sessionHeadline,
@@ -249,7 +251,7 @@ function SessionCard({ session }: { session: TrainingSession }) {
         >
           Удалить
         </button>
-        {restart.isError && (
+        {restart.isError && !isNotEnoughLimits(restart.error) && (
           <p className="text-danger text-[12.5px]">
             {trainingErrorMessage(restart.error)}
           </p>
@@ -277,6 +279,8 @@ function SessionCard({ session }: { session: TrainingSession }) {
         onConfirm={onRestart}
         onClose={() => setConfirming(null)}
       />
+
+      <NotEnoughLimitsDialog error={restart.error} onClose={restart.reset} />
     </li>
   )
 }

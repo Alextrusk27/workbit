@@ -4,12 +4,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.content.model.SkillDict;
 
-public interface SkillDictRepository extends JpaRepository<@NotNull SkillDict, @NotNull UUID> {
+public interface SkillDictRepository extends JpaRepository<SkillDict, UUID> {
 
     Optional<SkillDict> findByProfessionIdAndMatchKey(UUID professionId, String matchKey);
 

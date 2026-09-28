@@ -1,13 +1,12 @@
 package ru.workbit.billing.repository;
 
 import java.time.Instant;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.billing.model.WelcomeGrant;
 
-public interface WelcomeGrantRepository extends JpaRepository<@NotNull WelcomeGrant, @NotNull String> {
+public interface WelcomeGrantRepository extends JpaRepository<WelcomeGrant, String> {
 
     @Modifying
     @Query(value = """

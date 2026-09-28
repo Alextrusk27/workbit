@@ -3,12 +3,11 @@ package ru.workbit.training.repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.training.model.TrainingQuestion;
 
-public interface TrainingQuestionRepository extends JpaRepository<@NotNull TrainingQuestion, @NotNull UUID> {
+public interface TrainingQuestionRepository extends JpaRepository<TrainingQuestion, UUID> {
 
     interface QuestionCounts {
         UUID getSessionId();

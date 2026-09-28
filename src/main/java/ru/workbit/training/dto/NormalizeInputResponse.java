@@ -7,15 +7,13 @@ public record NormalizeInputResponse(
         @Schema(description = "Удалось ли распознать навык")
         boolean skillRecognized,
 
-        @Schema(description = "Канонические варианты навыка для подтверждения пользователем, до 3-4; пустой список, "
-                + "если предлагать нечего")
+        @Schema(description = "Варианты навыка для подтверждения; пустой список, если предлагать нечего")
         List<String> skillSuggestions,
 
         @Schema(description = "Удалось ли распознать профессию")
         boolean professionRecognized,
 
-        @Schema(description = "Канонические варианты профессии для подтверждения пользователем, до 3-4; пустой список, "
-                + "если предлагать нечего")
+        @Schema(description = "Варианты профессии для подтверждения; пустой список, если предлагать нечего")
         List<String> professionSuggestions,
 
         @Schema(description = "Подходит ли навык профессии (мягкий сигнал, не блокировка)")

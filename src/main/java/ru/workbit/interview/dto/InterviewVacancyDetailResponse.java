@@ -22,8 +22,7 @@ public record InterviewVacancyDetailResponse(
         @Schema(description = "Интервью по вакансии, старые первыми")
         List<InterviewAttemptResponse> interviews,
 
-        @Schema(description = "Рекомендованные тренировки по отстающим навыкам из отчётов интервью, самые слабые "
-                + "первыми")
+        @Schema(description = "Рекомендованные тренировки по слабым навыкам, самые слабые первыми")
         List<RecommendedTrainingResponse> recommendedTrainings
 ) {
 }

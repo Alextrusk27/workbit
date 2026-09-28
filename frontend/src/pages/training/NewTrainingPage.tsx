@@ -19,6 +19,8 @@ import {
   useSkillSuggest,
   useTrainingOptions,
 } from '@/features/training/useTraining'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { trainingErrorMessage } from '@/features/training/errors'
 import { cn } from '@/lib/cn'
 import { useDebounced } from '@/lib/useDebounced'
@@ -360,60 +362,65 @@ function TrainingForm({ options }: { options: TrainingOptions }) {
   const pending = create.isPending || normalize.isPending
 
   return (
-    <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-6">
-      {create.isError && <Alert>{trainingErrorMessage(create.error)}</Alert>}
-
-      <SuggestField
-        label="Навык"
-        hint="Технология, область знаний или умение — по нему и будут вопросы"
-        placeholder="Spring Boot"
-        value={skill}
-        suggestions={skillOptions}
-        required
-        onChange={editSkill}
-        onPick={editSkill}
-      />
-
-      <SuggestField
-        label="Профессия"
-        hint="Уточняет, под каким углом смотреть на навык"
-        placeholder="Java-разработчик"
-        value={profession}
-        suggestions={professionOptions}
-        required
-        onChange={editProfession}
-        onPick={editProfession}
-      />
-
-      <ChipGroup
-        label="Уровень сложности"
-        options={options.levels}
-        value={level}
-        onChange={setLevel}
-      />
-
-      {checked && (
-        <ConfirmPanel
-          result={checked}
-          skill={skill}
-          profession={profession}
-          onPickSkill={setSkill}
-          onPickProfession={setProfession}
-        />
-      )}
-
-      <Button type="submit" disabled={!ready || blocked || pending}>
-        {create.isPending ? (
-          'Создаём…'
-        ) : normalize.isPending ? (
-          'Проверяем…'
-        ) : (
-          <>
-            Начать тренировку · <Limits value={OPERATION_COST.training} />
-          </>
+    <>
+      <form onSubmit={onSubmit} className="mt-10 max-w-160 space-y-6">
+        {create.isError && !isNotEnoughLimits(create.error) && (
+          <Alert>{trainingErrorMessage(create.error)}</Alert>
         )}
-      </Button>
-    </form>
+
+        <SuggestField
+          label="Навык"
+          hint="Технология, область знаний или умение — по нему и будут вопросы"
+          placeholder="Spring Boot"
+          value={skill}
+          suggestions={skillOptions}
+          required
+          onChange={editSkill}
+          onPick={editSkill}
+        />
+
+        <SuggestField
+          label="Профессия"
+          hint="Уточняет, под каким углом смотреть на навык"
+          placeholder="Java-разработчик"
+          value={profession}
+          suggestions={professionOptions}
+          required
+          onChange={editProfession}
+          onPick={editProfession}
+        />
+
+        <ChipGroup
+          label="Уровень сложности"
+          options={options.levels}
+          value={level}
+          onChange={setLevel}
+        />
+
+        {checked && (
+          <ConfirmPanel
+            result={checked}
+            skill={skill}
+            profession={profession}
+            onPickSkill={setSkill}
+            onPickProfession={setProfession}
+          />
+        )}
+
+        <Button type="submit" disabled={!ready || blocked || pending}>
+          {create.isPending ? (
+            'Создаём…'
+          ) : normalize.isPending ? (
+            'Проверяем…'
+          ) : (
+            <>
+              Начать тренировку · <Limits value={OPERATION_COST.training} />
+            </>
+          )}
+        </Button>
+      </form>
+      <NotEnoughLimitsDialog error={create.error} onClose={create.reset} />
+    </>
   )
 }
 

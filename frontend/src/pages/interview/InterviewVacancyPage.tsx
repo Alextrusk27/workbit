@@ -22,6 +22,8 @@ import {
   trainingLevelCode,
   VACANCY_STATUS_LABELS,
 } from '@/features/interview/labels'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { interviewCreateErrorMessage } from '@/features/interview/errors'
 import {
   useCreateInterview,
@@ -242,7 +244,7 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
         </div>
       </div>
 
-      {create.isError && (
+      {create.isError && !isNotEnoughLimits(create.error) && (
         <div className="mt-5">
           <Alert>{interviewCreateErrorMessage(create.error)}</Alert>
         </div>
@@ -261,6 +263,8 @@ function VacancyHeader({ detail }: { detail: InterviewVacancyDetail }) {
         onConfirm={onDelete}
         onClose={() => setConfirming(false)}
       />
+
+      <NotEnoughLimitsDialog error={create.error} onClose={create.reset} />
     </div>
   )
 }

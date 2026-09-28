@@ -8,6 +8,8 @@ import { MarginNote } from '@/components/ui/MarginNote'
 import { Spinner } from '@/components/ui/Spinner'
 import { Stars } from '@/components/ui/Stars'
 import { OPERATION_COST } from '@/content/limits'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { useTopUpModal } from '@/features/billing/useTopUpModal'
 import { billingKeys, useBalance } from '@/features/billing/useBilling'
 import { trainingApi, type TrainingQuestion } from '@/features/training/api'
@@ -131,11 +133,12 @@ export function ReferenceAnswer({
           Готовим эталонный ответ…
         </p>
       )}
-      {isError && (
+      {isError && !isNotEnoughLimits(error) && (
         <div className="mt-3">
-          <Alert>{trainingErrorMessage(error, 'reference')}</Alert>
+          <Alert>{trainingErrorMessage(error)}</Alert>
         </div>
       )}
+      <NotEnoughLimitsDialog error={error} onClose={() => setOpen(false)} />
       {data && (
         <>
           <p className="text-muted mt-3 max-w-[78ch] text-[15px] break-words whitespace-pre-wrap">

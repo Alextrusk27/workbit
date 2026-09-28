@@ -1,6 +1,3 @@
-import type { ReactNode } from 'react'
-import { OPERATION_COST } from '@/content/limits'
-import { TopUpLink } from '@/features/billing/TopUpLink'
 import { apiErrorDetail, getErrorMessage } from '@/lib/api'
 
 /** Детали training-ошибок с бэка (ApiError.errors[0]). Стабильный контракт для UI. */
@@ -9,17 +6,8 @@ const TRAINING_DETAIL = {
   PROFESSION_NOT_RECOGNIZED: 'Profession not recognized',
   NO_NEW_QUESTIONS: 'No new questions available',
   QUESTION_LIMIT_REACHED: 'Question limit reached',
-  NOT_ENOUGH_LIMITS: 'Not enough limits',
   PURCHASE_REQUIRED: 'Purchase required',
 } as const
-
-export type TrainingOperation = 'training' | 'more' | 'reference'
-
-const OPERATION_NAME: Record<TrainingOperation, string> = {
-  training: 'тренировка',
-  more: 'добор вопросов',
-  reference: 'эталонный ответ',
-}
 
 const RU_MESSAGE: Record<string, string> = {
   [TRAINING_DETAIL.SKILL_NOT_RECOGNIZED]:
@@ -35,18 +23,8 @@ const RU_MESSAGE: Record<string, string> = {
 }
 
 /** Русское сообщение training-ошибки: известные случаи маппим, иначе — общий текст. */
-export function trainingErrorMessage(
-  error: unknown,
-  operation: TrainingOperation = 'training',
-): ReactNode {
+export function trainingErrorMessage(error: unknown): string {
   const detail = apiErrorDetail(error)
-  if (detail === TRAINING_DETAIL.NOT_ENOUGH_LIMITS)
-    return (
-      <>
-        Не хватает лимитов: {OPERATION_NAME[operation]} стоит{' '}
-        {OPERATION_COST[operation]}. <TopUpLink />.
-      </>
-    )
   if (detail && RU_MESSAGE[detail]) return RU_MESSAGE[detail]
   return getErrorMessage(error)
 }

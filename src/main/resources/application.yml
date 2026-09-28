@@ -92,6 +92,9 @@ management:
     web:
       exposure:
         include: health, info
+  health:
+    mail:
+      enabled: false
 
 llm:
   prompts-dir: ${LLM_PROMPTS_DIR:classpath:llm}

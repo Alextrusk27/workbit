@@ -15,7 +15,7 @@ import { motionTokens, springs } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 const links = [
-  { label: 'AI-интервью', to: '/ai-interview' },
+  { label: 'ИИ-интервью', to: '/ai-interview' },
   { label: 'Тренажёр навыков', to: '/skills-trainer' },
   { label: 'FAQ', to: '/faq' },
   { label: 'Блог', to: '/blog' },

@@ -205,7 +205,7 @@ function SessionRun({ session }: { session: InterviewSession }) {
 
       <ChatShell
         className="mt-6"
-        name={`AI-интервьюер — ${interviewer}`}
+        name={`ИИ-интервьюер — ${interviewer}`}
         avatarUrl={session.employerLogoUrl}
         status={finishing ? 'формируем разбор' : 'интервью идёт'}
         bodyRef={bodyRef}

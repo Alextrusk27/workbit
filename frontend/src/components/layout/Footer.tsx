@@ -8,7 +8,7 @@ const columns = [
   {
     title: 'Продукт',
     links: [
-      { label: 'AI-интервью', to: '/ai-interview' },
+      { label: 'ИИ-интервью', to: '/ai-interview' },
       { label: 'Тренажёр навыков', to: '/skills-trainer' },
     ],
   },
@@ -47,7 +47,7 @@ export function Footer() {
           <div className="col-span-2 flex max-w-[36ch] flex-col gap-2.5 sm:col-span-4 lg:col-span-1">
             <Logo />
             <p className="text-muted text-[13px]">
-              Тренажёр собеседований с AI-рецензентом под профессию или навык
+              Тренажёр собеседований с ИИ-рецензентом под профессию или навык
             </p>
             <div className="text-dim flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
               <span>

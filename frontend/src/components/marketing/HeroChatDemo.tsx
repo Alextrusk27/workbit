@@ -130,7 +130,7 @@ export function HeroChatDemo() {
     >
       <div aria-hidden>
         <ChatShell
-          name="AI-интервьюер"
+          name="ИИ-интервьюер"
           status="онлайн"
           className="grid h-[29rem] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]"
           bodyRef={bodyRef}

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const BASE_TITLE = 'Workbit — тренажёр собеседований с AI'
+const BASE_TITLE = 'Workbit — тренажёр собеседований с ИИ'
 
 /** Заголовок вкладки: «<title> — Workbit»; без аргумента — базовый. */
 export function usePageTitle(title?: string) {

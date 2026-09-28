@@ -4,13 +4,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 
-public interface ProfessionDictRepository extends JpaRepository<@NotNull ProfessionDict, @NotNull UUID> {
+public interface ProfessionDictRepository extends JpaRepository<ProfessionDict, UUID> {
 
     List<ProfessionDict> findTop20ByStatusOrderByUsageCountDesc(DictStatus status);
 

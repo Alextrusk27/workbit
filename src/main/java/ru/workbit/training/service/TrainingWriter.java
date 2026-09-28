@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.billing.model.UsageEvent;
@@ -146,8 +147,8 @@ class TrainingWriter {
                 + ", вопрос " + question.getOrderIndex();
     }
 
-    private static TrainingQuestion buildQuestion(TrainingSession session, String text, UUID bankQuestionId,
-                                                  String referenceAnswer, int orderIndex) {
+    private static TrainingQuestion buildQuestion(TrainingSession session, String text, @Nullable UUID bankQuestionId,
+                                                  @Nullable String referenceAnswer, int orderIndex) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
                 .bankQuestionId(bankQuestionId)

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import org.jspecify.annotations.Nullable;
 
 public record RequestCodeRequest(
         @Schema(
@@ -18,6 +19,6 @@ public record RequestCodeRequest(
         boolean personalDataConsent,
 
         @Schema(description = "Токен Yandex SmartCaptcha; обязателен, когда проверка капчи включена")
-        String captchaToken
+        @Nullable String captchaToken
 ) {
 }

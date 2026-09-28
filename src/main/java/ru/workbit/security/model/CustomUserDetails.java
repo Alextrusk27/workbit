@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -16,12 +16,12 @@ public class CustomUserDetails implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     @Override
-    public @NotNull String getUsername() {
+    public String getUsername() {
         return email;
     }
 
     @Override
-    public String getPassword() {
+    public @Nullable String getPassword() {
         return null;
     }
 }

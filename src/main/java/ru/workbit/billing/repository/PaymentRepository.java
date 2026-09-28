@@ -4,13 +4,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.billing.model.Payment;
 
-public interface PaymentRepository extends JpaRepository<@NotNull Payment, @NotNull UUID> {
+public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     Optional<Payment> findByInvId(int invId);
 

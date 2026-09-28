@@ -2,7 +2,6 @@ package ru.workbit.security.config;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -49,8 +48,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public FilterRegistrationBean<@NotNull JWTAuthFilter> jwtAuthFilterRegistration(JWTAuthFilter filter) {
-        FilterRegistrationBean<@NotNull JWTAuthFilter> registration = new FilterRegistrationBean<>(filter);
+    public FilterRegistrationBean<JWTAuthFilter> jwtAuthFilterRegistration(JWTAuthFilter filter) {
+        FilterRegistrationBean<JWTAuthFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

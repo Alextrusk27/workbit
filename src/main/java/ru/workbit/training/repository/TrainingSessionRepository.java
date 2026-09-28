@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -12,14 +11,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.training.model.TrainingSession;
 
-public interface TrainingSessionRepository extends JpaRepository<@NotNull TrainingSession, @NotNull UUID> {
+public interface TrainingSessionRepository extends JpaRepository<TrainingSession, UUID> {
 
-    boolean existsByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
+    boolean existsByIdAndUserId(UUID id, UUID userId);
 
     @EntityGraph(attributePaths = "report")
-    Page<@NotNull TrainingSession> findAllByUserId(@NotNull UUID userId, Pageable pageable);
+    Page<TrainingSession> findAllByUserId(UUID userId, Pageable pageable);
 
-    Optional<TrainingSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
+    Optional<TrainingSession> findByIdAndUserId(UUID id, UUID userId);
 
     @EntityGraph(attributePaths = "report")
     @Query("""
@@ -27,7 +26,7 @@ public interface TrainingSessionRepository extends JpaRepository<@NotNull Traini
             WHERE ts.userId = :userId AND LOWER(ts.skill) IN :skills
             ORDER BY ts.created DESC
             """)
-    List<TrainingSession> findAllByUserIdAndLoweredSkillIn(@NotNull UUID userId, @NotNull Collection<String> skills);
+    List<TrainingSession> findAllByUserIdAndLoweredSkillIn(UUID userId, Collection<String> skills);
 
     @Query("""
             SELECT ts FROM TrainingSession ts
@@ -35,5 +34,5 @@ public interface TrainingSessionRepository extends JpaRepository<@NotNull Traini
             LEFT JOIN FETCH q.feedback
             WHERE ts.id = :id
             """)
-    Optional<TrainingSession> findWithQuestionsById(@NotNull UUID id);
+    Optional<TrainingSession> findWithQuestionsById(UUID id);
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.within;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -13,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
@@ -76,6 +78,7 @@ class ResumeRepositoryIT extends AbstractPostgresIT {
                 .build();
     }
 
+    @SuppressWarnings("resource")
     private Statistics statistics() {
         return em.getEntityManager().getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
     }
@@ -491,18 +494,13 @@ class ResumeRepositoryIT extends AbstractPostgresIT {
             assertThat(b.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isEqualTo(1);
         }
 
-        private void awaitWaitingAdvisoryLock() throws InterruptedException {
-            var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
-            while (System.nanoTime() < deadline) {
-                var waiting = jdbcTemplate.queryForObject("SELECT count(*) FROM pg_locks "
-                        + "WHERE locktype = 'advisory' AND NOT granted AND database = "
-                        + "(SELECT oid FROM pg_database WHERE datname = current_database())", Long.class);
-                if (waiting != null && waiting > 0) {
-                    return;
-                }
-                Thread.sleep(50);
-            }
-            throw new AssertionError("Вторая транзакция не встала в ожидание advisory-блокировки");
+        private void awaitWaitingAdvisoryLock() {
+            Awaitility.await("вторая транзакция ждёт advisory-блокировку")
+                    .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+                    .until(() -> jdbcTemplate.queryForObject("SELECT count(*) FROM pg_locks "
+                            + "WHERE locktype = 'advisory' AND NOT granted AND database = "
+                            + "(SELECT oid FROM pg_database WHERE datname = current_database())", Long.class),
+                            waiting -> waiting != null && waiting > 0);
         }
 
         private void await(CountDownLatch latch) {

@@ -1,12 +1,15 @@
 package ru.workbit.resume.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
@@ -244,6 +248,55 @@ class ResumeControllerTest {
         void returns401WithoutAuth() throws Exception {
             // when / then
             mvc.perform(get(BASE))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(resumeService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Delete")
+    class Delete {
+
+        @Test
+        @DisplayName("Возвращает 204 без тела и вызывает сервис с id пользователя и id из пути")
+        void returns204AndCallsService() throws Exception {
+            // when
+            mvc.perform(delete(BASE + "/" + RESUME_ID).with(user(principal())))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            // then
+            verify(resumeService).delete(USER_ID, RESUME_ID);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404 и сообщение, когда резюме не найдено")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            doThrow(new NotFoundException("Resume not found")).when(resumeService).delete(USER_ID, RESUME_ID);
+
+            // when / then
+            mvc.perform(delete(BASE + "/" + RESUME_ID).with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Resume not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда id в пути не UUID, и не вызывает сервис")
+        void returns400WhenIdNotUuid() throws Exception {
+            // when / then
+            mvc.perform(delete(BASE + "/not-a-uuid").with(user(principal())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"))
+                    .andExpect(jsonPath("$.errors[0]").value("Parameter 'id' should be of type java.util.UUID"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401 без аутентификации и не вызывает сервис")
+        void returns401WithoutAuth() throws Exception {
+            // when / then
+            mvc.perform(delete(BASE + "/" + RESUME_ID))
                     .andExpect(status().isUnauthorized());
             verifyNoInteractions(resumeService);
         }

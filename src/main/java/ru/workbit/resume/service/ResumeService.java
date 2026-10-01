@@ -47,6 +47,10 @@ public class ResumeService {
                 () -> doUpload(userId, filename, content));
     }
 
+    public void delete(UUID userId, UUID resumeId) {
+        writer.delete(userId, resumeId);
+    }
+
     static void checkLimit(long resumeCount) {
         if (resumeCount >= MAX_RESUMES_PER_USER) {
             throw new ConflictException(RESUME_LIMIT_REACHED);

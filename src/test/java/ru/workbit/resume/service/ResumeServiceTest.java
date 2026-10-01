@@ -2,6 +2,7 @@ package ru.workbit.resume.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -36,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.resume.dto.ResumeResponse;
@@ -51,6 +54,7 @@ import ru.workbit.util.SingleFlight;
 @DisplayName("ResumeServiceTest")
 class ResumeServiceTest {
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID RESUME_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final String FILENAME = "Иванов Java.pdf";
     private static final byte[] PDF_BYTES = "%PDF-1.7 body".getBytes(StandardCharsets.US_ASCII);
     private static final RateLimitProperties.Bucket UPLOAD_BUCKET =
@@ -362,13 +366,10 @@ class ResumeServiceTest {
             });
         }
 
-        private void awaitWaiting(Thread thread) throws InterruptedException {
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
-            while (thread.getState() != Thread.State.WAITING) {
-                assertThat(thread.getState()).isNotEqualTo(Thread.State.TERMINATED);
-                assertThat(System.nanoTime()).isLessThan(deadline);
-                Thread.sleep(5);
-            }
+        private void awaitWaiting(Thread thread) {
+            await().atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+                    .failFast(() -> thread.getState() == Thread.State.TERMINATED)
+                    .until(() -> thread.getState() == Thread.State.WAITING);
         }
     }
 
@@ -403,6 +404,34 @@ class ResumeServiceTest {
 
             // when / then
             assertThat(service.list(USER_ID)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("Delete")
+    class Delete {
+
+        @Test
+        @DisplayName("Делегирует удаление в writer с теми же userId и resumeId")
+        void delegatesToWriter() {
+            // when
+            service.delete(USER_ID, RESUME_ID);
+
+            // then
+            verify(writer).delete(USER_ID, RESUME_ID);
+            verifyNoMoreInteractions(writer);
+            verifyNoInteractions(storage);
+        }
+
+        @Test
+        @DisplayName("Пробрасывает NotFoundException от writer")
+        void propagatesNotFound() {
+            // given
+            RuntimeException notFound = new NotFoundException("Resume not found");
+            doThrow(notFound).when(writer).delete(USER_ID, RESUME_ID);
+
+            // when / then
+            assertThatThrownBy(() -> service.delete(USER_ID, RESUME_ID)).isSameAs(notFound);
         }
     }
 }

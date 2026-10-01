@@ -3,6 +3,7 @@ package ru.workbit.resume.controller;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,5 +32,12 @@ public class ResumeController implements ResumeApi {
         return ResponseEntity
                 .created(URI.create("/api/v1/resumes/" + resume.id()))
                 .body(resume);
+    }
+
+    @Override
+    @Loggable
+    public ResponseEntity<Void> delete(UUID id, CustomUserDetails userDetails) {
+        resumeService.delete(userDetails.getId(), id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -7,6 +7,7 @@ const RESUME_DETAIL = {
   FILE_TOO_LARGE: 'File too large',
   RESUME_LIMIT_REACHED: 'Resume limit reached',
   TOO_MANY_REQUESTS: 'Too many requests',
+  RESUME_NOT_FOUND: 'Resume not found',
 } as const
 
 export const FILE_TOO_LARGE_MESSAGE = 'Файл больше 5 МБ.'
@@ -23,6 +24,7 @@ const RU_MESSAGE: Record<string, string> = {
     'У тебя уже 3 резюме. Удали одно, чтобы загрузить новое.',
   [RESUME_DETAIL.TOO_MANY_REQUESTS]:
     'Слишком много загрузок за сутки. Попробуй завтра.',
+  [RESUME_DETAIL.RESUME_NOT_FOUND]: 'Резюме уже удалено.',
 }
 
 export function resumeErrorMessage(error: unknown): string {

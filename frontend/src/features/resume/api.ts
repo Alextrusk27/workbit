@@ -21,4 +21,6 @@ export const resumeApi = {
     formData.append('file', file)
     return apiFetch<Resume>(BASE, { method: 'POST', body: formData })
   },
+
+  remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: 'DELETE' }),
 }

@@ -23,3 +23,11 @@ export function useUploadResume() {
     },
   })
 }
+
+export function useDeleteResume() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: resumeApi.remove,
+    onSettled: () => qc.invalidateQueries({ queryKey: resumeKeys.list }),
+  })
+}

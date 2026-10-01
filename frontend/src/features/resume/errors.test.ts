@@ -44,6 +44,12 @@ describe('resumeErrorMessage', () => {
     )
   })
 
+  it('не найденное резюме называет уже удалённым', () => {
+    expect(resumeErrorMessage(apiError('Resume not found'))).toBe(
+      'Резюме уже удалено.',
+    )
+  })
+
   it('слишком частые загрузки просит попробовать завтра', () => {
     expect(resumeErrorMessage(apiError('Too many requests'))).toBe(
       'Слишком много загрузок за сутки. Попробуй завтра.',

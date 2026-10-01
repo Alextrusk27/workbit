@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
@@ -12,7 +13,11 @@ import {
   RESUME_ACCEPT,
   resumeFileError,
 } from '@/features/resume/files'
-import { useResumes, useUploadResume } from '@/features/resume/useResumes'
+import {
+  useDeleteResume,
+  useResumes,
+  useUploadResume,
+} from '@/features/resume/useResumes'
 import { getErrorMessage } from '@/lib/api'
 import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -157,15 +162,49 @@ function EmptyState({
 }
 
 function ResumeCard({ resume }: { resume: Resume }) {
+  const del = useDeleteResume()
+  const [confirming, setConfirming] = useState(false)
+
+  const onDelete = () => {
+    setConfirming(false)
+    del.mutate(resume.id)
+  }
+
   return (
-    <li className="border-line bg-card rounded-xl border px-6 py-5.5">
-      <h2 className="text-ink text-[17px] font-semibold tracking-[-0.01em] break-words">
-        {resume.name}
-      </h2>
-      <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[12.5px]">
-        <span>{resume.format}</span>
-        <span>{formatDate(resume.uploadedAt)}</span>
+    <li className="border-line bg-card flex flex-wrap justify-between gap-5 rounded-xl border px-6 py-5.5">
+      <div className="min-w-0">
+        <h2 className="text-ink text-[17px] font-semibold tracking-[-0.01em] break-words">
+          {resume.name}
+        </h2>
+        <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[12.5px]">
+          <span>{resume.format}</span>
+          <span>{formatDate(resume.uploadedAt)}</span>
+        </div>
       </div>
+
+      <div className="flex flex-col items-center justify-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={del.isPending}
+          className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
+        >
+          Удалить
+        </button>
+        {del.isError && (
+          <p className="text-danger text-[12.5px]">
+            {resumeErrorMessage(del.error)}
+          </p>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Удалить резюме?"
+        text={`Резюме «${resume.name}» будет удалено вместе с файлом.`}
+        onConfirm={onDelete}
+        onClose={() => setConfirming(false)}
+      />
     </li>
   )
 }

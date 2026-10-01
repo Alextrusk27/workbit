@@ -7,7 +7,11 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Resume } from '@/features/resume/api'
 import { resumeErrorMessage } from '@/features/resume/errors'
-import { RESUME_ACCEPT, resumeFileError } from '@/features/resume/files'
+import {
+  MAX_RESUMES,
+  RESUME_ACCEPT,
+  resumeFileError,
+} from '@/features/resume/files'
 import { useResumes, useUploadResume } from '@/features/resume/useResumes'
 import { getErrorMessage } from '@/lib/api'
 import { formatDate } from '@/lib/dates'
@@ -18,6 +22,7 @@ export function ResumeListPage() {
   const { data: resumes, isLoading, isError, error } = useResumes()
   const upload = useUploadResume()
   const hasResumes = !!resumes?.length
+  const atLimit = (resumes?.length ?? 0) >= MAX_RESUMES
   const inputRef = useRef<HTMLInputElement>(null)
   const [fileError, setFileError] = useState<string | null>(null)
 
@@ -44,7 +49,11 @@ export function ResumeListPage() {
         title="Мои резюме"
         actions={
           hasResumes && (
-            <UploadButton pending={upload.isPending} onClick={pickFile} />
+            <UploadButton
+              pending={upload.isPending}
+              disabled={atLimit}
+              onClick={pickFile}
+            />
           )
         }
       />
@@ -58,6 +67,12 @@ export function ResumeListPage() {
       />
 
       <div className="mt-8 flex flex-col gap-4">
+        {atLimit && (
+          <p className="text-muted text-sm">
+            У тебя {MAX_RESUMES} резюме. Удали одно, чтобы загрузить новое.
+          </p>
+        )}
+
         {fileError && <Alert>{fileError}</Alert>}
         {upload.isError && <Alert>{resumeErrorMessage(upload.error)}</Alert>}
 
@@ -83,15 +98,17 @@ export function ResumeListPage() {
 
 function UploadButton({
   pending,
+  disabled,
   onClick,
   size,
 }: {
   pending: boolean
+  disabled?: boolean
   onClick: () => void
   size?: 'lg'
 }) {
   return (
-    <Button size={size} onClick={onClick} disabled={pending}>
+    <Button size={size} onClick={onClick} disabled={pending || disabled}>
       {pending ? (
         <>
           <Spinner className="size-4 border-white" />

@@ -26,6 +26,15 @@ export function useUploadResume() {
   })
 }
 
+export function useRenameResume() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      resumeApi.rename(id, name),
+    onSettled: () => qc.invalidateQueries({ queryKey: resumeKeys.list }),
+  })
+}
+
 export function useDeleteResume() {
   const qc = useQueryClient()
   return useMutation({

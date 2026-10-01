@@ -22,6 +22,9 @@ export const resumeApi = {
     return apiFetch<Resume>(BASE, { method: 'POST', body: formData })
   },
 
+  rename: (id: string, name: string) =>
+    apiFetch<Resume>(`${BASE}/${id}`, { method: 'PATCH', body: { name } }),
+
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: 'DELETE' }),
 
   file: (id: string) => apiFetchBlob(`${BASE}/${id}/file`),

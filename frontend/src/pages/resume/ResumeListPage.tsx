@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import type { Resume } from '@/features/resume/api'
 import { resumeErrorMessage } from '@/features/resume/errors'
 import { ResumePreviewDialog } from '@/features/resume/ResumePreviewDialog'
+import { ResumeRenameDialog } from '@/features/resume/ResumeRenameDialog'
 import {
   MAX_RESUMES,
   RESUME_ACCEPT,
@@ -168,6 +169,7 @@ function ResumeCard({ resume }: { resume: Resume }) {
   const download = useDownloadResume()
   const [confirming, setConfirming] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const error = del.error ?? download.error
 
   const onDelete = () => {
@@ -196,6 +198,9 @@ function ResumeCard({ resume }: { resume: Resume }) {
           >
             Скачать
           </CardAction>
+          <CardAction onClick={() => setRenaming(true)}>
+            Переименовать
+          </CardAction>
           <CardAction
             onClick={() => setConfirming(true)}
             disabled={del.isPending}
@@ -214,6 +219,11 @@ function ResumeCard({ resume }: { resume: Resume }) {
         resume={resume}
         open={previewing}
         onClose={() => setPreviewing(false)}
+      />
+      <ResumeRenameDialog
+        resume={resume}
+        open={renaming}
+        onClose={() => setRenaming(false)}
       />
       <ConfirmDialog
         open={confirming}

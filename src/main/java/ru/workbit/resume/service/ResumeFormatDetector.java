@@ -45,6 +45,15 @@ public class ResumeFormatDetector {
         throw new UnprocessableEntityException(UNSUPPORTED_FORMAT);
     }
 
+    public Charset textCharset(byte[] content) {
+        try {
+            decodeUtf8(content);
+            return StandardCharsets.UTF_8;
+        } catch (CharacterCodingException e) {
+            return WINDOWS_1251;
+        }
+    }
+
     private static String head(byte[] content) {
         int length = Math.min(content.length, PDF_SIGNATURE_WINDOW);
         return new String(content, 0, length, StandardCharsets.ISO_8859_1);
@@ -74,17 +83,20 @@ public class ResumeFormatDetector {
     }
 
     private static String decode(byte[] content) {
-        int offset = startsWith(content, UTF8_BOM) ? UTF8_BOM.length : 0;
-        ByteBuffer bytes = ByteBuffer.wrap(content, offset, content.length - offset);
         try {
-            CharBuffer chars = StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(bytes);
-            return chars.toString();
+            return decodeUtf8(content).toString();
         } catch (CharacterCodingException e) {
             return new String(content, WINDOWS_1251);
         }
+    }
+
+    private static CharBuffer decodeUtf8(byte[] content) throws CharacterCodingException {
+        int offset = startsWith(content, UTF8_BOM) ? UTF8_BOM.length : 0;
+        ByteBuffer bytes = ByteBuffer.wrap(content, offset, content.length - offset);
+        return StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(bytes);
     }
 
     private static boolean isForbiddenControl(int c) {

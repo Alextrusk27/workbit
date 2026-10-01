@@ -1,5 +1,6 @@
 package ru.workbit.resume.service;
 
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -10,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.NotFoundException;
+import ru.workbit.resume.dto.ResumeFile;
 import ru.workbit.resume.dto.ResumeResponse;
 import ru.workbit.resume.model.Resume;
 import ru.workbit.resume.model.mapper.ResumeMapper;
@@ -24,6 +27,8 @@ import ru.workbit.util.SingleFlight;
 public class ResumeService {
     private static final int MAX_RESUMES_PER_USER = 3;
     private static final String RESUME_LIMIT_REACHED = "Resume limit reached";
+    static final String RESUME_NOT_FOUND = "Resume not found";
+    private static final String RESUME_FILE_MISSING = "Resume file missing";
 
     private final ResumeRepository resumeRepository;
     private final ResumeWriter writer;
@@ -49,6 +54,17 @@ public class ResumeService {
 
     public void delete(UUID userId, UUID resumeId) {
         writer.delete(userId, resumeId);
+    }
+
+    public ResumeFile file(UUID userId, UUID resumeId) {
+        Resume resume = resumeRepository.findByIdAndUserId(resumeId, userId)
+                .orElseThrow(() -> new NotFoundException(RESUME_NOT_FOUND));
+        byte[] content = storage.read(userId, resumeId).orElseThrow(() -> {
+            log.warn("Resume file missing uid={} resumeId={}", userId, resumeId);
+            return new NotFoundException(RESUME_FILE_MISSING);
+        });
+        Charset charset = resume.getFormat() == Resume.Format.TXT ? formatDetector.textCharset(content) : null;
+        return new ResumeFile(resume.getOriginalFilename(), resume.getFormat(), charset, content);
     }
 
     static void checkLimit(long resumeCount) {

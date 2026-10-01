@@ -2,6 +2,8 @@ package ru.workbit.resume.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -9,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +28,7 @@ import ru.workbit.security.model.CustomUserDetails;
 @RequestMapping("/api/v1/resumes")
 @Tag(name = "Resumes", description = "Резюме пользователя: исходные файлы")
 public interface ResumeApi {
+    String DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     @Operation(summary = "Список резюме")
     @SecurityRequirement(name = "bearerAuth")
@@ -49,6 +53,24 @@ public interface ResumeApi {
             @Parameter(description = "Файл резюме") @RequestPart("file") MultipartFile file,
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) throws IOException;
+
+    @Operation(summary = "Исходный файл резюме", description = "Отдаёт файл в том виде, в каком его загрузили.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Файл резюме", content = {
+                    @Content(mediaType = "application/pdf",
+                            schema = @Schema(type = "string", format = "binary")),
+                    @Content(mediaType = DOCX_MEDIA_TYPE,
+                            schema = @Schema(type = "string", format = "binary")),
+                    @Content(mediaType = "text/plain", schema = @Schema(type = "string", format = "binary"))
+            }),
+            @ApiResponse(responseCode = "404", description = "Резюме или файл не найдены")
+    })
+    @GetMapping("/{id}/file")
+    ResponseEntity<Resource> file(
+            @PathVariable UUID id,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
 
     @Operation(summary = "Удалить резюме", description = "Удаляет резюме вместе с исходным файлом.")
     @SecurityRequirement(name = "bearerAuth")

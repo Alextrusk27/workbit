@@ -15,12 +15,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -41,6 +43,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
+import ru.workbit.resume.dto.ResumeFile;
 import ru.workbit.resume.dto.ResumeResponse;
 import ru.workbit.resume.model.Resume;
 import ru.workbit.resume.model.mapper.ResumeMapper;
@@ -100,6 +103,16 @@ class ResumeServiceTest {
                 .name(name)
                 .originalFilename(name + ".pdf")
                 .format(Resume.Format.PDF)
+                .sizeBytes(100)
+                .build();
+    }
+
+    private static Resume aResumeOf(String originalFilename, Resume.Format format) {
+        return Resume.builder()
+                .userId(USER_ID)
+                .name("Резюме")
+                .originalFilename(originalFilename)
+                .format(format)
                 .sizeBytes(100)
                 .build();
     }
@@ -404,6 +417,99 @@ class ResumeServiceTest {
 
             // when / then
             assertThat(service.list(USER_ID)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("File")
+    class File {
+        private static final byte[] TXT_BYTES = "Иванов Иван, Java".getBytes(StandardCharsets.UTF_8);
+        private static final byte[] DOCX_BYTES = {'P', 'K', 3, 4, 1, 2};
+
+        @Test
+        @DisplayName("Возвращает имя, формат и байты PDF без кодировки и не зовёт детектор")
+        void returnsPdfWithoutCharset() {
+            // given
+            when(resumeRepository.findByIdAndUserId(RESUME_ID, USER_ID))
+                    .thenReturn(Optional.of(aResumeOf(FILENAME, Resume.Format.PDF)));
+            when(storage.read(USER_ID, RESUME_ID)).thenReturn(Optional.of(PDF_BYTES));
+
+            // when
+            ResumeFile result = service.file(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result.filename()).isEqualTo(FILENAME);
+            assertThat(result.format()).isEqualTo(Resume.Format.PDF);
+            assertThat(result.charset()).isNull();
+            assertThat(result.content()).isEqualTo(PDF_BYTES);
+            verifyNoInteractions(formatDetector);
+        }
+
+        @Test
+        @DisplayName("Возвращает DOCX без кодировки и не зовёт детектор")
+        void returnsDocxWithoutCharset() {
+            // given
+            when(resumeRepository.findByIdAndUserId(RESUME_ID, USER_ID))
+                    .thenReturn(Optional.of(aResumeOf("resume.docx", Resume.Format.DOCX)));
+            when(storage.read(USER_ID, RESUME_ID)).thenReturn(Optional.of(DOCX_BYTES));
+
+            // when
+            ResumeFile result = service.file(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result.filename()).isEqualTo("resume.docx");
+            assertThat(result.format()).isEqualTo(Resume.Format.DOCX);
+            assertThat(result.charset()).isNull();
+            assertThat(result.content()).isEqualTo(DOCX_BYTES);
+            verifyNoInteractions(formatDetector);
+        }
+
+        @Test
+        @DisplayName("Берёт кодировку TXT у детектора по байтам файла")
+        void returnsTxtWithDetectedCharset() {
+            // given
+            Charset windows1251 = Charset.forName("windows-1251");
+            when(resumeRepository.findByIdAndUserId(RESUME_ID, USER_ID))
+                    .thenReturn(Optional.of(aResumeOf("resume.txt", Resume.Format.TXT)));
+            when(storage.read(USER_ID, RESUME_ID)).thenReturn(Optional.of(TXT_BYTES));
+            when(formatDetector.textCharset(TXT_BYTES)).thenReturn(windows1251);
+
+            // when
+            ResumeFile result = service.file(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result.filename()).isEqualTo("resume.txt");
+            assertThat(result.format()).isEqualTo(Resume.Format.TXT);
+            assertThat(result.charset()).isEqualTo(windows1251);
+            assertThat(result.content()).isEqualTo(TXT_BYTES);
+        }
+
+        @Test
+        @DisplayName("Бросает NotFoundException и не читает файл, когда резюме нет у этого пользователя")
+        void throwsWhenResumeNotFound() {
+            // given
+            when(resumeRepository.findByIdAndUserId(RESUME_ID, USER_ID)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> service.file(USER_ID, RESUME_ID))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Resume not found");
+            verifyNoInteractions(storage, formatDetector);
+        }
+
+        @Test
+        @DisplayName("Бросает NotFoundException, когда файла в storage нет, и не зовёт детектор")
+        void throwsWhenFileMissing() {
+            // given
+            when(resumeRepository.findByIdAndUserId(RESUME_ID, USER_ID))
+                    .thenReturn(Optional.of(aResumeOf("resume.txt", Resume.Format.TXT)));
+            when(storage.read(USER_ID, RESUME_ID)).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> service.file(USER_ID, RESUME_ID))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessage("Resume file missing");
+            verifyNoInteractions(formatDetector);
         }
     }
 

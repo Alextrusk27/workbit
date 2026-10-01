@@ -3,8 +3,10 @@ package ru.workbit.resume.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,16 @@ public class ResumeFileStorage {
             Files.move(tmp, dir.resolve(resumeId.toString()), StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
             deleteQuietly(tmp);
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public Optional<byte[]> read(UUID userId, UUID resumeId) {
+        try {
+            return Optional.of(Files.readAllBytes(userDir(userId).resolve(resumeId.toString())));
+        } catch (NoSuchFileException e) {
+            return Optional.empty();
+        } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }

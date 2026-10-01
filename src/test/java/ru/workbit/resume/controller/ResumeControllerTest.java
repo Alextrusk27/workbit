@@ -1,6 +1,8 @@
 package ru.workbit.resume.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -14,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +37,7 @@ import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
+import ru.workbit.resume.dto.ResumeFile;
 import ru.workbit.resume.dto.ResumeResponse;
 import ru.workbit.resume.model.Resume;
 import ru.workbit.resume.service.ResumeService;
@@ -297,6 +301,156 @@ class ResumeControllerTest {
         void returns401WithoutAuth() throws Exception {
             // when / then
             mvc.perform(delete(BASE + "/" + RESUME_ID))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(resumeService);
+        }
+    }
+
+    @Nested
+    @DisplayName("File")
+    class File {
+
+        private static final String DOCX_TYPE =
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        private String url() {
+            return BASE + "/" + RESUME_ID + "/file";
+        }
+
+        @Test
+        @DisplayName("Отдаёт PDF: 200, application/pdf, inline и исходные байты")
+        void returnsPdfInline() throws Exception {
+            // given
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile("resume.pdf", Resume.Format.PDF, null, PDF_BYTES));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "application/pdf"))
+                    .andExpect(header().string("Content-Disposition", startsWith("inline")))
+                    .andExpect(content().bytes(PDF_BYTES));
+            verify(resumeService).file(USER_ID, RESUME_ID);
+        }
+
+        @Test
+        @DisplayName("Отдаёт DOCX: тип DOCX и attachment")
+        void returnsDocxAsAttachment() throws Exception {
+            // given
+            var bytes = new byte[] {'P', 'K', 3, 4, 1, 2};
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile("resume.docx", Resume.Format.DOCX, null, bytes));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", DOCX_TYPE))
+                    .andExpect(header().string("Content-Disposition", startsWith("attachment")))
+                    .andExpect(content().bytes(bytes));
+        }
+
+        @Test
+        @DisplayName("Отдаёт TXT в windows-1251 с charset в Content-Type и байтами без перекодирования")
+        void returnsTxtWindows1251Untouched() throws Exception {
+            // given
+            var charset = Charset.forName("windows-1251");
+            var bytes = "Привет, резюме".getBytes(charset);
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile("resume.txt", Resume.Format.TXT, charset, bytes));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", containsString("text/plain")))
+                    .andExpect(header().string("Content-Type", containsString("charset=windows-1251")))
+                    .andExpect(header().string("Content-Disposition", startsWith("inline")))
+                    .andExpect(content().bytes(bytes));
+        }
+
+        @Test
+        @DisplayName("Отдаёт TXT в UTF-8 с charset=UTF-8")
+        void returnsTxtUtf8() throws Exception {
+            // given
+            var bytes = "Привет".getBytes(StandardCharsets.UTF_8);
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile("resume.txt", Resume.Format.TXT, StandardCharsets.UTF_8, bytes));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", containsString("charset=UTF-8")))
+                    .andExpect(content().bytes(bytes));
+        }
+
+        @Test
+        @DisplayName("Кодирует кириллическое имя файла по RFC 5987 в Content-Disposition")
+        void encodesCyrillicFilename() throws Exception {
+            // given
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile(FILENAME, Resume.Format.PDF, null, PDF_BYTES));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Disposition", containsString("filename*=UTF-8''")))
+                    .andExpect(header().string("Content-Disposition",
+                            containsString("%D0%98%D0%B2%D0%B0%D0%BD%D0%BE%D0%B2")))
+                    .andExpect(header().string("Content-Disposition", not(containsString("Иванов"))));
+        }
+
+        @Test
+        @DisplayName("Добавляет Content-Security-Policy: sandbox и X-Frame-Options: DENY")
+        void addsSecurityHeaders() throws Exception {
+            // given
+            when(resumeService.file(USER_ID, RESUME_ID))
+                    .thenReturn(new ResumeFile("resume.pdf", Resume.Format.PDF, null, PDF_BYTES));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Security-Policy", "sandbox"))
+                    .andExpect(header().string("X-Frame-Options", "DENY"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 404 и Resume not found, когда резюме не найдено")
+        void returns404WhenResumeNotFound() throws Exception {
+            // given
+            when(resumeService.file(USER_ID, RESUME_ID)).thenThrow(new NotFoundException("Resume not found"));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Resume not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 404 и Resume file missing, когда файла нет на диске")
+        void returns404WhenFileMissing() throws Exception {
+            // given
+            when(resumeService.file(USER_ID, RESUME_ID)).thenThrow(new NotFoundException("Resume file missing"));
+
+            // when / then
+            mvc.perform(get(url()).with(user(principal())))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Resume file missing"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда id в пути не UUID, и не вызывает сервис")
+        void returns400WhenIdNotUuid() throws Exception {
+            // when / then
+            mvc.perform(get(BASE + "/not-a-uuid/file").with(user(principal())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value("Parameter 'id' should be of type java.util.UUID"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401 без аутентификации и не вызывает сервис")
+        void returns401WithoutAuth() throws Exception {
+            // when / then
+            mvc.perform(get(url()))
                     .andExpect(status().isUnauthorized());
             verifyNoInteractions(resumeService);
         }

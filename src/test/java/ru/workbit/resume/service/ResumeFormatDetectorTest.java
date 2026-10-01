@@ -296,6 +296,54 @@ class ResumeFormatDetectorTest {
     }
 
     @Nested
+    @DisplayName("TextCharset")
+    class TextCharset {
+
+        @Test
+        @DisplayName("Возвращает UTF-8 для UTF-8 с кириллицей")
+        void returnsUtf8ForCyrillic() {
+            // when
+            Charset charset = detector.textCharset(CYRILLIC_TEXT.getBytes(StandardCharsets.UTF_8));
+
+            // then
+            assertThat(charset).isEqualTo(StandardCharsets.UTF_8);
+        }
+
+        @Test
+        @DisplayName("Возвращает UTF-8 для UTF-8 с BOM")
+        void returnsUtf8ForBom() {
+            // given
+            byte[] content = concat(UTF8_BOM, CYRILLIC_TEXT.getBytes(StandardCharsets.UTF_8));
+
+            // when
+            Charset charset = detector.textCharset(content);
+
+            // then
+            assertThat(charset).isEqualTo(StandardCharsets.UTF_8);
+        }
+
+        @Test
+        @DisplayName("Возвращает UTF-8 для чистого ASCII")
+        void returnsUtf8ForAscii() {
+            // when
+            Charset charset = detector.textCharset(ascii("Java developer, Spring, PostgreSQL\n"));
+
+            // then
+            assertThat(charset).isEqualTo(StandardCharsets.UTF_8);
+        }
+
+        @Test
+        @DisplayName("Возвращает windows-1251 для байтов Windows-1251 с кириллицей")
+        void returnsWindows1251ForCyrillic() {
+            // when
+            Charset charset = detector.textCharset(CYRILLIC_TEXT.getBytes(WINDOWS_1251));
+
+            // then
+            assertThat(charset).isEqualTo(WINDOWS_1251);
+        }
+    }
+
+    @Nested
     @DisplayName("Unsupported")
     class Unsupported {
 

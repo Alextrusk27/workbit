@@ -26,7 +26,7 @@ class ResumeWriter {
     @Transactional
     public void delete(UUID userId, UUID resumeId) {
         Resume resume = resumeRepository.findByIdAndUserId(resumeId, userId)
-                .orElseThrow(() -> new NotFoundException("Resume not found"));
+                .orElseThrow(() -> new NotFoundException(ResumeService.RESUME_NOT_FOUND));
         resumeRepository.delete(resume);
         eventPublisher.publishEvent(new ResumeDeletedEvent(userId, resumeId));
     }

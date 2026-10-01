@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -149,6 +150,58 @@ class ResumeFileStorageTest {
             try (Stream<Path> files = Files.list(userDir)) {
                 assertThat(files.map(path -> path.getFileName().toString())).containsExactly(RESUME_ID.toString());
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("Read")
+    class Read {
+
+        @Test
+        @DisplayName("Читает те же байты, что записаны через write")
+        void readsWrittenBytes() {
+            // given
+            storage.write(USER_ID, RESUME_ID, CONTENT);
+
+            // when
+            Optional<byte[]> result = storage.read(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result).hasValue(CONTENT);
+        }
+
+        @Test
+        @DisplayName("Возвращает empty, когда файла нет, а папка пользователя есть")
+        void returnsEmptyWhenFileMissing() {
+            // given
+            storage.write(USER_ID, UUID.fromString("33333333-3333-3333-3333-333333333333"), CONTENT);
+
+            // when
+            Optional<byte[]> result = storage.read(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Возвращает empty, когда нет папки пользователя")
+        void returnsEmptyWhenUserDirMissing() {
+            // when
+            Optional<byte[]> result = storage.read(USER_ID, RESUME_ID);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Бросает UncheckedIOException, когда на месте файла каталог")
+        void throwsWhenPathIsDirectory() throws IOException {
+            // given
+            Files.createDirectories(root.resolve(USER_ID.toString()).resolve(RESUME_ID.toString()));
+
+            // when / then
+            assertThatThrownBy(() -> storage.read(USER_ID, RESUME_ID))
+                    .isInstanceOf(UncheckedIOException.class);
         }
     }
 

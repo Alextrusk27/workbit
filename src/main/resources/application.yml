@@ -29,6 +29,8 @@ app:
     base-url: https://workbit.ru
   email:
     hash-secret: ${EMAIL_HASH_SECRET}
+  resume:
+    storage-dir: ${RESUME_STORAGE_DIR:data/resumes}
 
 server:
   shutdown: graceful
@@ -38,6 +40,10 @@ spring:
     name: ${app.name}
   lifecycle:
     timeout-per-shutdown-phase: 270s
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   flyway:
     placeholders:
       payment_inv_id_start: ${PAYMENT_INV_ID_START:1000000}

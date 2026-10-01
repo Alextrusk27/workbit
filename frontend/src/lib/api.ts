@@ -71,7 +71,7 @@ async function parse<T>(res: Response): Promise<T> {
 
 export interface RequestOptions {
   method?: string
-  /** JSON-тело: сериализуется и проставляется Content-Type. */
+  /** Тело: FormData уходит как есть (boundary ставит браузер), остальное сериализуется в JSON. */
   body?: unknown
   /** Query-параметры. */
   query?: Record<string, string | number | boolean | undefined>
@@ -94,7 +94,9 @@ export async function apiFetch<T>(
   }
 
   const init: RequestInit = { method, credentials: 'include' }
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    init.body = body
+  } else if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }

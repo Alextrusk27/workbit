@@ -1,0 +1,143 @@
+import { useRef, type ChangeEvent } from 'react'
+import { AppPageHeader } from '@/components/app/AppPageHeader'
+import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
+import { Container } from '@/components/ui/Container'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Spinner } from '@/components/ui/Spinner'
+import type { Resume } from '@/features/resume/api'
+import { resumeErrorMessage } from '@/features/resume/errors'
+import { useResumes, useUploadResume } from '@/features/resume/useResumes'
+import { getErrorMessage } from '@/lib/api'
+import { formatDate } from '@/lib/dates'
+import { usePageTitle } from '@/lib/usePageTitle'
+
+export function ResumeListPage() {
+  usePageTitle('Мои резюме')
+  const { data: resumes, isLoading, isError, error } = useResumes()
+  const upload = useUploadResume()
+  const hasResumes = !!resumes?.length
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const pickFile = () => inputRef.current?.click()
+
+  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) upload.mutate(file)
+  }
+
+  return (
+    <Container>
+      <AppPageHeader
+        back={{ to: '/', label: 'Главная' }}
+        eyebrow="Резюме"
+        title="Мои резюме"
+        actions={
+          hasResumes && (
+            <UploadButton pending={upload.isPending} onClick={pickFile} />
+          )
+        }
+      />
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf"
+        className="hidden"
+        onChange={onFileChange}
+      />
+
+      <div className="mt-8 flex flex-col gap-4">
+        {upload.isError && <Alert>{resumeErrorMessage(upload.error)}</Alert>}
+
+        {isLoading && <ResumeListSkeleton />}
+
+        {isError && <Alert>{getErrorMessage(error)}</Alert>}
+
+        {resumes && resumes.length === 0 && (
+          <EmptyState pending={upload.isPending} onUpload={pickFile} />
+        )}
+
+        {resumes && hasResumes && (
+          <ul className="flex flex-col gap-4">
+            {resumes.map((r) => (
+              <ResumeCard key={r.id} resume={r} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </Container>
+  )
+}
+
+function UploadButton({
+  pending,
+  onClick,
+  size,
+}: {
+  pending: boolean
+  onClick: () => void
+  size?: 'lg'
+}) {
+  return (
+    <Button size={size} onClick={onClick} disabled={pending}>
+      {pending ? (
+        <>
+          <Spinner className="size-4 border-white" />
+          Загружаем…
+        </>
+      ) : (
+        'Загрузить резюме'
+      )}
+    </Button>
+  )
+}
+
+function ResumeListSkeleton() {
+  return (
+    <div role="status" className="flex flex-col gap-4">
+      <span className="sr-only">Загрузка списка резюме…</span>
+      {[0, 1].map((i) => (
+        <div key={i} className="border-line bg-card rounded-xl border p-6">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="mt-3 h-4 w-32" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EmptyState({
+  pending,
+  onUpload,
+}: {
+  pending: boolean
+  onUpload: () => void
+}) {
+  return (
+    <div className="border-line rounded-xl border border-dashed p-10 text-center">
+      <h2 className="text-ink text-xl font-bold">Пока нет резюме</h2>
+      <p className="text-muted mx-auto mt-2 max-w-md text-sm">
+        Загрузи резюме в PDF. Оно будет храниться здесь, и видишь его только ты.
+      </p>
+      <div className="mt-6">
+        <UploadButton pending={pending} onClick={onUpload} size="lg" />
+      </div>
+    </div>
+  )
+}
+
+function ResumeCard({ resume }: { resume: Resume }) {
+  return (
+    <li className="border-line bg-card rounded-xl border px-6 py-5.5">
+      <h2 className="text-ink text-[17px] font-semibold tracking-[-0.01em] break-words">
+        {resume.name}
+      </h2>
+      <div className="text-dim mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[12.5px]">
+        <span>{resume.format}</span>
+        <span>{formatDate(resume.uploadedAt)}</span>
+      </div>
+    </li>
+  )
+}

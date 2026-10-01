@@ -13,6 +13,8 @@ class ResumeWriter {
 
     @Transactional
     public Resume save(Resume resume) {
+        resumeRepository.lockUser(resume.getUserId());
+        ResumeService.checkLimit(resumeRepository.countByUserId(resume.getUserId()));
         return resumeRepository.save(resume);
     }
 }

@@ -35,7 +35,11 @@ public interface ResumeApi {
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Резюме загружено"),
-            @ApiResponse(responseCode = "422", description = "Формат файла не поддерживается")
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос"),
+            @ApiResponse(responseCode = "409", description = "Резюме уже 3"),
+            @ApiResponse(responseCode = "413", description = "Файл больше 5 МБ"),
+            @ApiResponse(responseCode = "422", description = "Формат файла не поддерживается"),
+            @ApiResponse(responseCode = "429", description = "Слишком много загрузок")
     })
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<ResumeResponse> upload(

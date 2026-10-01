@@ -1,8 +1,6 @@
 package ru.workbit.resume.controller;
 
-import static org.mockito.AdditionalMatchers.aryEq;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -27,6 +25,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import ru.workbit.exception.ConflictException;
+import ru.workbit.exception.TooManyRequestsException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.exception.controller.ExceptionController;
 import ru.workbit.resume.dto.ResumeResponse;
@@ -87,7 +88,7 @@ class ResumeControllerTest {
         @DisplayName("Возвращает 201, Location и тело с метаданными резюме")
         void returns201WithLocationAndBody() throws Exception {
             // given
-            when(resumeService.upload(any(), any(), any())).thenReturn(aResume(RESUME_ID, "Иванов Java"));
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES)).thenReturn(aResume(RESUME_ID, "Иванов Java"));
 
             // when / then
             mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
@@ -105,27 +106,91 @@ class ResumeControllerTest {
         @DisplayName("Передаёт в сервис id пользователя из принципала и загруженный файл")
         void passesUserIdAndFileToService() throws Exception {
             // given
-            when(resumeService.upload(any(), any(), any())).thenReturn(aResume(RESUME_ID, "Иванов Java"));
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES)).thenReturn(aResume(RESUME_ID, "Иванов Java"));
 
             // when
             mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
                     .andExpect(status().isCreated());
 
             // then
-            verify(resumeService).upload(eq(USER_ID), eq(FILENAME), aryEq(PDF_BYTES));
+            verify(resumeService).upload(USER_ID, FILENAME, PDF_BYTES);
         }
 
         @Test
         @DisplayName("Возвращает 422 и сообщение об ошибке, когда формат не поддерживается")
         void returns422WhenFormatUnsupported() throws Exception {
             // given
-            when(resumeService.upload(any(), any(), any()))
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES))
                     .thenThrow(new UnprocessableEntityException("Unsupported format"));
 
             // when / then
             mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
                     .andExpect(status().isUnprocessableContent())
                     .andExpect(jsonPath("$.errors[0]").value("Unsupported format"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400 с сообщением про часть file, когда прислана другая часть")
+        void returns400WhenFilePartMissingButOtherPartPresent() throws Exception {
+            // given
+            var other = new MockMultipartFile("other", FILENAME, "application/pdf", PDF_BYTES);
+
+            // when / then
+            mvc.perform(multipart(BASE).file(other).with(user(principal())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"))
+                    .andExpect(jsonPath("$.errors[0]").value(containsString("'file'")));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400 с сообщением про часть file, когда multipart пустой")
+        void returns400WhenMultipartEmpty() throws Exception {
+            // when / then
+            mvc.perform(multipart(BASE).with(user(principal())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value(containsString("'file'")));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 413 и File too large, когда сервис бросает MaxUploadSizeExceededException")
+        void returns413WhenUploadTooLarge() throws Exception {
+            // given
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES))
+                    .thenThrow(new MaxUploadSizeExceededException(5L * 1024 * 1024));
+
+            // when / then
+            mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
+                    .andExpect(status().isContentTooLarge())
+                    .andExpect(jsonPath("$.message").value("Content too large."))
+                    .andExpect(jsonPath("$.errors[0]").value("File too large"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 409 и сообщение, когда достигнут лимит резюме")
+        void returns409WhenLimitReached() throws Exception {
+            // given
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES))
+                    .thenThrow(new ConflictException("Resume limit reached"));
+
+            // when / then
+            mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errors[0]").value("Resume limit reached"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 429 и сообщение, когда превышен суточный лимит загрузок")
+        void returns429WhenTooManyRequests() throws Exception {
+            // given
+            when(resumeService.upload(USER_ID, FILENAME, PDF_BYTES))
+                    .thenThrow(new TooManyRequestsException("Too many requests"));
+
+            // when / then
+            mvc.perform(multipart(BASE).file(aFile()).with(user(principal())))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.errors[0]").value("Too many requests"));
         }
 
         @Test
@@ -147,7 +212,7 @@ class ResumeControllerTest {
         void returns200WithOrderedArray() throws Exception {
             // given
             var secondId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-            when(resumeService.list(any())).thenReturn(List.of(aResume(RESUME_ID, "Новое"), aResume(secondId, "Старое")));
+            when(resumeService.list(USER_ID)).thenReturn(List.of(aResume(RESUME_ID, "Новое"), aResume(secondId, "Старое")));
 
             // when / then
             mvc.perform(get(BASE).with(user(principal())))
@@ -163,7 +228,7 @@ class ResumeControllerTest {
         @DisplayName("Вызывает сервис с id текущего пользователя")
         void callsServiceWithCurrentUserId() throws Exception {
             // given
-            when(resumeService.list(any())).thenReturn(List.of());
+            when(resumeService.list(USER_ID)).thenReturn(List.of());
 
             // when
             mvc.perform(get(BASE).with(user(principal())))

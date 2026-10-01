@@ -2,13 +2,21 @@ package ru.workbit.resume.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.within;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,6 +26,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
 import ru.workbit.resume.model.Resume;
@@ -38,6 +51,12 @@ class ResumeRepositoryIT extends AbstractPostgresIT {
 
     @Autowired
     private TestEntityManager em;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     // --- фабрики ---
 
@@ -304,6 +323,197 @@ class ResumeRepositoryIT extends AbstractPostgresIT {
             assertThat(repository.findById(mine2.getId())).isEmpty();
             assertThat(repository.findAllByUserIdOrderByCreatedAtDesc(user.getId())).isEmpty();
             assertThat(repository.findById(foreign.getId())).isPresent();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("CountByUserId")
+    class CountByUserId {
+
+        @Test
+        @DisplayName("Возвращает 0 для пользователя без резюме")
+        void returnsZeroWhenNone() {
+            // given
+            var user = em.persistAndFlush(aUser("resume-count-empty@example.com"));
+
+            // when
+            var count = repository.countByUserId(user.getId());
+
+            // then
+            assertThat(count).isZero();
+        }
+
+        @Test
+        @DisplayName("Считает только резюме своего пользователя")
+        void countsOnlyOwn() {
+            // given
+            var user = em.persistAndFlush(aUser("resume-count-owner@example.com"));
+            var other = em.persistAndFlush(aUser("resume-count-other@example.com"));
+            repository.save(aResume(user.getId(), "Моё 1"));
+            repository.save(aResume(user.getId(), "Моё 2"));
+            repository.save(aResume(other.getId(), "Чужое"));
+            repository.flush();
+
+            // when
+            var count = repository.countByUserId(user.getId());
+
+            // then
+            assertThat(count).isEqualTo(2);
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @DisplayName("LockUser")
+    class LockUser {
+
+        @Test
+        @DisplayName("Выполняется в транзакции без ошибок и берёт advisory-блокировку")
+        void acquiresAdvisoryLock() {
+            // given
+            var user = em.persistAndFlush(aUser("resume-lock-simple@example.com"));
+
+            // when
+            repository.lockUser(user.getId());
+
+            // then
+            var held = em.getEntityManager().createNativeQuery("SELECT count(*) FROM pg_locks "
+                            + "WHERE locktype = 'advisory' AND granted AND pid = pg_backend_pid()")
+                    .getSingleResult();
+            assertThat(((Number) held).longValue()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Повторный вызов в той же транзакции не блокируется")
+        void isReentrantWithinTransaction() {
+            // given
+            var user = em.persistAndFlush(aUser("resume-lock-reentrant@example.com"));
+            repository.lockUser(user.getId());
+
+            // when / then
+            assertThat(catchThrowable(() -> repository.lockUser(user.getId()))).isNull();
+        }
+    }
+
+    // =========================================================================
+
+    @Nested
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("LockUserConcurrency")
+    class LockUserConcurrency {
+
+        private static final long TIMEOUT_SECONDS = 10;
+
+        private final ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        private TransactionTemplate tx;
+
+        private UUID userId;
+
+        private UUID otherUserId;
+
+        @BeforeEach
+        void setUp() {
+            tx = new TransactionTemplate(transactionManager);
+            userId = tx.execute(status -> em.persistAndFlush(
+                    aUser("resume-lock-a-" + UUID.randomUUID() + "@example.com")).getId());
+            otherUserId = tx.execute(status -> em.persistAndFlush(
+                    aUser("resume-lock-b-" + UUID.randomUUID() + "@example.com")).getId());
+        }
+
+        @AfterEach
+        void tearDown() {
+            executor.shutdownNow();
+            jdbcTemplate.update("DELETE FROM auth.users WHERE id IN (?, ?)", userId, otherUserId);
+        }
+
+        @Test
+        @DisplayName("Транзакция ждёт блокировку того же пользователя, не мешает другому и продолжает после коммита")
+        void serializesSameUserOnly() throws Exception {
+            // given
+            var holderLocked = new CountDownLatch(1);
+            var releaseA = new CountDownLatch(1);
+            var waiterAcquired = new CountDownLatch(1);
+            Future<?> a = executor.submit(() -> tx.executeWithoutResult(status -> {
+                repository.lockUser(userId);
+                holderLocked.countDown();
+                await(releaseA);
+            }));
+            assertThat(holderLocked.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            Future<?> b = executor.submit(() -> tx.executeWithoutResult(status -> {
+                repository.lockUser(userId);
+                waiterAcquired.countDown();
+            }));
+            awaitWaitingAdvisoryLock();
+            Future<?> other = executor.submit(
+                    () -> tx.executeWithoutResult(status -> repository.lockUser(otherUserId)));
+
+            // then
+            other.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertThat(waiterAcquired.getCount()).isEqualTo(1);
+            assertThat(b.isDone()).isFalse();
+
+            releaseA.countDown();
+            a.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            b.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertThat(waiterAcquired.getCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("Повторный счёт под блокировкой видит строку, закоммиченную предыдущим держателем")
+        void countUnderLockSeesCommittedRow() throws Exception {
+            // given
+            var holderLocked = new CountDownLatch(1);
+            var releaseA = new CountDownLatch(1);
+            Future<?> a = executor.submit(() -> tx.executeWithoutResult(status -> {
+                repository.lockUser(userId);
+                holderLocked.countDown();
+                await(releaseA);
+                repository.saveAndFlush(aResume(userId, "Из A"));
+            }));
+            assertThat(holderLocked.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+            Future<Long> b = executor.submit(() -> tx.execute(status -> {
+                repository.lockUser(userId);
+                return repository.countByUserId(userId);
+            }));
+            awaitWaitingAdvisoryLock();
+
+            // when
+            releaseA.countDown();
+            a.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            // then
+            assertThat(b.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isEqualTo(1);
+        }
+
+        private void awaitWaitingAdvisoryLock() throws InterruptedException {
+            var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+            while (System.nanoTime() < deadline) {
+                var waiting = jdbcTemplate.queryForObject("SELECT count(*) FROM pg_locks "
+                        + "WHERE locktype = 'advisory' AND NOT granted AND database = "
+                        + "(SELECT oid FROM pg_database WHERE datname = current_database())", Long.class);
+                if (waiting != null && waiting > 0) {
+                    return;
+                }
+                Thread.sleep(50);
+            }
+            throw new AssertionError("Вторая транзакция не встала в ожидание advisory-блокировки");
+        }
+
+        private void await(CountDownLatch latch) {
+            try {
+                if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Латч не освобождён за " + TIMEOUT_SECONDS + " с");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
         }
     }
 }

@@ -19,8 +19,9 @@ class RateLimiterServiceTest {
     private static final String KEY = "127.0.0.1";
     private static final int LIMIT = 3;
 
-    private RateLimiterService aRateLimiter(int limit, Duration window) {
-        return new RateLimiterService(new RateLimitProperties(limit, window, null, null, null, null));
+    private RateLimiterService aRateLimiter(Duration window) {
+        RateLimitProperties.Bucket bucket = new RateLimitProperties.Bucket(LIMIT, window);
+        return new RateLimiterService(new RateLimitProperties(LIMIT, window, bucket, bucket, bucket, bucket, bucket));
     }
 
     @Nested
@@ -31,7 +32,7 @@ class RateLimiterServiceTest {
         @DisplayName("Не бросает исключение, пока число вызовов не превышает лимит")
         void doesNotThrowUpToLimit() {
             // given
-            var service = aRateLimiter(LIMIT, Duration.ofMinutes(1));
+            var service = aRateLimiter(Duration.ofMinutes(1));
 
             // when / then
             assertThatCode(() -> {
@@ -45,7 +46,7 @@ class RateLimiterServiceTest {
         @DisplayName("Бросает TooManyRequestsException при превышении лимита в том же окне")
         void throwsWhenLimitExceededInSameWindow() {
             // given
-            var service = aRateLimiter(LIMIT, Duration.ofMinutes(1));
+            var service = aRateLimiter(Duration.ofMinutes(1));
             for (int i = 0; i < LIMIT; i++) {
                 service.check(KEY);
             }
@@ -60,7 +61,7 @@ class RateLimiterServiceTest {
         @DisplayName("Разные ключи имеют независимые счётчики")
         void independentCountersPerKey() {
             // given
-            var service = aRateLimiter(LIMIT, Duration.ofMinutes(1));
+            var service = aRateLimiter(Duration.ofMinutes(1));
             for (int i = 0; i < LIMIT; i++) {
                 service.check("key-a");
             }
@@ -73,7 +74,7 @@ class RateLimiterServiceTest {
         @DisplayName("Счётчик сбрасывается после истечения окна")
         void resetsCounterAfterWindowExpires() throws InterruptedException {
             // given
-            var service = aRateLimiter(LIMIT, Duration.ofMillis(50));
+            var service = aRateLimiter(Duration.ofMillis(50));
             for (int i = 0; i < LIMIT; i++) {
                 service.check(KEY);
             }

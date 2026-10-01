@@ -10,7 +10,8 @@ public record RateLimitProperties(
         Bucket verifyCode,
         Bucket suggest,
         Bucket normalize,
-        Bucket stt
+        Bucket stt,
+        Bucket resumeUpload
 ) {
     public record Bucket(int limit, Duration window) {
     }

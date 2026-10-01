@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Resume } from '@/features/resume/api'
 import { resumeErrorMessage } from '@/features/resume/errors'
+import { RESUME_ACCEPT, resumeFileError } from '@/features/resume/files'
 import { useResumes, useUploadResume } from '@/features/resume/useResumes'
 import { getErrorMessage } from '@/lib/api'
 import { formatDate } from '@/lib/dates'
@@ -18,13 +19,21 @@ export function ResumeListPage() {
   const upload = useUploadResume()
   const hasResumes = !!resumes?.length
   const inputRef = useRef<HTMLInputElement>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   const pickFile = () => inputRef.current?.click()
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (file) upload.mutate(file)
+    if (!file) return
+    const error = resumeFileError(file)
+    setFileError(error)
+    if (error) {
+      upload.reset()
+      return
+    }
+    upload.mutate(file)
   }
 
   return (
@@ -43,12 +52,13 @@ export function ResumeListPage() {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf"
+        accept={RESUME_ACCEPT}
         className="hidden"
         onChange={onFileChange}
       />
 
       <div className="mt-8 flex flex-col gap-4">
+        {fileError && <Alert>{fileError}</Alert>}
         {upload.isError && <Alert>{resumeErrorMessage(upload.error)}</Alert>}
 
         {isLoading && <ResumeListSkeleton />}
@@ -119,7 +129,8 @@ function EmptyState({
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
       <h2 className="text-ink text-xl font-bold">Пока нет резюме</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Загрузи резюме в PDF. Оно будет храниться здесь, и видишь его только ты.
+        Загрузи резюме в PDF, DOCX или TXT. Оно будет храниться здесь, и видишь
+        его только ты.
       </p>
       <div className="mt-6">
         <UploadButton pending={pending} onClick={onUpload} size="lg" />

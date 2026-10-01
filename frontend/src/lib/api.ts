@@ -81,6 +81,15 @@ export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  return parse<T>(await send(path, options))
+}
+
+/** Файл как Blob. `blob.type` — Content-Type ответа вместе с `charset`. */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  return (await send(path, {})).blob()
+}
+
+async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', body, query } = options
 
   let url = `${BASE_URL}${path}`
@@ -109,7 +118,7 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) throw await toError(res)
-  return parse<T>(res)
+  return res
 }
 
 const REPORT_POLL_ATTEMPTS = 40

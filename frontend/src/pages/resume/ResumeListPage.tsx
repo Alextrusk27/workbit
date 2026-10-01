@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Resume } from '@/features/resume/api'
 import { resumeErrorMessage } from '@/features/resume/errors'
+import { ResumePreviewDialog } from '@/features/resume/ResumePreviewDialog'
 import {
   MAX_RESUMES,
   RESUME_ACCEPT,
@@ -15,6 +16,7 @@ import {
 } from '@/features/resume/files'
 import {
   useDeleteResume,
+  useDownloadResume,
   useResumes,
   useUploadResume,
 } from '@/features/resume/useResumes'
@@ -163,7 +165,10 @@ function EmptyState({
 
 function ResumeCard({ resume }: { resume: Resume }) {
   const del = useDeleteResume()
+  const download = useDownloadResume()
   const [confirming, setConfirming] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const error = del.error ?? download.error
 
   const onDelete = () => {
     setConfirming(false)
@@ -182,22 +187,34 @@ function ResumeCard({ resume }: { resume: Resume }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-2.5">
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          disabled={del.isPending}
-          className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
-        >
-          Удалить
-        </button>
-        {del.isError && (
+      <div className="flex flex-col items-end justify-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <CardAction onClick={() => setPreviewing(true)}>Просмотр</CardAction>
+          <CardAction
+            onClick={() => download.mutate(resume)}
+            disabled={download.isPending}
+          >
+            Скачать
+          </CardAction>
+          <CardAction
+            onClick={() => setConfirming(true)}
+            disabled={del.isPending}
+          >
+            Удалить
+          </CardAction>
+        </div>
+        {error && (
           <p className="text-danger text-[12.5px]">
-            {resumeErrorMessage(del.error)}
+            {resumeErrorMessage(error)}
           </p>
         )}
       </div>
 
+      <ResumePreviewDialog
+        resume={resume}
+        open={previewing}
+        onClose={() => setPreviewing(false)}
+      />
       <ConfirmDialog
         open={confirming}
         title="Удалить резюме?"
@@ -206,5 +223,26 @@ function ResumeCard({ resume }: { resume: Resume }) {
         onClose={() => setConfirming(false)}
       />
     </li>
+  )
+}
+
+function CardAction({
+  onClick,
+  disabled,
+  children,
+}: {
+  onClick: () => void
+  disabled?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="text-dim hover:text-ink text-[13px] transition-colors disabled:opacity-50"
+    >
+      {children}
+    </button>
   )
 }

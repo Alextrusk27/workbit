@@ -50,6 +50,12 @@ describe('resumeErrorMessage', () => {
     )
   })
 
+  it('пропавший файл просит загрузить резюме заново', () => {
+    expect(resumeErrorMessage(apiError('Resume file missing'))).toBe(
+      'Исходный файл недоступен. Загрузи резюме заново.',
+    )
+  })
+
   it('слишком частые загрузки просит попробовать завтра', () => {
     expect(resumeErrorMessage(apiError('Too many requests'))).toBe(
       'Слишком много загрузок за сутки. Попробуй завтра.',

@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api'
+import { apiFetch, apiFetchBlob } from '@/lib/api'
 
 export type ResumeFormat = 'PDF' | 'DOCX' | 'TXT'
 
@@ -23,4 +23,6 @@ export const resumeApi = {
   },
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: 'DELETE' }),
+
+  file: (id: string) => apiFetchBlob(`${BASE}/${id}/file`),
 }

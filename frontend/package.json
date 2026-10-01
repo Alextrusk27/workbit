@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.2",
+    "docx-preview": "^0.4.1",
     "motion": "^12.43.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

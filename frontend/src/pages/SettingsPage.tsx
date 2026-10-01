@@ -10,7 +10,7 @@ import { getErrorMessage } from '@/lib/api'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 const DELETE_WARNING =
-  'Аккаунт и вся история интервью и тренировок удаляются безвозвратно. ' +
+  'Аккаунт, резюме и вся история интервью и тренировок удаляются безвозвратно. ' +
   'Неиспользованные лимиты сгорают.'
 
 export function SettingsPage() {

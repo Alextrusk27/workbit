@@ -4,16 +4,19 @@ updates:
     directory: /
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       maven-minor-patch:
         update-types: [ minor, patch ]
+    ignore:
+      - dependency-name: org.springframework.boot:spring-boot-starter-parent
+        update-types: [ version-update:semver-major, version-update:semver-minor ]
 
   - package-ecosystem: npm
     directory: /frontend
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       npm-minor-patch:
         update-types: [ minor, patch ]
@@ -22,7 +25,7 @@ updates:
     directory: /
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       actions:
         patterns: [ "*" ]
@@ -31,16 +34,22 @@ updates:
     directory: /
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       docker-minor-patch:
         update-types: [ minor, patch ]
+    ignore:
+      - dependency-name: maven
+        update-types: [ version-update:semver-major ]
 
   - package-ecosystem: docker-compose
     directory: /
     target-branch: develop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       compose-minor-patch:
         update-types: [ minor, patch ]
+    ignore:
+      - dependency-name: postgres
+        update-types: [ version-update:semver-major ]

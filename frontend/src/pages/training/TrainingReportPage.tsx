@@ -9,6 +9,8 @@ import { Limits } from '@/components/ui/LimitIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { buttonClasses } from '@/components/ui/buttonStyles'
 import { OPERATION_COST } from '@/content/limits'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { trainingErrorMessage } from '@/features/training/errors'
 import { sessionSubtitle } from '@/features/training/labels'
 import { useReport, useRestartSession } from '@/features/training/useTraining'
@@ -102,7 +104,7 @@ export function TrainingReportPage() {
         </ol>
       </div>
 
-      {restart.isError && (
+      {restart.isError && !isNotEnoughLimits(restart.error) && (
         <div className="mt-8">
           <Alert>{trainingErrorMessage(restart.error)}</Alert>
         </div>
@@ -146,6 +148,8 @@ export function TrainingReportPage() {
         onConfirm={onRestart}
         onClose={() => setConfirming(false)}
       />
+
+      <NotEnoughLimitsDialog error={restart.error} onClose={restart.reset} />
     </Container>
   )
 }

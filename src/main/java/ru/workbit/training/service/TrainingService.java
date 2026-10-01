@@ -16,7 +16,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -142,8 +142,8 @@ public class TrainingService {
                 .orElseThrow(() -> new NotFoundException("Session not found"));
     }
 
-    public Page<@NotNull TrainingSessionResponse> getAll(UUID userId, Pageable pageable) {
-        Page<@NotNull TrainingSession> sessions = trainingSessionRepository.findAllByUserId(userId, pageable);
+    public Page<TrainingSessionResponse> getAll(UUID userId, Pageable pageable) {
+        Page<TrainingSession> sessions = trainingSessionRepository.findAllByUserId(userId, pageable);
 
         Map<UUID, TrainingQuestionRepository.QuestionCounts> counts = trainingQuestionRepository
                 .countBySessionIds(sessions.stream().map(TrainingSession::getId).toList())
@@ -418,7 +418,7 @@ public class TrainingService {
      * по всему словарю (одноимённые навыки разных профессий схлопываются). Профессия резолвится по
      * ключу сравнения, поэтому подсказки находятся и по своему написанию названия.
      */
-    public List<String> suggestSkills(String profession, String query) {
+    public List<String> suggestSkills(@Nullable String profession, String query) {
         if (isTooShortQuery(query)) {
             return List.of();
         }
@@ -640,7 +640,7 @@ public class TrainingService {
         }
     }
 
-    private static TrainingUserFeedback buildUserFeedback(UUID sessionId, UUID questionId,
+    private static TrainingUserFeedback buildUserFeedback(UUID sessionId, @Nullable UUID questionId,
                                                           FeedbackRequest request) {
         return TrainingUserFeedback.builder()
                 .sessionId(sessionId)

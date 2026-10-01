@@ -15,7 +15,7 @@ export const OPERATION_COST = {
 export const WELCOME_LIMITS = 20
 
 export const operations: { name: string; cost: number }[] = [
-  { name: 'AI-интервью по вакансии', cost: OPERATION_COST.interview },
+  { name: 'ИИ-интервью по вакансии', cost: OPERATION_COST.interview },
   { name: 'Тренировка навыка, 10 вопросов', cost: OPERATION_COST.training },
 ]
 
@@ -69,7 +69,7 @@ export const freePack: Pack = {
   cta: 'Начать бесплатно',
   features: [
     `${WELCOME_LIMITS} лимитов при регистрации`,
-    'AI-интервью или две тренировки',
+    'ИИ-интервью или две тренировки',
     'Полный разбор ответов',
   ],
 }

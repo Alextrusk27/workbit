@@ -14,6 +14,8 @@ import { OPERATION_COST } from '@/content/limits'
 import { useDictatedAnswer } from '@/features/speech/useDictatedAnswer'
 import { trainingApi } from '@/features/training/api'
 import type { TrainingQuestion, TrainingSession } from '@/features/training/api'
+import { isNotEnoughLimits } from '@/features/billing/errors'
+import { NotEnoughLimitsDialog } from '@/features/billing/NotEnoughLimitsDialog'
 import { trainingErrorMessage } from '@/features/training/errors'
 import { sessionSubtitle } from '@/features/training/labels'
 import {
@@ -259,10 +261,13 @@ function SessionRun({ session }: { session: TrainingSession }) {
         batch={Math.min(batch, maxQuestions - total)}
         addPending={more.isPending}
         addError={
-          more.isError ? trainingErrorMessage(more.error, 'more') : null
+          more.isError && !isNotEnoughLimits(more.error)
+            ? trainingErrorMessage(more.error)
+            : null
         }
         onAddQuestions={onAddQuestions}
       />
+      <NotEnoughLimitsDialog error={more.error} onClose={more.reset} />
 
       <div ref={bottomRef} />
     </Container>

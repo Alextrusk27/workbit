@@ -7,20 +7,20 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>4.0.8</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
     <groupId>ru.workbit</groupId>
     <artifactId>workbit</artifactId>
-    <version>1.6.2-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
 
     <properties>
         <java.version>25</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <tomcat.version>11.0.26</tomcat.version>
         <greenmail.version>2.1.4</greenmail.version>
         <grpc.version>1.83.0</grpc.version>
-        <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
         <jsonwebtoken.version>0.13.0</jsonwebtoken.version>
         <jsoup.version>1.21.1</jsoup.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
@@ -128,13 +128,6 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct-processor</artifactId>
             <version>${mapstruct.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>${jetbrains.annotations.version}</version>
             <scope>provided</scope>
         </dependency>
 

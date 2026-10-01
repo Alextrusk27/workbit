@@ -110,7 +110,7 @@ export const seoPages: SeoPage[] = [
   {
     path: '/offer',
     title: 'Публичная оферта | Workbit',
-    description: 'Публичная оферта сервиса Workbit: условия оплаты тарифов.',
+    description: 'Публичная оферта сервиса Workbit: условия оплаты.',
     sources: ['docs/offer.md'],
   },
 ]

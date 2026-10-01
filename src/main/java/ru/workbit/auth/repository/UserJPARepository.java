@@ -4,14 +4,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.workbit.auth.model.User;
 
-public interface UserJPARepository extends JpaRepository<@NotNull User, @NotNull UUID> {
+public interface UserJPARepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 

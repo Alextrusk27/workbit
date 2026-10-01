@@ -4,26 +4,25 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import ru.workbit.interview.model.InterviewSession;
 
-public interface InterviewSessionRepository extends JpaRepository<@NotNull InterviewSession, @NotNull UUID> {
+public interface InterviewSessionRepository extends JpaRepository<InterviewSession, UUID> {
 
     @EntityGraph(attributePaths = "report")
-    List<InterviewSession> findAllByUserIdOrderByCreatedDesc(@NotNull UUID userId);
+    List<InterviewSession> findAllByUserIdOrderByCreatedDesc(UUID userId);
 
-    Optional<InterviewSession> findByIdAndUserId(@NotNull UUID id, @NotNull UUID userId);
+    Optional<InterviewSession> findByIdAndUserId(UUID id, UUID userId);
 
     @EntityGraph(attributePaths = "report")
     List<InterviewSession> findAllByUserIdAndVacancySnapshotIdInOrderByCreatedAsc(
-            @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds);
+            UUID userId, Collection<UUID> vacancySnapshotIds);
 
     boolean existsByUserIdAndVacancySnapshotIdInAndStatusNot(
-            @NotNull UUID userId, @NotNull Collection<UUID> vacancySnapshotIds,
-            @NotNull InterviewSession.Status status);
+            UUID userId, Collection<UUID> vacancySnapshotIds,
+            InterviewSession.Status status);
 
     @Query("""
             SELECT s FROM InterviewSession s
@@ -31,5 +30,5 @@ public interface InterviewSessionRepository extends JpaRepository<@NotNull Inter
             LEFT JOIN FETCH q.feedback
             WHERE s.id = :id
             """)
-    Optional<InterviewSession> findWithQuestionsById(@NotNull UUID id);
+    Optional<InterviewSession> findWithQuestionsById(UUID id);
 }

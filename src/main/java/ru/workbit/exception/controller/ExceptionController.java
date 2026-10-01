@@ -4,9 +4,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -41,14 +40,15 @@ public class ExceptionController {
             MissingServletRequestParameterException.class,
             HttpMessageNotReadableException.class
     })
-    public ResponseEntity<@NotNull ApiError> handleSpringValidation(final Exception e) {
+    public ResponseEntity<ApiError> handleSpringValidation(final Exception e) {
         List<String> errors = switch (e) {
             case ConstraintViolationException cve -> cve.getConstraintViolations().stream()
                     .map(ConstraintViolation::getMessage)
                     .toList();
 
             case MethodArgumentNotValidException mnv -> mnv.getBindingResult().getFieldErrors().stream()
-                    .map(DefaultMessageSourceResolvable::getDefaultMessage)
+                    .map(fe -> Objects.requireNonNullElse(fe.getDefaultMessage(),
+                            "Invalid value for field '%s'".formatted(fe.getField())))
                     .toList();
 
             case MethodArgumentTypeMismatchException mtm -> {
@@ -85,7 +85,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<@NotNull ApiError> handleBadCredentials(final BadCredentialsException e) {
+    public ResponseEntity<ApiError> handleBadCredentials(final BadCredentialsException e) {
         log.warn("Bad credentials exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiError.of(HttpStatus.UNAUTHORIZED, "Bad credentials",
@@ -93,7 +93,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(NotFoundException.class)
-    public ResponseEntity<@NotNull ApiError> handleNotFound(final NotFoundException e) {
+    public ResponseEntity<ApiError> handleNotFound(final NotFoundException e) {
         log.warn("NotFound exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiError.of(HttpStatus.NOT_FOUND, "The required object was not found.",
@@ -101,7 +101,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(ForbiddenException.class)
-    public ResponseEntity<@NotNull ApiError> handleForbidden(final ForbiddenException e) {
+    public ResponseEntity<ApiError> handleForbidden(final ForbiddenException e) {
         log.warn("Forbidden exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiError.of(HttpStatus.FORBIDDEN, "Forbidden.",
@@ -109,7 +109,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(PaymentRequiredException.class)
-    public ResponseEntity<@NotNull ApiError> handlePaymentRequired(final PaymentRequiredException e) {
+    public ResponseEntity<ApiError> handlePaymentRequired(final PaymentRequiredException e) {
         log.warn("Payment required exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
                 .body(ApiError.of(HttpStatus.PAYMENT_REQUIRED, "Payment required.",
@@ -117,7 +117,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<@NotNull ApiError> handleConflict(final ConflictException e) {
+    public ResponseEntity<ApiError> handleConflict(final ConflictException e) {
         log.warn("Conflict exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
@@ -125,7 +125,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<@NotNull ApiError> handleIllegalArgument(final IllegalArgumentException e) {
+    public ResponseEntity<ApiError> handleIllegalArgument(final IllegalArgumentException e) {
         log.warn("Illegal argument exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiError.of(HttpStatus.BAD_REQUEST, "Bad request.",
@@ -133,7 +133,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(UnprocessableEntityException.class)
-    public ResponseEntity<@NotNull ApiError> handleUnprocessableEntity(final UnprocessableEntityException e) {
+    public ResponseEntity<ApiError> handleUnprocessableEntity(final UnprocessableEntityException e) {
         log.warn("Unprocessable entity exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
                 .body(ApiError.of(HttpStatus.UNPROCESSABLE_CONTENT, "Unprocessable content.",
@@ -141,7 +141,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(TooManyRequestsException.class)
-    public ResponseEntity<@NotNull ApiError> handleTooManyRequests(final TooManyRequestsException e) {
+    public ResponseEntity<ApiError> handleTooManyRequests(final TooManyRequestsException e) {
         log.warn("Too many requests exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS, "Too many requests.",
@@ -149,7 +149,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(VacancyFetchException.class)
-    public ResponseEntity<@NotNull ApiError> handleVacancyFetch(final VacancyFetchException e) {
+    public ResponseEntity<ApiError> handleVacancyFetch(final VacancyFetchException e) {
         log.warn("Vacancy fetch exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ApiError.of(HttpStatus.SERVICE_UNAVAILABLE, "Vacancy service unavailable.",
@@ -157,7 +157,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(LlmException.class)
-    public ResponseEntity<@NotNull ApiError> handleLlm(final LlmException e) {
+    public ResponseEntity<ApiError> handleLlm(final LlmException e) {
         log.warn("LLM exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ApiError.of(HttpStatus.SERVICE_UNAVAILABLE, "AI service unavailable.",
@@ -165,7 +165,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<@NotNull ApiError> handleMethodNotSupported(final HttpRequestMethodNotSupportedException e) {
+    public ResponseEntity<ApiError> handleMethodNotSupported(final HttpRequestMethodNotSupportedException e) {
         log.warn("Method not supported exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(ApiError.of(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed.",
@@ -173,7 +173,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(InternalServerException.class)
-    public ResponseEntity<@NotNull ApiError> handleInternalServer(final InternalServerException e) {
+    public ResponseEntity<ApiError> handleInternalServer(final InternalServerException e) {
         log.error("Internal Server Error", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
@@ -181,7 +181,7 @@ public class ExceptionController {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<@NotNull ApiError> handleAll(final Exception e) {
+    public ResponseEntity<ApiError> handleAll(final Exception e) {
         log.error("Unhandled exception", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",

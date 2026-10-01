@@ -2,6 +2,7 @@ package ru.workbit.security.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -19,7 +20,7 @@ public class CaptchaService {
     private final CaptchaProperties properties;
     private final RestClient captchaRestClient;
 
-    public void validate(String token, String ip) {
+    public void validate(@Nullable String token, String ip) {
         if (!properties.enabled()) {
             return;
         }
@@ -40,7 +41,7 @@ public class CaptchaService {
         }
     }
 
-    private ValidationResponse requestValidation(String token, String ip) {
+    private @Nullable ValidationResponse requestValidation(String token, String ip) {
         var form = new LinkedMultiValueMap<String, String>();
         form.add("secret", properties.serverKey());
         form.add("token", token);

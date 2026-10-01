@@ -3,7 +3,6 @@ package ru.workbit.security.service;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -19,13 +18,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserJPARepository userRepository;
 
     @Override
-    public @NotNull UserDetails loadUserByUsername(@NotNull String username) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User %s not found".formatted(username)));
         return toUserDetails(user);
     }
 
-    public @NotNull UserDetails loadUserById(@NotNull UUID id) throws UsernameNotFoundException {
+    public UserDetails loadUserById(UUID id) throws UsernameNotFoundException {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("User %s not found".formatted(id)));
         return toUserDetails(user);

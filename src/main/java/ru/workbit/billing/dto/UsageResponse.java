@@ -6,7 +6,7 @@ import java.util.List;
 import ru.workbit.billing.model.UsageEvent;
 
 public record UsageResponse(
-        @Schema(description = "Остаток лимитов; просроченный баланс отдаётся нулём", example = "20")
+        @Schema(description = "Остаток лимитов", example = "20")
         int limits,
 
         @Schema(description = "Срок действия лимитов (UTC); null, если лимитов нет")

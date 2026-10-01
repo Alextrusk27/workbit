@@ -1,12 +1,14 @@
 package ru.workbit.auth.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.auth.UsersDeletedEvent;
 import ru.workbit.auth.dto.RequestCodeRequest;
 import ru.workbit.auth.dto.TokenResponse;
 import ru.workbit.auth.dto.UserResponse;
@@ -89,6 +91,7 @@ public class AuthService {
     @Transactional
     public void deleteUser(UUID userId) {
         userRepository.deleteById(userId);
+        eventPublisher.publishEvent(new UsersDeletedEvent(List.of(userId)));
         log.info("User deleted uid={}", userId);
     }
 

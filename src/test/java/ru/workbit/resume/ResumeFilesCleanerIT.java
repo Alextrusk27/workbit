@@ -7,6 +7,8 @@ import static org.awaitility.Awaitility.await;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,8 +22,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.workbit.AbstractPostgresIT;
+import ru.workbit.auth.UsersDeletedEvent;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
+import ru.workbit.auth.service.AccountCleanupService;
+import ru.workbit.auth.service.AuthService;
 import ru.workbit.resume.config.ResumeProperties;
 import ru.workbit.resume.model.Resume;
 import ru.workbit.resume.repository.ResumeRepository;
@@ -61,6 +66,12 @@ class ResumeFilesCleanerIT extends AbstractPostgresIT {
     private ResumeProperties properties;
 
     @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private AccountCleanupService accountCleanupService;
+
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     @Autowired
@@ -69,12 +80,12 @@ class ResumeFilesCleanerIT extends AbstractPostgresIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private UUID userId;
+    private final List<UUID> userIds = new ArrayList<>();
 
     @AfterEach
     void tearDown() {
-        if (userId != null) {
-            jdbcTemplate.update("DELETE FROM auth.users WHERE id = ?", userId);
+        for (UUID id : userIds) {
+            jdbcTemplate.update("DELETE FROM auth.users WHERE id = ?", id);
         }
     }
 
@@ -82,8 +93,14 @@ class ResumeFilesCleanerIT extends AbstractPostgresIT {
         var user = userRepository.save(User.builder()
                 .email("cleaner-" + UUID.randomUUID() + "@example.com")
                 .build());
-        userId = user.getId();
-        return userId;
+        userIds.add(user.getId());
+        return user.getId();
+    }
+
+    private void markWarnedLongAgo(UUID ownerId) {
+        jdbcTemplate.update(
+                "UPDATE auth.users SET deletion_warned_at = now() - interval '31 days', last_seen = now() WHERE id = ?",
+                ownerId);
     }
 
     private Resume aResumeWithFile(UUID ownerId) {
@@ -110,6 +127,10 @@ class ResumeFilesCleanerIT extends AbstractPostgresIT {
 
     private Path fileOf(UUID ownerId, UUID resumeId) {
         return properties.storageDir().resolve(ownerId.toString()).resolve(resumeId.toString());
+    }
+
+    private Path dirOf(UUID ownerId) {
+        return properties.storageDir().resolve(ownerId.toString());
     }
 
     private void awaitFileDeleted(Path file) {
@@ -177,6 +198,98 @@ class ResumeFilesCleanerIT extends AbstractPostgresIT {
             // then
             assertThat(thrown).isNull();
             assertThat(resumeRepository.findById(resume.getId())).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("OnUsersDeleted")
+    class OnUsersDeleted {
+
+        @Test
+        @DisplayName("Удаляет папку пользователя целиком после удаления аккаунта")
+        void deletesUserDirectoryAfterAccountDeletion() {
+            // given
+            var owner = aUser();
+            var first = aResumeWithFile(owner);
+            var second = aResumeWithFile(owner);
+            var directory = dirOf(owner);
+            assertThat(fileOf(owner, first.getId())).exists();
+            assertThat(fileOf(owner, second.getId())).exists();
+
+            // when
+            authService.deleteUser(owner);
+
+            // then
+            assertThat(userRepository.findById(owner)).isEmpty();
+            assertThat(resumeRepository.countByUserId(owner)).isZero();
+            awaitFileDeleted(directory);
+            assertThat(directory).doesNotExist();
+        }
+
+        @Test
+        @DisplayName("Ночная очистка удаляет папку пользователя с истёкшим предупреждением и не трогает активного")
+        void cleanupDeletesDirectoryOfExpiredUserOnly() {
+            // given
+            var expired = aUser();
+            var active = aUser();
+            aResumeWithFile(expired);
+            aResumeWithFile(active);
+            markWarnedLongAgo(expired);
+            var expiredDirectory = dirOf(expired);
+            var activeDirectory = dirOf(active);
+
+            // when
+            accountCleanupService.cleanupInactiveAccounts();
+
+            // then
+            assertThat(userRepository.findById(expired)).isEmpty();
+            assertThat(userRepository.findById(active)).isPresent();
+            awaitFileDeleted(expiredDirectory);
+            assertThat(expiredDirectory).doesNotExist();
+            assertThat(activeDirectory).isDirectory();
+            assertThat(resumeRepository.countByUserId(active)).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Оставляет папку на месте, когда транзакция удаления пользователя откатилась")
+        void keepsDirectoryOnRollback() {
+            // given
+            var rolledBack = aUser();
+            var first = aResumeWithFile(rolledBack);
+            var second = aResumeWithFile(rolledBack);
+            var committed = aUser();
+            aResumeWithFile(committed);
+
+            // when
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                userRepository.deleteById(rolledBack);
+                eventPublisher.publishEvent(new UsersDeletedEvent(List.of(rolledBack)));
+                status.setRollbackOnly();
+            });
+            authService.deleteUser(committed);
+            awaitFileDeleted(dirOf(committed));
+
+            // then
+            assertThat(userRepository.findById(rolledBack)).isPresent();
+            assertThat(resumeRepository.countByUserId(rolledBack)).isEqualTo(2);
+            assertThat(fileOf(rolledBack, first.getId())).exists();
+            assertThat(fileOf(rolledBack, second.getId())).exists();
+            assertThat(userRepository.findById(committed)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Не считает ошибкой отсутствие папки пользователя на диске")
+        void succeedsWhenDirectoryIsMissing() {
+            // given
+            var owner = aUser();
+            assertThat(dirOf(owner)).doesNotExist();
+
+            // when
+            var thrown = catchThrowable(() -> authService.deleteUser(owner));
+
+            // then
+            assertThat(thrown).isNull();
+            assertThat(userRepository.findById(owner)).isEmpty();
         }
     }
 }

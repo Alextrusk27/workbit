@@ -266,4 +266,64 @@ class ResumeFileStorageTest {
                     .isInstanceOf(UncheckedIOException.class);
         }
     }
+
+    @Nested
+    @DisplayName("DeleteUser")
+    class DeleteUser {
+        private static final UUID OTHER_USER_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+        @Test
+        @DisplayName("Удаляет папку пользователя со всеми файлами, вложенной папкой и временным файлом")
+        void deletesUserDirWithAllContent() throws IOException {
+            // given
+            storage.write(USER_ID, RESUME_ID, CONTENT);
+            storage.write(USER_ID, UUID.fromString("33333333-3333-3333-3333-333333333333"), CONTENT);
+            Path userDir = root.resolve(USER_ID.toString());
+            Files.createFile(userDir.resolve(RESUME_ID + "-leftover.tmp"));
+            Path nested = Files.createDirectories(userDir.resolve("nested"));
+            Files.write(nested.resolve("child"), CONTENT);
+
+            // when
+            storage.deleteUser(USER_ID);
+
+            // then
+            assertThat(userDir).doesNotExist();
+            assertThat(root).isDirectory();
+        }
+
+        @Test
+        @DisplayName("Не трогает папку другого пользователя")
+        void keepsOtherUserDir() throws IOException {
+            // given
+            storage.write(USER_ID, RESUME_ID, CONTENT);
+            storage.write(OTHER_USER_ID, RESUME_ID, CONTENT);
+
+            // when
+            storage.deleteUser(USER_ID);
+
+            // then
+            Path otherFile = root.resolve(OTHER_USER_ID.toString()).resolve(RESUME_ID.toString());
+            assertThat(otherFile).isRegularFile();
+            assertThat(Files.readAllBytes(otherFile)).isEqualTo(CONTENT);
+        }
+
+        @Test
+        @DisplayName("Не падает при повторном вызове")
+        void isIdempotent() {
+            // given
+            storage.write(USER_ID, RESUME_ID, CONTENT);
+            storage.deleteUser(USER_ID);
+
+            // when / then
+            assertThatCode(() -> storage.deleteUser(USER_ID)).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Не падает, когда у пользователя нет папки")
+        void doesNothingWhenUserDirMissing() {
+            // when / then
+            assertThatCode(() -> storage.deleteUser(USER_ID)).doesNotThrowAnyException();
+            assertThat(root).isEmptyDirectory();
+        }
+    }
 }

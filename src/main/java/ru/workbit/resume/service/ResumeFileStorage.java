@@ -6,8 +6,10 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import ru.workbit.resume.config.ResumeProperties;
@@ -55,6 +57,18 @@ public class ResumeFileStorage {
     public void delete(UUID userId, UUID resumeId) {
         try {
             Files.deleteIfExists(userDir(userId).resolve(resumeId.toString()));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public void deleteUser(UUID userId) {
+        try (Stream<Path> paths = Files.walk(userDir(userId))) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (NoSuchFileException ignored) {
+            // intentionally ignored: the user has no resume files
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

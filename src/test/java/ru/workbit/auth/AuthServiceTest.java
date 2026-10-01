@@ -5,14 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -458,6 +461,19 @@ class AuthServiceTest {
 
             // then
             verify(userRepository).deleteById(USER_ID);
+        }
+
+        @Test
+        @DisplayName("Публикует UsersDeletedEvent с id удалённого пользователя после удаления")
+        void publishesUsersDeletedEventAfterDelete() {
+            // when
+            authService.deleteUser(USER_ID);
+
+            // then
+            var order = inOrder(userRepository, eventPublisher);
+            order.verify(userRepository).deleteById(USER_ID);
+            order.verify(eventPublisher).publishEvent(new UsersDeletedEvent(List.of(USER_ID)));
+            verifyNoMoreInteractions(eventPublisher);
         }
     }
 }

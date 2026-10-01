@@ -73,7 +73,7 @@ class ResumeServiceTest {
         @DisplayName("Пишет файл в storage с тем же resumeId, что уходит в writer.save, и возвращает ответ")
         void storesFileAndReturnsResponse() {
             // given
-            when(formatDetector.detect(PDF_BYTES)).thenReturn(Resume.Format.PDF);
+            when(formatDetector.detect(PDF_BYTES, FILENAME)).thenReturn(Resume.Format.PDF);
             when(writer.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // when
@@ -96,10 +96,55 @@ class ResumeServiceTest {
         }
 
         @Test
+        @DisplayName("Передаёт в детектор имя без пути и сохраняет его же как originalFilename")
+        void passesStrippedFilenameToDetector() {
+            // given
+            when(formatDetector.detect(PDF_BYTES, FILENAME)).thenReturn(Resume.Format.PDF);
+            when(writer.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            ResumeResponse response = service.upload(USER_ID, "C:\\Users\\ivan\\docs/" + FILENAME, PDF_BYTES);
+
+            // then
+            verify(formatDetector).detect(PDF_BYTES, FILENAME);
+            assertThat(response.originalFilename()).isEqualTo(FILENAME);
+        }
+
+        @Test
+        @DisplayName("Передаёт в детектор пустое имя, подставляет resume.<ext> и название «Резюме», когда имя файла null")
+        void usesDefaultFilenameWhenNull() {
+            // given
+            when(formatDetector.detect(PDF_BYTES, "")).thenReturn(Resume.Format.PDF);
+            when(writer.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            ResumeResponse response = service.upload(USER_ID, null, PDF_BYTES);
+
+            // then
+            assertThat(response.originalFilename()).isEqualTo("resume.pdf");
+            assertThat(response.name()).isEqualTo("Резюме");
+        }
+
+        @Test
+        @DisplayName("Подставляет resume.<ext> и название «Резюме», когда имя файла состоит из пробелов")
+        void usesDefaultFilenameWhenBlank() {
+            // given
+            when(formatDetector.detect(PDF_BYTES, "")).thenReturn(Resume.Format.PDF);
+            when(writer.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            ResumeResponse response = service.upload(USER_ID, "   ", PDF_BYTES);
+
+            // then
+            assertThat(response.originalFilename()).isEqualTo("resume.pdf");
+            assertThat(response.name()).isEqualTo("Резюме");
+        }
+
+        @Test
         @DisplayName("Пробрасывает UnprocessableEntityException от детектора и не трогает storage и writer")
         void propagatesUnsupportedFormat() {
             // given
-            when(formatDetector.detect(PDF_BYTES)).thenThrow(new UnprocessableEntityException("Unsupported format"));
+            when(formatDetector.detect(PDF_BYTES, FILENAME)).thenThrow(new UnprocessableEntityException("Unsupported format"));
 
             // when / then
             assertThatThrownBy(() -> service.upload(USER_ID, FILENAME, PDF_BYTES))
@@ -113,7 +158,7 @@ class ResumeServiceTest {
         void deletesFileWhenSaveFails() {
             // given
             RuntimeException saveError = new IllegalStateException("db down");
-            when(formatDetector.detect(PDF_BYTES)).thenReturn(Resume.Format.PDF);
+            when(formatDetector.detect(PDF_BYTES, FILENAME)).thenReturn(Resume.Format.PDF);
             when(writer.save(any(Resume.class))).thenThrow(saveError);
 
             // when / then
@@ -130,7 +175,7 @@ class ResumeServiceTest {
             // given
             RuntimeException saveError = new IllegalStateException("db down");
             RuntimeException deleteError = new UncheckedIOException(new IOException("disk"));
-            when(formatDetector.detect(PDF_BYTES)).thenReturn(Resume.Format.PDF);
+            when(formatDetector.detect(PDF_BYTES, FILENAME)).thenReturn(Resume.Format.PDF);
             when(writer.save(any(Resume.class))).thenThrow(saveError);
             doThrow(deleteError).when(storage).delete(any(UUID.class), any(UUID.class));
 

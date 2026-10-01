@@ -29,12 +29,13 @@ public class ResumeService {
     }
 
     public ResumeResponse upload(UUID userId, @Nullable String filename, byte[] content) {
-        Resume.Format format = formatDetector.detect(content);
-        String originalFilename = ResumeName.originalFilename(ResumeName.stripPath(filename), format);
+        String strippedFilename = ResumeName.stripPath(filename);
+        Resume.Format format = formatDetector.detect(content, strippedFilename);
+        String originalFilename = ResumeName.originalFilename(strippedFilename, format);
 
         Resume resume = Resume.builder()
                 .userId(userId)
-                .name(ResumeName.title(originalFilename))
+                .name(ResumeName.title(strippedFilename))
                 .originalFilename(originalFilename)
                 .format(format)
                 .sizeBytes(content.length)

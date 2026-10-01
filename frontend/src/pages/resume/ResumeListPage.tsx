@@ -1,4 +1,10 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type ReactNode,
+} from 'react'
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -22,6 +28,7 @@ import {
   useUploadResume,
 } from '@/features/resume/useResumes'
 import { getErrorMessage } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { formatDate } from '@/lib/dates'
 import { usePageTitle } from '@/lib/usePageTitle'
 
@@ -39,7 +46,10 @@ export function ResumeListPage() {
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (file) uploadFile(file)
+  }
+
+  const uploadFile = (file: File) => {
     const error = resumeFileError(file)
     setFileError(error)
     if (error) {
@@ -89,7 +99,11 @@ export function ResumeListPage() {
         {isError && <Alert>{getErrorMessage(error)}</Alert>}
 
         {resumes && resumes.length === 0 && (
-          <EmptyState pending={upload.isPending} onUpload={pickFile} />
+          <EmptyState
+            pending={upload.isPending}
+            onUpload={pickFile}
+            onDropFile={uploadFile}
+          />
         )}
 
         {resumes && hasResumes && (
@@ -98,6 +112,27 @@ export function ResumeListPage() {
               <ResumeCard key={r.id} resume={r} />
             ))}
           </ul>
+        )}
+
+        {hasResumes && !atLimit && (
+          <DropZone
+            disabled={upload.isPending}
+            onDropFile={uploadFile}
+            className="p-6"
+          >
+            <p className="text-muted text-sm">
+              Перетащи сюда ещё одно резюме или{' '}
+              <button
+                type="button"
+                onClick={pickFile}
+                disabled={upload.isPending}
+                className="text-ink underline underline-offset-2 disabled:opacity-50"
+              >
+                выбери файл
+              </button>
+              .
+            </p>
+          </DropZone>
         )}
       </div>
     </Container>
@@ -146,20 +181,70 @@ function ResumeListSkeleton() {
 function EmptyState({
   pending,
   onUpload,
+  onDropFile,
 }: {
   pending: boolean
   onUpload: () => void
+  onDropFile: (file: File) => void
 }) {
   return (
-    <div className="border-line rounded-xl border border-dashed p-10 text-center">
+    <DropZone disabled={pending} onDropFile={onDropFile} className="p-10">
       <h2 className="text-ink text-xl font-bold">Пока нет резюме</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
-        Загрузи резюме в PDF, DOCX или TXT. Оно будет храниться здесь, и видишь
-        его только ты.
+        Перетащи сюда резюме в PDF, DOCX или TXT или выбери файл кнопкой. Оно
+        будет храниться здесь, и видишь его только ты.
       </p>
       <div className="mt-6">
         <UploadButton pending={pending} onClick={onUpload} size="lg" />
       </div>
+    </DropZone>
+  )
+}
+
+function DropZone({
+  disabled,
+  onDropFile,
+  className,
+  children,
+}: {
+  disabled: boolean
+  onDropFile: (file: File) => void
+  className?: string
+  children: ReactNode
+}) {
+  const [over, setOver] = useState(false)
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = disabled ? 'none' : 'copy'
+    if (!disabled) setOver(true)
+  }
+
+  const onDragLeave = (e: DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setOver(false)
+    }
+  }
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file && !disabled) onDropFile(file)
+  }
+
+  return (
+    <div
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={cn(
+        'rounded-xl border border-dashed text-center transition-colors',
+        over ? 'border-indigo bg-indigo/5' : 'border-line',
+        className,
+      )}
+    >
+      {children}
     </div>
   )
 }

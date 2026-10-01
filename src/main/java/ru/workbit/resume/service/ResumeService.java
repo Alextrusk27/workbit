@@ -52,6 +52,10 @@ public class ResumeService {
                 () -> doUpload(userId, filename, content));
     }
 
+    public ResumeResponse rename(UUID userId, UUID resumeId, String name) {
+        return resumeMapper.toResponse(writer.rename(userId, resumeId, name));
+    }
+
     public void delete(UUID userId, UUID resumeId) {
         writer.delete(userId, resumeId);
     }

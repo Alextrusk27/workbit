@@ -11,6 +11,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,9 +29,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.NotFoundException;
@@ -451,6 +454,139 @@ class ResumeControllerTest {
         void returns401WithoutAuth() throws Exception {
             // when / then
             mvc.perform(get(url()))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(resumeService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Rename")
+    class Rename {
+
+        private String url() {
+            return BASE + "/" + RESUME_ID;
+        }
+
+        private String body(String name) {
+            return "{\"name\":\"" + name + "\"}";
+        }
+
+        private ResultActions rename(String json) throws Exception {
+            return mvc.perform(patch(url()).contentType(MediaType.APPLICATION_JSON).content(json)
+                    .with(user(principal())));
+        }
+
+        @Test
+        @DisplayName("Возвращает 200 и резюме с новым названием, в сервис уходит обрезанное название")
+        void returns200AndPassesStrippedName() throws Exception {
+            // given
+            when(resumeService.rename(USER_ID, RESUME_ID, "Новое")).thenReturn(aResume(RESUME_ID, "Новое"));
+
+            // when / then
+            rename(body("  Новое  "))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(RESUME_ID.toString()))
+                    .andExpect(jsonPath("$.name").value("Новое"))
+                    .andExpect(jsonPath("$.format").value("PDF"))
+                    .andExpect(jsonPath("$.originalFilename").value("Новое.pdf"))
+                    .andExpect(jsonPath("$.sizeBytes").value(1024))
+                    .andExpect(jsonPath("$.uploadedAt").exists());
+            verify(resumeService).rename(USER_ID, RESUME_ID, "Новое");
+        }
+
+        @Test
+        @DisplayName("Принимает 100 символов после обрезки пробелов")
+        void accepts100CharsAfterStrip() throws Exception {
+            // given
+            var name = "ы".repeat(100);
+            when(resumeService.rename(USER_ID, RESUME_ID, name)).thenReturn(aResume(RESUME_ID, name));
+
+            // when / then
+            rename(body("  " + name + "  "))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value(name));
+            verify(resumeService).rename(USER_ID, RESUME_ID, name);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400 на пустую строку и не вызывает сервис")
+        void returns400WhenNameEmpty() throws Exception {
+            // when / then
+            rename(body(""))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"))
+                    .andExpect(jsonPath("$.errors.length()").value(1));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400 на строку из одних пробелов и не вызывает сервис")
+        void returns400WhenNameBlank() throws Exception {
+            // when / then
+            rename(body("     "))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400 на 101 символ и не вызывает сервис")
+        void returns400WhenNameTooLong() throws Exception {
+            // when / then
+            rename(body("ы".repeat(101)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда name равен null, и не вызывает сервис")
+        void returns400WhenNameNull() throws Exception {
+            // when / then
+            rename("{\"name\":null}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда name отсутствует в JSON, и не вызывает сервис")
+        void returns400WhenNameMissing() throws Exception {
+            // when / then
+            rename("{}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Validation Failed"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 404 и Resume not found, когда резюме не найдено")
+        void returns404WhenNotFound() throws Exception {
+            // given
+            when(resumeService.rename(USER_ID, RESUME_ID, "Новое")).thenThrow(new NotFoundException("Resume not found"));
+
+            // when / then
+            rename(body("Новое"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errors[0]").value("Resume not found"));
+        }
+
+        @Test
+        @DisplayName("Возвращает 400, когда id в пути не UUID, и не вызывает сервис")
+        void returns400WhenIdNotUuid() throws Exception {
+            // when / then
+            mvc.perform(patch(BASE + "/not-a-uuid").contentType(MediaType.APPLICATION_JSON).content(body("Новое"))
+                            .with(user(principal())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value("Parameter 'id' should be of type java.util.UUID"));
+            verifyNoInteractions(resumeService);
+        }
+
+        @Test
+        @DisplayName("Возвращает 401 без аутентификации и не вызывает сервис")
+        void returns401WithoutAuth() throws Exception {
+            // when / then
+            mvc.perform(patch(url()).contentType(MediaType.APPLICATION_JSON).content(body("Новое")))
                     .andExpect(status().isUnauthorized());
             verifyNoInteractions(resumeService);
         }

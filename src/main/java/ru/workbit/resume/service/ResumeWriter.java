@@ -24,10 +24,20 @@ class ResumeWriter {
     }
 
     @Transactional
+    public Resume rename(UUID userId, UUID resumeId, String name) {
+        Resume resume = find(userId, resumeId);
+        resume.setName(name);
+        return resume;
+    }
+
+    @Transactional
     public void delete(UUID userId, UUID resumeId) {
-        Resume resume = resumeRepository.findByIdAndUserId(resumeId, userId)
-                .orElseThrow(() -> new NotFoundException(ResumeService.RESUME_NOT_FOUND));
-        resumeRepository.delete(resume);
+        resumeRepository.delete(find(userId, resumeId));
         eventPublisher.publishEvent(new ResumeDeletedEvent(userId, resumeId));
+    }
+
+    private Resume find(UUID userId, UUID resumeId) {
+        return resumeRepository.findByIdAndUserId(resumeId, userId)
+                .orElseThrow(() -> new NotFoundException(ResumeService.RESUME_NOT_FOUND));
     }
 }

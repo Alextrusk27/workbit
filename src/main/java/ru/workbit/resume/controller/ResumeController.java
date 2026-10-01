@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import ru.workbit.resume.dto.RenameResumeRequest;
 import ru.workbit.resume.dto.ResumeFile;
 import ru.workbit.resume.dto.ResumeResponse;
 import ru.workbit.resume.model.Resume;
@@ -55,6 +56,12 @@ public class ResumeController implements ResumeApi {
                         disposition.filename(file.filename(), StandardCharsets.UTF_8).build()))
                 .header("Content-Security-Policy", "sandbox")
                 .body(new ByteArrayResource(file.content()));
+    }
+
+    @Override
+    @Loggable
+    public ResponseEntity<ResumeResponse> rename(UUID id, RenameResumeRequest request, CustomUserDetails userDetails) {
+        return ResponseEntity.ok(resumeService.rename(userDetails.getId(), id, Objects.requireNonNull(request.name())));
     }
 
     @Override

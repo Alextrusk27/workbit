@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { IconPencil } from '@/components/marketing/icons'
 import { Alert } from '@/components/ui/Alert'
-import { buttonClasses } from '@/components/ui/buttonStyles'
+import { Button } from '@/components/ui/Button'
 import { Field } from '@/components/ui/Field'
 import {
   modalOverlayClasses,
@@ -64,7 +65,10 @@ export function ResumeRenameDialog({
             role="dialog"
             aria-modal="true"
             aria-label="Переименовать резюме"
-            className={cn(modalPanelClasses, 'w-full max-w-[420px]')}
+            className={cn(
+              modalPanelClasses,
+              'w-full max-w-[440px] text-center',
+            )}
           >
             <RenameForm resume={resume} onClose={onClose} />
           </motion.div>
@@ -95,10 +99,15 @@ function RenameForm({
 
   return (
     <form onSubmit={onSubmit}>
-      <h3 className="text-ink text-[17px] font-bold">Переименовать резюме</h3>
+      <span className="bg-indigo/14 text-indigo mx-auto flex size-14 items-center justify-center rounded-full">
+        <IconPencil className="size-[26px]" />
+      </span>
+      <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+        Переименовать резюме
+      </h3>
       <Field
         label="Название"
-        className="mt-4"
+        className="mt-5 text-left"
         value={name}
         maxLength={MAX_NAME_LENGTH}
         autoComplete="off"
@@ -106,26 +115,20 @@ function RenameForm({
         onChange={(e) => setName(e.target.value)}
       />
       {rename.isError && (
-        <div className="mt-4">
+        <div className="mt-4 text-left">
           <Alert>{resumeErrorMessage(rename.error)}</Alert>
         </div>
       )}
-      <div className="mt-[22px] flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-        >
-          Отмена
-        </button>
-        <button
-          type="submit"
-          disabled={!trimmed || rename.isPending}
-          className={buttonClasses({ variant: 'primary', size: 'sm' })}
-        >
-          Сохранить
-        </button>
-      </div>
+      <Button
+        type="submit"
+        disabled={!trimmed || rename.isPending}
+        className="mt-5 w-full"
+      >
+        Сохранить
+      </Button>
+      <Button variant="ghost" className="mt-2 w-full" onClick={onClose}>
+        Отмена
+      </Button>
     </form>
   )
 }

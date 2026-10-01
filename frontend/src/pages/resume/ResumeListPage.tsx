@@ -8,12 +8,12 @@ import {
 import { AppPageHeader } from '@/components/app/AppPageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Container } from '@/components/ui/Container'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Resume } from '@/features/resume/api'
 import { resumeErrorMessage } from '@/features/resume/errors'
+import { ResumeDeleteDialog } from '@/features/resume/ResumeDeleteDialog'
 import { ResumePreviewDialog } from '@/features/resume/ResumePreviewDialog'
 import { ResumeRenameDialog } from '@/features/resume/ResumeRenameDialog'
 import {
@@ -310,10 +310,9 @@ function ResumeCard({ resume }: { resume: Resume }) {
         open={renaming}
         onClose={() => setRenaming(false)}
       />
-      <ConfirmDialog
+      <ResumeDeleteDialog
+        resume={resume}
         open={confirming}
-        title="Удалить резюме?"
-        text={`Резюме «${resume.name}» будет удалено вместе с файлом.`}
         onConfirm={onDelete}
         onClose={() => setConfirming(false)}
       />

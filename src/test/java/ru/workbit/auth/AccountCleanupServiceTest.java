@@ -151,5 +151,64 @@ class AccountCleanupServiceTest {
                     .revokeWelcome(List.of("expired1@example.com", "expired2@example.com"));
             inOrderCheck.verify(userRepository).deleteByDeletionWarnedAtBefore(any());
         }
+
+        @Test
+        @DisplayName("Публикует UsersDeletedEvent с id всех истёкших пользователей в порядке выборки")
+        void publishesUsersDeletedEventWithExpiredIds() {
+            // given
+            var expired1 = aUser("expired1@example.com");
+            var expired2 = aUser("expired2@example.com");
+            var expired3 = aUser("expired3@example.com");
+            when(userRepository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(any())).thenReturn(List.of());
+            when(userRepository.findByDeletionWarnedAtBefore(any()))
+                    .thenReturn(List.of(expired1, expired2, expired3));
+
+            // when
+            service.cleanupInactiveAccounts();
+
+            // then
+            var eventCaptor = ArgumentCaptor.forClass(UsersDeletedEvent.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().userIds())
+                    .containsExactly(expired1.getId(), expired2.getId(), expired3.getId());
+        }
+
+        @Test
+        @DisplayName("Публикует UsersDeletedEvent после снятия приветственных грантов и до bulk-удаления")
+        void publishesUsersDeletedEventBeforeBulkDelete() {
+            // given
+            var expired = aUser("expired@example.com");
+            when(userRepository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(any())).thenReturn(List.of());
+            when(userRepository.findByDeletionWarnedAtBefore(any())).thenReturn(List.of(expired));
+
+            // when
+            service.cleanupInactiveAccounts();
+
+            // then
+            var inOrderCheck = inOrder(limitService, eventPublisher, userRepository);
+            inOrderCheck.verify(limitService).revokeWelcome(List.of("expired@example.com"));
+            inOrderCheck.verify(eventPublisher).publishEvent(new UsersDeletedEvent(List.of(expired.getId())));
+            inOrderCheck.verify(userRepository).deleteByDeletionWarnedAtBefore(any());
+        }
+
+        @Test
+        @DisplayName("Не публикует UsersDeletedEvent, когда истёкших пользователей нет")
+        void doesNotPublishUsersDeletedEventWhenNoExpired() {
+            // given
+            var inactive = aUser("inactive@example.com");
+            when(userRepository.findByLastSeenBeforeAndDeletionWarnedAtIsNull(any()))
+                    .thenReturn(List.of(inactive));
+            when(userRepository.findByDeletionWarnedAtBefore(any())).thenReturn(List.of());
+
+            // when
+            service.cleanupInactiveAccounts();
+
+            // then
+            var eventCaptor = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getAllValues())
+                    .hasOnlyElementsOfType(AccountDeletionWarningEmailEvent.class)
+                    .noneMatch(UsersDeletedEvent.class::isInstance);
+        }
     }
 }

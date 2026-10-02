@@ -17,6 +17,9 @@ app:
       stt:
         limit: ${STT_RATE_LIMIT_LIMIT:60}
         window: ${STT_RATE_LIMIT_WINDOW:1h}
+      resume-upload:
+        limit: ${RESUME_UPLOAD_RATE_LIMIT_LIMIT:10}
+        window: ${RESUME_UPLOAD_RATE_LIMIT_WINDOW:24h}
     captcha:
       enabled: ${CAPTCHA_ENABLED:false}
       server-key: ${CAPTCHA_SERVER_KEY:}
@@ -29,15 +32,23 @@ app:
     base-url: https://workbit.ru
   email:
     hash-secret: ${EMAIL_HASH_SECRET}
+  resume:
+    storage-dir: ${RESUME_STORAGE_DIR:data/resumes}
 
 server:
   shutdown: graceful
+  tomcat:
+    max-swallow-size: 10MB
 
 spring:
   application:
     name: ${app.name}
   lifecycle:
     timeout-per-shutdown-phase: 270s
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   flyway:
     placeholders:
       payment_inv_id_start: ${PAYMENT_INV_ID_START:1000000}

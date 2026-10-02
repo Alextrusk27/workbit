@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   IconChat,
   IconChevronRight,
+  IconFile,
   IconLogout,
   IconPencil,
   IconUser,
@@ -24,6 +25,7 @@ const links: {
 }[] = [
   { to: '/app/interview', label: 'Мои интервью', Icon: IconChat },
   { to: '/app/training', label: 'Мои тренировки', Icon: IconPencil },
+  { to: '/app/resumes', label: 'Мои резюме', Icon: IconFile },
   { to: '/app/settings', label: 'Настройки', Icon: IconSettings },
 ]
 

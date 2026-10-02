@@ -81,6 +81,13 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: 'resumes',
+                lazy: async () => ({
+                  Component: (await import('@/pages/resume/ResumeListPage'))
+                    .ResumeListPage,
+                }),
+              },
+              {
                 path: 'interview',
                 lazy: async () => ({
                   Component: (

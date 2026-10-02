@@ -15,6 +15,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
@@ -38,6 +40,7 @@ public class ExceptionController {
             MethodArgumentNotValidException.class,
             MethodArgumentTypeMismatchException.class,
             MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class,
             HttpMessageNotReadableException.class
     })
     public ResponseEntity<ApiError> handleSpringValidation(final Exception e) {
@@ -146,6 +149,14 @@ public class ExceptionController {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS, "Too many requests.",
                         Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSize(final MaxUploadSizeExceededException e) {
+        log.warn("Max upload size exceeded: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiError.of(HttpStatus.CONTENT_TOO_LARGE, "Content too large.",
+                        Collections.singletonList("File too large")));
     }
 
     @ExceptionHandler(VacancyFetchException.class)

@@ -5,6 +5,7 @@ target/
 .kotlin
 *.env
 src/main/resources/llm/
+data/
 
 ### IntelliJ IDEA ###
 .idea/

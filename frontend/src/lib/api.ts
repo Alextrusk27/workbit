@@ -71,7 +71,7 @@ async function parse<T>(res: Response): Promise<T> {
 
 export interface RequestOptions {
   method?: string
-  /** JSON-тело: сериализуется и проставляется Content-Type. */
+  /** Тело: FormData уходит как есть (boundary ставит браузер), остальное сериализуется в JSON. */
   body?: unknown
   /** Query-параметры. */
   query?: Record<string, string | number | boolean | undefined>
@@ -81,6 +81,15 @@ export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  return parse<T>(await send(path, options))
+}
+
+/** Файл как Blob. `blob.type` — Content-Type ответа вместе с `charset`. */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  return (await send(path, {})).blob()
+}
+
+async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', body, query } = options
 
   let url = `${BASE_URL}${path}`
@@ -94,7 +103,9 @@ export async function apiFetch<T>(
   }
 
   const init: RequestInit = { method, credentials: 'include' }
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    init.body = body
+  } else if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }
@@ -107,7 +118,7 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) throw await toError(res)
-  return parse<T>(res)
+  return res
 }
 
 const REPORT_POLL_ATTEMPTS = 40

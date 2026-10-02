@@ -1,0 +1,104 @@
+package ru.workbit.resume.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import ru.workbit.resume.dto.RenameResumeRequest;
+import ru.workbit.resume.dto.ResumeResponse;
+import ru.workbit.security.model.CustomUserDetails;
+
+@RequestMapping("/api/v1/resumes")
+@Tag(name = "Resumes", description = "Резюме пользователя: исходные файлы")
+public interface ResumeApi {
+    String DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    @Operation(summary = "Список резюме")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponse(responseCode = "200", description = "Список резюме")
+    @GetMapping
+    ResponseEntity<List<ResumeResponse>> list(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+
+    @Operation(summary = "Загрузить резюме", description = "Сохраняет исходный файл резюме.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Резюме загружено"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос"),
+            @ApiResponse(responseCode = "409", description = "Резюме уже 3"),
+            @ApiResponse(responseCode = "413", description = "Файл больше 5 МБ"),
+            @ApiResponse(responseCode = "422", description = "Формат файла не поддерживается"),
+            @ApiResponse(responseCode = "429", description = "Слишком много загрузок")
+    })
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<ResumeResponse> upload(
+            @Parameter(description = "Файл резюме") @RequestPart("file") MultipartFile file,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) throws IOException;
+
+    @Operation(summary = "Исходный файл резюме", description = "Отдаёт файл в том виде, в каком его загрузили.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Файл резюме", content = {
+                    @Content(mediaType = "application/pdf",
+                            schema = @Schema(type = "string", format = "binary")),
+                    @Content(mediaType = DOCX_MEDIA_TYPE,
+                            schema = @Schema(type = "string", format = "binary")),
+                    @Content(mediaType = "text/plain", schema = @Schema(type = "string", format = "binary"))
+            }),
+            @ApiResponse(responseCode = "404", description = "Резюме или файл не найдены")
+    })
+    @GetMapping("/{id}/file")
+    ResponseEntity<Resource> file(
+            @PathVariable UUID id,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+
+    @Operation(summary = "Переименовать резюме")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Резюме переименовано"),
+            @ApiResponse(responseCode = "400", description = "Невалидный запрос"),
+            @ApiResponse(responseCode = "404", description = "Резюме не найдено")
+    })
+    @PatchMapping("/{id}")
+    ResponseEntity<ResumeResponse> rename(
+            @PathVariable UUID id,
+            @RequestBody @Valid RenameResumeRequest request,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+
+    @Operation(summary = "Удалить резюме", description = "Удаляет резюме вместе с исходным файлом.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Резюме удалено"),
+            @ApiResponse(responseCode = "404", description = "Резюме не найдено")
+    })
+    @DeleteMapping("/{id}")
+    ResponseEntity<Void> delete(
+            @PathVariable UUID id,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+}

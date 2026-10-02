@@ -6,53 +6,43 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.core.JsonMissing;
-import com.anthropic.core.JsonValue;
-import com.anthropic.core.http.Headers;
-import com.anthropic.core.http.StreamResponse;
-import com.anthropic.errors.AnthropicException;
-import com.anthropic.errors.AnthropicInvalidDataException;
-import com.anthropic.errors.BadRequestException;
-import com.anthropic.models.messages.Message;
-import com.anthropic.models.messages.MessageParam;
-import com.anthropic.models.messages.OutputConfig;
-import com.anthropic.models.messages.RawContentBlockDeltaEvent;
-import com.anthropic.models.messages.RawContentBlockStartEvent;
-import com.anthropic.models.messages.RawMessageDeltaEvent;
-import com.anthropic.models.messages.RawMessageStopEvent;
-import com.anthropic.models.messages.RawMessageStreamEvent;
-import com.anthropic.models.messages.StopReason;
-import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.TextBlock;
-import com.anthropic.models.messages.Usage;
-import com.anthropic.services.blocking.MessageService;
+import com.openai.client.OpenAIClient;
+import com.openai.core.http.Headers;
+import com.openai.core.http.StreamResponse;
+import com.openai.errors.BadRequestException;
+import com.openai.errors.OpenAIException;
+import com.openai.errors.OpenAIInvalidDataException;
+import com.openai.models.ReasoningEffort;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
+import com.openai.models.chat.completions.ChatCompletionChunk;
+import com.openai.models.chat.completions.ChatCompletionChunk.Choice.FinishReason;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
+import com.openai.models.completions.CompletionUsage;
+import com.openai.services.blocking.ChatService;
+import com.openai.services.blocking.chat.ChatCompletionService;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.exception.LlmException;
-import ru.workbit.llm.config.AnthropicProperties;
+import ru.workbit.llm.config.ClaudeProperties;
 import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
-import tools.jackson.databind.ObjectMapper;
 
 /**
- * Ответ модели стабится потоком настоящих SDK-событий в форме реселлера: {@code message_delta}
- * без {@code usage}, так что стоп-причина читается обходным путём клиента, а текст ответа
- * разбирает сам SDK - случаи «SDK не разобрал» кормятся сырым текстом, а не моком блока.
+ * Ответ модели стабится потоком настоящих SDK-чанков: текст, чанк с причиной остановки и чанк с
+ * usage без choices. Текст ответа разбирает сам SDK.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClaudeClientTest")
@@ -62,92 +52,80 @@ class ClaudeClientTest {
     private static final String ANSWER_JSON = "{\"answer\":\"используйте индекс для поиска\"}";
 
     @Mock
-    AnthropicClient client;
+    OpenAIClient client;
     @Mock
-    MessageService messageService;
+    ChatService chatService;
+    @Mock
+    ChatCompletionService completionService;
 
-    private final AnthropicProperties props = new AnthropicProperties(
-            "claude-test-model", OutputConfig.Effort.MEDIUM);
-    private final ObjectMapper objectMapper = spy(new ObjectMapper());
+    private final ClaudeProperties props = new ClaudeProperties("claude-test-model", ReasoningEffort.MEDIUM);
 
     private ClaudeClient claudeClient;
 
     @BeforeEach
     void setUp() {
-        claudeClient = new ClaudeClient(client, props, objectMapper);
-        when(client.messages()).thenReturn(messageService);
+        claudeClient = new ClaudeClient(client, props);
+        when(client.chat()).thenReturn(chatService);
+        when(chatService.completions()).thenReturn(completionService);
     }
 
-    private static <T> StructuredMessageCreateParams<T> anyParams() {
+    private static <T> StructuredChatCompletionCreateParams<T> anyParams() {
         return any();
     }
 
     private LlmTrainingReferenceAnswer converse() {
-        return claudeClient.converse(PROMPT, List.of("вводная"), List.<MessageParam>of(), null,
+        return claudeClient.converse(PROMPT, List.of("вводная"), List.of(), null,
                 LlmTrainingReferenceAnswer.class);
     }
 
     private void stubText(String text) {
-        doReturn(streamOf(text, StopReason.END_TURN))
-                .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+        doReturn(streamOf(text, FinishReason.STOP))
+                .when(completionService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
     }
 
-    private void stubStopReason(StopReason stop) {
-        doReturn(streamOf(null, stop))
-                .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+    private void stubFinishReason(FinishReason finish) {
+        doReturn(streamOf(null, finish))
+                .when(completionService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
     }
 
     /**
-     * Поток событий одного ответа; {@code text == null} - ответ без текстового блока.
+     * Поток чанков одного ответа; {@code text == null} - ответ без текста.
      */
     @SuppressWarnings("unchecked")
-    private static StreamResponse<RawMessageStreamEvent> streamOf(String text, StopReason stop) {
-        List<RawMessageStreamEvent> events = new ArrayList<>();
-        events.add(RawMessageStreamEvent.ofMessageStart(Message.builder()
-                .id("msg_test")
-                .model("claude-test-model")
-                .content(List.of())
-                .container(Optional.empty())
-                .stopDetails(Optional.empty())
-                .stopReason(Optional.empty())
-                .stopSequence(Optional.empty())
-                .usage(Usage.builder()
-                        .inputTokens(10)
-                        .outputTokens(0)
-                        .cacheCreation(Optional.empty())
-                        .cacheCreationInputTokens(0)
-                        .cacheReadInputTokens(0)
-                        .inferenceGeo(Optional.empty())
-                        .outputTokensDetails(Optional.empty())
-                        .serverToolUse(Optional.empty())
-                        .serviceTier(Optional.empty())
-                        .build())
-                .build()));
+    private static StreamResponse<ChatCompletionChunk> streamOf(String text, FinishReason finish) {
+        List<ChatCompletionChunk> chunks = new ArrayList<>();
         if (text != null) {
-            events.add(RawMessageStreamEvent.ofContentBlockStart(RawContentBlockStartEvent.builder()
-                    .index(0)
-                    .contentBlock(TextBlock.builder().text("").citations(List.of()).build())
-                    .build()));
-            events.add(RawMessageStreamEvent.ofContentBlockDelta(RawContentBlockDeltaEvent.builder()
-                    .index(0)
-                    .textDelta(text)
-                    .build()));
-            events.add(RawMessageStreamEvent.ofContentBlockStop(0));
+            chunks.add(chunk(List.of(choice(text, null))));
         }
-        events.add(RawMessageStreamEvent.ofMessageDelta(RawMessageDeltaEvent.builder()
-                .delta(RawMessageDeltaEvent.Delta.builder()
-                        .container(Optional.empty())
-                        .stopDetails(Optional.empty())
-                        .stopReason(stop)
-                        .stopSequence(Optional.empty())
-                        .build())
-                .usage(JsonMissing.of())
-                .build()));
-        events.add(RawMessageStreamEvent.ofMessageStop(RawMessageStopEvent.builder().build()));
+        chunks.add(chunk(List.of(choice(null, finish))));
+        chunks.add(chunk(List.of()).toBuilder()
+                .usage(CompletionUsage.builder().promptTokens(10).completionTokens(5).totalTokens(15).build())
+                .build());
 
-        StreamResponse<RawMessageStreamEvent> response = mock(StreamResponse.class);
-        when(response.stream()).thenAnswer(invocation -> events.stream());
+        StreamResponse<ChatCompletionChunk> response = mock(StreamResponse.class);
+        when(response.stream()).thenAnswer(invocation -> chunks.stream());
         return response;
+    }
+
+    private static ChatCompletionChunk chunk(List<ChatCompletionChunk.Choice> choices) {
+        return ChatCompletionChunk.builder()
+                .id("gen_test")
+                .created(0)
+                .model("claude-test-model")
+                .choices(choices)
+                .build();
+    }
+
+    private static ChatCompletionChunk.Choice choice(String text, FinishReason finish) {
+        ChatCompletionChunk.Choice.Delta.Builder delta = ChatCompletionChunk.Choice.Delta.builder();
+        if (text != null) {
+            delta.content(text);
+        }
+        return ChatCompletionChunk.Choice.builder()
+                .index(0)
+                .delta(delta.build())
+                .finishReason(Optional.ofNullable(finish))
+                .build();
     }
 
     @Nested
@@ -155,22 +133,8 @@ class ClaudeClientTest {
     class Converse {
 
         @Test
-        @DisplayName("SDK не разобрал structured output, но ответ в markdown-ограде - разбирается ObjectMapper'ом")
-        void parsesFencedJsonWhenSdkFailsToParseStructuredOutput() {
-            // given
-            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            stubText("```json\n" + ANSWER_JSON + "\n```");
-
-            // when
-            var result = ClaudeClientTest.this.converse();
-
-            // then
-            assertThat(result).isEqualTo(expected);
-        }
-
-        @Test
-        @DisplayName("SDK не разобрал ответ, ограды нет - LlmException с причиной от SDK")
-        void throwsWhenSdkFailsToParseAndThereIsNoFence() {
+        @DisplayName("Ответ не разбирается по схеме - LlmException с причиной от SDK, без повтора")
+        void throwsWithoutRetryWhenResponseIsNotParseable() {
             // given
             stubText("это вообще не json");
 
@@ -178,66 +142,9 @@ class ClaudeClientTest {
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM response is not parseable")
-                    .hasCauseInstanceOf(AnthropicInvalidDataException.class);
-        }
-
-        @Test
-        @DisplayName("Ограда есть, но внутри не разбираемый JSON - LlmException")
-        void throwsWhenFencedContentIsNotValidJson() {
-            // given
-            stubText("```json\nне json\n```");
-
-            // when / then
-            assertThatThrownBy(ClaudeClientTest.this::converse)
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("LLM response is not parseable");
-        }
-
-        @Test
-        @DisplayName("JSON без ограды, но с пояснением вокруг - разбирается срезом от первой { до последней }")
-        void parsesJsonSurroundedByProseWhenSdkFailsToParse() {
-            // given
-            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            stubText("Вот ответ по схеме:\n" + ANSWER_JSON + "\nГотово.");
-
-            // when
-            var result = ClaudeClientTest.this.converse();
-
-            // then
-            assertThat(result).isEqualTo(expected);
-        }
-
-        @Test
-        @DisplayName("Неразбираемый ответ перезапрашивается один раз: повтор вернул JSON - результат его")
-        void retriesOnceWhenResponseIsNotParseable() {
-            // given
-            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            doReturn(streamOf("**answer:**\n\n1. используйте индекс", StopReason.END_TURN),
-                    streamOf(ANSWER_JSON, StopReason.END_TURN))
-                    .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
-
-            // when
-            var result = ClaudeClientTest.this.converse();
-
-            // then
-            assertThat(result).isEqualTo(expected);
-            verify(messageService, times(2)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
-        }
-
-        @Test
-        @DisplayName("Неразбираемый ответ и после повтора - LlmException, вызовов ровно два")
-        void throwsAfterSingleRetryWhenResponseStaysUnparseable() {
-            // given
-            doReturn(streamOf("это вообще не json", StopReason.END_TURN),
-                    streamOf("и снова не json", StopReason.END_TURN))
-                    .when(messageService).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
-
-            // when / then
-            assertThatThrownBy(ClaudeClientTest.this::converse)
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("LLM response is not parseable")
-                    .hasCauseInstanceOf(AnthropicInvalidDataException.class);
-            verify(messageService, times(2)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+                    .hasCauseInstanceOf(OpenAIInvalidDataException.class);
+            verify(completionService, times(1))
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
@@ -246,40 +153,25 @@ class ClaudeClientTest {
             // given
             var serviceException = BadRequestException.builder()
                     .headers(Headers.builder().build())
-                    .body(JsonValue.from(Map.of()))
                     .build();
-            doThrow(serviceException).when(messageService)
+            doThrow(serviceException).when(completionService)
                     .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse).isInstanceOf(LlmException.class);
-            verify(messageService, times(1)).createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+            verify(completionService, times(1))
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
-        @DisplayName("Нормальный путь не сломан: SDK разобрал JSON сам, ObjectMapper не трогается")
-        void returnsSdkParsedTextAndDoesNotTouchObjectMapper() {
-            // given
-            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
-            stubText(ANSWER_JSON);
-
-            // when
-            var result = ClaudeClientTest.this.converse();
-
-            // then
-            assertThat(result).isEqualTo(expected);
-            verifyNoInteractions(objectMapper);
-        }
-
-        @Test
-        @DisplayName("Ход k+1: история и новая реплика уходят кэшируемым хвостом")
+        @DisplayName("Ход k+1: промпт и вводная частями первого сообщения, затем история и новая реплика")
         void sendsDialogAndLastUserOnSubsequentTurn() {
             // given
             var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
             stubText(ANSWER_JSON);
 
-            List<MessageParam> dialog = List.of(
-                    MessageParam.builder().role(MessageParam.Role.ASSISTANT).content("Какой у вас опыт?").build());
+            List<ChatCompletionMessageParam> dialog = List.of(ChatCompletionMessageParam.ofAssistant(
+                    ChatCompletionAssistantMessageParam.builder().content("Какой у вас опыт?").build()));
 
             // when
             var result = claudeClient.converse(PROMPT, List.of("вводная"), dialog, "Три года",
@@ -287,32 +179,46 @@ class ClaudeClientTest {
 
             // then
             assertThat(result).isEqualTo(expected);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<StructuredChatCompletionCreateParams<LlmTrainingReferenceAnswer>> paramsCaptor =
+                    ArgumentCaptor.forClass(StructuredChatCompletionCreateParams.class);
+            verify(completionService).createStreaming(paramsCaptor.capture());
+            var params = paramsCaptor.getValue().rawParams();
+
+            assertThat(params.model().asString()).isEqualTo("claude-test-model");
+            assertThat(params.reasoningEffort()).contains(ReasoningEffort.MEDIUM);
+            assertThat(params.messages()).hasSize(3);
+            assertThat(params.messages().get(0).asUser().content().asArrayOfContentParts())
+                    .extracting(part -> part.asText().text())
+                    .containsExactly(PROMPT, "вводная");
+            assertThat(params.messages().get(1).isAssistant()).isTrue();
+            assertThat(params.messages().get(2).asUser().content().asText()).isEqualTo("Три года");
         }
 
         @Test
-        @DisplayName("Сам SDK-вызов кидает AnthropicInvalidDataException - LlmException с исходной причиной")
-        void wrapsAnthropicInvalidDataExceptionFromTheCallItself() {
+        @DisplayName("Сам SDK-вызов кидает OpenAIInvalidDataException - LlmException с исходной причиной")
+        void wrapsInvalidDataExceptionFromTheCallItself() {
             // given
-            var cause = new AnthropicInvalidDataException("malformed response envelope");
-            doThrow(cause).when(messageService)
+            var cause = new OpenAIInvalidDataException("malformed response envelope");
+            doThrow(cause).when(completionService)
                     .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
-                    .hasMessage("LLM response is not parseable")
+                    .hasMessage("LLM call failed")
                     .hasCause(cause);
         }
 
         @Test
-        @DisplayName("AnthropicServiceException оборачивается в LlmException со статусом")
-        void wrapsAnthropicServiceExceptionWithStatusCode() {
+        @DisplayName("OpenAIServiceException оборачивается в LlmException со статусом")
+        void wrapsServiceExceptionWithStatusCode() {
             // given
             var serviceException = BadRequestException.builder()
                     .headers(Headers.builder().build())
-                    .body(JsonValue.from(Map.of()))
                     .build();
-            doThrow(serviceException).when(messageService)
+            doThrow(serviceException).when(completionService)
                     .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
@@ -323,49 +229,49 @@ class ClaudeClientTest {
         }
 
         @Test
-        @DisplayName("Прочий AnthropicException оборачивается в LlmException")
-        void wrapsGenericAnthropicException() {
+        @DisplayName("Прочий OpenAIException оборачивается в LlmException")
+        void wrapsGenericOpenAiException() {
             // given
-            var anthropicException = new AnthropicException("connection reset");
-            doThrow(anthropicException).when(messageService)
+            var openAiException = new OpenAIException("connection reset");
+            doThrow(openAiException).when(completionService)
                     .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM call failed")
-                    .hasCause(anthropicException);
+                    .hasCause(openAiException);
         }
 
         @Test
-        @DisplayName("Модель отказалась отвечать (REFUSAL) - LlmException")
-        void throwsWhenModelRefuses() {
+        @DisplayName("Ответ остановлен фильтром (CONTENT_FILTER) - LlmException")
+        void throwsWhenContentFiltered() {
             // given
-            stubStopReason(StopReason.REFUSAL);
+            stubFinishReason(FinishReason.CONTENT_FILTER);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
-                    .hasMessage("LLM stopped with reason " + StopReason.REFUSAL);
+                    .hasMessage("LLM stopped with reason content_filter");
         }
 
         @Test
-        @DisplayName("Ответ упёрся в лимит токенов (MAX_TOKENS) - LlmException")
+        @DisplayName("Ответ упёрся в лимит токенов (LENGTH) - LlmException")
         void throwsWhenModelHitsMaxTokens() {
             // given
-            stubStopReason(StopReason.MAX_TOKENS);
+            stubFinishReason(FinishReason.LENGTH);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
-                    .hasMessage("LLM stopped with reason " + StopReason.MAX_TOKENS);
+                    .hasMessage("LLM stopped with reason length");
         }
 
         @Test
-        @DisplayName("В ответе нет текстового блока - LlmException Model not response")
-        void throwsWhenResponseHasNoTextBlock() {
+        @DisplayName("В ответе нет текста - LlmException Model not response")
+        void throwsWhenResponseHasNoText() {
             // given
-            stubStopReason(StopReason.END_TURN);
+            stubFinishReason(FinishReason.STOP);
 
             // when / then
             assertThatThrownBy(ClaudeClientTest.this::converse)

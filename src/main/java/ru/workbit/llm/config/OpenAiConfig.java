@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Клиент OpenAI-моделей на том же шлюзе, что и Claude: ключ и хост общие, отличается маршрут.
+ * Клиент OpenAI-моделей на том же шлюзе и маршруте, что и Claude, но с коротким таймаутом под подсказки ввода.
  * Версия API у этого SDK входит в базовый URL, без неё запрос уходит в 404.
  */
 @Configuration

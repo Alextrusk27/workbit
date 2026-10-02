@@ -1,6 +1,8 @@
 package ru.workbit.llm.client;
 
-import com.anthropic.models.messages.MessageParam;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -85,7 +87,7 @@ public class InterviewerClient {
     public LlmInterviewStep next(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
                                  List<LlmInterviewTurn> history, String lastAnswer, String askedBefore) {
 
-        List<MessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
+        List<ChatCompletionMessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
         dialog.add(assistant(plan));
         Map<String, Integer> planned = plannedByTopic(plan);
         Map<String, Integer> askedByTopic = new HashMap<>();
@@ -161,17 +163,15 @@ public class InterviewerClient {
         }
     }
 
-    private static MessageParam user(String text) {
-        return MessageParam.builder()
-                .role(MessageParam.Role.USER)
+    private static ChatCompletionMessageParam user(String text) {
+        return ChatCompletionMessageParam.ofUser(ChatCompletionUserMessageParam.builder()
                 .content(text)
-                .build();
+                .build());
     }
 
-    private MessageParam assistant(Object reply) {
-        return MessageParam.builder()
-                .role(MessageParam.Role.ASSISTANT)
+    private ChatCompletionMessageParam assistant(Object reply) {
+        return ChatCompletionMessageParam.ofAssistant(ChatCompletionAssistantMessageParam.builder()
                 .content(objectMapper.writeValueAsString(reply))
-                .build();
+                .build());
     }
 }

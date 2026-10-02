@@ -9,7 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.anthropic.models.messages.MessageParam;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +45,7 @@ class InterviewerClientTest {
     ClaudeClient claude;
 
     @Captor
-    ArgumentCaptor<List<MessageParam>> dialogCaptor;
+    ArgumentCaptor<List<ChatCompletionMessageParam>> dialogCaptor;
 
     @Captor
     ArgumentCaptor<List<String>> openingCaptor;
@@ -78,8 +78,11 @@ class InterviewerClientTest {
         return new LlmInterviewTurn(answer, new LlmInterviewStep(kind, question, topic));
     }
 
-    private static String contentOf(List<MessageParam> dialog, int index) {
-        return dialog.get(index).content().asString();
+    private static String contentOf(List<ChatCompletionMessageParam> dialog, int index) {
+        ChatCompletionMessageParam message = dialog.get(index);
+        return message.isUser()
+                ? message.asUser().content().asText()
+                : message.asAssistant().content().orElseThrow().asText();
     }
 
     @Nested
@@ -195,7 +198,7 @@ class InterviewerClientTest {
 
             // then
             String lastUser = captureLastUser();
-            List<MessageParam> dialog = dialogCaptor.getValue();
+            List<ChatCompletionMessageParam> dialog = dialogCaptor.getValue();
             assertThat(dialog).hasSize(5);
             assertThat(contentOf(dialog, 0)).isEqualTo(objectMapper.writeValueAsString(plan));
             assertThat(contentOf(dialog, 1)).isEqualTo(
@@ -226,8 +229,8 @@ class InterviewerClientTest {
             verify(claude, times(2)).converse(any(), any(), dialogCaptor.capture(), lastUserCaptor.capture(),
                     eq(LlmInterviewStep.class));
 
-            List<MessageParam> firstDialog = dialogCaptor.getAllValues().getFirst();
-            List<MessageParam> secondDialog = dialogCaptor.getAllValues().getLast();
+            List<ChatCompletionMessageParam> firstDialog = dialogCaptor.getAllValues().getFirst();
+            List<ChatCompletionMessageParam> secondDialog = dialogCaptor.getAllValues().getLast();
             assertThat(contentOf(secondDialog, 0)).isEqualTo(contentOf(firstDialog, 0));
             assertThat(contentOf(secondDialog, 1)).isEqualTo(contentOf(firstDialog, 1));
             assertThat(contentOf(secondDialog, 3)).isEqualTo(lastUserCaptor.getAllValues().getFirst());

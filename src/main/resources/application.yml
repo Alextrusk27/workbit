@@ -112,8 +112,8 @@ llm:
   gateway:
     base-url: ${LLM_GATEWAY_BASE_URL}
     auth-token: ${LLM_GATEWAY_AUTH_TOKEN}
-  anthropic:
-    model: claude-opus-5
+  claude:
+    model: claude-opus-5.5
     effort: medium
   openai:
     model: gpt-5.4-mini

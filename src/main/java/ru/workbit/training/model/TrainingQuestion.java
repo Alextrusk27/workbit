@@ -34,9 +34,6 @@ public class TrainingQuestion {
     @JoinColumn(name = "session_id", nullable = false, updatable = false)
     private TrainingSession trainingSession;
 
-    @Column(name = "bank_question_id", updatable = false)
-    private UUID bankQuestionId;
-
     @OneToOne(mappedBy = "question", orphanRemoval = true, cascade = CascadeType.ALL)
     private TrainingFeedback feedback;
 

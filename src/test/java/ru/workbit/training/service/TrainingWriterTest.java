@@ -28,7 +28,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.service.LimitService;
-import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
@@ -81,22 +80,18 @@ class TrainingWriterTest {
     class UpsertDictionaries {
 
         @Test
-        @DisplayName("Апсертит и профессию, и навык с посчитанным ключом сравнения, возвращает оба id")
+        @DisplayName("Апсертит и профессию, и навык с посчитанным ключом сравнения, навык - под id профессии")
         void upsertsBothProfessionAndSkill() {
             // given
             UUID professionId = UUID.randomUUID();
-            UUID skillId = UUID.randomUUID();
             when(professionDictRepository.upsertAndIncrementUsage(PROFESSION, DictText.matchKey(PROFESSION)))
                     .thenReturn(professionId);
-            when(skillDictRepository.upsertAndIncrementUsage(professionId, SKILL, DictText.matchKey(SKILL)))
-                    .thenReturn(skillId);
 
             // when
-            TrainingWriter.DictionaryRefs result = trainingWriter.upsertDictionaries(SKILL, PROFESSION);
+            trainingWriter.upsertDictionaries(SKILL, PROFESSION);
 
             // then
-            assertThat(result.professionId()).isEqualTo(professionId);
-            assertThat(result.skillId()).isEqualTo(skillId);
+            verify(professionDictRepository).upsertAndIncrementUsage(PROFESSION, DictText.matchKey(PROFESSION));
             verify(skillDictRepository).upsertAndIncrementUsage(professionId, SKILL, DictText.matchKey(SKILL));
         }
     }
@@ -106,49 +101,35 @@ class TrainingWriterTest {
     class CreateSession {
 
         @Test
-        @DisplayName("Банковские вопросы идут первыми с bankQuestionId и скопированным referenceAnswer (blank -> null), "
-                + "затем сгенерированные без bankQuestionId и без referenceAnswer; orderIndex 1..N по порядку")
-        void ordersBankThenGeneratedQuestionsCopyingReferenceAnswer() {
+        @DisplayName("Сгенерированные вопросы сохраняются с orderIndex 1..N по порядку и без referenceAnswer, лимит списывается")
+        void savesGeneratedQuestionsInOrderWithoutReferenceAnswer() {
             // given
             TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
-            UUID bankId1 = UUID.randomUUID();
-            UUID bankId2 = UUID.randomUUID();
-            BankQuestion bank1 = BankQuestion.builder().id(bankId1).text("Банковский вопрос 1")
-                    .referenceAnswer("Эталонный ответ 1").build();
-            BankQuestion bank2 = BankQuestion.builder().id(bankId2).text("Банковский вопрос 2")
-                    .referenceAnswer("   ").build();
-            List<String> generated = List.of("Сгенерированный вопрос");
+            List<String> generated = List.of("Первый сгенерированный вопрос", "Второй сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null, null);
-            when(trainingSessionMapper.toResponse(session, 0, 3)).thenReturn(expectedResponse);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 2, null, null, null);
+            when(trainingSessionMapper.toResponse(session, 0, 2)).thenReturn(expectedResponse);
 
             // when
-            TrainingSessionResponse result = trainingWriter.createSession(session, List.of(bank1, bank2), generated);
+            TrainingSessionResponse result = trainingWriter.createSession(session, generated);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
 
             List<TrainingQuestion> questions = session.getQuestions();
-            assertThat(questions).hasSize(3);
+            assertThat(questions).hasSize(2);
 
             TrainingQuestion first = questions.get(0);
-            assertThat(first.getBankQuestionId()).isEqualTo(bankId1);
             assertThat(first.getOrderIndex()).isEqualTo(1);
-            assertThat(first.getText()).isEqualTo("Банковский вопрос 1");
-            assertThat(first.getReferenceAnswer()).isEqualTo("Эталонный ответ 1");
+            assertThat(first.getText()).isEqualTo("Первый сгенерированный вопрос");
+            assertThat(first.getReferenceAnswer()).isNull();
             assertThat(first.getTrainingSession()).isSameAs(session);
 
             TrainingQuestion second = questions.get(1);
-            assertThat(second.getBankQuestionId()).isEqualTo(bankId2);
             assertThat(second.getOrderIndex()).isEqualTo(2);
+            assertThat(second.getText()).isEqualTo("Второй сгенерированный вопрос");
             assertThat(second.getReferenceAnswer()).isNull();
-
-            TrainingQuestion third = questions.get(2);
-            assertThat(third.getBankQuestionId()).isNull();
-            assertThat(third.getOrderIndex()).isEqualTo(3);
-            assertThat(third.getText()).isEqualTo("Сгенерированный вопрос");
-            assertThat(third.getReferenceAnswer()).isNull();
 
             verify(trainingSessionRepository).save(session);
             verify(limitService).debit(session.getUserId(), UsageEvent.Operation.TRAINING, "Тренировка — " + SKILL
@@ -156,7 +137,7 @@ class TrainingWriterTest {
         }
 
         @Test
-        @DisplayName("Банк и генерация пусты - сохраняет сессию с пустым списком вопросов, answeredCount=0")
+        @DisplayName("Сгенерированных вопросов нет - сохраняет сессию с пустым списком вопросов, answeredCount=0")
         void emptyQuestionsSavesSessionWithEmptyList() {
             // given
             TrainingSession session = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
@@ -165,7 +146,7 @@ class TrainingWriterTest {
             when(trainingSessionMapper.toResponse(session, 0, 0)).thenReturn(expectedResponse);
 
             // when
-            TrainingSessionResponse result = trainingWriter.createSession(session, List.of(), List.of());
+            TrainingSessionResponse result = trainingWriter.createSession(session, List.of());
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
@@ -179,9 +160,9 @@ class TrainingWriterTest {
     class AppendQuestions {
 
         @Test
-        @DisplayName("Продолжает нумерацию с max(orderIndex)+1 - сначала банковские с bankQuestionId/referenceAnswer, "
-                + "затем сгенерированные без них; answered/total считаются по итоговому списку")
-        void continuesOrderIndexNumberingAppendingBankThenGenerated() {
+        @DisplayName("Продолжает нумерацию с max(orderIndex)+1, новые вопросы без referenceAnswer; "
+                + "answered/total считаются по итоговому списку")
+        void continuesOrderIndexNumberingAppendingGenerated() {
             // given
             UUID sessionId = UUID.randomUUID();
             TrainingQuestion existingAnswered = TrainingQuestion.builder()
@@ -195,10 +176,7 @@ class TrainingWriterTest {
                     .build();
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
-            UUID bankId = UUID.randomUUID();
-            BankQuestion bankQuestion = BankQuestion.builder()
-                    .id(bankId).text("Банковский вопрос").referenceAnswer("Эталон").build();
-            List<String> generated = List.of("Сгенерированный вопрос");
+            List<String> generated = List.of("Первый сгенерированный вопрос", "Второй сгенерированный вопрос");
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     sessionId, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.IN_PROGRESS,
@@ -206,7 +184,7 @@ class TrainingWriterTest {
             when(trainingSessionMapper.toResponse(session, 1, 4)).thenReturn(expectedResponse);
 
             // when
-            TrainingSessionResponse result = trainingWriter.appendQuestions(sessionId, List.of(bankQuestion), generated);
+            TrainingSessionResponse result = trainingWriter.appendQuestions(sessionId, generated);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
@@ -214,16 +192,15 @@ class TrainingWriterTest {
             List<TrainingQuestion> questions = session.getQuestions();
             assertThat(questions).hasSize(4);
 
-            TrainingQuestion appendedBank = questions.get(2);
-            assertThat(appendedBank.getBankQuestionId()).isEqualTo(bankId);
-            assertThat(appendedBank.getOrderIndex()).isEqualTo(3);
-            assertThat(appendedBank.getReferenceAnswer()).isEqualTo("Эталон");
+            TrainingQuestion firstAppended = questions.get(2);
+            assertThat(firstAppended.getOrderIndex()).isEqualTo(3);
+            assertThat(firstAppended.getText()).isEqualTo("Первый сгенерированный вопрос");
+            assertThat(firstAppended.getReferenceAnswer()).isNull();
 
-            TrainingQuestion appendedGenerated = questions.get(3);
-            assertThat(appendedGenerated.getBankQuestionId()).isNull();
-            assertThat(appendedGenerated.getOrderIndex()).isEqualTo(4);
-            assertThat(appendedGenerated.getText()).isEqualTo("Сгенерированный вопрос");
-            assertThat(appendedGenerated.getReferenceAnswer()).isNull();
+            TrainingQuestion secondAppended = questions.get(3);
+            assertThat(secondAppended.getOrderIndex()).isEqualTo(4);
+            assertThat(secondAppended.getText()).isEqualTo("Второй сгенерированный вопрос");
+            assertThat(secondAppended.getReferenceAnswer()).isNull();
 
             verify(trainingSessionRepository).save(session);
             verify(trainingSessionMapper).toResponse(session, 1, 4);
@@ -239,7 +216,7 @@ class TrainingWriterTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
 
             // when / then
-            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of(), List.of()))
+            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of()))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
             verify(trainingSessionRepository, never()).save(any());
@@ -259,7 +236,7 @@ class TrainingWriterTest {
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
             // when / then
-            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of(), List.of()))
+            assertThatThrownBy(() -> trainingWriter.appendQuestions(sessionId, List.of()))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
             verify(trainingSessionRepository, never()).save(any());
@@ -425,14 +402,14 @@ class TrainingWriterTest {
                     .skill(SKILL).profession(PROFESSION).level(TrainingSession.Level.MEDIUM).build();
             TrainingQuestion question = TrainingQuestion.builder()
                     .id(questionId).trainingSession(session).text("Что такое JVM?")
-                    .referenceAnswer("Готовый ответ из банка").orderIndex(3).build();
+                    .referenceAnswer("Сохранённый ответ").orderIndex(3).build();
             when(trainingQuestionRepository.findWithSessionById(questionId)).thenReturn(Optional.of(question));
 
             // when
             trainingWriter.unlockReferenceAnswer(questionId, userId);
 
             // then
-            assertThat(question.getReferenceAnswer()).isEqualTo("Готовый ответ из банка");
+            assertThat(question.getReferenceAnswer()).isEqualTo("Сохранённый ответ");
             assertThat(question.getReferenceAnswerUnlockedAt()).isNotNull();
             verify(limitService).debit(userId, UsageEvent.Operation.REFERENCE_ANSWER,
                     "Эталонный ответ — " + SKILL + ", вопрос 3");

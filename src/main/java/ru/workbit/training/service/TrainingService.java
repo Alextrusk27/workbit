@@ -13,7 +13,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -24,12 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.service.LimitService;
-import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.SkillDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
-import ru.workbit.content.repository.QuestionBankRepository;
 import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
@@ -90,7 +87,6 @@ public class TrainingService {
     private final TrainingUserFeedbackRepository trainingUserFeedbackRepository;
     private final ProfessionDictRepository professionDictRepository;
     private final SkillDictRepository skillDictRepository;
-    private final QuestionBankRepository questionBankRepository;
     private final TrainingWriter trainingWriter;
     private final LlmService llmService;
     private final LimitService limitService;
@@ -120,18 +116,12 @@ public class TrainingService {
 
         canonicalizeInput(session);
 
-        TrainingWriter.DictionaryRefs refs = trainingWriter.upsertDictionaries(
-                session.getSkill(), session.getProfession());
-        List<BankQuestion> bankQuestions = questionBankRepository.sampleUnseen(
-                refs.professionId(), refs.skillId(), session.getLevel().name(), userId, QUESTION_CAP);
+        trainingWriter.upsertDictionaries(session.getSkill(), session.getProfession());
 
-        List<String> generatedQuestions = bankQuestions.size() < QUESTION_CAP
-                ? generateQuestions(session, QUESTION_CAP - bankQuestions.size(),
-                        bankQuestions.stream().map(BankQuestion::getText).toList())
-                : List.of();
-        checkEnoughQuestions(session, bankQuestions, generatedQuestions);
+        List<String> generatedQuestions = generateQuestions(session, QUESTION_CAP, List.of());
+        checkEnoughQuestions(session, generatedQuestions);
 
-        return trainingWriter.createSession(session, bankQuestions, generatedQuestions);
+        return trainingWriter.createSession(session, generatedQuestions);
     }
 
     public TrainingSessionResponse get(UUID sessionId, UUID userId) {
@@ -201,8 +191,8 @@ public class TrainingService {
 
     /**
      * Следующая пачка вопросов в ту же сессию — альтернатива разбору, когда вопросы кончились.
-     * Банк отдаёт только не виденное пользователем, недостающее пишет LLM с оглядкой на уже
-     * заданные вопросы. Ни одного нового вопроса — 409: предлагать по этому навыку и уровню нечего.
+     * LLM пишет их с оглядкой на уже заданные вопросы. Ни одного нового вопроса — 409: предлагать
+     * по этому навыку и уровню нечего.
      */
     public TrainingSessionResponse addQuestions(UUID sessionId, UUID userId) {
         return singleFlight.run(
@@ -222,17 +212,11 @@ public class TrainingService {
         checkAllQuestionsAnswered(sessionId, questions);
 
         int missing = Math.min(QUESTION_CAP, MAX_QUESTIONS - questions.size());
-        List<BankQuestion> bankQuestions = sampleBank(session, userId, missing);
-        List<String> generatedQuestions = bankQuestions.size() < missing
-                ? generateQuestions(session, missing - bankQuestions.size(),
-                        Stream.concat(
-                                        questions.stream().map(TrainingQuestion::getText),
-                                        bankQuestions.stream().map(BankQuestion::getText))
-                                .toList())
-                : List.of();
-        checkAnyNewQuestion(session, bankQuestions, generatedQuestions);
+        List<String> generatedQuestions = generateQuestions(session, missing,
+                questions.stream().map(TrainingQuestion::getText).toList());
+        checkAnyNewQuestion(session, generatedQuestions);
 
-        return trainingWriter.appendQuestions(sessionId, bankQuestions, generatedQuestions);
+        return trainingWriter.appendQuestions(sessionId, generatedQuestions);
     }
 
     @Transactional
@@ -277,8 +261,8 @@ public class TrainingService {
     }
 
     /**
-     * Эталонный ответ на вопрос: у вопроса из банка он скопирован при создании сессии, у сгенерированного
-     * живьём — генерируется по первому запросу и кешируется, чтобы повторный показ не стоил вызова LLM.
+     * Эталонный ответ на вопрос генерируется по первому запросу и кешируется, чтобы повторный показ
+     * не стоил вызова LLM.
      */
     public ReferenceAnswerResponse getReferenceAnswer(UUID sessionId, UUID questionId, UUID userId) {
         return singleFlight.run(
@@ -531,19 +515,6 @@ public class TrainingService {
         return usable.getFirst();
     }
 
-    /**
-     * Банк адресуется id словарных записей, а в сессии от них остались только строки-снапшоты,
-     * поэтому пара ищется по ключу сравнения; нет записи в словаре — вопросы даст только LLM.
-     */
-    private List<BankQuestion> sampleBank(TrainingSession session, UUID userId, int limit) {
-        return professionDictRepository.findByMatchKey(DictText.matchKey(session.getProfession()))
-                .flatMap(profession -> skillDictRepository
-                        .findByProfessionIdAndMatchKey(profession.getId(), DictText.matchKey(session.getSkill()))
-                        .map(skill -> questionBankRepository.sampleUnseen(
-                                profession.getId(), skill.getId(), session.getLevel().name(), userId, limit)))
-                .orElseGet(List::of);
-    }
-
     private List<String> generateQuestions(TrainingSession session, int missing, List<String> existingQuestions) {
         LlmTrainingQuestions generated = llmService.generateTrainingQuestions(
                 new LlmTrainingQuestionsRequest(
@@ -579,18 +550,16 @@ public class TrainingService {
         }
     }
 
-    private void checkAnyNewQuestion(TrainingSession session, List<BankQuestion> bankQuestions,
-                                     List<String> generatedQuestions) {
-        if (bankQuestions.isEmpty() && generatedQuestions.isEmpty()) {
+    private void checkAnyNewQuestion(TrainingSession session, List<String> generatedQuestions) {
+        if (generatedQuestions.isEmpty()) {
             log.warn("No new questions left [skill={}, profession={}, level={}]",
                     session.getSkill(), session.getProfession(), session.getLevel());
             throw new ConflictException("No new questions available");
         }
     }
 
-    private void checkEnoughQuestions(TrainingSession session, List<BankQuestion> bankQuestions,
-                                      List<String> generatedQuestions) {
-        int questions = bankQuestions.size() + generatedQuestions.size();
+    private void checkEnoughQuestions(TrainingSession session, List<String> generatedQuestions) {
+        int questions = generatedQuestions.size();
         if (questions < MIN_ANSWERED_TO_FINISH) {
             log.error("Only {} questions for new training session, {} required "
                             + "[skill={}, profession={}, level={}]",

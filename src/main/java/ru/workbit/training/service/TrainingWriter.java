@@ -11,12 +11,10 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.service.LimitService;
-import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.repository.ProfessionDictRepository;
 import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.LlmException;
@@ -52,30 +50,20 @@ class TrainingWriter {
     private final TrainingSessionMapper trainingSessionMapper;
     private final TrainingReportMapper trainingReportMapper;
 
-    record DictionaryRefs(UUID professionId, UUID skillId) {
-    }
-
     @Transactional
-    public DictionaryRefs upsertDictionaries(String skill, String profession) {
+    public void upsertDictionaries(String skill, String profession) {
         UUID professionId = professionDictRepository.upsertAndIncrementUsage(
                 profession, DictText.matchKey(profession));
-        UUID skillId = skillDictRepository.upsertAndIncrementUsage(
-                professionId, skill, DictText.matchKey(skill));
-        return new DictionaryRefs(professionId, skillId);
+        skillDictRepository.upsertAndIncrementUsage(professionId, skill, DictText.matchKey(skill));
     }
 
     @Transactional
-    public TrainingSessionResponse createSession(TrainingSession session, List<BankQuestion> bankQuestions,
-                                                 List<String> generatedQuestions) {
+    public TrainingSessionResponse createSession(TrainingSession session, List<String> generatedQuestions) {
         limitService.debit(session.getUserId(), UsageEvent.Operation.TRAINING, spendLabel(session));
 
         List<TrainingQuestion> questions = new ArrayList<>();
-        for (BankQuestion bankQuestion : bankQuestions) {
-            questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
-                    bankQuestion.getReferenceAnswer(), questions.size() + 1));
-        }
         for (String text : generatedQuestions) {
-            questions.add(buildQuestion(session, text, null, null, questions.size() + 1));
+            questions.add(buildQuestion(session, text, questions.size() + 1));
         }
 
         session.setQuestions(questions);
@@ -85,8 +73,7 @@ class TrainingWriter {
     }
 
     @Transactional
-    public TrainingSessionResponse appendQuestions(UUID sessionId, List<BankQuestion> bankQuestions,
-                                                   List<String> generatedQuestions) {
+    public TrainingSessionResponse appendQuestions(UUID sessionId, List<String> generatedQuestions) {
         TrainingSession session = trainingSessionRepository.findWithQuestionsById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Session not found"));
         checkSessionNotCompleted(session);
@@ -94,12 +81,8 @@ class TrainingWriter {
 
         List<TrainingQuestion> questions = session.getQuestions();
         int orderIndex = questions.stream().mapToInt(TrainingQuestion::getOrderIndex).max().orElse(0);
-        for (BankQuestion bankQuestion : bankQuestions) {
-            questions.add(buildQuestion(session, bankQuestion.getText(), bankQuestion.getId(),
-                    bankQuestion.getReferenceAnswer(), ++orderIndex));
-        }
         for (String text : generatedQuestions) {
-            questions.add(buildQuestion(session, text, null, null, ++orderIndex));
+            questions.add(buildQuestion(session, text, ++orderIndex));
         }
 
         trainingSessionRepository.save(session);
@@ -147,13 +130,10 @@ class TrainingWriter {
                 + ", вопрос " + question.getOrderIndex();
     }
 
-    private static TrainingQuestion buildQuestion(TrainingSession session, String text, @Nullable UUID bankQuestionId,
-                                                  @Nullable String referenceAnswer, int orderIndex) {
+    private static TrainingQuestion buildQuestion(TrainingSession session, String text, int orderIndex) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
-                .bankQuestionId(bankQuestionId)
                 .text(text)
-                .referenceAnswer(referenceAnswer != null && !referenceAnswer.isBlank() ? referenceAnswer : null)
                 .orderIndex(orderIndex)
                 .build();
     }

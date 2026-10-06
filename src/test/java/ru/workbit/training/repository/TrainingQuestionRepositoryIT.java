@@ -17,12 +17,8 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
 import ru.workbit.auth.model.User;
-import ru.workbit.content.model.BankQuestion;
-import ru.workbit.content.model.ProfessionDict;
-import ru.workbit.content.model.SkillDict;
 import ru.workbit.training.model.TrainingQuestion;
 import ru.workbit.training.model.TrainingSession;
-import ru.workbit.util.DictText;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -53,13 +49,8 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
     }
 
     private TrainingQuestion aQuestion(TrainingSession session, int orderIndex) {
-        return aQuestion(session, orderIndex, null);
-    }
-
-    private TrainingQuestion aQuestion(TrainingSession session, int orderIndex, UUID bankQuestionId) {
         return TrainingQuestion.builder()
                 .trainingSession(session)
-                .bankQuestionId(bankQuestionId)
                 .text("Вопрос " + orderIndex)
                 .orderIndex(orderIndex)
                 .build();
@@ -70,64 +61,6 @@ class TrainingQuestionRepositoryIT extends AbstractPostgresIT {
         question.setAnswerText("Ответ");
         question.setAnsweredAt(answeredAt);
         return question;
-    }
-
-    private ProfessionDict aProfession(String name) {
-        return ProfessionDict.builder()
-                .name(name)
-                .matchKey(DictText.matchKey(name))
-                .build();
-    }
-
-    private SkillDict aSkill(UUID professionId, String name) {
-        return SkillDict.builder()
-                .professionId(professionId)
-                .name(name)
-                .matchKey(DictText.matchKey(name))
-                .build();
-    }
-
-    private BankQuestion aBankQuestion(UUID professionId, UUID skillId) {
-        return BankQuestion.builder()
-                .professionId(professionId)
-                .skillId(skillId)
-                .levels(List.of("EASY"))
-                .text("Вопрос из банка")
-                .build();
-    }
-
-    // =========================================================================
-
-    @Nested
-    @DisplayName("OnDeleteSetNull")
-    class OnDeleteSetNull {
-
-        @Test
-        @DisplayName("Удаление вопроса банка обнуляет bank_question_id, не трогая саму строку")
-        void deletingBankQuestionSetsBankQuestionIdNull() {
-            // given
-            var user = em.persistAndFlush(aUser("set-null@example.com"));
-            var session = em.persistAndFlush(aSession(user.getId()));
-            var profession = em.persistAndFlush(aProfession("Set Null Profession"));
-            var skill = em.persistAndFlush(aSkill(profession.getId(), "Set Null Skill"));
-            var bankQuestion = em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId()));
-            var question = em.persistAndFlush(aQuestion(session, 1, bankQuestion.getId()));
-
-            // when — физическое удаление вопроса банка нативным SQL, чтобы проверить реальный
-            // ON DELETE SET NULL в БД, минуя JPA-кеш
-            em.getEntityManager()
-                    .createNativeQuery("DELETE FROM content.question_bank WHERE id = :id")
-                    .setParameter("id", bankQuestion.getId())
-                    .executeUpdate();
-            em.flush();
-            em.clear();
-
-            // then
-            var reloaded = repository.findById(question.getId());
-            assertThat(reloaded).isPresent();
-            assertThat(reloaded.get().getBankQuestionId()).isNull();
-            assertThat(reloaded.get().getText()).isEqualTo("Вопрос 1");
-        }
     }
 
     // =========================================================================

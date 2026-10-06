@@ -15,3 +15,7 @@ CREATE TABLE IF NOT EXISTS resume.document (
 
 CREATE INDEX IF NOT EXISTS idx_document_user_created
     ON resume.document(user_id, created_at DESC);
+
+ALTER TABLE training.question DROP COLUMN bank_question_id;
+
+DROP TABLE content.question_bank;

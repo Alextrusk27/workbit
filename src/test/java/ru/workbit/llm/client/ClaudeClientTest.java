@@ -91,20 +91,35 @@ class ClaudeClientTest {
     /**
      * Поток чанков одного ответа; {@code text == null} - ответ без текста.
      */
-    @SuppressWarnings("unchecked")
     private static StreamResponse<ChatCompletionChunk> streamOf(String text, FinishReason finish) {
         List<ChatCompletionChunk> chunks = new ArrayList<>();
         if (text != null) {
             chunks.add(chunk(List.of(choice(text, null))));
         }
         chunks.add(chunk(List.of(choice(null, finish))));
-        chunks.add(chunk(List.of()).toBuilder()
-                .usage(CompletionUsage.builder().promptTokens(10).completionTokens(5).totalTokens(15).build())
-                .build());
+        chunks.add(chunk(List.of()).toBuilder().usage(usage()).build());
+        return streamResponse(chunks);
+    }
 
+    /**
+     * Поток, в котором причина остановки и usage приходят одним последним чанком.
+     */
+    private static StreamResponse<ChatCompletionChunk> streamWithFinishAndUsageInOneChunk(String text) {
+        List<ChatCompletionChunk> chunks = List.of(
+                chunk(List.of(choice(text, null))),
+                chunk(List.of(choice(null, FinishReason.STOP))).toBuilder().usage(usage()).build());
+        return streamResponse(chunks);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static StreamResponse<ChatCompletionChunk> streamResponse(List<ChatCompletionChunk> chunks) {
         StreamResponse<ChatCompletionChunk> response = mock(StreamResponse.class);
         when(response.stream()).thenAnswer(invocation -> chunks.stream());
         return response;
+    }
+
+    private static CompletionUsage usage() {
+        return CompletionUsage.builder().promptTokens(10).completionTokens(5).totalTokens(15).build();
     }
 
     private static ChatCompletionChunk chunk(List<ChatCompletionChunk.Choice> choices) {
@@ -131,6 +146,22 @@ class ClaudeClientTest {
     @Nested
     @DisplayName("Converse")
     class Converse {
+
+        @Test
+        @DisplayName("Шлюз присылает finish_reason и usage одним чанком - ответ разбирается")
+        void parsesAnswerWhenFinishReasonAndUsageComeInOneChunk() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            doReturn(streamWithFinishAndUsageInOneChunk(ANSWER_JSON))
+                    .when(completionService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+
+            // when
+            var result = converse();
+
+            // then
+            assertThat(result).isEqualTo(expected);
+        }
 
         @Test
         @DisplayName("Ответ не разбирается по схеме - LlmException с причиной от SDK, без повтора")

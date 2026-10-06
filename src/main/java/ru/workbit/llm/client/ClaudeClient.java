@@ -19,6 +19,7 @@ import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import com.openai.models.completions.CompletionUsage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -103,7 +104,7 @@ public class ClaudeClient {
 
         StructuredChatCompletion<T> response = call(() -> {
             try (StreamResponse<ChatCompletionChunk> stream = client.chat().completions().createStreaming(params)) {
-                stream.stream().forEach(accumulator::accumulate);
+                stream.stream().forEach(chunk -> accumulate(accumulator, chunk));
             }
             return accumulator.chatCompletion(responseType);
         });
@@ -157,6 +158,20 @@ public class ClaudeClient {
                 .messages(messages)
                 .responseFormat(responseType)
                 .build();
+    }
+
+    /**
+     * Шлюз присылает {@code finish_reason} и {@code usage} одним последним чанком, а аккумулятор SDK
+     * на чанке с usage сразу собирает ответ, не разобрав его choices, и падает. Такой чанк делится
+     * на два в порядке OpenAI: сначала choices, затем usage отдельным чанком.
+     */
+    private static void accumulate(ChatCompletionAccumulator accumulator, ChatCompletionChunk chunk) {
+        if (chunk.usage().isEmpty() || chunk.choices().isEmpty()) {
+            accumulator.accumulate(chunk);
+            return;
+        }
+        accumulator.accumulate(chunk.toBuilder().usage(Optional.empty()).build());
+        accumulator.accumulate(chunk.toBuilder().choices(List.of()).build());
     }
 
     private static ChatCompletionMessageParam user(ChatCompletionUserMessageParam.Content content) {

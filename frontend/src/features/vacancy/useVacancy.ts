@@ -16,12 +16,21 @@ export function hhVacancyId(url: string): string {
   return HH_VACANCY_URL.exec(url.trim())?.groups?.id ?? ''
 }
 
+/** Сейчас у вакансий hh.ru 9-значные ID. Ссылку, которую набирают руками,
+ *  до последней цифры на предпросмотр не шлём: иначе каждая промежуточная
+ *  цифра уходит запросом в hh.ru. Отправку формы это не ограничивает. */
+const MIN_PREVIEW_ID_LENGTH = 9
+
+export function isPreviewableVacancyUrl(url: string): boolean {
+  return hhVacancyId(url).length >= MIN_PREVIEW_ID_LENGTH
+}
+
 export function useVacancyPreview(url: string) {
   const trimmed = url.trim()
   return useQuery({
     queryKey: ['vacancy', 'preview', trimmed],
     queryFn: () => vacancyApi.preview(trimmed),
-    enabled: isHhVacancyUrl(trimmed),
+    enabled: isPreviewableVacancyUrl(trimmed),
     retry: false,
     staleTime: 5 * 60_000,
   })

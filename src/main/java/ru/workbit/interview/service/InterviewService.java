@@ -236,11 +236,7 @@ public class InterviewService {
         }
     }
 
-    /**
-     * Основные вопросы прошлых интервью этого пользователя по этой вакансии - блоком для модели,
-     * чтобы она их не повторяла. Собирается один раз при создании сессии и дальше живёт в ней:
-     * блок идёт в кэшируемый префикс запроса и обязан быть одним и тем же на всех ходах беседы.
-     */
+    /** Основные вопросы прошлых интервью пользователя по этой вакансии. */
     private String askedBefore(UUID userId, List<UUID> snapshotIds) {
         if (snapshotIds.isEmpty()) {
             return null;
@@ -253,12 +249,7 @@ public class InterviewService {
                 : questions.stream().collect(Collectors.joining("\n- ", ASKED_BEFORE_HEADER + "\n- ", ""));
     }
 
-    /**
-     * План собеседования с одним повторным вызовом на вырожденный или несведённый ответ. План без
-     * первого вопроса и после повтора - ошибка; план с несведённым распределением по темам (сумма
-     * questions против questionCount, доля ядра, лимит SOFT-темы) после повтора не отвергается,
-     * а приводится кодом - {@link #normalizePlan}.
-     */
+    /** Запрашивает план собеседования с одним повтором на негодный ответ. */
     private LlmInterviewPlan requestPlan(VacancyData vacancyData, String askedBefore) {
         LlmInterviewVacancy vacancy = new LlmInterviewVacancy(vacancyData.name(), vacancyData.employer(),
                 vacancyData.experience(), vacancyData.keySkills(), vacancyData.description());
@@ -287,11 +278,7 @@ public class InterviewService {
         return hasLetters(plan.question());
     }
 
-    /**
-     * Инварианты структурного плана: темы без дыр, questionCount в коридоре и равен сумме
-     * questions, на ядро - не меньше половины, про отношение к работе - не больше одного вопроса
-     * одной темой, тема первого вопроса есть в списке.
-     */
+    /** Проверяет инварианты плана. */
     private static boolean isConsistentPlan(LlmInterviewPlan plan) {
         List<LlmInterviewTopic> topics = plan.topics();
         if (topics == null || topics.isEmpty() || !topics.stream().allMatch(InterviewService::isWellFormedTopic)) {
@@ -323,12 +310,7 @@ public class InterviewService {
                 .sum();
     }
 
-    /**
-     * Приводит несведённый план к инвариантам {@link #isConsistentPlan}: чинит вырожденные темы,
-     * оставляет одну SOFT-тему с одним вопросом, гарантирует тему первого вопроса и ядро,
-     * доводит долю ядра и сумму questions до коридора, а questionCount берёт из суммы.
-     * План вовсе без пригодных тем возвращается по-старому: без тем, с обрезанным questionCount.
-     */
+    /** Приводит план к инвариантам. */
     private static LlmInterviewPlan normalizePlan(LlmInterviewPlan plan) {
         List<LlmInterviewTopic> topics = new ArrayList<>();
         for (LlmInterviewTopic topic : plan.topics() == null ? List.<LlmInterviewTopic>of() : plan.topics()) {
@@ -354,7 +336,7 @@ public class InterviewService {
         return new LlmInterviewPlan(sum, List.copyOf(topics), plan.topic(), plan.question());
     }
 
-    /** Первая SOFT-тема остаётся с одним вопросом, остальные SOFT-темы отбрасываются. */
+    /** Оставляет одну SOFT-тему с одним вопросом. */
     private static void dropExtraSoft(List<LlmInterviewTopic> topics) {
         boolean seen = false;
         for (int i = 0; i < topics.size(); ) {
@@ -381,7 +363,7 @@ public class InterviewService {
         topics.addFirst(new LlmInterviewTopic(firstTopic, 1, LlmInterviewTopicKind.CORE));
     }
 
-    /** Без единой CORE-темы ядром назначается тема первого вопроса, а нет её в плане - первая. */
+    /** Гарантирует в плане тему ядра. */
     private static void ensureCore(List<LlmInterviewTopic> topics, String firstTopic) {
         if (topics.stream().anyMatch(t -> t.kind() == LlmInterviewTopicKind.CORE)) {
             return;
@@ -391,7 +373,7 @@ public class InterviewService {
         topics.set(index, new LlmInterviewTopic(topic.name(), topic.questions(), LlmInterviewTopicKind.CORE));
     }
 
-    /** Добавляет вопросы первой CORE-теме, пока ядро не займёт половину и сумма не дойдёт до MIN_COUNT. */
+    /** Доводит ядро до половины вопросов, а сумму - до минимума. */
     private static void growCore(List<LlmInterviewTopic> topics) {
         int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
         int core = questionsOf(topics, LlmInterviewTopicKind.CORE);
@@ -409,11 +391,7 @@ public class InterviewService {
         topics.set(index, new LlmInterviewTopic(topic.name(), topic.questions() + extra, topic.kind()));
     }
 
-    /**
-     * Срезает сумму questions до лимита: с хвоста, сначала по не-CORE-темам, затем по CORE,
-     * последний вопрос темы не срезается. Когда резать больше нечего, хвостовые темы
-     * отбрасываются целиком; тема первого вопроса не отбрасывается никогда.
-     */
+    /** Срезает сумму вопросов плана до лимита. */
     private static void trimTo(List<LlmInterviewTopic> topics, int limit, String firstTopic) {
         int sum = topics.stream().mapToInt(LlmInterviewTopic::questions).sum();
         while (sum > limit) {
@@ -459,13 +437,7 @@ public class InterviewService {
                         .thenComparingInt(InterviewQuestion::getOrderIndex));
     }
 
-    /**
-     * Очередной ход беседы: модель получает вакансию, план и всю историю и возвращает следующую реплику.
-     * Что с ней делать, решает код: не больше одного уточнения на основной вопрос (второе идёт как
-     * новый основной), основной сверх плана завершает интервью, и текст такого хода - прощальная
-     * реплика. Оборвать беседу решает модель ({@code END}); код лишь страхует от бесконечного
-     * топтания на одном вопросе.
-     */
+    /** Запрашивает и сохраняет следующую реплику беседы. */
     private Optional<InterviewQuestionResponse> askNextStep(InterviewSession session) {
         List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
         if (cases.isEmpty()) {
@@ -486,10 +458,6 @@ public class InterviewService {
         }
 
         LlmInterviewStep step = requestStep(session, dialog, cases.size());
-        if (step.kind() == LlmInterviewStepKind.END) {
-            interviewWriter.closeQuestioning(answered.getId(), farewell(step.question()));
-            return Optional.empty();
-        }
 
         InterviewQuestion.Kind kind = resolveKind(step.kind(), cases.getLast());
         if (isFinalStep(kind, session.getTotalQuestions(), cases.size())) {
@@ -506,11 +474,7 @@ public class InterviewService {
         }
     }
 
-    /**
-     * Запрос реплики с одним повторным вызовом на вырожденный ответ (текст без букв): такой допустим у
-     * {@code MAIN}, когда основные исчерпаны, и у {@code END} - в обоих случаях беседа кончилась
-     * и текст нужен лишь на прощание.
-     */
+    /** Запрашивает реплику с одним повтором на негодный ответ. */
     private LlmInterviewStep requestStep(InterviewSession session, List<InterviewQuestion> dialog, int mainAsked) {
         VacancySnapshotView vacancy = vacancyService.getSnapshotView(session.getVacancySnapshotId());
 
@@ -548,11 +512,7 @@ public class InterviewService {
         throw new LlmException("Interview step has no question");
     }
 
-    /**
-     * Темы плана из сессии: JSON из БД разбирается в объекты и дальше сериализуется тем же
-     * ObjectMapper, что писал первый ход, - так восстановленный план совпадает байт в байт
-     * и кэш промпта не промахивается.
-     */
+    /** Читает темы плана из сессии. */
     private List<LlmInterviewTopic> readPlanTopics(InterviewSession session) {
         String json = session.getPlanTopics();
         return json == null || json.isBlank() ? null : objectMapper.readValue(json, PLAN_TOPICS_TYPE);
@@ -565,15 +525,12 @@ public class InterviewService {
                 question.getTopic());
     }
 
-    /**
-     * Прощальная реплика берётся только у {@code MAIN}: там модель прощается сама. Уточнение,
-     * которое код переквалифицировал в основной вопрос и тут же отбросил, прощанием не является.
-     */
+    /** Прощальная реплика хода, если она есть. */
     private static String closingRemark(LlmInterviewStep step) {
         return step.kind() == LlmInterviewStepKind.MAIN ? farewell(step.question()) : null;
     }
 
-    /** Прощание без букв - сбой генерации, а не текст: такое не сохраняем, фронт покажет своё. */
+    /** Прощание, если в нём есть буквы. */
     private static String farewell(String question) {
         return hasLetters(question) ? question : null;
     }
@@ -585,14 +542,10 @@ public class InterviewService {
 
 
         return hasLetters(step.question())
-                || step.kind() == LlmInterviewStepKind.END
                 || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
     }
 
-    /**
-     * Вопрос без единой буквы - сбой генерации: модель изредка отдаёт вместо текста обрывок JSON
-     * вроде {@code ":"} или {@code ",...}]}"}, и непустая строка дошла бы до кандидата.
-     */
+    /** Есть ли в тексте хоть одна буква. */
     private static boolean hasLetters(String question) {
         return question != null && question.codePoints().anyMatch(Character::isLetter);
     }
@@ -605,7 +558,6 @@ public class InterviewService {
                     : InterviewQuestion.Kind.FOLLOW_UP;
             case CLARIFICATION -> InterviewQuestion.Kind.CLARIFICATION;
             case REDIRECT -> InterviewQuestion.Kind.REDIRECT;
-            case END -> throw new IllegalStateException("END is handled before kind resolution");
         };
     }
 
@@ -622,11 +574,7 @@ public class InterviewService {
         }
     }
 
-    /**
-     * Запрос отчёта с одним повторным вызовом на вырожденный ответ: пустой итог или номера разборов
-     * не ровно 1..N - модель бывает подписывает разбор чужим номером. Итоговую валидацию делает
-     * completeReport.
-     */
+    /** Запрашивает отчёт с одним повтором на негодный ответ. */
     private LlmInterviewReport requestReport(UUID sessionId, VacancySnapshotView vacancy,
                                              List<List<InterviewQuestion>> cases) {
 

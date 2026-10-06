@@ -1230,54 +1230,6 @@ class InterviewServiceTest {
         }
 
         @Test
-        @DisplayName("Модель вернула END - беседа обрывается, прощальная реплика уходит в сессию")
-        void closesQuestioningWithClosingRemarkOnEnd() {
-            // given
-            InterviewSession session = activeSession(5);
-            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
-            session.setQuestions(List.of(main));
-            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-
-            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
-            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
-
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, "Похоже, разговор не складывается. Давайте на этом остановимся.",
-                    "Тема");
-            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(NoQuestionsLeftException.class)
-                    .hasMessage("No questions left");
-            verify(interviewWriter).closeQuestioning(main.getId(), step.question());
-            verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("Модель вернула END без прощальной реплики - беседа обрывается, реплика не сохраняется")
-        void closesQuestioningOnEndWithoutClosingRemark() {
-            // given
-            InterviewSession session = activeSession(5);
-            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
-            session.setQuestions(List.of(main));
-            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-
-            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
-            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
-
-            LlmInterviewStep step = new LlmInterviewStep(LlmInterviewStepKind.END, null, null);
-            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(step);
-
-            // when / then
-            assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(NoQuestionsLeftException.class)
-                    .hasMessage("No questions left");
-            verify(llmService).nextInterviewStep(any(), any(), any(), any(), any());
-            verify(interviewWriter).closeQuestioning(main.getId(), null);
-            verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
-        }
-
-        @Test
         @DisplayName("Шесть реплик на одном основном вопросе - опрос закрывается, к модели не идём")
         void closesQuestioningWhenCaseHitsReplyLimit() {
             // given

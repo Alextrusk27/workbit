@@ -33,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 public class InterviewerClient {
-    private static final String CANDIDATE_ANSWER = "Ответ кандидата: ";
+    private static final String CANDIDATE_ANSWER = "<answer>%s</answer>";
     private static final String MAIN_ASKED = "\nОсновных задано: %d из %d.";
     private static final String MAIN_EXHAUSTED = "\nОсновных задано: %d из %d, новых основных не будет.";
     private static final String TOPIC_ASKED = " По теме «%s» задано %d из %d.";
@@ -134,7 +134,7 @@ public class InterviewerClient {
 
     private static String candidateReply(String answer, int asked, int total, String topicCounter) {
         String counter = asked < total ? MAIN_ASKED : MAIN_EXHAUSTED;
-        return CANDIDATE_ANSWER + answer + counter.formatted(asked, total) + topicCounter;
+        return CANDIDATE_ANSWER.formatted(answer) + counter.formatted(asked, total) + topicCounter;
     }
 
     /**

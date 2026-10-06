@@ -201,11 +201,11 @@ class InterviewerClientTest {
             List<ChatCompletionMessageParam> dialog = dialogCaptor.getValue();
             assertThat(dialog).hasSize(5);
             assertThat(contentOf(dialog, 1)).isEqualTo(
-                    "Ответ кандидата: Ответ 1\nОсновных задано: 1 из 5. По теме «SOLID» задано 1 из 3.");
+                    "<answer>Ответ 1</answer>\nОсновных задано: 1 из 5. По теме «SOLID» задано 1 из 3.");
             assertThat(contentOf(dialog, 3)).isEqualTo(
-                    "Ответ кандидата: Ответ 2\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
+                    "<answer>Ответ 2</answer>\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(lastUser).isEqualTo(
-                    "Ответ кандидата: Ответ 3\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
+                    "<answer>Ответ 3</answer>\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(step).isEqualTo(
                     new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про индексы", STEP_TOPIC));
         }
@@ -297,7 +297,7 @@ class InterviewerClientTest {
 
             // then
             assertThat(captureLastUser())
-                    .isEqualTo("Ответ кандидата: Ответ 1\nОсновных задано: 1 из 1, новых основных не будет.");
+                    .isEqualTo("<answer>Ответ 1</answer>\nОсновных задано: 1 из 1, новых основных не будет.");
         }
 
         @Test
@@ -311,7 +311,7 @@ class InterviewerClientTest {
             next(plan, List.of(), "Ответ 1");
 
             // then
-            assertThat(captureLastUser()).isEqualTo("Ответ кандидата: Ответ 1\nОсновных задано: 1 из 5.");
+            assertThat(captureLastUser()).isEqualTo("<answer>Ответ 1</answer>\nОсновных задано: 1 из 5.");
         }
 
         @Test
@@ -327,7 +327,7 @@ class InterviewerClientTest {
             next(plan, history, "Ответ 2");
 
             // then
-            assertThat(captureLastUser()).isEqualTo("Ответ кандидата: Ответ 2\nОсновных задано: 2 из 5.");
+            assertThat(captureLastUser()).isEqualTo("<answer>Ответ 2</answer>\nОсновных задано: 2 из 5.");
         }
     }
 }

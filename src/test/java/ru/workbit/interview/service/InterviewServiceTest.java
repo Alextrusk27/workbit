@@ -298,6 +298,52 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("Первый план с мусором вместо вопроса (без букв) - ретрай, используется второй план с нормальным вопросом")
+        void retriesAndCreatesSessionWhenFirstPlanQuestionHasNoLetters() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+
+            List<LlmInterviewTopic> topics = List.of(aTopic("Java", 8, LlmInterviewTopicKind.CORE));
+            LlmInterviewPlan garbagePlan = new LlmInterviewPlan(8, topics, "Java", ":");
+            LlmInterviewPlan usablePlan = new LlmInterviewPlan(8, topics, "Java", "Расскажите про Java");
+            when(llmService.planInterview(any(), any())).thenReturn(garbagePlan, usablePlan);
+
+            InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
+                    UUID.randomUUID(), 8);
+            when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
+            when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
+                    .thenReturn(mock(InterviewSessionResponse.class));
+
+            // when
+            interviewService.createSession(vacancyUrl, userId);
+
+            // then
+            verify(llmService, times(2)).planInterview(any(), any());
+            ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
+            verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
+            assertThat(captor.getValue().question()).isEqualTo("Расскажите про Java");
+        }
+
+        @Test
+        @DisplayName("Оба плана с мусором вместо вопроса (без букв) - LlmException, LLM вызван дважды, сессия не создаётся")
+        void throwsAfterRetryWhenBothPlanQuestionsHaveNoLetters() {
+            // given
+            VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
+            when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
+            when(llmService.planInterview(any(), any())).thenReturn(new LlmInterviewPlan(8,
+                    List.of(aTopic("Java", 8, LlmInterviewTopicKind.CORE)), "Java", ",...}]}"));
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.createSession(vacancyUrl, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview plan has no first question");
+            verify(llmService, times(2)).planInterview(any(), any());
+            verify(interviewWriter, never()).createSession(any(), any(), any(), any());
+            verifyNoInteractions(interviewSessionMapper);
+        }
+
+        @Test
         @DisplayName("Сумма questions тем расходится с questionCount - после ретрая questionCount берётся из суммы")
         void alignsQuestionCountWithTopicsSumAfterRetry() {
             // given
@@ -370,8 +416,8 @@ class InterviewServiceTest {
             VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
             when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
 
-            LlmInterviewPlan rawPlan = new LlmInterviewPlan(6,
-                    List.of(aTopic("Java", 3, LlmInterviewTopicKind.CORE),
+            LlmInterviewPlan rawPlan = new LlmInterviewPlan(8,
+                    List.of(aTopic("Java", 5, LlmInterviewTopicKind.CORE),
                             aTopic("Отношение к работе", 1, LlmInterviewTopicKind.SOFT),
                             aTopic("Мотивация", 1, LlmInterviewTopicKind.SOFT),
                             aTopic("SQL", 1, LlmInterviewTopicKind.STANDARD)),
@@ -379,7 +425,7 @@ class InterviewServiceTest {
             when(llmService.planInterview(any(), any())).thenReturn(rawPlan);
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
-                    UUID.randomUUID(), 5);
+                    UUID.randomUUID(), 7);
             when(interviewWriter.createSession(eq(vacancyData), eq(userId), any(), any())).thenReturn(createdSession);
             when(interviewSessionMapper.toResponse(createdSession, vacancyData, 0))
                     .thenReturn(mock(InterviewSessionResponse.class));
@@ -391,9 +437,9 @@ class InterviewServiceTest {
             verify(llmService, times(2)).planInterview(any(), any());
             ArgumentCaptor<LlmInterviewPlan> captor = ArgumentCaptor.forClass(LlmInterviewPlan.class);
             verify(interviewWriter).createSession(eq(vacancyData), eq(userId), captor.capture(), any());
-            assertThat(captor.getValue().questionCount()).isEqualTo(5);
+            assertThat(captor.getValue().questionCount()).isEqualTo(7);
             assertThat(captor.getValue().topics()).containsExactly(
-                    aTopic("Java", 3, LlmInterviewTopicKind.CORE),
+                    aTopic("Java", 5, LlmInterviewTopicKind.CORE),
                     aTopic("Отношение к работе", 1, LlmInterviewTopicKind.SOFT),
                     aTopic("SQL", 1, LlmInterviewTopicKind.STANDARD));
         }
@@ -494,14 +540,17 @@ class InterviewServiceTest {
             VacancyData vacancyData = aVacancyData("От 1 года до 3 лет");
             when(vacancyService.fetch(vacancyUrl)).thenReturn(vacancyData);
 
+            int coreTopics = 7;
+            int standardTopics = LlmInterviewPlan.MAX_COUNT + 1 - coreTopics;
             List<LlmInterviewTopic> topics = new ArrayList<>();
             topics.add(aTopic("Java", 1, LlmInterviewTopicKind.CORE));
-            IntStream.rangeClosed(2, 7)
+            IntStream.rangeClosed(2, coreTopics)
                     .forEach(i -> topics.add(aTopic("Ядро " + i, 1, LlmInterviewTopicKind.CORE)));
-            IntStream.rangeClosed(1, 6)
+            IntStream.rangeClosed(1, standardTopics)
                     .forEach(i -> topics.add(aTopic("Тема " + i, 1, LlmInterviewTopicKind.STANDARD)));
             when(llmService.planInterview(any(), any()))
-                    .thenReturn(new LlmInterviewPlan(13, topics, "Java", "Расскажите про Java"));
+                    .thenReturn(new LlmInterviewPlan(LlmInterviewPlan.MAX_COUNT + 1, topics, "Java",
+                            "Расскажите про Java"));
 
             InterviewSession createdSession = aSession(UUID.randomUUID(), userId, InterviewSession.Status.CREATED,
                     UUID.randomUUID(), LlmInterviewPlan.MAX_COUNT);
@@ -520,7 +569,7 @@ class InterviewServiceTest {
                     .hasSize(LlmInterviewPlan.MAX_COUNT)
                     .extracting(LlmInterviewTopic::name)
                     .contains("Java")
-                    .doesNotContain("Тема 6");
+                    .doesNotContain("Тема " + standardTopics);
         }
 
         @Test
@@ -1301,6 +1350,58 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("Первая реплика MAIN с мусором вместо вопроса (без букв) при незакрытом счётчике - ретрай, сохраняется вторая реплика")
+        void retriesWhenFirstMainStepHasNoLetters() {
+            // given
+            InterviewSession session = activeSession(5);
+            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
+            session.setQuestions(List.of(main));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewStep garbage = new LlmInterviewStep(LlmInterviewStepKind.MAIN, ":0,", "Java");
+            LlmInterviewStep usable = new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про JVM", "Java");
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(garbage, usable);
+
+            InterviewQuestionResponse expected = mock(InterviewQuestionResponse.class);
+            when(interviewWriter.saveStep(main.getId(), InterviewQuestion.Kind.MAIN, usable.question(), usable.topic()))
+                    .thenReturn(Optional.of(expected));
+
+            // when
+            InterviewQuestionResponse result = interviewService.nextQuestion(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any(), any());
+            verify(interviewWriter, never()).saveStep(any(), any(), eq(garbage.question()), any());
+        }
+
+        @Test
+        @DisplayName("Обе реплики FOLLOW_UP с мусором вместо вопроса (без букв) - LlmException, LLM вызван дважды, ничего не сохраняется")
+        void throwsAfterRetryWhenBothFollowUpStepsHaveNoLetters() {
+            // given
+            InterviewSession session = activeSession(5);
+            InterviewQuestion main = aMain(UUID.randomUUID(), 1, true, false);
+            session.setQuestions(List.of(main));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewStep garbage = new LlmInterviewStep(LlmInterviewStepKind.FOLLOW_UP, ":", "Java");
+            when(llmService.nextInterviewStep(any(), any(), any(), any(), any())).thenReturn(garbage);
+
+            // when / then
+            assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
+                    .isInstanceOf(LlmException.class)
+                    .hasMessage("Interview step has no question");
+            verify(llmService, times(2)).nextInterviewStep(any(), any(), any(), any(), any());
+            verifyNoInteractions(interviewWriter);
+        }
+
+        @Test
         @DisplayName("Конкурентная гонка при сохранении реплики - возвращается уже сохранённый параллельным запросом вопрос")
         void resolvesRaceByReturningNextUnansweredAfterConflict() {
             // given
@@ -2032,6 +2133,116 @@ class InterviewServiceTest {
                     .isInstanceOf(LlmException.class);
             verify(llmService, times(2)).createInterviewReport(any(), any());
             verify(interviewWriter).completeReport(sessionId, secondDegenerate);
+        }
+
+        @Test
+        @DisplayName("Первый ответ с дублем номера в разборах - повторный вызов, writer-у уходит второй ответ")
+        void retriesWhenFirstResponseHasDuplicateIndex() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport duplicateIndexReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Разбор первого кейса", 4),
+                            new LlmInterviewAnswerReview(1, "Разбор второго кейса под чужим номером", 5)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            LlmInterviewReport usableReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any()))
+                    .thenReturn(duplicateIndexReport, usableReport);
+
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewWriter.completeReport(eq(sessionId), any(LlmInterviewReport.class))).thenReturn(expectedResponse);
+
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(2)).createInterviewReport(any(), any());
+            verify(interviewWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Первый ответ с разбором одного кейса из двух - повторный вызов")
+        void retriesWhenFirstResponseSkipsCaseNumber() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport missingCaseReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Разбор первого кейса", 4)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            LlmInterviewReport usableReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any()))
+                    .thenReturn(missingCaseReport, usableReport);
+
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewWriter.completeReport(eq(sessionId), any(LlmInterviewReport.class))).thenReturn(expectedResponse);
+
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(2)).createInterviewReport(any(), any());
+            verify(interviewWriter).completeReport(sessionId, usableReport);
+        }
+
+        @Test
+        @DisplayName("Первый ответ с номером разбора вне диапазона кейсов - повторный вызов")
+        void retriesWhenFirstResponseHasOutOfRangeIndex() {
+            // given
+            InterviewSession session = aSession(sessionId, userId, InterviewSession.Status.IN_PROGRESS,
+                    vacancySnapshotId, 2);
+            InterviewQuestion main1 = aQuestion(UUID.randomUUID(), null, 1, false, true, "Вопрос 1", "Ответ 1");
+            InterviewQuestion main2 = aQuestion(UUID.randomUUID(), null, 2, false, true, "Вопрос 2", "Ответ 2");
+            session.setQuestions(List.of(main1, main2));
+            when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
+
+            VacancySnapshotView vacancy = aVacancySnapshotView("От 1 года до 3 лет");
+            when(vacancyService.getSnapshotView(vacancySnapshotId)).thenReturn(vacancy);
+
+            LlmInterviewReport outOfRangeReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Разбор первого кейса", 4),
+                            new LlmInterviewAnswerReview(3, "Разбор второго кейса с номером 3", 5)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            LlmInterviewReport usableReport = new LlmInterviewReport(
+                    List.of(new LlmInterviewAnswerReview(1, "Хороший ответ по первому кейсу", 4),
+                            new LlmInterviewAnswerReview(2, "Хороший ответ по второму кейсу", 5)),
+                    LlmOfferProbability.MEDIUM, "Итоговый фидбэк по интервью", null, null);
+            when(llmService.createInterviewReport(any(), any()))
+                    .thenReturn(outOfRangeReport, usableReport);
+
+            InterviewReportResponse expectedResponse = mock(InterviewReportResponse.class);
+            when(interviewWriter.completeReport(eq(sessionId), any(LlmInterviewReport.class))).thenReturn(expectedResponse);
+
+            // when
+            InterviewReportResponse result = interviewService.createReport(sessionId, userId);
+
+            // then
+            assertThat(result).isEqualTo(expectedResponse);
+            verify(llmService, times(2)).createInterviewReport(any(), any());
+            verify(interviewWriter).completeReport(sessionId, usableReport);
         }
 
         @Test

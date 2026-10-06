@@ -136,7 +136,9 @@ public class InterviewWriter {
         final InterviewReport.OfferProbability offerProbability = parseOfferProbability(sessionId, llmReport);
 
         List<List<InterviewQuestion>> cases = groupCases(answeredSorted(session));
-        saveFeedbacks(cases, llmReport.answers() != null ? llmReport.answers() : List.of());
+        List<LlmInterviewAnswerReview> reviews = llmReport.answers() != null ? llmReport.answers() : List.of();
+        checkNoDuplicateIndexes(sessionId, reviews);
+        saveFeedbacks(cases, reviews);
         checkEnoughReviewed(sessionId, cases);
 
         List<InterviewQuestion> mains = cases.stream().map(List::getFirst).toList();
@@ -190,6 +192,19 @@ public class InterviewWriter {
         ));
     }
 
+    /**
+     * Два разбора с одним номером значат, что модель подписала хотя бы один разбор чужим номером:
+     * такой отчёт не пишем, иначе пользователь увидит чужой разбор под вопросом.
+     */
+    private void checkNoDuplicateIndexes(UUID sessionId, List<LlmInterviewAnswerReview> reviews) {
+        long distinct = reviews.stream().map(LlmInterviewAnswerReview::index).distinct().count();
+        if (distinct < reviews.size()) {
+            log.error("Cannot finish interview session {}: LLM returned duplicate review indexes {}",
+                    sessionId, reviews.stream().map(LlmInterviewAnswerReview::index).toList());
+            throw new LlmException("Interview report has duplicate review indexes");
+        }
+    }
+
     private void saveFeedbacks(List<List<InterviewQuestion>> cases, List<LlmInterviewAnswerReview> reviews) {
         for (LlmInterviewAnswerReview review : reviews) {
             if (review.index() < 1 || review.index() > cases.size()) {
@@ -203,10 +218,6 @@ public class InterviewWriter {
             }
 
             InterviewQuestion question = cases.get(review.index() - 1).getFirst();
-            if (question.getFeedback() != null) {
-                log.warn("LLM returned duplicate review for answer {}, skipping feedback", review.index());
-                continue;
-            }
             question.setFeedback(InterviewFeedback.builder()
                     .question(question)
                     .score(review.score())

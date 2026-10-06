@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -40,6 +41,7 @@ import ru.workbit.interview.repository.InterviewQuestionRepository;
 import ru.workbit.interview.repository.InterviewSessionRepository;
 import ru.workbit.interview.repository.InterviewUserFeedbackRepository;
 import ru.workbit.llm.dto.LlmInterviewAnswer;
+import ru.workbit.llm.dto.LlmInterviewAnswerReview;
 import ru.workbit.llm.dto.LlmInterviewFollowUp;
 import ru.workbit.llm.dto.LlmInterviewPlan;
 import ru.workbit.llm.dto.LlmInterviewReport;
@@ -263,7 +265,7 @@ public class InterviewService {
         LlmInterviewPlan plan = llmService.planInterview(vacancy, askedBefore);
         if (!isUsablePlan(plan) || !isConsistentPlan(plan)) {
             log.warn("LLM returned an unusable or inconsistent interview plan, retrying "
-                    + "[url={}, blankQuestion={}]", vacancyData.url(), !isUsablePlan(plan));
+                    + "[url={}, noQuestion={}]", vacancyData.url(), !isUsablePlan(plan));
             plan = llmService.planInterview(vacancy, askedBefore);
         }
         if (!isUsablePlan(plan)) {
@@ -281,7 +283,7 @@ public class InterviewService {
     }
 
     private static boolean isUsablePlan(LlmInterviewPlan plan) {
-        return plan.question() != null && !plan.question().isBlank();
+        return hasLetters(plan.question());
     }
 
     /**
@@ -484,7 +486,7 @@ public class InterviewService {
 
         LlmInterviewStep step = requestStep(session, dialog, cases.size());
         if (step.kind() == LlmInterviewStepKind.END) {
-            interviewWriter.closeQuestioning(answered.getId(), step.question());
+            interviewWriter.closeQuestioning(answered.getId(), farewell(step.question()));
             return Optional.empty();
         }
 
@@ -504,7 +506,7 @@ public class InterviewService {
     }
 
     /**
-     * Запрос реплики с одним повторным вызовом на вырожденный ответ: пустой текст допустим у
+     * Запрос реплики с одним повторным вызовом на вырожденный ответ (текст без букв): такой допустим у
      * {@code MAIN}, когда основные исчерпаны, и у {@code END} - в обоих случаях беседа кончилась
      * и текст нужен лишь на прощание.
      */
@@ -567,7 +569,12 @@ public class InterviewService {
      * которое код переквалифицировал в основной вопрос и тут же отбросил, прощанием не является.
      */
     private static String closingRemark(LlmInterviewStep step) {
-        return step.kind() == LlmInterviewStepKind.MAIN ? step.question() : null;
+        return step.kind() == LlmInterviewStepKind.MAIN ? farewell(step.question()) : null;
+    }
+
+    /** Прощание без букв - сбой генерации, а не текст: такое не сохраняем, фронт покажет своё. */
+    private static String farewell(String question) {
+        return hasLetters(question) ? question : null;
     }
 
     private static boolean isUsableStep(LlmInterviewStep step, int mainAsked, int totalQuestions) {
@@ -576,13 +583,17 @@ public class InterviewService {
         }
 
 
-        return !isBlank(step.question())
+        return hasLetters(step.question())
                 || step.kind() == LlmInterviewStepKind.END
                 || step.kind() == LlmInterviewStepKind.MAIN && mainAsked >= totalQuestions;
     }
 
-    private static boolean isBlank(String question) {
-        return question == null || question.isBlank();
+    /**
+     * Вопрос без единой буквы - сбой генерации: модель изредка отдаёт вместо текста обрывок JSON
+     * вроде {@code ":"} или {@code ",...}]}"}, и непустая строка дошла бы до кандидата.
+     */
+    private static boolean hasLetters(String question) {
+        return question != null && question.codePoints().anyMatch(Character::isLetter);
     }
 
     private static InterviewQuestion.Kind resolveKind(LlmInterviewStepKind kind, List<InterviewQuestion> currentCase) {
@@ -611,8 +622,9 @@ public class InterviewService {
     }
 
     /**
-     * Запрос отчёта с одним повторным вызовом на вырожденный ответ: пустой итог или разборы не на
-     * все кейсы. Итоговую валидацию делает completeReport.
+     * Запрос отчёта с одним повторным вызовом на вырожденный ответ: пустой итог или номера разборов
+     * не ровно 1..N - модель бывает подписывает разбор чужим номером. Итоговую валидацию делает
+     * completeReport.
      */
     private LlmInterviewReport requestReport(UUID sessionId, VacancySnapshotView vacancy,
                                              List<List<InterviewQuestion>> cases) {
@@ -638,7 +650,14 @@ public class InterviewService {
                 && report.overallFeedback().length() >= InterviewWriter.MIN_OVERALL_FEEDBACK_LENGTH
                 && report.offerProbability() != null
                 && report.answers() != null
-                && report.answers().size() >= casesCount * InterviewWriter.MIN_REVIEWED_ANSWERS_RATIO;
+                && reviewsEachCaseOnce(report.answers(), casesCount);
+    }
+
+    private static boolean reviewsEachCaseOnce(List<LlmInterviewAnswerReview> reviews, int casesCount) {
+        Set<Integer> indexes = reviews.stream().map(LlmInterviewAnswerReview::index).collect(Collectors.toSet());
+        return reviews.size() == casesCount
+                && indexes.size() == casesCount
+                && indexes.stream().allMatch(i -> i >= 1 && i <= casesCount);
     }
 
     private static LlmInterviewAnswer toLlmAnswer(int index, List<InterviewQuestion> interviewCase) {

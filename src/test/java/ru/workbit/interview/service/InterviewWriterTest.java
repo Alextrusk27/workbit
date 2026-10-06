@@ -107,8 +107,8 @@ class InterviewWriterTest {
             assertThat(result.getVacancySnapshotId()).isEqualTo(vacancySnapshotId);
             assertThat(result.getTotalQuestions()).isEqualTo(7);
             assertThat(result.getPlanTopics()).isEqualTo(
-                    "[{\"name\":\"Java core\",\"questions\":4,\"kind\":\"CORE\"},"
-                            + "{\"name\":\"Spring\",\"questions\":3,\"kind\":\"STANDARD\"}]");
+                    "[{\"kind\":\"CORE\",\"name\":\"Java core\",\"questions\":4},"
+                            + "{\"kind\":\"STANDARD\",\"name\":\"Spring\",\"questions\":3}]");
 
             assertThat(result.getQuestions()).hasSize(1);
             InterviewQuestion first = result.getQuestions().getFirst();
@@ -623,31 +623,30 @@ class InterviewWriterTest {
         }
 
         @Test
-        @DisplayName("Два review на один и тот же кейс - применяется только первый валидный, второй игнорируется как дубликат")
-        void appliesOnlyFirstValidReviewPerCase() {
+        @DisplayName("Два review с одним номером - LlmException, ни один feedback не сохранён, отчёт не создан")
+        void throwsWhenTwoReviewsShareIndex() {
             // given
             UUID sessionId = UUID.randomUUID();
             InterviewQuestion q1 = answeredMain(1);
+            InterviewQuestion q2 = answeredMain(2);
             InterviewSession session = InterviewSession.builder()
-                    .id(sessionId).questions(new ArrayList<>(List.of(q1))).build();
+                    .id(sessionId).questions(new ArrayList<>(List.of(q1, q2))).build();
             when(interviewSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
 
             LlmInterviewReport llmReport = new LlmInterviewReport(
                     List.of(new LlmInterviewAnswerReview(1, "Первый", 3),
-                            new LlmInterviewAnswerReview(1, "Второй", 5)),
+                            new LlmInterviewAnswerReview(2, "Второй", 4),
+                            new LlmInterviewAnswerReview(1, "Дубль первого", 5)),
                     LlmOfferProbability.LOW, OVERALL_FEEDBACK, null, null);
 
-            when(interviewReportMapper.toResponse(any(InterviewReport.class), eq(session), any()))
-                    .thenReturn(new InterviewReportResponse(
-                            UUID.randomUUID(), sessionId, 3.0, InterviewReport.OfferProbability.LOW,
-                            OVERALL_FEEDBACK, null, null, null, List.of()));
-
-            // when
-            interviewWriter.completeReport(sessionId, llmReport);
-
-            // then
-            assertThat(q1.getFeedback().getScore()).isEqualTo(3);
-            assertThat(q1.getFeedback().getText()).isEqualTo("Первый");
+            // when / then
+            assertThatThrownBy(() -> interviewWriter.completeReport(sessionId, llmReport))
+                    .isInstanceOf(LlmException.class);
+            assertThat(q1.getFeedback()).isNull();
+            assertThat(q2.getFeedback()).isNull();
+            assertThat(session.getReport()).isNull();
+            verify(interviewSessionRepository, never()).save(any());
+            verifyNoInteractions(interviewReportMapper);
         }
 
         @Test

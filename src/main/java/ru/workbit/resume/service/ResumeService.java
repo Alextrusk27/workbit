@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.NotFoundException;
@@ -22,6 +23,7 @@ import ru.workbit.security.service.RateLimiterService;
 import ru.workbit.util.SingleFlight;
 
 @Service
+@ConditionalOnBooleanProperty(name = "app.resume.enabled", matchIfMissing = true)
 @Slf4j
 @RequiredArgsConstructor
 public class ResumeService {

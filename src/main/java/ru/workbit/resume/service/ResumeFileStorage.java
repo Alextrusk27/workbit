@@ -11,10 +11,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 import ru.workbit.resume.config.ResumeProperties;
 
 @Component
+@ConditionalOnBooleanProperty(name = "app.resume.enabled", matchIfMissing = true)
 public class ResumeFileStorage {
     private final Path root;
 

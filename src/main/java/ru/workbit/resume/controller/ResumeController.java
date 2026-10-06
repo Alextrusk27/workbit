@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -23,6 +24,7 @@ import ru.workbit.security.model.CustomUserDetails;
 import ru.workbit.util.annotation.Loggable;
 
 @RestController
+@ConditionalOnBooleanProperty(name = "app.resume.enabled", matchIfMissing = true)
 @RequiredArgsConstructor
 public class ResumeController implements ResumeApi {
     private final ResumeService resumeService;

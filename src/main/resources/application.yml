@@ -33,6 +33,7 @@ app:
   email:
     hash-secret: ${EMAIL_HASH_SECRET}
   resume:
+    enabled: ${RESUME_ENABLED:true}
     storage-dir: ${RESUME_STORAGE_DIR:data/resumes}
 
 server:

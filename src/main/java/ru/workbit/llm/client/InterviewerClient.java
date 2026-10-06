@@ -77,7 +77,8 @@ public class InterviewerClient {
 
     /**
      * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы. Схема ответа -
-     * {@link LlmInterviewStep}, без полей плана: они нужны только первому ходу.
+     * {@link LlmInterviewStep}, без полей плана: они нужны только первому ходу. План в истории -
+     * {@link LlmInterviewReply}, в том виде, в каком его выдала модель.
      *
      * @param plan        план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
      * @param history     завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
@@ -88,7 +89,8 @@ public class InterviewerClient {
                                  List<LlmInterviewTurn> history, String lastAnswer, String askedBefore) {
 
         List<ChatCompletionMessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
-        dialog.add(assistant(plan));
+        dialog.add(assistant(new LlmInterviewReply(LlmInterviewStepKind.MAIN, plan.questionCount(), plan.topics(),
+                plan.topic(), plan.question())));
         Map<String, Integer> planned = plannedByTopic(plan);
         Map<String, Integer> askedByTopic = new HashMap<>();
         int total = plan.questionCount();

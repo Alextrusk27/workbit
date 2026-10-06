@@ -200,7 +200,6 @@ class InterviewerClientTest {
             String lastUser = captureLastUser();
             List<ChatCompletionMessageParam> dialog = dialogCaptor.getValue();
             assertThat(dialog).hasSize(5);
-            assertThat(contentOf(dialog, 0)).isEqualTo(objectMapper.writeValueAsString(plan));
             assertThat(contentOf(dialog, 1)).isEqualTo(
                     "Ответ кандидата: Ответ 1\nОсновных задано: 1 из 5. По теме «SOLID» задано 1 из 3.");
             assertThat(contentOf(dialog, 3)).isEqualTo(
@@ -209,6 +208,41 @@ class InterviewerClientTest {
                     "Ответ кандидата: Ответ 3\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(step).isEqualTo(
                     new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про индексы", STEP_TOPIC));
+        }
+
+        @Test
+        @DisplayName("План в истории - в том виде, как его выдала модель: поля по алфавиту схемы ответа, с kind")
+        void writesPlanToHistoryInReplySchemaFieldOrder() {
+            // given
+            LlmInterviewPlan plan = aPlan(5, planTopics());
+            stubReply();
+
+            // when
+            next(plan, List.of(), "Ответ 1");
+
+            // then
+            captureLastUser();
+            assertThat(contentOf(dialogCaptor.getValue(), 0)).isEqualTo(
+                    "{\"kind\":\"MAIN\",\"question\":\"Расскажите про SOLID\",\"questionCount\":5,"
+                            + "\"topic\":\"SOLID\",\"topics\":[{\"kind\":\"CORE\",\"name\":\"SOLID\","
+                            + "\"questions\":3},{\"kind\":\"STANDARD\",\"name\":\"SQL\",\"questions\":2}]}");
+        }
+
+        @Test
+        @DisplayName("Легаси-план без тем в истории - в порядке схемы ответа, topics равен null")
+        void writesLegacyPlanWithoutTopicsToHistoryInReplySchemaFieldOrder() {
+            // given
+            LlmInterviewPlan plan = aPlan(5, null);
+            stubReply();
+
+            // when
+            next(plan, List.of(), "Ответ 1");
+
+            // then
+            captureLastUser();
+            assertThat(contentOf(dialogCaptor.getValue(), 0)).isEqualTo(
+                    "{\"kind\":\"MAIN\",\"question\":\"Расскажите про SOLID\",\"questionCount\":5,"
+                            + "\"topic\":\"SOLID\",\"topics\":null}");
         }
 
         @Test

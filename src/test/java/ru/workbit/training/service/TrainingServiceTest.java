@@ -54,6 +54,7 @@ import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.UnprocessableEntityException;
@@ -1299,7 +1300,7 @@ class TrainingServiceTest {
 
             // when / then
             assertThatThrownBy(() -> trainingService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("Question cap reached");
         }
     }

@@ -38,6 +38,7 @@ import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.interview.dto.FeedbackRequest;
@@ -967,7 +968,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verifyNoInteractions(llmService, vacancyService, interviewWriter, interviewQuestionMapper);
         }
@@ -983,7 +984,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verifyNoInteractions(llmService, vacancyService, interviewWriter);
         }
@@ -1032,7 +1033,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(main.getId(), null);
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
@@ -1056,7 +1057,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(main.getId(), "На этом всё, спасибо за разговор.");
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
@@ -1162,7 +1163,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(existingFollowUp.getId(), null);
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
@@ -1246,7 +1247,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(main.getId(), step.question());
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());
@@ -1269,7 +1270,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(llmService).nextInterviewStep(any(), any(), any(), any(), any());
             verify(interviewWriter).closeQuestioning(main.getId(), null);
@@ -1291,7 +1292,7 @@ class InterviewServiceTest {
 
             // when / then
             assertThatThrownBy(() -> interviewService.nextQuestion(sessionId, userId))
-                    .isInstanceOf(ConflictException.class)
+                    .isInstanceOf(NoQuestionsLeftException.class)
                     .hasMessage("No questions left");
             verify(interviewWriter).closeQuestioning(questions.getLast().getId(), null);
             verify(interviewWriter, never()).saveStep(any(), any(), any(), any());

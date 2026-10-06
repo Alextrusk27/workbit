@@ -24,6 +24,7 @@ import ru.workbit.billing.service.LimitService;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.interview.dto.FeedbackRequest;
 import ru.workbit.interview.dto.InterviewQuestionResponse;
@@ -128,7 +129,7 @@ public class InterviewService {
         return unanswered(session)
                 .map(interviewQuestionMapper::toDto)
                 .or(() -> askNextStep(session))
-                .orElseThrow(() -> new ConflictException("No questions left"));
+                .orElseThrow(() -> new NoQuestionsLeftException("No questions left"));
     }
 
     public List<InterviewQuestionResponse> getAnsweredQuestions(UUID sessionId, UUID userId) {

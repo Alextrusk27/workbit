@@ -30,7 +30,6 @@
         <protobuf-maven-plugin.version>5.1.7</protobuf-maven-plugin.version>
         <springdoc.version>3.0.3</springdoc.version>
         <ulid.creator.version>5.2.4</ulid.creator.version>
-        <anthropic-java.version>2.59.0</anthropic-java.version>
         <checkstyle.version>14.1.0</checkstyle.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     </properties>
@@ -187,12 +186,6 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty-shaded</artifactId>
             <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.anthropic</groupId>
-            <artifactId>anthropic-java</artifactId>
-            <version>${anthropic-java.version}</version>
         </dependency>
 
         <!-- Тесты: версии управляются Spring Boot BOM -->

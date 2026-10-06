@@ -9,7 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.anthropic.models.messages.MessageParam;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +45,7 @@ class InterviewerClientTest {
     ClaudeClient claude;
 
     @Captor
-    ArgumentCaptor<List<MessageParam>> dialogCaptor;
+    ArgumentCaptor<List<ChatCompletionMessageParam>> dialogCaptor;
 
     @Captor
     ArgumentCaptor<List<String>> openingCaptor;
@@ -78,8 +78,11 @@ class InterviewerClientTest {
         return new LlmInterviewTurn(answer, new LlmInterviewStep(kind, question, topic));
     }
 
-    private static String contentOf(List<MessageParam> dialog, int index) {
-        return dialog.get(index).content().asString();
+    private static String contentOf(List<ChatCompletionMessageParam> dialog, int index) {
+        ChatCompletionMessageParam message = dialog.get(index);
+        return message.isUser()
+                ? message.asUser().content().asText()
+                : message.asAssistant().content().orElseThrow().asText();
     }
 
     @Nested
@@ -195,17 +198,51 @@ class InterviewerClientTest {
 
             // then
             String lastUser = captureLastUser();
-            List<MessageParam> dialog = dialogCaptor.getValue();
+            List<ChatCompletionMessageParam> dialog = dialogCaptor.getValue();
             assertThat(dialog).hasSize(5);
-            assertThat(contentOf(dialog, 0)).isEqualTo(objectMapper.writeValueAsString(plan));
             assertThat(contentOf(dialog, 1)).isEqualTo(
-                    "Ответ кандидата: Ответ 1\nОсновных задано: 1 из 5. По теме «SOLID» задано 1 из 3.");
+                    "<answer>Ответ 1</answer>\nОсновных задано: 1 из 5. По теме «SOLID» задано 1 из 3.");
             assertThat(contentOf(dialog, 3)).isEqualTo(
-                    "Ответ кандидата: Ответ 2\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
+                    "<answer>Ответ 2</answer>\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(lastUser).isEqualTo(
-                    "Ответ кандидата: Ответ 3\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
+                    "<answer>Ответ 3</answer>\nОсновных задано: 2 из 5. По теме «SQL» задано 1 из 2.");
             assertThat(step).isEqualTo(
                     new LlmInterviewStep(LlmInterviewStepKind.MAIN, "Расскажите про индексы", STEP_TOPIC));
+        }
+
+        @Test
+        @DisplayName("План в истории - в том виде, как его выдала модель: поля по алфавиту схемы ответа, с kind")
+        void writesPlanToHistoryInReplySchemaFieldOrder() {
+            // given
+            LlmInterviewPlan plan = aPlan(5, planTopics());
+            stubReply();
+
+            // when
+            next(plan, List.of(), "Ответ 1");
+
+            // then
+            captureLastUser();
+            assertThat(contentOf(dialogCaptor.getValue(), 0)).isEqualTo(
+                    "{\"kind\":\"MAIN\",\"question\":\"Расскажите про SOLID\",\"questionCount\":5,"
+                            + "\"topic\":\"SOLID\",\"topics\":[{\"kind\":\"CORE\",\"name\":\"SOLID\","
+                            + "\"questions\":3},{\"kind\":\"STANDARD\",\"name\":\"SQL\",\"questions\":2}]}");
+        }
+
+        @Test
+        @DisplayName("Легаси-план без тем в истории - в порядке схемы ответа, topics равен null")
+        void writesLegacyPlanWithoutTopicsToHistoryInReplySchemaFieldOrder() {
+            // given
+            LlmInterviewPlan plan = aPlan(5, null);
+            stubReply();
+
+            // when
+            next(plan, List.of(), "Ответ 1");
+
+            // then
+            captureLastUser();
+            assertThat(contentOf(dialogCaptor.getValue(), 0)).isEqualTo(
+                    "{\"kind\":\"MAIN\",\"question\":\"Расскажите про SOLID\",\"questionCount\":5,"
+                            + "\"topic\":\"SOLID\",\"topics\":null}");
         }
 
         @Test
@@ -226,8 +263,8 @@ class InterviewerClientTest {
             verify(claude, times(2)).converse(any(), any(), dialogCaptor.capture(), lastUserCaptor.capture(),
                     eq(LlmInterviewStep.class));
 
-            List<MessageParam> firstDialog = dialogCaptor.getAllValues().getFirst();
-            List<MessageParam> secondDialog = dialogCaptor.getAllValues().getLast();
+            List<ChatCompletionMessageParam> firstDialog = dialogCaptor.getAllValues().getFirst();
+            List<ChatCompletionMessageParam> secondDialog = dialogCaptor.getAllValues().getLast();
             assertThat(contentOf(secondDialog, 0)).isEqualTo(contentOf(firstDialog, 0));
             assertThat(contentOf(secondDialog, 1)).isEqualTo(contentOf(firstDialog, 1));
             assertThat(contentOf(secondDialog, 3)).isEqualTo(lastUserCaptor.getAllValues().getFirst());
@@ -260,7 +297,7 @@ class InterviewerClientTest {
 
             // then
             assertThat(captureLastUser())
-                    .isEqualTo("Ответ кандидата: Ответ 1\nОсновных задано: 1 из 1, новых основных не будет.");
+                    .isEqualTo("<answer>Ответ 1</answer>\nОсновных задано: 1 из 1, новых основных не будет.");
         }
 
         @Test
@@ -274,7 +311,7 @@ class InterviewerClientTest {
             next(plan, List.of(), "Ответ 1");
 
             // then
-            assertThat(captureLastUser()).isEqualTo("Ответ кандидата: Ответ 1\nОсновных задано: 1 из 5.");
+            assertThat(captureLastUser()).isEqualTo("<answer>Ответ 1</answer>\nОсновных задано: 1 из 5.");
         }
 
         @Test
@@ -290,7 +327,7 @@ class InterviewerClientTest {
             next(plan, history, "Ответ 2");
 
             // then
-            assertThat(captureLastUser()).isEqualTo("Ответ кандидата: Ответ 2\nОсновных задано: 2 из 5.");
+            assertThat(captureLastUser()).isEqualTo("<answer>Ответ 2</answer>\nОсновных задано: 2 из 5.");
         }
     }
 }

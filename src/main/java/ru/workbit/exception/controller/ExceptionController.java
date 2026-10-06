@@ -22,6 +22,7 @@ import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.TooManyRequestsException;
@@ -122,6 +123,14 @@ public class ExceptionController {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(final ConflictException e) {
         log.warn("Conflict exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(NoQuestionsLeftException.class)
+    public ResponseEntity<ApiError> handleNoQuestionsLeft(final NoQuestionsLeftException e) {
+        log.info("Session questions exhausted: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
                         Collections.singletonList(e.getMessage())));

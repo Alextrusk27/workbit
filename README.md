@@ -26,7 +26,7 @@ based on real hh.ru job postings, answering by text or voice.
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
-![Claude](https://img.shields.io/badge/Claude-Opus_5-D97757?logo=anthropic&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude-Opus_5.5-D97757?logo=anthropic&logoColor=white)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-STT_%7C_VM-5282FF)
 ![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
@@ -77,7 +77,7 @@ based on real hh.ru job postings, answering by text or voice.
 | Core | Java 25, Spring Boot 4 (Web, Data JPA, Security, WebSocket, Validation, Actuator, AspectJ) |
 | Database | PostgreSQL 16, Flyway (schema per domain), Hibernate (`ddl-auto: validate`) |
 | Security | Spring Security + JWT (JJWT), HttpOnly cookies, in-memory per-IP rate limiting |
-| LLM | Claude Opus 5 via the Messages API (`anthropic-java`) for the prompt agents, gpt-5.4-mini via an OpenAI-compatible route (`openai-java`) for the input normalizer |
+| LLM | Claude Opus 5.5 for the prompt agents and gpt-5.4-mini for the input normalizer, both via an OpenAI-compatible route (`openai-java`) |
 | Speech | Yandex SpeechKit STT v3 — bidirectional gRPC streaming, stubs generated from proto at build time (`protobuf-maven-plugin`) |
 | Email | Spring Mail + Thymeleaf templates, Spring domain events (AFTER_COMMIT) |
 | Billing | Limit balance with atomic debits; Robokassa one-time payments — signed URLs and webhooks (SHA-256), a per-minute reconciliation job |
@@ -130,7 +130,7 @@ flowchart TB
 
     BE -->|"schema per domain, Flyway"| PG[("PostgreSQL 16")]
     vacancy -->|"vacancy data"| HH["hh.ru API"]
-    llm -->|"Messages API: Claude agents"| CL["Claude Opus 5"]
+    llm -->|"OpenAI-compatible route: Claude agents"| CL["Claude Opus 5.5"]
     llm -->|"OpenAI-compatible route: normalizer"| GPT["gpt-5.4-mini"]
     speech -->|"bidirectional gRPC stream"| STT["Yandex SpeechKit STT v3"]
     billing -->|"payments, webhooks"| RK["Robokassa"]

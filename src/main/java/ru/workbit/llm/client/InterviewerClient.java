@@ -1,6 +1,8 @@
 package ru.workbit.llm.client;
 
-import com.anthropic.models.messages.MessageParam;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -21,17 +23,10 @@ import ru.workbit.llm.dto.LlmInterviewTurn;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «интервьюер» поверх {@link ClaudeClient}: промпт из ресурса, вводная с
- * вакансией и уже заданными в прошлых интервью вопросами, сборка диалога из плана и обменов
- * «ответ кандидата - реплика модели».
- * К каждому ответу кандидата код дописывает счётчики заданных основных вопросов - общий и по
- * теме текущего вопроса, чтобы модель не считала их по истории и не теряла темы плана. Сборка
- * должна быть байт в байт одинаковой между ходами, иначе кэш промпта промахивается.
- */
+/** Клиент агента «интервьюер»: план и очередной ход беседы. */
 @Component
 public class InterviewerClient {
-    private static final String CANDIDATE_ANSWER = "Ответ кандидата: ";
+    private static final String CANDIDATE_ANSWER = "<answer>%s</answer>";
     private static final String MAIN_ASKED = "\nОсновных задано: %d из %d.";
     private static final String MAIN_EXHAUSTED = "\nОсновных задано: %d из %d, новых основных не будет.";
     private static final String TOPIC_ASKED = " По теме «%s» задано %d из %d.";
@@ -57,11 +52,7 @@ public class InterviewerClient {
         }
     }
 
-    /**
-     * Просит у модели план собеседования и первый вопрос.
-     *
-     * @param askedBefore блок с вопросами прошлых интервью по этой вакансии; null, когда их не было
-     */
+    /** Запрашивает план собеседования и первый вопрос. */
     public LlmInterviewPlan plan(LlmInterviewVacancy vacancy, String askedBefore) {
         LlmInterviewReply reply = claude.converse(prompt, opening(vacancy, askedBefore), List.of(), null,
                 LlmInterviewReply.class);
@@ -73,20 +64,13 @@ public class InterviewerClient {
                 reply.question());
     }
 
-    /**
-     * Запрашивает у модели следующий шаг интервью с учётом плана и истории беседы. Схема ответа -
-     * {@link LlmInterviewStep}, без полей плана: они нужны только первому ходу.
-     *
-     * @param plan        план с числом основных вопросов, уже обрезанным кодом в допустимый диапазон
-     * @param history     завершённые обмены «ответ кандидата - реплика модели» в порядке беседы
-     * @param lastAnswer  новый ответ кандидата, на который модель ещё не отвечала
-     * @param askedBefore тот же блок, что ушёл в {@link #plan}: вводная между ходами не меняется
-     */
+    /** Запрашивает следующую реплику беседы по плану и истории. */
     public LlmInterviewStep next(LlmInterviewVacancy vacancy, LlmInterviewPlan plan,
                                  List<LlmInterviewTurn> history, String lastAnswer, String askedBefore) {
 
-        List<MessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
-        dialog.add(assistant(plan));
+        List<ChatCompletionMessageParam> dialog = new ArrayList<>(history.size() * 2 + 1);
+        dialog.add(assistant(new LlmInterviewReply(LlmInterviewStepKind.MAIN, plan.questionCount(), plan.topics(),
+                plan.topic(), plan.question())));
         Map<String, Integer> planned = plannedByTopic(plan);
         Map<String, Integer> askedByTopic = new HashMap<>();
         int total = plan.questionCount();
@@ -112,10 +96,7 @@ public class InterviewerClient {
                 LlmInterviewStep.class);
     }
 
-    /**
-     * Вводная блоками: вакансия и, если прошлые интервью были, вопросы из них. Отдельным блоком,
-     * а не приклейкой к вакансии, чтобы кэш вакансии переживал смену списка от сессии к сессии.
-     */
+    /** Собирает вводную: вакансия и вопросы прошлых интервью. */
     private List<String> opening(LlmInterviewVacancy vacancy, String askedBefore) {
         String vacancyBlock = OPENING.formatted(
                 objectMapper.writeValueAsString(vacancy),
@@ -130,13 +111,10 @@ public class InterviewerClient {
 
     private static String candidateReply(String answer, int asked, int total, String topicCounter) {
         String counter = asked < total ? MAIN_ASKED : MAIN_EXHAUSTED;
-        return CANDIDATE_ANSWER + answer + counter.formatted(asked, total) + topicCounter;
+        return CANDIDATE_ANSWER.formatted(answer) + counter.formatted(asked, total) + topicCounter;
     }
 
-    /**
-     * Счётчик по теме текущего основного вопроса. Пуст, когда новых основных не будет, когда
-     * у плана нет структурных тем (легаси-сессии) и когда модель ушла на тему вне плана.
-     */
+    /** Счётчик по теме текущего основного вопроса. */
     private static String topicCounter(Map<String, Integer> planned, Map<String, Integer> askedByTopic,
                                        String topic, int asked, int total) {
         Integer plannedCount = topic == null ? null : planned.get(topic);
@@ -161,17 +139,15 @@ public class InterviewerClient {
         }
     }
 
-    private static MessageParam user(String text) {
-        return MessageParam.builder()
-                .role(MessageParam.Role.USER)
+    private static ChatCompletionMessageParam user(String text) {
+        return ChatCompletionMessageParam.ofUser(ChatCompletionUserMessageParam.builder()
                 .content(text)
-                .build();
+                .build());
     }
 
-    private MessageParam assistant(Object reply) {
-        return MessageParam.builder()
-                .role(MessageParam.Role.ASSISTANT)
+    private ChatCompletionMessageParam assistant(Object reply) {
+        return ChatCompletionMessageParam.ofAssistant(ChatCompletionAssistantMessageParam.builder()
                 .content(objectMapper.writeValueAsString(reply))
-                .build();
+                .build());
     }
 }

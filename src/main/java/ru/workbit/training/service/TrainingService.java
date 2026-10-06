@@ -34,6 +34,7 @@ import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.UnprocessableEntityException;
 import ru.workbit.llm.dto.LlmInputNormalization;
@@ -185,10 +186,7 @@ public class TrainingService {
 
         return trainingQuestionRepository.findNextUnanswered(sessionId)
                 .map(trainingQuestionMapper::toDto)
-                .orElseThrow(() -> {
-                    log.warn("Session {} has no questions left to ask", sessionId);
-                    return new ConflictException("Question cap reached");
-                });
+                .orElseThrow(() -> new NoQuestionsLeftException("Question cap reached"));
     }
 
     public List<TrainingQuestionResponse> getAnsweredQuestions(UUID sessionId, UUID userId) {

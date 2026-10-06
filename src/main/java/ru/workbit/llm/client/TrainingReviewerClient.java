@@ -10,11 +10,7 @@ import ru.workbit.llm.dto.LlmTrainingReport;
 import ru.workbit.llm.dto.LlmTrainingReportRequest;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «рецензент тренажёра» поверх {@link ClaudeClient}: промпт из ресурса и вводная из
- * JSON запроса. Уровня во вводной нет: планку задаёт сам вопрос, шкала одна для любого вопроса.
- * Вызов одноходовой.
- */
+/** Клиент агента «рецензент тренажёра». */
 @Component
 public class TrainingReviewerClient {
     private static final String TASK = """

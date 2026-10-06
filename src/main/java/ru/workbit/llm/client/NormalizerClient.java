@@ -22,11 +22,7 @@ import ru.workbit.llm.dto.LlmInputNormalization;
 import ru.workbit.llm.dto.LlmInputNormalizationRequest;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «нормализатор ввода»: промпт первым блоком единственного user-сообщения,
- * вводная - JSON запроса вторым, ответ - structured output по схеме {@link LlmInputNormalization}.
- * Размышления выключены - подсказки ждёт печатающий пользователь.
- */
+/** Клиент агента «нормализатор ввода». */
 @Slf4j
 @Component
 public class NormalizerClient {

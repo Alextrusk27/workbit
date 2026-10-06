@@ -12,10 +12,7 @@ import ru.workbit.llm.dto.LlmInterviewReport;
 import ru.workbit.llm.dto.LlmInterviewVacancy;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «рецензент» поверх {@link ClaudeClient}: промпт из ресурса и вводная из
- * вакансии и транскрипта собеседования. Вызов одноходовой - беседы с моделью тут нет.
- */
+/** Клиент агента «рецензент интервью». */
 @Component
 public class ReviewerClient {
     private static final String TASK = """

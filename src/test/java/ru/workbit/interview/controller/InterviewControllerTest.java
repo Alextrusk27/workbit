@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.VacancyFetchException;
@@ -443,7 +444,7 @@ class InterviewControllerTest {
         void returns409WhenNoQuestionsLeft() throws Exception {
             // given
             var sessionId = UUID.randomUUID();
-            when(interviewService.nextQuestion(sessionId, USER_ID)).thenThrow(new ConflictException("No questions left"));
+            when(interviewService.nextQuestion(sessionId, USER_ID)).thenThrow(new NoQuestionsLeftException("No questions left"));
 
             // when / then
             mvc.perform(post(BASE + "/sessions/" + sessionId + "/questions/next")

@@ -10,11 +10,7 @@ import ru.workbit.llm.dto.LlmTrainingQuestions;
 import ru.workbit.llm.dto.LlmTrainingQuestionsRequest;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «составитель вопросов тренажёра» поверх {@link ClaudeClient}: промпт из ресурса и
- * вводная из JSON запроса. Уровень приходит полем запроса, а не отдельным агентом на грейд: планки
- * всех уровней живут в одном промпте. Вызов одноходовой.
- */
+/** Клиент агента «составитель вопросов тренажёра». */
 @Component
 public class QuestionGeneratorClient {
     private static final String TASK = """

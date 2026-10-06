@@ -1,5 +1,9 @@
 package ru.workbit;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -21,6 +25,8 @@ public abstract class AbstractPostgresIT {
     // EmailHasher: SQL и Java должны давать один хеш на одном адресе.
     protected static final String EMAIL_HASH_SECRET = "test-email-hash-secret-not-used-in-production";
 
+    private static final Path RESUME_STORAGE_DIR = createResumeStorageDir();
+
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -28,5 +34,14 @@ public abstract class AbstractPostgresIT {
         r.add("spring.datasource.password", POSTGRES::getPassword);
         r.add("spring.flyway.placeholders.email_hash_secret", () -> EMAIL_HASH_SECRET);
         r.add("app.email.hash-secret", () -> EMAIL_HASH_SECRET);
+        r.add("app.resume.storage-dir", RESUME_STORAGE_DIR::toString);
+    }
+
+    private static Path createResumeStorageDir() {
+        try {
+            return Files.createTempDirectory("workbit-resumes");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

@@ -35,8 +35,11 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       LLM_PROMPTS_DIR: file:/app/prompts
+      RESUME_ENABLED: "false"
+      RESUME_STORAGE_DIR: /app/resumes
     volumes:
       - /opt/workbit/prompts:/app/prompts:ro
+      - /opt/workbit/resumes:/app/resumes
     depends_on:
       postgres:
         condition: service_healthy

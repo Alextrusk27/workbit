@@ -68,6 +68,17 @@ describe('apiFetch', () => {
     expect(init.body).toBe('{"skill":"Docker"}')
   })
 
+  it('шлёт FormData как есть и не ставит Content-Type', async () => {
+    fetchMock.mockResolvedValueOnce(json(201, {}))
+    const formData = new FormData()
+    formData.append('file', new Blob(['%PDF-1.7']), 'cv.pdf')
+
+    await apiFetch('/resumes', { method: 'POST', body: formData })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.body).toBe(formData)
+    expect(init.headers).toBeUndefined()
+  })
+
   it('на 401 делает refresh и повторяет запрос', async () => {
     fetchMock
       .mockResolvedValueOnce(json(401, {}))

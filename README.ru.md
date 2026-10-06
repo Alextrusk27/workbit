@@ -26,7 +26,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Caddy](https://img.shields.io/badge/Caddy-reverse_proxy-1F88C0)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
-![Claude](https://img.shields.io/badge/Claude-Opus_5-D97757?logo=anthropic&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude-Opus_5.5-D97757?logo=anthropic&logoColor=white)
 ![Yandex Cloud](https://img.shields.io/badge/Yandex_Cloud-STT_%7C_VM-5282FF)
 ![Robokassa](https://img.shields.io/badge/Robokassa-payments-8B5CF6)
 ![Testcontainers](https://img.shields.io/badge/Testcontainers-integration_tests-291A3F)
@@ -77,7 +77,7 @@
 | Ядро | Java 25, Spring Boot 4 (Web, Data JPA, Security, WebSocket, Validation, Actuator, AspectJ) |
 | БД | PostgreSQL 16, Flyway (схема на домен), Hibernate (`ddl-auto: validate`) |
 | Безопасность | Spring Security + JWT (JJWT), HttpOnly-куки, in-memory rate limiting per-IP |
-| LLM | Claude Opus 5 через Messages API (`anthropic-java`) для промптов-агентов, gpt-5.4-mini через OpenAI-совместимый маршрут (`openai-java`) для нормализатора ввода |
+| LLM | Claude Opus 5.5 для промптов-агентов и gpt-5.4-mini для нормализатора ввода, оба через OpenAI-совместимый маршрут (`openai-java`) |
 | Речь | Yandex SpeechKit STT v3 — двунаправленный gRPC-стрим, стабы из proto при сборке (`protobuf-maven-plugin`) |
 | Почта | Spring Mail + Thymeleaf-шаблоны, доменные события Spring (AFTER_COMMIT) |
 | Биллинг | Баланс лимитов с атомарными списаниями; разовые платежи Робокассы — подписанные URL и вебхуки (SHA-256), минутная джоба сверки |
@@ -130,7 +130,7 @@ flowchart TB
 
     BE -->|"схема на домен, Flyway"| PG[("PostgreSQL 16")]
     vacancy -->|"данные вакансии"| HH["hh.ru API"]
-    llm -->|"Messages API: Claude-агенты"| CL["Claude Opus 5"]
+    llm -->|"OpenAI-совместимый маршрут: Claude-агенты"| CL["Claude Opus 5.5"]
     llm -->|"OpenAI-совместимый маршрут: нормализатор"| GPT["gpt-5.4-mini"]
     speech -->|"двунаправленный gRPC-стрим"| STT["Yandex SpeechKit STT v3"]
     billing -->|"платежи, вебхуки"| RK["Робокасса"]

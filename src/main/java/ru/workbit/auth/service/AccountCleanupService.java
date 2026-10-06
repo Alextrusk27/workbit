@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.workbit.auth.UsersDeletedEvent;
 import ru.workbit.auth.model.User;
 import ru.workbit.auth.repository.UserJPARepository;
 import ru.workbit.billing.service.LimitService;
@@ -49,6 +50,7 @@ public class AccountCleanupService {
         List<User> expired = userRepository.findByDeletionWarnedAtBefore(threshold);
         if (!expired.isEmpty()) {
             limitService.revokeWelcome(expired.stream().map(User::getEmail).toList());
+            eventPublisher.publishEvent(new UsersDeletedEvent(expired.stream().map(User::getId).toList()));
         }
 
         int deleted = userRepository.deleteByDeletionWarnedAtBefore(threshold);

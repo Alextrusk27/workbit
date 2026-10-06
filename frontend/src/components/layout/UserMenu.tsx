@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   IconChat,
   IconChevronRight,
+  IconFile,
   IconLogout,
   IconPencil,
   IconUser,
@@ -21,9 +22,16 @@ const links: {
   to: string
   label: string
   Icon: ComponentType<{ className?: string }>
+  soon?: boolean
 }[] = [
   { to: '/app/interview', label: 'Мои интервью', Icon: IconChat },
   { to: '/app/training', label: 'Мои тренировки', Icon: IconPencil },
+  {
+    to: '/app/resumes',
+    label: 'Мои резюме',
+    Icon: IconFile,
+    soon: import.meta.env.PROD,
+  },
   { to: '/app/settings', label: 'Настройки', Icon: IconSettings },
 ]
 
@@ -96,13 +104,27 @@ export function UserMenu({ open, onToggle, onClose }: UserMenuProps) {
               </span>
             </div>
 
-            {links.map(({ to, label, Icon }) => (
-              <Link key={to} to={to} onClick={onClose} className={rowClass}>
-                <Icon className="text-muted size-5 shrink-0" />
-                <span className="flex-1">{label}</span>
-                <IconChevronRight className="text-dim size-4 shrink-0" />
-              </Link>
-            ))}
+            {links.map(({ to, label, Icon, soon }) =>
+              soon ? (
+                <span
+                  key={to}
+                  aria-disabled="true"
+                  className={cn(rowClass, 'opacity-50 hover:bg-transparent')}
+                >
+                  <Icon className="text-muted size-5 shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  <span className="border-line text-dim shrink-0 rounded-full border px-2 py-0.5 text-[11px]">
+                    скоро
+                  </span>
+                </span>
+              ) : (
+                <Link key={to} to={to} onClick={onClose} className={rowClass}>
+                  <Icon className="text-muted size-5 shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  <IconChevronRight className="text-dim size-4 shrink-0" />
+                </Link>
+              ),
+            )}
             <button
               type="button"
               onClick={onLogout}

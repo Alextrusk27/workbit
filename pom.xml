@@ -13,7 +13,7 @@
 
     <groupId>ru.workbit</groupId>
     <artifactId>workbit</artifactId>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.0-SNAPSHOT</version>
 
     <properties>
         <java.version>25</java.version>
@@ -30,7 +30,6 @@
         <protobuf-maven-plugin.version>5.1.7</protobuf-maven-plugin.version>
         <springdoc.version>3.0.3</springdoc.version>
         <ulid.creator.version>5.2.4</ulid.creator.version>
-        <anthropic-java.version>2.59.0</anthropic-java.version>
         <checkstyle.version>14.1.0</checkstyle.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     </properties>
@@ -189,12 +188,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <dependency>
-            <groupId>com.anthropic</groupId>
-            <artifactId>anthropic-java</artifactId>
-            <version>${anthropic-java.version}</version>
-        </dependency>
-
         <!-- Тесты: версии управляются Spring Boot BOM -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -223,6 +216,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
 

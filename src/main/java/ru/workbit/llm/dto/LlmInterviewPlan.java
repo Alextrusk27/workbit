@@ -8,6 +8,6 @@ public record LlmInterviewPlan(
         String topic,
         String question
 ) {
-    public static final int MIN_COUNT = 5;
-    public static final int MAX_COUNT = 12;
+    public static final int MIN_COUNT = 6;
+    public static final int MAX_COUNT = 13;
 }

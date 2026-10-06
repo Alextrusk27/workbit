@@ -15,11 +15,15 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.workbit.exception.BadCredentialsException;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
 import ru.workbit.exception.InternalServerException;
 import ru.workbit.exception.LlmException;
+import ru.workbit.exception.NoQuestionsLeftException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.PaymentRequiredException;
 import ru.workbit.exception.TooManyRequestsException;
@@ -38,6 +42,7 @@ public class ExceptionController {
             MethodArgumentNotValidException.class,
             MethodArgumentTypeMismatchException.class,
             MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class,
             HttpMessageNotReadableException.class
     })
     public ResponseEntity<ApiError> handleSpringValidation(final Exception e) {
@@ -100,6 +105,14 @@ public class ExceptionController {
                         Collections.singletonList(e.getMessage())));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(final NoResourceFoundException e) {
+        log.warn("No resource: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(HttpStatus.NOT_FOUND, "The required object was not found.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ApiError> handleForbidden(final ForbiddenException e) {
         log.warn("Forbidden exception: {}", e.getMessage());
@@ -119,6 +132,14 @@ public class ExceptionController {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(final ConflictException e) {
         log.warn("Conflict exception: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
+                        Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(NoQuestionsLeftException.class)
+    public ResponseEntity<ApiError> handleNoQuestionsLeft(final NoQuestionsLeftException e) {
+        log.info("Session questions exhausted: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiError.of(HttpStatus.CONFLICT, "Conflict.",
                         Collections.singletonList(e.getMessage())));
@@ -146,6 +167,14 @@ public class ExceptionController {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS, "Too many requests.",
                         Collections.singletonList(e.getMessage())));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSize(final MaxUploadSizeExceededException e) {
+        log.warn("Max upload size exceeded: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiError.of(HttpStatus.CONTENT_TOO_LARGE, "Content too large.",
+                        Collections.singletonList("File too large")));
     }
 
     @ExceptionHandler(VacancyFetchException.class)

@@ -1,287 +1,201 @@
 package ru.workbit.llm.client;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.core.http.StreamResponse;
-import com.anthropic.errors.AnthropicException;
-import com.anthropic.errors.AnthropicInvalidDataException;
-import com.anthropic.errors.AnthropicServiceException;
-import com.anthropic.helpers.MessageAccumulator;
-import com.anthropic.models.messages.CacheControlEphemeral;
-import com.anthropic.models.messages.ContentBlockParam;
-import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.MessageParam;
-import com.anthropic.models.messages.RawMessageStreamEvent;
-import com.anthropic.models.messages.StopReason;
-import com.anthropic.models.messages.StructuredMessage;
-import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.StructuredOutputConfig;
-import com.anthropic.models.messages.StructuredTextBlock;
-import com.anthropic.models.messages.TextBlockParam;
-import com.anthropic.models.messages.Usage;
+import com.openai.client.OpenAIClient;
+import com.openai.core.JsonValue;
+import com.openai.core.http.StreamResponse;
+import com.openai.errors.OpenAIException;
+import com.openai.errors.OpenAIInvalidDataException;
+import com.openai.errors.OpenAIServiceException;
+import com.openai.helpers.ChatCompletionAccumulator;
+import com.openai.models.chat.completions.ChatCompletion.Choice.FinishReason;
+import com.openai.models.chat.completions.ChatCompletionChunk;
+import com.openai.models.chat.completions.ChatCompletionContentPart;
+import com.openai.models.chat.completions.ChatCompletionContentPartText;
+import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.ChatCompletionStreamOptions;
+import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
+import com.openai.models.chat.completions.StructuredChatCompletion;
+import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
+import com.openai.models.completions.CompletionUsage;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import ru.workbit.exception.LlmException;
-import ru.workbit.llm.config.AnthropicProperties;
-import tools.jackson.databind.ObjectMapper;
+import ru.workbit.llm.config.ClaudeProperties;
 
-/**
- * Обвязка над AnthropicClient для вызовов со structured output.
- * Промпт агента идёт первым блоком первого user-сообщения, а не в system, вводная - вторым.
- * Неразбираемый ответ (модель отдала не JSON) перезапрашивается один раз:
- * у реселлера схема ответа - просьба в тексте, а не грамматика, и модель изредка отвечает
- * markdown-списком вместо объекта; повтор идёт по кэшированному промпту и стоит дешевле первого вызова.
- */
+/** Клиент Claude-агентов через OpenAI-совместимый маршрут шлюза. */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ClaudeClient {
     private static final long MAX_TOKENS = 32_000L;
-    private static final CacheControlEphemeral CACHE_1H = CacheControlEphemeral.builder()
-                    .ttl(CacheControlEphemeral.Ttl.TTL_1H).build();
-    private static final Pattern JSON_FENCE = Pattern.compile("^\\s*```(?:json)?\\s*|\\s*```\\s*$");
-    private static final String NOT_PARSEABLE = "LLM response is not parseable";
+    private static final JsonValue CACHE_1H = JsonValue.from(Map.of("type", "ephemeral", "ttl", "1h"));
+    private static final ChatCompletionStreamOptions WITH_USAGE = ChatCompletionStreamOptions.builder()
+            .includeUsage(true)
+            .build();
 
-    private final AnthropicClient client;
-    private final AnthropicProperties props;
-    private final ObjectMapper objectMapper;
+    private final OpenAIClient client;
+    private final ClaudeProperties props;
 
-    /**
-     * Многоходовая беседа. Метки кэша стоят на промпте, блоках вводной и новой реплике пользователя:
-     * вводная неизменна между ходами, а подвижная метка на хвосте истории оставляет вне кэша только
-     * прирост с прошлого хода - без неё вся переписка досылалась бы каждый ход по цене обычного входа.
-     * Провайдер держит не больше четырёх меток на запрос, поэтому блоков вводной - не больше двух.
-     * Схема ответа входит в кэшируемый префикс, поэтому на всех ходах беседы она должна быть одна.
-     * Стриминговый: нестриминговый запрос с max_tokens выше 21 333 провайдер отвергает с 400.
-     *
-     * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
-     * @param opening      первая реплика пользователя (вводная задачи) блоками, каждый кэшируется отдельно
-     * @param dialog       завершённые реплики по очереди assistant/user, пустой на первом ходе
-     * @param lastUser     новая реплика пользователя, на которую отвечает модель; null на первом ходе
-     * @param responseType record со схемой ответа, общий для всех ходов беседы
-     */
-    public <T> T converse(String prompt, List<String> opening, List<MessageParam> dialog, String lastUser,
-                          Class<T> responseType) {
+    public ClaudeClient(@Qualifier("gatewayClaudeClient") OpenAIClient client, ClaudeProperties props) {
+        this.client = client;
+        this.props = props;
+    }
 
-        List<MessageParam> messages = new ArrayList<>(dialog.size() + 2);
-        List<ContentBlockParam> openingBlocks = new ArrayList<>(opening.size() + 1);
+    /** Многоходовая беседа: ответ модели на последнюю реплику. */
+    public <T> T converse(String prompt, List<String> opening, List<ChatCompletionMessageParam> dialog,
+                          String lastUser, Class<T> responseType) {
 
-        openingBlocks.add(cached(prompt));
-        opening.forEach(block -> openingBlocks.add(cached(block)));
+        List<ChatCompletionMessageParam> messages = new ArrayList<>(dialog.size() + 2);
+        List<ChatCompletionContentPart> openingParts = new ArrayList<>(opening.size() + 1);
 
-        messages.add(MessageParam.builder()
-                .role(MessageParam.Role.USER)
-                .contentOfBlockParams(openingBlocks)
-                .build());
+        openingParts.add(marked(prompt));
+        opening.forEach(part -> openingParts.add(marked(part)));
+
+        messages.add(user(ChatCompletionUserMessageParam.Content.ofArrayOfContentParts(openingParts)));
         messages.addAll(dialog);
 
         if (lastUser != null) {
-            messages.add(MessageParam.builder()
-                    .role(MessageParam.Role.USER)
-                    .contentOfBlockParams(List.of(cached(lastUser)))
-                    .build());
+            messages.add(user(props.cacheMarks()
+                    ? ChatCompletionUserMessageParam.Content.ofArrayOfContentParts(List.of(marked(lastUser)))
+                    : ChatCompletionUserMessageParam.Content.ofText(lastUser)));
         }
 
-        return withParseRetry(() -> sendStreaming(messages, responseType));
+        return sendStreaming(messages, responseType);
     }
 
-    /**
-     * Одноходовой вызов, стриминговый. Метка кэша стоит только на промпте: вводная уникальна для
-     * вызова, из кэша повторно не читается, а запись в кэш с TTL 1h стоит дороже обычного входа.
-     * Стриминг здесь не ради частичного вывода, а против обрыва: отчёт по длинному интервью
-     * генерируется больше минуты, а молчащее соединение с провайдером режет NAT.
-     *
-     * @param prompt       текст промпта агента, байт в байт одинаковый между вызовами
-     * @param task         вводная с данными задачи
-     * @param responseType record со схемой ответа
-     */
+    /** Одноходовой вызов: промпт и вводная, ответ по схеме. */
     public <T> T ask(String prompt, String task, Class<T> responseType) {
-        MessageParam message = MessageParam.builder()
-                .role(MessageParam.Role.USER)
-                .contentOfBlockParams(List.of(cached(prompt), plain(task)))
-                .build();
+        ChatCompletionMessageParam message = user(
+                ChatCompletionUserMessageParam.Content.ofArrayOfContentParts(List.of(marked(prompt), text(task))));
 
-        return withParseRetry(() -> sendStreaming(List.of(message), responseType));
+        return sendStreaming(List.of(message), responseType);
     }
 
-    /**
-     * Один повтор на неразбираемом ответе. Батарея генератора вопросов 2026-09-09: 1 ответ из 45 -
-     * markdown-заголовок и нумерованный список вместо объекта схемы; без повтора это оплаченный вызов
-     * и ошибка пользователю. Сетевые ошибки и статусы провайдера не повторяются - их гасит SDK.
-     */
-    private <T> T withParseRetry(Supplier<T> request) {
-        try {
-            return request.get();
-        } catch (UnparseableResponseException first) {
-            log.warn("Claude response is not parseable [model={}], retrying once: {}",
-                    props.model(), String.valueOf(first.getCause()));
-            try {
-                return request.get();
-            } catch (UnparseableResponseException second) {
-                log.error("Claude response is not parseable after retry [model={}]", props.model(), second);
-                throw second;
-            }
-        }
-    }
+    /** Отправляет запрос стримом и собирает ответ. */
+    private <T> T sendStreaming(List<ChatCompletionMessageParam> messages, Class<T> responseType) {
+        StructuredChatCompletionCreateParams<T> params = buildParams(messages, responseType);
+        ChatCompletionAccumulator accumulator = ChatCompletionAccumulator.create();
+        Set<Long> finished = new HashSet<>();
 
-    /**
-     * Обходной путь: провайдер шлёт {@code message_delta} без обязательного по спеке {@code usage}, а
-     * {@link MessageAccumulator} читает это поле через {@code getRequired} и падает. Поэтому
-     * событие без разбираемого usage идёт мимо аккумулятора, а {@code stop_reason} берётся прямо
-     * из него; когда провайдер починит формат, событие снова пойдёт в аккумулятор и выходные
-     * токены появятся в логе сами.
-     */
-    private <T> T sendStreaming(List<MessageParam> messages, Class<T> responseType) {
-        StructuredMessageCreateParams<T> params = buildParams(messages, responseType);
-        MessageAccumulator accumulator = MessageAccumulator.create();
-        AtomicReference<StopReason> stop = new AtomicReference<>();
-        AtomicInteger outputChars = new AtomicInteger();
-
-        StructuredMessage<T> response = call(() -> {
-            try (StreamResponse<RawMessageStreamEvent> stream = client.messages().createStreaming(params)) {
-                stream.stream().forEach(event -> {
-                    if (event.isMessageDelta() && event.asMessageDelta()._usage().asKnown().isEmpty()) {
-                        event.asMessageDelta().delta().stopReason().ifPresent(stop::set);
-                        return;
-                    }
-                    event.contentBlockDelta()
-                            .flatMap(block -> block.delta().text())
-                            .ifPresent(text -> outputChars.addAndGet(text.text().length()));
-                    accumulator.accumulate(event);
-                });
+        StructuredChatCompletion<T> response = call(() -> {
+            try (StreamResponse<ChatCompletionChunk> stream = client.chat().completions().createStreaming(params)) {
+                stream.stream().forEach(chunk -> accumulate(accumulator, finished, chunk));
             }
-            return accumulator.message(responseType);
+            return accumulator.chatCompletion(responseType);
         });
 
-        logStreamUsage(response.usage(), outputChars.get());
-        return result(response, stop.get() != null ? stop.get() : response.stopReason().orElse(null), responseType);
+        response.usage().ifPresent(this::logUsage);
+        return result(response);
     }
 
-    private <T> StructuredMessage<T> call(Supplier<StructuredMessage<T>> request) {
+    private <T> StructuredChatCompletion<T> call(Supplier<StructuredChatCompletion<T>> request) {
         try {
             return request.get();
 
-        } catch (AnthropicInvalidDataException e) {
-            throw new UnparseableResponseException(e);
-
-        } catch (AnthropicServiceException e) {
-            log.error("Claude call failed [model={}]: status={}, type={}, body={}",
-                    props.model(), e.statusCode(), e.errorType().orElse(null), e.body());
+        } catch (OpenAIServiceException e) {
+            log.error("Claude call failed [model={}]: status={}, code={}, type={}, body={}",
+                    props.model(), e.statusCode(), e.code().orElse(null), e.type().orElse(null), e.body());
             throw new LlmException("LLM call failed with status %d".formatted(e.statusCode()), e);
 
-        } catch (AnthropicException e) {
+        } catch (OpenAIException e) {
             log.error("Claude call failed [model={}]", props.model(), e);
             throw new LlmException("LLM call failed", e);
         }
     }
 
-    private <T> T result(StructuredMessage<T> response, StopReason stop, Class<T> responseType) {
-        if (StopReason.REFUSAL.equals(stop) || StopReason.MAX_TOKENS.equals(stop)) {
-            log.error("Claude stopped abnormally [model={}, stopReason={}, details={}]",
-                    props.model(), stop, response.stopDetails().orElse(null));
-            throw new LlmException("LLM stopped with reason " + stop);
-        }
-
-        StructuredTextBlock<T> block = response.content().stream()
-                .flatMap(content -> content.text().stream())
+    private <T> T result(StructuredChatCompletion<T> response) {
+        StructuredChatCompletion.Choice<T> choice = response.choices().stream()
                 .findFirst()
                 .orElseThrow(() -> new LlmException("Model not response"));
 
-        log.debug("Claude raw response [model={}]: {}", props.model(), block.rawTextBlock().text());
+        FinishReason finish = choice.finishReason();
+        if (FinishReason.CONTENT_FILTER.equals(finish) || FinishReason.LENGTH.equals(finish)) {
+            log.error("Claude stopped abnormally [model={}, finishReason={}]", props.model(), finish);
+            throw new LlmException("LLM stopped with reason " + finish);
+        }
+
+        log.debug("Claude raw response [model={}]: {}", props.model(), choice.message().rawMessage().content());
         try {
-            return block.text();
-        } catch (AnthropicInvalidDataException e) {
-            return parseRawText(block, responseType, e);
+            return choice.message().content().orElseThrow(() -> new LlmException("Model not response"));
+        } catch (OpenAIInvalidDataException e) {
+            log.error("Claude response is not parseable [model={}]", props.model(), e);
+            throw new LlmException("LLM response is not parseable", e);
         }
     }
 
-    /**
-     * Ответ по схеме, который SDK не разобрал: реселлер отдаёт structured output не как грамматику, а
-     * обычным текстом, и модель иногда оборачивает JSON в markdown-ограду или пояснение. Снимаем ограду,
-     * затем берём текст от первой «{» до последней «}» и разбираем сами - вызов уже оплачен, а у отчёта
-     * по интервью он длится минуту. Объекта в тексте нет (markdown-список вместо JSON) - ответ
-     * неразбираемый, его перезапрашивает {@link #withParseRetry}.
-     */
-    private <T> T parseRawText(StructuredTextBlock<T> block, Class<T> responseType,
-                               AnthropicInvalidDataException cause) {
-
-        String raw = block.rawTextBlock().text();
-        String unfenced = JSON_FENCE.matcher(raw).replaceAll("");
-        int from = unfenced.indexOf('{');
-        int to = unfenced.lastIndexOf('}');
-
-        if (from < 0 || to < from) {
-            log.warn("Claude response has no JSON object [model={}]: {}", props.model(), abbreviate(raw));
-            throw new UnparseableResponseException(cause);
-        }
-
-        String json = unfenced.substring(from, to + 1);
-        log.warn("Claude wrapped the structured response [model={}], unwrapping: {}",
-                props.model(), abbreviate(raw));
-        try {
-            return objectMapper.readValue(json, responseType);
-        } catch (RuntimeException e) {
-            log.warn("Claude response is not parseable even unwrapped [model={}]", props.model(), e);
-            throw new UnparseableResponseException(e);
-        }
-    }
-
-    private static String abbreviate(String text) {
-        return text.length() <= 200 ? text : text.substring(0, 200) + "...";
-    }
-
-    /**
-     * Ответ не разобран ни SDK, ни по сырому тексту. Отдельный тип - чтобы {@link #withParseRetry}
-     * повторял только этот случай, а не статусы провайдера и сетевые ошибки.
-     */
-    private static final class UnparseableResponseException extends LlmException {
-        UnparseableResponseException(Throwable cause) {
-            super(NOT_PARSEABLE, cause);
-        }
-    }
-
-    private <T> StructuredMessageCreateParams<T> buildParams(List<MessageParam> messages, Class<T> responseType) {
-        return MessageCreateParams.builder()
+    private <T> StructuredChatCompletionCreateParams<T> buildParams(List<ChatCompletionMessageParam> messages,
+                                                                     Class<T> responseType) {
+        return ChatCompletionCreateParams.builder()
                 .model(props.model())
-                .maxTokens(MAX_TOKENS)
+                .maxCompletionTokens(MAX_TOKENS)
+                .reasoningEffort(props.effort())
+                .streamOptions(WITH_USAGE)
                 .messages(messages)
-                .outputConfig(StructuredOutputConfig.<T>builder()
-                        .effort(props.effort())
-                        .format(responseType)
-                        .build())
+                .responseFormat(responseType)
                 .build();
     }
 
-    private static ContentBlockParam cached(String text) {
-        return ContentBlockParam.ofText(TextBlockParam.builder()
-                .text(text)
-                .cacheControl(CACHE_1H)
-                .build()
-        );
+    /** Передаёт чанк в аккумулятор SDK, приводя завершающие чанки шлюза к формату OpenAI. */
+    private static void accumulate(ChatCompletionAccumulator accumulator, Set<Long> finished,
+                                   ChatCompletionChunk chunk) {
+        if (chunk.choices().isEmpty()) {
+            accumulator.accumulate(chunk);
+            return;
+        }
+        List<ChatCompletionChunk.Choice> fresh = chunk.choices().stream()
+                .filter(choice -> !finished.contains(choice.index()))
+                .toList();
+        fresh.stream()
+                .filter(choice -> choice.finishReason().isPresent())
+                .forEach(choice -> finished.add(choice.index()));
+
+        if (!fresh.isEmpty()) {
+            accumulator.accumulate(chunk.toBuilder().choices(fresh).usage(Optional.empty()).build());
+        }
+        if (chunk.usage().isPresent()) {
+            accumulator.accumulate(chunk.toBuilder().choices(List.of()).build());
+        }
     }
 
-    private static ContentBlockParam plain(String text) {
-        return ContentBlockParam.ofText(TextBlockParam.builder()
+    private ChatCompletionContentPart marked(String text) {
+        if (!props.cacheMarks()) {
+            return text(text);
+        }
+        return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
                 .text(text)
-                .build()
-        );
+                .putAdditionalProperty("cache_control", CACHE_1H)
+                .build());
     }
 
-    /**
-     * Выходных токенов при стриминге нет: в {@code message_start} вместо них заглушка, а
-     * {@code message_delta} с настоящим значением провайдер не шлёт. Вместо них - длина ответа
-     * в символах, чтобы цифру нельзя было прочесть как токены; расход выхода меряет батарея
-     * нестриминговым прогоном.
-     */
-    private void logStreamUsage(Usage usage, int outputChars) {
-        log.info("Claude usage [model={}]: input={}, outputChars={}, cacheRead={}, cacheCreation={}",
-                props.model(), usage.inputTokens(), outputChars,
-                usage.cacheReadInputTokens().orElse(0L), usage.cacheCreationInputTokens().orElse(0L));
+    private static ChatCompletionMessageParam user(ChatCompletionUserMessageParam.Content content) {
+        return ChatCompletionMessageParam.ofUser(ChatCompletionUserMessageParam.builder()
+                .content(content)
+                .build());
+    }
+
+    private static ChatCompletionContentPart text(String text) {
+        return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
+                .text(text)
+                .build());
+    }
+
+    /** Пишет в лог расход токенов и стоимость вызова. */
+    private void logUsage(CompletionUsage usage) {
+        log.info("Claude usage [model={}]: input={}, output={}, reasoning={}, cacheRead={}, cacheWrite={}, cost={}",
+                props.model(), usage.promptTokens(), usage.completionTokens(),
+                usage.completionTokensDetails().flatMap(CompletionUsage.CompletionTokensDetails::reasoningTokens)
+                        .orElse(0L),
+                usage.promptTokensDetails().flatMap(CompletionUsage.PromptTokensDetails::cachedTokens).orElse(0L),
+                usage.promptTokensDetails().map(d -> d._additionalProperties().get("cache_write_tokens"))
+                        .orElse(null),
+                usage._additionalProperties().get("cost"));
     }
 }

@@ -13,7 +13,6 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import ru.workbit.AbstractPostgresIT;
-import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.SkillDict;
@@ -61,15 +60,6 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
                 .professionId(professionId)
                 .name(name)
                 .matchKey(DictText.matchKey(name))
-                .build();
-    }
-
-    private BankQuestion aBankQuestion(UUID professionId, UUID skillId) {
-        return BankQuestion.builder()
-                .professionId(professionId)
-                .skillId(skillId)
-                .levels(List.of("EASY"))
-                .text("Что такое SOLID?")
                 .build();
     }
 
@@ -172,12 +162,11 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
     class CascadeDelete {
 
         @Test
-        @DisplayName("Удаление профессии каскадно удаляет её навыки и вопросы банка")
-        void cascadeDeleteRemovesSkillsAndBankQuestions() {
+        @DisplayName("Удаление профессии каскадно удаляет её навыки")
+        void cascadeDeleteRemovesSkills() {
             // given
             var profession = em.persistAndFlush(aProfession("Cascade Profession"));
             var skill = em.persistAndFlush(aSkill(profession.getId(), "Cascade Skill"));
-            var question = em.persistAndFlush(aBankQuestion(profession.getId(), skill.getId()));
 
             // when — физическое удаление профессии нативным SQL, чтобы проверить реальный
             // ON DELETE CASCADE в БД, минуя JPA-кеш
@@ -191,7 +180,6 @@ class ProfessionDictRepositoryIT extends AbstractPostgresIT {
             // then
             assertThat(repository.findById(profession.getId())).isEmpty();
             assertThat(em.find(SkillDict.class, skill.getId())).isNull();
-            assertThat(em.find(BankQuestion.class, question.getId())).isNull();
         }
     }
 

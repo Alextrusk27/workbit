@@ -10,11 +10,7 @@ import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
 import ru.workbit.llm.dto.LlmTrainingReferenceAnswerRequest;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Протокол агента «автор эталонных ответов тренажёра» поверх {@link ClaudeClient}: промпт из ресурса
- * и вводная из JSON запроса. Уровня во вводной нет: глубину эталона задаёт сам вопрос, составленный
- * на планке своего уровня. Вызов одноходовой.
- */
+/** Клиент агента «автор эталонных ответов тренажёра». */
 @Component
 public class ReferenceAnswerClient {
     private static final String TASK = """

@@ -19,6 +19,7 @@ export type MetrikaGoal =
   | 'training_start'
   | 'training_finish'
   | 'payment_success'
+  | 'resume_upload'
 
 /** Отправка цели. Для `payment_success` параметры `order_price` + `currency`
  *  Метрика понимает как доход цели (передача ценности в отчёты). */

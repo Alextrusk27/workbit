@@ -44,12 +44,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import ru.workbit.billing.model.UsageEvent;
 import ru.workbit.billing.service.LimitService;
-import ru.workbit.content.model.BankQuestion;
 import ru.workbit.content.model.DictStatus;
 import ru.workbit.content.model.ProfessionDict;
 import ru.workbit.content.model.SkillDict;
 import ru.workbit.content.repository.ProfessionDictRepository;
-import ru.workbit.content.repository.QuestionBankRepository;
 import ru.workbit.content.repository.SkillDictRepository;
 import ru.workbit.exception.ConflictException;
 import ru.workbit.exception.ForbiddenException;
@@ -109,8 +107,6 @@ class TrainingServiceTest {
     @Mock
     SkillDictRepository skillDictRepository;
     @Mock
-    QuestionBankRepository questionBankRepository;
-    @Mock
     TrainingWriter trainingWriter;
     @Mock
     LlmService llmService;
@@ -149,9 +145,9 @@ class TrainingServiceTest {
                 .build();
     }
 
-    private static List<BankQuestion> bankQuestions(int count) {
+    private static List<String> generatedQuestions(int count) {
         return IntStream.rangeClosed(1, count)
-                .mapToObj(i -> BankQuestion.builder().id(UUID.randomUUID()).text("Банковский вопрос " + i).build())
+                .mapToObj(i -> "Сгенерированный вопрос " + i)
                 .toList();
     }
 
@@ -191,83 +187,6 @@ class TrainingServiceTest {
                     .thenReturn(Optional.of(skillDict));
         }
 
-        @Test
-        @DisplayName("Банк выдал полные QUESTION_CAP вопросов - LLM не вызывается, в writer уходят банковские и пустой список сгенерированных")
-        void fullBankSkipsLlmGeneration() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-
-            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.create(request, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            assertThat(mappedEntity.getUserId()).isEqualTo(userId);
-
-            verifyNoInteractions(llmService);
-            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
-        }
-
-        @Test
-        @DisplayName("Банк выдал часть вопросов (7 из 10) - LLM вызывается с count=3, текстами банковских вопросов и грейдом сессии")
-        void partialBankRequestsMissingFromLlm() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-
-            List<BankQuestion> bank = bankQuestions(7);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-
-            List<String> generated = List.of("Сгенерированный 1", "Сгенерированный 2", "Сгенерированный 3");
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
-
-            TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.create(request, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-
-            verify(questionBankRepository).sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP);
-
-            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
-                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
-            verify(llmService).generateTrainingQuestions(captor.capture());
-            LlmTrainingQuestionsRequest llmRequest = captor.getValue();
-            assertThat(llmRequest.skill()).isEqualTo(SKILL);
-            assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
-            assertThat(llmRequest.level()).isEqualTo("medium");
-            assertThat(llmRequest.count()).isEqualTo(3);
-            assertThat(llmRequest.existingQuestions())
-                    .containsExactlyElementsOf(bank.stream().map(BankQuestion::getText).toList());
-
-            verify(trainingWriter).createSession(mappedEntity, bank, generated);
-        }
-
         @ParameterizedTest
         @EnumSource(TrainingSession.Level.class)
         @DisplayName("Грейд в запросе к generateTrainingQuestions - это getGrade() уровня сессии")
@@ -277,11 +196,6 @@ class TrainingServiceTest {
             TrainingSession mappedEntity = TrainingSession.builder().skill(SKILL).profession(PROFESSION).level(level).build();
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, level.name(), userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             when(llmService.generateTrainingQuestions(any()))
                     .thenReturn(new LlmTrainingQuestions(List.of("Q1", "Q2", "Q3")));
 
@@ -296,19 +210,14 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Банк пуст - LLM запрашивается на полный батч из QUESTION_CAP вопросов")
-        void emptyBankRequestsFullBatch() {
+        @DisplayName("LLM запрашивается на полный батч из QUESTION_CAP вопросов без уже заданных")
+        void requestsFullBatchFromLlm() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
 
             List<String> generated = IntStream.rangeClosed(1, TrainingService.QUESTION_CAP)
                     .mapToObj(i -> "Сгенерированный " + i)
@@ -317,7 +226,7 @@ class TrainingServiceTest {
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, List.of(), generated)).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -331,39 +240,34 @@ class TrainingServiceTest {
             assertThat(captor.getValue().count()).isEqualTo(TrainingService.QUESTION_CAP);
             assertThat(captor.getValue().existingQuestions()).isEmpty();
 
-            verify(trainingWriter).createSession(mappedEntity, List.of(), generated);
+            verify(trainingWriter).createSession(mappedEntity, generated);
         }
 
         @Test
-        @DisplayName("Ответ LLM с null/blank и лишними строками - фильтруется и обрезается до missing")
+        @DisplayName("Ответ LLM с null/blank и лишними строками - фильтруется и обрезается до QUESTION_CAP")
         void filtersAndTrimsLlmResponse() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(8);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> llmQuestions = Stream.concat(
+                    Stream.of((String) null, "   "),
+                    generatedQuestions(TrainingService.QUESTION_CAP + 1).stream()).toList();
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(llmQuestions));
 
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(
-                    Arrays.asList(null, "   ", "Годный вопрос 1", "Годный вопрос 2", "Лишний вопрос 3")));
-
-            List<String> expectedGenerated = List.of("Годный вопрос 1", "Годный вопрос 2");
+            List<String> expectedGenerated = generatedQuestions(TrainingService.QUESTION_CAP);
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, expectedGenerated)).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, expectedGenerated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).createSession(mappedEntity, bank, expectedGenerated);
+            verify(trainingWriter).createSession(mappedEntity, expectedGenerated);
         }
 
         @Test
@@ -374,66 +278,49 @@ class TrainingServiceTest {
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(8);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-
-            List<String> generated = List.of("Единственный сгенерированный");
+            List<String> generated = generatedQuestions(4);
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
-                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 9, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, generated)).thenReturn(expectedResponse);
+                    null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 4, null, null, null);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).createSession(mappedEntity, bank, generated);
+            verify(trainingWriter).createSession(mappedEntity, generated);
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул null-список - LlmException (недостаточно вопросов), сессия не создаётся")
-        void throwsWhenBankEmptyAndLlmReturnsNullList() {
+        @DisplayName("LLM вернул null-список - LlmException (недостаточно вопросов), сессия не создаётся")
+        void throwsWhenLlmReturnsNullList() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(null));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Not enough questions for a training session");
-            verify(trainingWriter, never()).createSession(any(), any(), any());
+            verify(trainingWriter, never()).createSession(any(), any());
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул только blank-строки - LlmException (недостаточно вопросов), сессия не создаётся")
-        void throwsWhenBankEmptyAndLlmReturnsOnlyBlankStrings() {
+        @DisplayName("LLM вернул только blank-строки - LlmException (недостаточно вопросов), сессия не создаётся")
+        void throwsWhenLlmReturnsOnlyBlankStrings() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             when(llmService.generateTrainingQuestions(any()))
                     .thenReturn(new LlmTrainingQuestions(Arrays.asList("", "   ", null)));
 
@@ -441,85 +328,49 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Not enough questions for a training session");
-            verify(trainingWriter, never()).createSession(any(), any(), any());
+            verify(trainingWriter, never()).createSession(any(), any());
         }
 
         @Test
-        @DisplayName("Суммарно 2 вопроса (2 из банка, LLM вернул 0) - LlmException, сессия не создаётся")
-        void throwsWhenTotalQuestionsBelowThresholdFromBank() {
+        @DisplayName("LLM вернул 2 вопроса (меньше порога) - LlmException, сессия не создаётся")
+        void throwsWhenQuestionsBelowThreshold() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-
-            List<BankQuestion> bank = bankQuestions(2);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
-
-            // when / then
-            assertThatThrownBy(() -> trainingService.create(request, userId))
-                    .isInstanceOf(LlmException.class)
-                    .hasMessage("Not enough questions for a training session");
-            verify(trainingWriter, never()).createSession(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("Суммарно 2 вопроса (1 из банка, 1 от LLM) - LlmException, сессия не создаётся")
-        void throwsWhenTotalQuestionsBelowThresholdMixedSources() {
-            // given
-            CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
-            TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
-            when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
-            stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-
-            List<BankQuestion> bank = bankQuestions(1);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
             when(llmService.generateTrainingQuestions(any()))
-                    .thenReturn(new LlmTrainingQuestions(List.of("Единственный сгенерированный")));
+                    .thenReturn(new LlmTrainingQuestions(generatedQuestions(2)));
 
             // when / then
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Not enough questions for a training session");
-            verify(trainingWriter, never()).createSession(any(), any(), any());
+            verify(trainingWriter, never()).createSession(any(), any());
         }
 
         @Test
-        @DisplayName("Суммарно ровно 3 вопроса (порог не строгий) - сессия создаётся")
+        @DisplayName("LLM вернул ровно 3 вопроса (порог не строгий) - сессия создаётся")
         void createsSessionWhenExactlyAtThreshold() {
             // given
             CreateSessionRequest request = new CreateSessionRequest(SKILL, PROFESSION, TrainingSession.Level.MEDIUM);
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(3);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(List.of()));
+            List<String> generated = generatedQuestions(3);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 3, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).createSession(mappedEntity, bank, List.of());
+            verify(trainingWriter).createSession(mappedEntity, generated);
         }
 
         @Test
@@ -530,17 +381,13 @@ class TrainingServiceTest {
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -569,16 +416,12 @@ class TrainingServiceTest {
             when(skillDictRepository.findByProfessionIdAndMatchKey(professionId, DictText.matchKey(skillInput)))
                     .thenReturn(Optional.of(skillDict));
 
-            when(trainingWriter.upsertDictionaries("Spring JPA", PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, "Spring JPA", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -587,7 +430,7 @@ class TrainingServiceTest {
             assertThat(result).isEqualTo(expectedResponse);
             assertThat(mappedEntity.getSkill()).isEqualTo("Spring JPA");
             assertThat(mappedEntity.getProfession()).isEqualTo(PROFESSION);
-            verifyNoInteractions(llmService);
+            verify(llmService, never()).normalizeInput(any());
             verify(trainingWriter).upsertDictionaries("Spring JPA", PROFESSION);
         }
 
@@ -603,16 +446,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any()))
                     .thenReturn(new LlmInputNormalization(true, List.of(), false, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -642,15 +481,11 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any()))
                     .thenReturn(new LlmInputNormalization(true, List.of(), true, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             trainingService.create(request, userId);
@@ -734,16 +569,12 @@ class TrainingServiceTest {
             when(professionDictRepository.findByMatchKey(DictText.matchKey(secondSuggestion)))
                     .thenReturn(Optional.of(known));
 
-            when(trainingWriter.upsertDictionaries(SKILL, dictionaryName))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, dictionaryName, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -771,7 +602,7 @@ class TrainingServiceTest {
                     .hasMessage("Profession not recognized");
             verify(llmService, never()).generateTrainingQuestions(any());
             verify(skillDictRepository, never()).findByProfessionIdAndMatchKey(any(), any());
-            verifyNoInteractions(trainingWriter, questionBankRepository);
+            verifyNoInteractions(trainingWriter);
         }
 
         @Test
@@ -790,7 +621,7 @@ class TrainingServiceTest {
                     .isInstanceOf(UnprocessableEntityException.class)
                     .hasMessage("Skill not recognized");
             verify(llmService, never()).generateTrainingQuestions(any());
-            verifyNoInteractions(trainingWriter, questionBankRepository);
+            verifyNoInteractions(trainingWriter);
         }
 
         @Test
@@ -804,16 +635,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, List.of("Java-инженер", "Java Developer"), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, "Java-инженер"))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, "Java-инженер", TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -836,16 +663,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of("Spring Framework", "Spring MVC"), true, List.of(), true));
 
-            when(trainingWriter.upsertDictionaries("Spring Framework", PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, "Spring Framework", PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -869,16 +692,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, professionSuggestions, true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -910,16 +729,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, List.of(tooLong, atLimit), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, atLimit))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, atLimit, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -944,16 +759,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, List.of(tooLong1, tooLong2), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, PROFESSION, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -978,16 +789,12 @@ class TrainingServiceTest {
             when(llmService.normalizeInput(any())).thenReturn(new LlmInputNormalization(
                     true, List.of(), true, List.of(rawSuggestion), true));
 
-            when(trainingWriter.upsertDictionaries(SKILL, strippedSuggestion))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = new TrainingSessionResponse(
                     null, SKILL, strippedSuggestion, TrainingSession.Level.MEDIUM, TrainingSession.Status.CREATED, 0, 10, null, null, null);
-            when(trainingWriter.createSession(mappedEntity, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.createSession(mappedEntity, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.create(request, userId);
@@ -1006,16 +813,10 @@ class TrainingServiceTest {
             TrainingSession mappedEntity = mappedEntity(SKILL, PROFESSION);
             when(trainingSessionMapper.toEntity(request)).thenReturn(mappedEntity);
             stubProfessionAndSkillApproved();
-            when(trainingWriter.upsertDictionaries(SKILL, PROFESSION))
-                    .thenReturn(new TrainingWriter.DictionaryRefs(professionId, skillId));
 
-            List<BankQuestion> bank = bankQuestions(7);
-            when(questionBankRepository.sampleUnseen(
-                    professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-            List<String> generated = List.of("Сгенерированный 1", "Сгенерированный 2", "Сгенерированный 3");
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
-            when(trainingWriter.createSession(mappedEntity, bank, generated))
+            when(trainingWriter.createSession(mappedEntity, generated))
                     .thenReturn(mock(TrainingSessionResponse.class));
 
             // when
@@ -1039,7 +840,7 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.create(request, userId))
                     .isInstanceOf(PaymentRequiredException.class)
                     .hasMessage("Not enough limits");
-            verifyNoInteractions(trainingSessionMapper, llmService, trainingWriter, questionBankRepository,
+            verifyNoInteractions(trainingSessionMapper, llmService, trainingWriter,
                     professionDictRepository, skillDictRepository);
         }
 
@@ -1388,8 +1189,6 @@ class TrainingServiceTest {
 
         private final UUID userId = UUID.randomUUID();
         private final UUID sessionId = UUID.randomUUID();
-        private final UUID professionId = UUID.randomUUID();
-        private final UUID skillId = UUID.randomUUID();
 
         private TrainingSession sessionWithQuestions(List<TrainingQuestion> questions) {
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
@@ -1397,57 +1196,19 @@ class TrainingServiceTest {
             return session;
         }
 
-        private void stubProfessionAndSkillFound() {
-            ProfessionDict professionDict = ProfessionDict.builder().id(professionId).name(PROFESSION).build();
-            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.of(professionDict));
-            SkillDict skillDict = SkillDict.builder().id(skillId).name(SKILL).build();
-            when(skillDictRepository.findByProfessionIdAndMatchKey(professionId, DictText.matchKey(SKILL)))
-                    .thenReturn(Optional.of(skillDict));
-        }
-
         @Test
-        @DisplayName("Банк выдал ровно missing вопросов - LLM не вызывается вовсе")
-        void addsQuestionsEntirelyFromBankWithoutCallingLlm() {
-            // given
-            List<TrainingQuestion> existing = IntStream.rangeClosed(1, 5).mapToObj(i -> aQuestion(i)).toList();
-            TrainingSession session = sessionWithQuestions(existing);
-            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
-
-            List<BankQuestion> bank = bankQuestions(TrainingService.QUESTION_CAP);
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-
-            TrainingSessionResponse expectedResponse = mock(TrainingSessionResponse.class);
-            when(trainingWriter.appendQuestions(sessionId, bank, List.of())).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.addQuestions(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verifyNoInteractions(llmService);
-            verify(trainingWriter).appendQuestions(sessionId, bank, List.of());
-        }
-
-        @Test
-        @DisplayName("Банк выдал часть вопросов (6 из 10 missing) - LLM добирает остаток, existingQuestions - все заданные плюс только что отобранные банковские")
-        void addsQuestionsPartiallyFromBankAndLlm() {
+        @DisplayName("LLM просят QUESTION_CAP вопросов, existingQuestions - тексты всех заданных вопросов, в writer уходят сгенерированные")
+        void requestsBatchWithAllAskedQuestionsFromLlm() {
             // given
             List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3), aQuestion(4), aQuestion(5));
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
 
-            List<BankQuestion> bank = bankQuestions(6);
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
-
-            List<String> generated = List.of("Новый 1", "Новый 2", "Новый 3", "Новый 4");
+            List<String> generated = generatedQuestions(TrainingService.QUESTION_CAP);
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = mock(TrainingSessionResponse.class);
-            when(trainingWriter.appendQuestions(sessionId, bank, generated)).thenReturn(expectedResponse);
+            when(trainingWriter.appendQuestions(sessionId, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.addQuestions(sessionId, userId);
@@ -1462,39 +1223,11 @@ class TrainingServiceTest {
             assertThat(llmRequest.skill()).isEqualTo(SKILL);
             assertThat(llmRequest.profession()).isEqualTo(PROFESSION);
             assertThat(llmRequest.level()).isEqualTo("medium");
-            assertThat(llmRequest.count()).isEqualTo(4);
-            assertThat(llmRequest.existingQuestions()).containsExactlyElementsOf(
-                    Stream.concat(existing.stream().map(TrainingQuestion::getText), bank.stream().map(BankQuestion::getText))
-                            .toList());
+            assertThat(llmRequest.count()).isEqualTo(TrainingService.QUESTION_CAP);
+            assertThat(llmRequest.existingQuestions())
+                    .containsExactlyElementsOf(existing.stream().map(TrainingQuestion::getText).toList());
 
-            verify(trainingWriter).appendQuestions(sessionId, bank, generated);
-        }
-
-        @Test
-        @DisplayName("Профессии нет в словаре - банк не опрашивается вовсе, вопросы даёт только LLM")
-        void addsQuestionsOnlyFromLlmWhenProfessionNotInDictionary() {
-            // given
-            List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
-            TrainingSession session = sessionWithQuestions(existing);
-            when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            when(professionDictRepository.findByMatchKey(DictText.matchKey(PROFESSION))).thenReturn(Optional.empty());
-
-            List<String> generated = IntStream.rangeClosed(1, TrainingService.QUESTION_CAP)
-                    .mapToObj(i -> "Сгенерированный " + i)
-                    .toList();
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
-
-            TrainingSessionResponse expectedResponse = mock(TrainingSessionResponse.class);
-            when(trainingWriter.appendQuestions(sessionId, List.of(), generated)).thenReturn(expectedResponse);
-
-            // when
-            var result = trainingService.addQuestions(sessionId, userId);
-
-            // then
-            assertThat(result).isEqualTo(expectedResponse);
-            verifyNoInteractions(questionBankRepository);
-            verify(skillDictRepository, never()).findByProfessionIdAndMatchKey(any(), any());
-            verify(trainingWriter).appendQuestions(sessionId, List.of(), generated);
+            verify(trainingWriter).appendQuestions(sessionId, generated);
         }
 
         @Test
@@ -1504,53 +1237,49 @@ class TrainingServiceTest {
             List<TrainingQuestion> existing = IntStream.rangeClosed(1, 45).mapToObj(i -> aQuestion(i)).toList();
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
 
-            List<BankQuestion> bank = bankQuestions(5);
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, 5)).thenReturn(bank);
+            List<String> generated = generatedQuestions(5);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
 
             TrainingSessionResponse expectedResponse = mock(TrainingSessionResponse.class);
-            when(trainingWriter.appendQuestions(sessionId, bank, List.of())).thenReturn(expectedResponse);
+            when(trainingWriter.appendQuestions(sessionId, generated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.addQuestions(sessionId, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(questionBankRepository).sampleUnseen(professionId, skillId, "MEDIUM", userId, 5);
-            verifyNoInteractions(llmService);
+            ArgumentCaptor<LlmTrainingQuestionsRequest> captor =
+                    ArgumentCaptor.forClass(LlmTrainingQuestionsRequest.class);
+            verify(llmService).generateTrainingQuestions(captor.capture());
+            assertThat(captor.getValue().count()).isEqualTo(5);
         }
 
         @Test
-        @DisplayName("LLM вернул больше вопросов, чем не хватает до missing - обрезается по limit")
+        @DisplayName("LLM вернул больше вопросов, чем осталось до MAX_QUESTIONS - обрезается по limit")
         void trimsExtraLlmQuestionsToMissingLimit() {
             // given
-            List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2));
+            List<TrainingQuestion> existing = IntStream.rangeClosed(1, 45).mapToObj(i -> aQuestion(i)).toList();
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
 
-            List<BankQuestion> bank = bankQuestions(8);
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(bank);
+            List<String> llmQuestions = generatedQuestions(7);
+            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(llmQuestions));
 
-            when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(
-                    List.of("Годный 1", "Годный 2", "Лишний 3")));
-
-            List<String> expectedGenerated = List.of("Годный 1", "Годный 2");
+            List<String> expectedGenerated = llmQuestions.subList(0, 5);
             TrainingSessionResponse expectedResponse = mock(TrainingSessionResponse.class);
-            when(trainingWriter.appendQuestions(sessionId, bank, expectedGenerated)).thenReturn(expectedResponse);
+            when(trainingWriter.appendQuestions(sessionId, expectedGenerated)).thenReturn(expectedResponse);
 
             // when
             var result = trainingService.addQuestions(sessionId, userId);
 
             // then
             assertThat(result).isEqualTo(expectedResponse);
-            verify(trainingWriter).appendQuestions(sessionId, bank, expectedGenerated);
+            verify(trainingWriter).appendQuestions(sessionId, expectedGenerated);
         }
 
         @Test
-        @DisplayName("Сессия не найдена - NotFoundException, словари/банк/LLM/writer не трогаются")
+        @DisplayName("Сессия не найдена - NotFoundException, словари/LLM/writer не трогаются")
         void throwsWhenSessionNotFound() {
             // given
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.empty());
@@ -1559,7 +1288,7 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
@@ -1573,11 +1302,11 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessage("Session not found");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
-        @DisplayName("Сессия уже завершена - ConflictException, словари/банк/LLM/writer не трогаются")
+        @DisplayName("Сессия уже завершена - ConflictException, словари/LLM/writer не трогаются")
         void throwsWhenSessionCompleted() {
             // given
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
@@ -1588,11 +1317,11 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Session already finished");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
-        @DisplayName("Вопросов уже MAX_QUESTIONS - ConflictException, словари/банк/LLM/writer не трогаются")
+        @DisplayName("Вопросов уже MAX_QUESTIONS - ConflictException, словари/LLM/writer не трогаются")
         void throwsWhenQuestionLimitReached() {
             // given
             List<TrainingQuestion> existing = IntStream.rangeClosed(1, TrainingService.MAX_QUESTIONS)
@@ -1605,11 +1334,11 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Question limit reached");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
-        @DisplayName("Остался неотвеченный вопрос - ConflictException, словари/банк/LLM/writer не трогаются")
+        @DisplayName("Остался неотвеченный вопрос - ConflictException, словари/LLM/writer не трогаются")
         void throwsWhenUnansweredQuestionsLeft() {
             // given
             TrainingQuestion unanswered = TrainingQuestion.builder()
@@ -1621,19 +1350,16 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(ConflictException.class)
                     .hasMessage("Unanswered questions left");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул null-список - ConflictException (нечего добавить), writer не вызывается")
-        void throwsConflictWhenBankEmptyAndLlmReturnsNullList() {
+        @DisplayName("LLM вернул null-список - ConflictException (нечего добавить), writer не вызывается")
+        void throwsConflictWhenLlmReturnsNullList() {
             // given
             List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(null));
 
             // when / then
@@ -1644,15 +1370,12 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Банк пуст и LLM вернул только blank-строки - ConflictException (нечего добавить)")
-        void throwsConflictWhenBankEmptyAndLlmReturnsOnlyBlankStrings() {
+        @DisplayName("LLM вернул только blank-строки - ConflictException (нечего добавить)")
+        void throwsConflictWhenLlmReturnsOnlyBlankStrings() {
             // given
             List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             when(llmService.generateTrainingQuestions(any()))
                     .thenReturn(new LlmTrainingQuestions(Arrays.asList("", "   ", null)));
 
@@ -1677,7 +1400,7 @@ class TrainingServiceTest {
             assertThatThrownBy(() -> trainingService.addQuestions(sessionId, userId))
                     .isInstanceOf(PaymentRequiredException.class)
                     .hasMessage("Not enough limits");
-            verifyNoInteractions(llmService, trainingWriter, questionBankRepository, professionDictRepository, skillDictRepository);
+            verifyNoInteractions(llmService, trainingWriter, professionDictRepository, skillDictRepository);
         }
 
         @Test
@@ -1687,14 +1410,11 @@ class TrainingServiceTest {
             List<TrainingQuestion> existing = List.of(aQuestion(1), aQuestion(2), aQuestion(3));
             TrainingSession session = sessionWithQuestions(existing);
             when(trainingSessionRepository.findWithQuestionsById(sessionId)).thenReturn(Optional.of(session));
-            stubProfessionAndSkillFound();
-            when(questionBankRepository.sampleUnseen(professionId, skillId, "MEDIUM", userId, TrainingService.QUESTION_CAP))
-                    .thenReturn(List.of());
             List<String> generated = IntStream.rangeClosed(1, TrainingService.QUESTION_CAP)
                     .mapToObj(i -> "Сгенерированный " + i)
                     .toList();
             when(llmService.generateTrainingQuestions(any())).thenReturn(new LlmTrainingQuestions(generated));
-            when(trainingWriter.appendQuestions(sessionId, List.of(), generated))
+            when(trainingWriter.appendQuestions(sessionId, generated))
                     .thenReturn(mock(TrainingSessionResponse.class));
 
             // when
@@ -2160,20 +1880,20 @@ class TrainingServiceTest {
         }
 
         @Test
-        @DisplayName("Не разблокирован, банковый вопрос (есть готовый ответ) - разблокирует без LLM")
-        void unlocksBankQuestionAnswerWithoutLlm() {
+        @DisplayName("Не разблокирован, ответ уже сохранён - разблокирует без LLM")
+        void unlocksStoredAnswerWithoutLlm() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
             TrainingSession session = aSession(sessionId, userId, PROFESSION);
-            TrainingQuestion question = aQuestionWithSession(session, "Готовый ответ из банка");
+            TrainingQuestion question = aQuestionWithSession(session, "Сохранённый ответ");
             when(trainingQuestionRepository.findWithSessionById(question.getId())).thenReturn(Optional.of(question));
 
             // when
             ReferenceAnswerResponse result = trainingService.getReferenceAnswer(sessionId, question.getId(), userId);
 
             // then
-            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Готовый ответ из банка"));
+            assertThat(result).isEqualTo(new ReferenceAnswerResponse("Сохранённый ответ"));
             verify(limitService).requirePaid(userId);
             verify(trainingWriter).unlockReferenceAnswer(question.getId(), userId);
             verify(trainingWriter, never()).saveReferenceAnswer(any(), any());

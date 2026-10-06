@@ -70,8 +70,8 @@ public class TrainingSession {
 
     /**
      * Уровень сложности вопросов, а не грейд должности: тренажёр рассчитан и на профессии вне IT.
-     * Имя константы хранится в БД (training.session.level, content.question_bank.levels), grade
-     * уходит в промпт генератора вопросов, label - наружу в API.
+     * Имя константы хранится в БД (training.session.level), grade уходит в промпт генератора вопросов,
+     * label - наружу в API.
      */
     @Getter
     public enum Level {

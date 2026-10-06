@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.openai.client.OpenAIClient;
+import com.openai.core.JsonValue;
 import com.openai.core.http.Headers;
 import com.openai.core.http.StreamResponse;
 import com.openai.errors.BadRequestException;
@@ -20,6 +21,7 @@ import com.openai.models.ReasoningEffort;
 import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionChunk.Choice.FinishReason;
+import com.openai.models.chat.completions.ChatCompletionContentPart;
 import com.openai.models.chat.completions.ChatCompletionMessageParam;
 import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import com.openai.models.completions.CompletionUsage;
@@ -27,6 +29,7 @@ import com.openai.services.blocking.ChatService;
 import com.openai.services.blocking.chat.ChatCompletionService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +53,7 @@ class ClaudeClientTest {
 
     private static final String PROMPT = "Промпт агента";
     private static final String ANSWER_JSON = "{\"answer\":\"используйте индекс для поиска\"}";
+    private static final JsonValue CACHE_1H = JsonValue.from(Map.of("type", "ephemeral", "ttl", "1h"));
 
     @Mock
     OpenAIClient client;
@@ -58,7 +62,7 @@ class ClaudeClientTest {
     @Mock
     ChatCompletionService completionService;
 
-    private final ClaudeProperties props = new ClaudeProperties("claude-test-model", ReasoningEffort.MEDIUM);
+    private final ClaudeProperties props = new ClaudeProperties("claude-test-model", ReasoningEffort.MEDIUM, false);
 
     private ClaudeClient claudeClient;
 
@@ -71,6 +75,27 @@ class ClaudeClientTest {
 
     private static <T> StructuredChatCompletionCreateParams<T> anyParams() {
         return any();
+    }
+
+    private static ClaudeProperties markedProps() {
+        return new ClaudeProperties("claude-test-model", ReasoningEffort.MEDIUM, true);
+    }
+
+    private static ChatCompletionMessageParam assistantMessage(String text) {
+        return ChatCompletionMessageParam.ofAssistant(
+                ChatCompletionAssistantMessageParam.builder().content(text).build());
+    }
+
+    private static JsonValue cacheControl(ChatCompletionContentPart part) {
+        return part.asText()._additionalProperties().get("cache_control");
+    }
+
+    private List<ChatCompletionMessageParam> sentMessages() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<StructuredChatCompletionCreateParams<LlmTrainingReferenceAnswer>> paramsCaptor =
+                ArgumentCaptor.forClass(StructuredChatCompletionCreateParams.class);
+        verify(completionService).createStreaming(paramsCaptor.capture());
+        return paramsCaptor.getValue().rawParams().messages();
     }
 
     private LlmTrainingReferenceAnswer converse() {
@@ -107,6 +132,18 @@ class ClaudeClientTest {
     private static StreamResponse<ChatCompletionChunk> streamWithFinishAndUsageInOneChunk(String text) {
         List<ChatCompletionChunk> chunks = List.of(
                 chunk(List.of(choice(text, null))),
+                chunk(List.of(choice(null, FinishReason.STOP))).toBuilder().usage(usage()).build());
+        return streamResponse(chunks);
+    }
+
+    /**
+     * Поток, в котором завершающий чанк с причиной остановки приходит дважды: сначала без usage, затем
+     * повтором вместе с usage.
+     */
+    private static StreamResponse<ChatCompletionChunk> streamWithRepeatedFinishChunk(String text) {
+        List<ChatCompletionChunk> chunks = List.of(
+                chunk(List.of(choice(text, null))),
+                chunk(List.of(choice(null, FinishReason.STOP))),
                 chunk(List.of(choice(null, FinishReason.STOP))).toBuilder().usage(usage()).build());
         return streamResponse(chunks);
     }
@@ -161,6 +198,24 @@ class ClaudeClientTest {
 
             // then
             assertThat(result).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("Шлюз повторяет завершающий чанк, второй раз вместе с usage - ответ разбирается")
+        void parsesAnswerWhenFinishChunkIsRepeatedWithUsage() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            doReturn(streamWithRepeatedFinishChunk(ANSWER_JSON))
+                    .when(completionService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+
+            // when
+            var result = converse();
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(completionService, times(1))
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
         }
 
         @Test
@@ -308,6 +363,152 @@ class ClaudeClientTest {
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("Model not response");
+        }
+
+        @Test
+        @DisplayName("Без меток кэша ни одна часть не несёт cache_control, последняя реплика уходит строкой")
+        void sendsNoCacheControlAndPlainLastUserWhenMarksDisabled() {
+            // given
+            stubText(ANSWER_JSON);
+            List<ChatCompletionMessageParam> dialog = List.of(assistantMessage("Какой у вас опыт?"));
+
+            // when
+            claudeClient.converse(PROMPT, List.of("вводная", "анкета"), dialog, "Три года",
+                    LlmTrainingReferenceAnswer.class);
+
+            // then
+            var messages = sentMessages();
+            assertThat(messages).hasSize(3);
+            assertThat(messages.get(0).asUser().content().asArrayOfContentParts())
+                    .extracting(ClaudeClientTest::cacheControl)
+                    .hasSize(3)
+                    .containsOnlyNulls();
+            assertThat(messages.get(2).asUser().content().isText()).isTrue();
+            assertThat(messages.get(2).asUser().content().asText()).isEqualTo("Три года");
+        }
+    }
+
+    @Nested
+    @DisplayName("ConverseWithCacheMarks")
+    class ConverseWithCacheMarks {
+
+        private ClaudeClient markedClient;
+
+        @BeforeEach
+        void setUpMarkedClient() {
+            markedClient = new ClaudeClient(client, markedProps());
+        }
+
+        @Test
+        @DisplayName("Метка на каждой части первого сообщения и на последней реплике, история без изменений")
+        void marksOpeningPartsAndLastUserAndKeepsDialogAsIs() {
+            // given
+            stubText(ANSWER_JSON);
+            var assistant = assistantMessage("Какой у вас опыт?");
+            List<ChatCompletionMessageParam> dialog = List.of(assistant);
+
+            // when
+            markedClient.converse(PROMPT, List.of("вводная", "анкета"), dialog, "Три года",
+                    LlmTrainingReferenceAnswer.class);
+
+            // then
+            var messages = sentMessages();
+            assertThat(messages).hasSize(3);
+
+            var openingParts = messages.get(0).asUser().content().asArrayOfContentParts();
+            assertThat(openingParts).extracting(part -> part.asText().text())
+                    .containsExactly(PROMPT, "вводная", "анкета");
+            assertThat(openingParts).extracting(ClaudeClientTest::cacheControl)
+                    .containsExactly(CACHE_1H, CACHE_1H, CACHE_1H);
+
+            assertThat(messages.get(1)).isEqualTo(assistant);
+            assertThat(messages.get(1).asAssistant().content().orElseThrow().isText()).isTrue();
+
+            var last = messages.get(2).asUser().content();
+            assertThat(last.isText()).isFalse();
+            assertThat(last.asArrayOfContentParts()).hasSize(1);
+            assertThat(last.asArrayOfContentParts().getFirst().asText().text()).isEqualTo("Три года");
+            assertThat(cacheControl(last.asArrayOfContentParts().getFirst())).isEqualTo(CACHE_1H);
+        }
+
+        @Test
+        @DisplayName("Первый ход без реплики: одно сообщение, все его части с меткой")
+        void sendsOnlyMarkedFirstMessageOnFirstTurn() {
+            // given
+            stubText(ANSWER_JSON);
+
+            // when
+            markedClient.converse(PROMPT, List.of("вводная"), List.of(), null, LlmTrainingReferenceAnswer.class);
+
+            // then
+            var messages = sentMessages();
+            assertThat(messages).hasSize(1);
+            assertThat(messages.getFirst().asUser().content().asArrayOfContentParts())
+                    .hasSize(2)
+                    .extracting(ClaudeClientTest::cacheControl)
+                    .containsExactly(CACHE_1H, CACHE_1H);
+        }
+    }
+
+    @Nested
+    @DisplayName("Ask")
+    class Ask {
+
+        @Test
+        @DisplayName("Шлюз повторяет завершающий чанк, второй раз вместе с usage - ответ разбирается")
+        void parsesAnswerWhenFinishChunkIsRepeatedWithUsage() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            doReturn(streamWithRepeatedFinishChunk(ANSWER_JSON))
+                    .when(completionService)
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+
+            // when
+            var result = claudeClient.ask(PROMPT, "задача", LlmTrainingReferenceAnswer.class);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(completionService, times(1))
+                    .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+        }
+
+        @Test
+        @DisplayName("С метками: промпт с меткой, вводная task без метки")
+        void marksOnlyPromptWhenMarksEnabled() {
+            // given
+            stubText(ANSWER_JSON);
+            var markedClient = new ClaudeClient(client, markedProps());
+
+            // when
+            markedClient.ask(PROMPT, "задача", LlmTrainingReferenceAnswer.class);
+
+            // then
+            var messages = sentMessages();
+            assertThat(messages).hasSize(1);
+            var parts = messages.getFirst().asUser().content().asArrayOfContentParts();
+            assertThat(parts).extracting(part -> part.asText().text()).containsExactly(PROMPT, "задача");
+            assertThat(cacheControl(parts.get(0))).isEqualTo(CACHE_1H);
+            assertThat(cacheControl(parts.get(1))).isNull();
+        }
+
+        @Test
+        @DisplayName("Без меток: обе части без cache_control")
+        void sendsNoCacheControlWhenMarksDisabled() {
+            // given
+            stubText(ANSWER_JSON);
+
+            // when
+            claudeClient.ask(PROMPT, "задача", LlmTrainingReferenceAnswer.class);
+
+            // then
+            var messages = sentMessages();
+            assertThat(messages).hasSize(1);
+            assertThat(messages.getFirst().asUser().content().asArrayOfContentParts())
+                    .extracting(part -> part.asText().text())
+                    .containsExactly(PROMPT, "задача");
+            assertThat(messages.getFirst().asUser().content().asArrayOfContentParts())
+                    .extracting(ClaudeClientTest::cacheControl)
+                    .containsOnlyNulls();
         }
     }
 }

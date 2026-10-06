@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "llm.claude")
 public record ClaudeProperties(
         String model,
-        ReasoningEffort effort
+        ReasoningEffort effort,
+        boolean cacheMarks
 ) {
 }

@@ -127,7 +127,7 @@ export function TopUpCard({
         </div>
 
         <div className="contents sm:block sm:min-w-0 sm:text-right">
-          <p className="text-ink min-w-0 text-right text-[28px] leading-none font-extrabold tracking-[-0.03em] tabular-nums sm:text-[36px]">
+          <p className="text-ink min-w-0 text-right text-[28px] leading-none font-semibold tracking-[-0.03em] tabular-nums sm:text-[36px]">
             {rub(quote.amount)} ₽
           </p>
           <p

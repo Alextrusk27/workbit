@@ -175,7 +175,7 @@ export function BrandPage() {
           </div>
           <div>
             <Eyebrow>Числа</Eyebrow>
-            <p className="text-ink mt-3 text-[34px] font-extrabold tracking-[-0.02em] tabular-nums">
+            <p className="text-ink mt-3 text-[34px] font-semibold tracking-[-0.02em] tabular-nums">
               4,2{' '}
               <span className="text-muted text-[17px] font-medium">/ 5</span>
             </p>

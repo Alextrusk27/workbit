@@ -141,7 +141,7 @@ function BalanceCard({ balance }: { balance: Balance }) {
         <p className="mt-2">
           <span
             className={cn(
-              'text-[28px] font-extrabold tracking-[-0.02em] tabular-nums',
+              'text-[28px] font-semibold tracking-[-0.02em] tabular-nums',
               low ? 'text-star' : 'text-ink',
             )}
           >

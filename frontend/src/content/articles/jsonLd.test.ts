@@ -9,6 +9,8 @@ const entry: ArticleEntry = {
   slug: 's',
   name: 'Статья',
   published: '2026-10-01',
+  readingMinutes: 1,
+  teaser: 'Анонс статьи',
   title: 'Заголовок | Workbit',
   description: 'Описание статьи',
   load: async () => ({ article }),

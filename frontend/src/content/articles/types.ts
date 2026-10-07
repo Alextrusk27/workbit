@@ -29,6 +29,8 @@ export interface ArticleEntry extends PageSeo {
   slug: string
   name: string
   published: string
+  readingMinutes: number
+  teaser: string
   load: () => Promise<{ article: Article }>
 }
 

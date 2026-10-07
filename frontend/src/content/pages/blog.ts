@@ -6,6 +6,14 @@ export interface BlogContent {
   back: string
   author: string
   empty: string
+  minutes: string
+  search: {
+    label: string
+    placeholder: string
+    emptyTitle: string
+    emptyText: string
+  }
+  view: { label: string; list: string; tiles: string }
 }
 
 export const seo: PageSeo = {
@@ -24,4 +32,12 @@ export const blog: BlogContent = {
   back: 'Блог',
   author: 'Команда Workbit',
   empty: 'В этой рубрике пока пусто, статьи появятся скоро.',
+  minutes: 'мин',
+  search: {
+    label: 'Поиск по профессии',
+    placeholder: 'Найти профессию',
+    emptyTitle: 'Такой профессии пока нет',
+    emptyText: 'Попробуй другое название или посмотри все статьи.',
+  },
+  view: { label: 'Вид списка', list: 'Списком', tiles: 'Плитками' },
 }

@@ -30,28 +30,33 @@ export function BlogPage() {
 
       <section className="pb-10 sm:pb-16">
         <Container>
-          <div
-            className="flex flex-wrap gap-2.5"
-            role="group"
-            aria-label="Рубрики"
-          >
-            <Chip selected={rubric === null} onClick={() => setRubric(null)}>
-              {blog.all}
-            </Chip>
-            {Object.entries(rubrics).map(([key, r]) => (
-              <Chip
-                key={key}
-                selected={rubric === key}
-                onClick={() => setRubric(key)}
+          <ArticleTiles
+            tiles={tiles}
+            empty={blog.empty}
+            filters={
+              <div
+                className="flex flex-wrap gap-2.5"
+                role="group"
+                aria-label="Рубрики"
               >
-                {r.label}
-              </Chip>
-            ))}
-          </div>
-
-          <div className="mt-8">
-            <ArticleTiles tiles={tiles} empty={blog.empty} />
-          </div>
+                <Chip
+                  selected={rubric === null}
+                  onClick={() => setRubric(null)}
+                >
+                  {blog.all}
+                </Chip>
+                {Object.entries(rubrics).map(([key, r]) => (
+                  <Chip
+                    key={key}
+                    selected={rubric === key}
+                    onClick={() => setRubric(key)}
+                  >
+                    {r.label}
+                  </Chip>
+                ))}
+              </div>
+            }
+          />
         </Container>
       </section>
     </>

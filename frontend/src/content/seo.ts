@@ -1,4 +1,5 @@
 import { rubrics } from '@/content/articles'
+import { articleJsonLd } from '@/content/articles/jsonLd'
 import { faq } from '@/content/faq'
 import { seo as aiInterviewSeo } from '@/content/pages/aiInterview'
 import { seo as blogSeo } from '@/content/pages/blog'
@@ -12,7 +13,7 @@ export const SITE = 'https://workbit.ru'
 export interface SeoPage extends PageSeo {
   path: string
   sources: string[]
-  jsonLd?: () => object[]
+  jsonLd?: () => object[] | Promise<object[]>
 }
 
 export const seoPages: SeoPage[] = [
@@ -82,16 +83,35 @@ export const seoPages: SeoPage[] = [
       ),
     ],
   },
+  ...Object.entries(rubrics).map(([rubric, { title, description }]) => ({
+    path: `/blog/${rubric}`,
+    title,
+    description,
+    sources: [
+      'frontend/src/content/articles/index.ts',
+      `frontend/src/content/articles/${rubric}/index.ts`,
+    ],
+  })),
   ...Object.entries(rubrics).flatMap(([rubric, { entries }]) =>
-    entries.map(({ slug, title, description }) => ({
-      path: `/blog/${rubric}/${slug}`,
-      title,
-      description,
-      sources: [
-        `frontend/src/content/articles/${rubric}/index.ts`,
-        `frontend/src/content/articles/${rubric}/${slug}.ts`,
-      ],
-    })),
+    entries.map((entry) => {
+      const path = `/blog/${rubric}/${entry.slug}`
+      return {
+        path,
+        title: entry.title,
+        description: entry.description,
+        sources: [
+          `frontend/src/content/articles/${rubric}/index.ts`,
+          `frontend/src/content/articles/${rubric}/${entry.slug}.ts`,
+        ],
+        jsonLd: async () =>
+          articleJsonLd(
+            SITE,
+            `${SITE}${path}`,
+            entry,
+            (await entry.load()).article,
+          ),
+      }
+    }),
   ),
   {
     path: '/privacy',

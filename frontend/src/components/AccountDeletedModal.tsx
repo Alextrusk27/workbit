@@ -73,7 +73,7 @@ export function AccountDeletedModal() {
             )}
           >
             <CheckCircle />
-            <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+            <h3 className="text-ink mt-[18px] text-[20px] font-semibold">
               Аккаунт удалён
             </h3>
             <Button autoFocus className="mt-5 w-full" onClick={close}>

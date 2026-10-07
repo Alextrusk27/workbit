@@ -9,7 +9,7 @@ export function Logo({ className }: LogoProps) {
     <span
       translate="no"
       className={cn(
-        'text-ink text-[26px] leading-none font-extrabold tracking-[-0.02em]',
+        'text-ink font-display text-[26px] leading-none font-extrabold tracking-[-0.02em]',
         className,
       )}
     >

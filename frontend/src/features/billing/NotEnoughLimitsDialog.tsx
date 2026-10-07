@@ -73,7 +73,7 @@ export function NotEnoughLimitsDialog({
             <span className="bg-indigo/14 text-indigo mx-auto flex size-14 items-center justify-center rounded-full text-[26px]">
               <LimitIcon />
             </span>
-            <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+            <h3 className="text-ink mt-[18px] text-[20px] font-semibold">
               Не хватает лимитов
             </h3>
             <Button autoFocus className="mt-5 w-full" onClick={topUp}>

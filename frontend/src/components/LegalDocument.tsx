@@ -5,7 +5,7 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 
 const components: Components = {
   h1: ({ children }) => (
-    <h1 className="text-ink mt-4 text-[clamp(32px,4.5vw,44px)] font-extrabold tracking-[-0.03em]">
+    <h1 className="text-ink mt-4 text-[clamp(32px,4.5vw,44px)] font-semibold tracking-[-0.03em]">
       {children}
     </h1>
   ),

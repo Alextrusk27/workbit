@@ -5,10 +5,12 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/app/queryClient'
 import { router } from '@/app/router'
 import './index.css'
-import interCyr from '@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2?url'
-import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url'
+import golosCyr from '@fontsource-variable/golos-text/files/golos-text-cyrillic-wght-normal.woff2?url'
+import golosLatin from '@fontsource-variable/golos-text/files/golos-text-latin-wght-normal.woff2?url'
+import geologicaCyr from '@fontsource-variable/geologica/files/geologica-cyrillic-wght-normal.woff2?url'
+import geologicaLatin from '@fontsource-variable/geologica/files/geologica-latin-wght-normal.woff2?url'
 
-for (const href of [interCyr, interLatin]) {
+for (const href of [golosCyr, golosLatin, geologicaCyr, geologicaLatin]) {
   const l = document.createElement('link')
   l.rel = 'preload'
   l.as = 'font'

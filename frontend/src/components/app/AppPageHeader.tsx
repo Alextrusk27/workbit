@@ -35,7 +35,7 @@ export function AppPageHeader({
           {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <h1
             className={cn(
-              'text-ink text-[24px] font-extrabold sm:text-[clamp(28px,3.6vw,38px)]',
+              'text-ink text-[24px] font-semibold sm:text-[clamp(28px,3.6vw,38px)]',
               eyebrow && 'mt-2.5',
             )}
           >

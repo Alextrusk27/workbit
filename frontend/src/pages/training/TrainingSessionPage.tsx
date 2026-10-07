@@ -295,7 +295,7 @@ function CurrentQuestion({
       <Eyebrow className="tracking-[0.08em]">
         Вопрос {question.orderIndex}
       </Eyebrow>
-      <h1 className="text-ink mt-2 text-lg leading-snug font-bold break-words sm:text-[21px]">
+      <h1 className="text-ink mt-2 text-lg leading-snug font-semibold break-words sm:text-[21px]">
         {question.questionText}
       </h1>
 
@@ -361,8 +361,8 @@ function FinishBar({
           Формируем разбор…
         </p>
         <p className="text-muted mx-auto mt-2.5 max-w-[46ch] text-sm">
-          Рецензент читает твои ответы и оценивает их. Это может занять
-          несколько секунд.
+          Рецензент читает твои ответы и оценивает их. Это займёт около 30
+          секунд.
         </p>
       </div>
     )

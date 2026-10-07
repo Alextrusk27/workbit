@@ -46,7 +46,7 @@ export const seo: PageSeo = {
 export const aiInterview: AiInterviewContent = {
   hero: {
     lead: 'Собеседование с нейросетью',
-    accent: 'по твоей вакансии',
+    accent: 'по реальной вакансии',
     breakBeforeAccent: true,
     text: '**Пробное интервью по ссылке с hh.ru:** полная сессия из вопросов под требования вакансии.',
     note: 'Первое интервью бесплатно',

@@ -110,7 +110,7 @@ export function LimitsCreditedModal({
             {pending ? (
               <>
                 <PendingCircle />
-                <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+                <h3 className="text-ink mt-[18px] text-[20px] font-semibold">
                   Проверяем оплату
                 </h3>
                 <p role="status" className="text-muted mt-2 text-[14.5px]">
@@ -121,7 +121,7 @@ export function LimitsCreditedModal({
             ) : (
               <>
                 <CheckCircle />
-                <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+                <h3 className="text-ink mt-[18px] text-[20px] font-semibold">
                   {title}
                 </h3>
                 <CreditedSummary footnote={footnote} />

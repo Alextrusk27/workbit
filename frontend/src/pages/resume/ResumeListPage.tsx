@@ -189,7 +189,7 @@ function EmptyState({
 }) {
   return (
     <DropZone disabled={pending} onDropFile={onDropFile} className="p-10">
-      <h2 className="text-ink text-xl font-bold">Пока нет резюме</h2>
+      <h2 className="text-ink text-xl font-semibold">Пока нет резюме</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
         Перетащи сюда резюме в PDF, DOCX или TXT или выбери файл кнопкой. Оно
         будет храниться здесь, и видишь его только ты.

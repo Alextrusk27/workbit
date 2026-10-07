@@ -73,7 +73,7 @@ export function ConfirmDialog({
             aria-label={title}
             className={cn(modalPanelClasses, 'w-full max-w-[420px]')}
           >
-            <h3 className="text-ink text-[17px] font-bold">{title}</h3>
+            <h3 className="text-ink text-[17px] font-semibold">{title}</h3>
             <p className="text-dim mt-2.5 text-[13.5px] leading-[1.55]">
               {text}
             </p>

@@ -25,8 +25,10 @@ export function PlanCard({
         className,
       )}
     >
-      <Heading className="text-ink text-[22px] font-bold">{plan.name}</Heading>
-      <p className="text-ink mt-4.5 text-[40px] leading-none font-extrabold tracking-[-0.03em] tabular-nums">
+      <Heading className="text-ink text-[22px] font-semibold">
+        {plan.name}
+      </Heading>
+      <p className="text-ink mt-4.5 text-[40px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
         {plan.price}
       </p>
       <ul className="mt-5.5 flex grow flex-col gap-2.5">

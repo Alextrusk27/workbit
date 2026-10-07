@@ -31,10 +31,10 @@ function escapeAttr(value) {
 
 function fontPreloads() {
   const files = readdirSync(join(dist, 'assets')).filter((f) =>
-    /^inter-(cyrillic|latin)-wght-normal-.*\.woff2$/.test(f),
+    /^(golos-text|geologica)-(cyrillic|latin)-wght-normal-.*\.woff2$/.test(f),
   )
-  if (files.length !== 2) {
-    throw new Error(`Expected 2 font files to preload, found: ${files}`)
+  if (files.length !== 4) {
+    throw new Error(`Expected 4 font files to preload, found: ${files}`)
   }
   return files
     .map(
@@ -62,7 +62,7 @@ function pageHtml(base, { title, description, headExtra, appHtml }) {
   return html.replace(ROOT_MARKER, `<div id="root">${appHtml}</div>`)
 }
 
-function metaBlock(page, canonical) {
+async function metaBlock(page, canonical) {
   const lines = [
     `    <link rel="canonical" href="${canonical}" />`,
     `    <meta property="og:type" content="website" />`,
@@ -76,7 +76,7 @@ function metaBlock(page, canonical) {
     `    <meta property="og:image:height" content="630" />`,
     `    <meta name="twitter:card" content="summary_large_image" />`,
   ]
-  for (const obj of page.jsonLd ? page.jsonLd() : []) {
+  for (const obj of page.jsonLd ? await page.jsonLd() : []) {
     const json = JSON.stringify(obj).replaceAll('<', '\\u003c')
     lines.push(`    <script type="application/ld+json">${json}</script>`)
   }
@@ -121,7 +121,7 @@ for (const page of seoPages) {
   const html = pageHtml(base, {
     title: page.title,
     description: page.description,
-    headExtra: metaBlock(page, canonical),
+    headExtra: await metaBlock(page, canonical),
     appHtml: await render(page.path),
   })
   const target =

@@ -45,5 +45,6 @@ CLAUDE.md
 .agents/
 ai-workspace/
 .mcp.json
+skills-lock.json
 
 .playwright-mcp/

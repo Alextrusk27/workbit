@@ -5,7 +5,6 @@ export const interviewQuestions: ArticleEntry[] = [
   {
     slug: 'sales-manager',
     name: 'Менеджер по продажам',
-    cover: '/images/blog/sales-manager.webp',
     published: '2026-09-15',
     title:
       'Вопросы на собеседовании менеджера по продажам: что спрашивают и как отвечать | Workbit',

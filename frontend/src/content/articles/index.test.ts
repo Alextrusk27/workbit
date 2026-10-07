@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findArticle, rubrics } from './index'
+import { findArticle, findRubric, rubrics } from './index'
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
@@ -28,5 +28,14 @@ describe('реестр статей', () => {
     expect(findArticle('news', 'sales-manager')).toBeUndefined()
     expect(findArticle('interview-questions', 'nope')).toBeUndefined()
     expect(findArticle()).toBeUndefined()
+  })
+
+  it('findRubric даёт undefined для неизвестной рубрики и ключей прототипа', () => {
+    expect(findRubric('interview-questions')).toBe(
+      rubrics['interview-questions'],
+    )
+    expect(findRubric('news')).toBeUndefined()
+    expect(findRubric('constructor')).toBeUndefined()
+    expect(findRubric()).toBeUndefined()
   })
 })

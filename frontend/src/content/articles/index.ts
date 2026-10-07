@@ -8,6 +8,10 @@ export const rubrics: Record<string, Rubric> = {
   },
 }
 
+export function findRubric(rubric = ''): Rubric | undefined {
+  return Object.hasOwn(rubrics, rubric) ? rubrics[rubric] : undefined
+}
+
 export function findArticle(rubric = '', slug = ''): ArticleEntry | undefined {
-  return rubrics[rubric]?.entries.find((a) => a.slug === slug)
+  return findRubric(rubric)?.entries.find((a) => a.slug === slug)
 }

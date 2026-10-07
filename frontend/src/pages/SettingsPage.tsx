@@ -28,7 +28,7 @@ export function SettingsPage() {
       </AppPageHeader>
 
       <section className="mt-10">
-        <h2 className="text-ink text-[21px] font-bold">Оформление</h2>
+        <h2 className="text-ink text-[21px] font-semibold">Оформление</h2>
         <p className="text-muted mt-2 text-sm">
           Тема сохраняется в этом браузере.
         </p>
@@ -53,7 +53,7 @@ function DeleteAccountSection() {
 
   return (
     <section>
-      <h2 className="text-ink text-lg font-bold sm:text-[21px]">
+      <h2 className="text-ink text-lg font-semibold sm:text-[21px]">
         Удаление аккаунта
       </h2>
       <p className="text-muted mt-2 max-w-[48ch] text-sm">{DELETE_WARNING}</p>

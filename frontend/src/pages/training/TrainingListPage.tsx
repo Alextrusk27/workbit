@@ -138,7 +138,7 @@ function SessionListSkeleton() {
 function EmptyState() {
   return (
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
-      <h2 className="text-ink text-xl font-bold">Пока нет тренировок</h2>
+      <h2 className="text-ink text-xl font-semibold">Пока нет тренировок</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
         Запусти первую тренировку — рецензент подберёт вопросы под навык и
         уровень, а в конце разберёт твои ответы.

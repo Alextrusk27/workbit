@@ -87,7 +87,7 @@ export function BrandPage() {
 
       <header className="mt-8">
         <Eyebrow>Брендбук</Eyebrow>
-        <h1 className="text-ink mt-4 text-[clamp(32px,4.5vw,48px)] font-extrabold tracking-[-0.03em]">
+        <h1 className="text-ink mt-4 text-[clamp(32px,4.5vw,48px)] font-semibold tracking-[-0.03em]">
           Тёмный <span className="text-grad">AI-SaaS</span>
         </h1>
         <p className="text-muted mt-5 max-w-xl text-lg">
@@ -152,16 +152,16 @@ export function BrandPage() {
       <Section title="Типографика">
         <div className="space-y-10">
           <div>
-            <Eyebrow>Inter · заголовки</Eyebrow>
-            <p className="text-ink mt-3 text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
+            <Eyebrow>Geologica · заголовки</Eyebrow>
+            <p className="text-ink font-display mt-3 text-[clamp(38px,5vw,58px)] leading-[1.08] font-semibold tracking-[-0.03em]">
               Тренажёр <span className="text-grad">собеседований</span>
             </p>
-            <p className="text-ink mt-3 text-[clamp(28px,3.6vw,40px)]">
+            <p className="text-ink font-display mt-3 text-[clamp(28px,3.6vw,40px)]">
               Как проходит сессия
             </p>
           </div>
           <div>
-            <Eyebrow>Inter · текст</Eyebrow>
+            <Eyebrow>Golos Text · текст</Eyebrow>
             <p className="text-ink mt-3 text-lg">
               Реалистичные вопросы под твою профессию и уровень, разбор каждого
               ответа и вероятность оффера.
@@ -175,7 +175,7 @@ export function BrandPage() {
           </div>
           <div>
             <Eyebrow>Числа</Eyebrow>
-            <p className="text-ink mt-3 text-[34px] font-extrabold tracking-[-0.02em] tabular-nums">
+            <p className="text-ink mt-3 text-[34px] font-semibold tracking-[-0.02em] tabular-nums">
               4,2{' '}
               <span className="text-muted text-[17px] font-medium">/ 5</span>
             </p>

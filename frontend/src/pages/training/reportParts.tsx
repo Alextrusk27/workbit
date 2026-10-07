@@ -29,7 +29,7 @@ export function QuestionEntry({
   return (
     <div>
       <Eyebrow className="tracking-[0.08em]">Вопрос {orderIndex}</Eyebrow>
-      <h3 className="text-ink mt-2 text-lg leading-snug font-bold break-words">
+      <h3 className="text-ink mt-2 text-lg leading-snug font-semibold break-words">
         {questionText}
       </h3>
       <p className="text-muted mt-3 break-words whitespace-pre-wrap">
@@ -210,7 +210,7 @@ export function ReportSummary({
         <Eyebrow>Средний балл</Eyebrow>
         {avgScore != null ? (
           <>
-            <p className="text-ink mt-2.5 text-[28px] leading-none font-extrabold tracking-[-0.02em] tabular-nums sm:text-[34px]">
+            <p className="text-ink mt-2.5 text-[28px] leading-none font-semibold tracking-[-0.02em] tabular-nums sm:text-[34px]">
               {avgScore.toFixed(1).replace('.', ',')}
               <span className="text-muted ml-1 text-[17px] font-medium">
                 / 5

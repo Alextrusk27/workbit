@@ -144,7 +144,7 @@ function VacancyListSkeleton() {
 function EmptyState() {
   return (
     <div className="border-line rounded-xl border border-dashed p-10 text-center">
-      <h2 className="text-ink text-xl font-bold">Пока нет интервью</h2>
+      <h2 className="text-ink text-xl font-semibold">Пока нет интервью</h2>
       <p className="text-muted mx-auto mt-2 max-w-md text-sm">
         Вставь ссылку на вакансию с hh.ru — рецензент подберёт вопросы под неё,
         а в конце разберёт ответы и оценит шансы на оффер.

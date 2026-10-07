@@ -89,7 +89,7 @@ export function TrainingReportPage() {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-ink text-lg font-bold tracking-[-0.015em] sm:text-[21px]">
+        <h2 className="text-ink text-lg font-semibold tracking-[-0.015em] sm:text-[21px]">
           Ответы с пометками
         </h2>
         <ol className="mt-6">

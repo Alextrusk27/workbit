@@ -239,6 +239,9 @@ function SessionRun({ session }: { session: InterviewSession }) {
             <Spinner className="mr-2.5" />
             {closingRemark ?? 'Спасибо, это был последний вопрос.'} Формирую
             разбор: оценки по каждому ответу, правки и вероятность оффера…
+            <span className="text-muted mt-1.5 block text-[12.5px]">
+              Это займёт около 20 секунд.
+            </span>
           </ChatBubble>
         )}
       </ChatShell>

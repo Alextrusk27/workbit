@@ -134,7 +134,7 @@ export function AiInterviewPage() {
               {flow.steps.map((s, i) => (
                 <Reveal key={s.title} delay={i * 0.05} className="text-center">
                   <div className="flex justify-center">
-                    <span className="border-indigo/30 bg-pop grid size-12 place-items-center rounded-full border text-[19px] font-extrabold shadow-[0_4px_14px_rgba(99,102,241,0.12)]">
+                    <span className="border-indigo/30 bg-pop grid size-12 place-items-center rounded-full border text-[19px] font-semibold shadow-[0_4px_14px_rgba(99,102,241,0.12)]">
                       <span className="bg-[image:var(--grad-btn)] bg-clip-text text-transparent">
                         {i + 1}
                       </span>

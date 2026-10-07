@@ -34,7 +34,7 @@ export function QuestionEntry({
       ) : (
         <Eyebrow className="tracking-[0.08em]">Вопрос {orderIndex}</Eyebrow>
       )}
-      <h3 className="text-ink mt-2 text-lg leading-snug font-bold break-words">
+      <h3 className="text-ink mt-2 text-lg leading-snug font-semibold break-words">
         {questionText}
       </h3>
       <p className="text-muted mt-3 break-words whitespace-pre-wrap">

@@ -87,7 +87,7 @@ export function TopUpCard({
         className,
       )}
     >
-      <Heading className="text-ink pr-9 text-[20px] font-bold sm:text-[22px]">
+      <Heading className="text-ink pr-9 text-[20px] font-semibold sm:text-[22px]">
         {topUp.name}
       </Heading>
 

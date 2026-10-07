@@ -102,7 +102,7 @@ function RenameForm({
       <span className="bg-indigo/14 text-indigo mx-auto flex size-14 items-center justify-center rounded-full">
         <IconPencil className="size-[26px]" />
       </span>
-      <h3 className="text-ink mt-[18px] text-[20px] font-bold">
+      <h3 className="text-ink mt-[18px] text-[20px] font-semibold">
         Переименовать резюме
       </h3>
       <Field

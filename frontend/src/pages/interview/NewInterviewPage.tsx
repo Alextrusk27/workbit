@@ -39,7 +39,7 @@ function PreviewCard({ preview }: { preview: VacancyPreview }) {
   return (
     <div className="border-line bg-card rounded-xl border px-6 py-5.5">
       <Eyebrow>Вакансия</Eyebrow>
-      <h2 className="text-ink mt-2 text-[19px] font-bold tracking-[-0.01em] break-words">
+      <h2 className="text-ink mt-2 text-[19px] font-semibold tracking-[-0.01em] break-words">
         {preview.name}
       </h2>
       <dl className="mt-3.5 flex flex-col gap-1.5 text-sm">

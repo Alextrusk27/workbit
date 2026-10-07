@@ -100,7 +100,7 @@ export function HomePage() {
       <header className="glow-hero relative overflow-hidden pt-10 pb-12 sm:pt-24 sm:pb-20">
         <Container className="relative grid grid-cols-[minmax(0,1fr)] items-center gap-9 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
           <div className="max-sm:text-center">
-            <h1 className="text-ink text-[clamp(38px,5vw,58px)] leading-[1.08] font-extrabold tracking-[-0.03em]">
+            <h1 className="text-ink text-[clamp(38px,5vw,58px)] leading-[1.08] font-semibold tracking-[-0.03em]">
               <HeroTitle hero={hero} />
             </h1>
             <p className="text-muted mt-5.5 max-w-[48ch] text-lg max-sm:mx-auto">
@@ -130,7 +130,7 @@ export function HomePage() {
                 <div className="border-indigo/25 bg-indigo/12 text-indigo mb-4.5 grid size-11 place-items-center rounded-lg border">
                   <IconLink />
                 </div>
-                <h3 className="text-ink text-xl font-bold tracking-[-0.01em]">
+                <h3 className="text-ink text-xl font-semibold tracking-[-0.01em]">
                   {simulator.vacancy.title}
                 </h3>
                 <p className="text-muted mt-2 max-w-[52ch] text-[14.5px]">
@@ -149,7 +149,7 @@ export function HomePage() {
                 <div className="border-indigo/25 bg-indigo/12 text-indigo mb-4.5 grid size-11 place-items-center rounded-lg border">
                   <IconStar />
                 </div>
-                <h3 className="text-ink text-xl font-bold tracking-[-0.01em]">
+                <h3 className="text-ink text-xl font-semibold tracking-[-0.01em]">
                   {simulator.scoring.title}
                 </h3>
                 <p className="text-muted mt-2 text-[14.5px]">

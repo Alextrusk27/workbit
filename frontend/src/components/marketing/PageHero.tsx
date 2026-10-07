@@ -27,7 +27,7 @@ export function PageHero({
             </Link>
           </div>
         )}
-        <h1 className="text-ink text-[clamp(32px,4.5vw,48px)] leading-[1.1] font-extrabold tracking-[-0.03em]">
+        <h1 className="text-ink text-[clamp(32px,4.5vw,48px)] leading-[1.1] font-semibold tracking-[-0.03em]">
           {title}
         </h1>
         {children && (

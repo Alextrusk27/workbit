@@ -31,10 +31,10 @@ function escapeAttr(value) {
 
 function fontPreloads() {
   const files = readdirSync(join(dist, 'assets')).filter((f) =>
-    /^inter-(cyrillic|latin)-wght-normal-.*\.woff2$/.test(f),
+    /^(golos-text|geologica)-(cyrillic|latin)-wght-normal-.*\.woff2$/.test(f),
   )
-  if (files.length !== 2) {
-    throw new Error(`Expected 2 font files to preload, found: ${files}`)
+  if (files.length !== 4) {
+    throw new Error(`Expected 4 font files to preload, found: ${files}`)
   }
   return files
     .map(

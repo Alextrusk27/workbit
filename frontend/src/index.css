@@ -1,12 +1,22 @@
-@import '@fontsource-variable/inter';
+@import '@fontsource-variable/golos-text';
+@import '@fontsource-variable/geologica';
 @import 'tailwindcss';
 
 @font-face {
-  font-family: 'Inter Fallback';
+  font-family: 'Golos Text Fallback';
   src: local('Arial');
-  size-adjust: 107.4%;
-  ascent-override: 90.2%;
-  descent-override: 22.48%;
+  size-adjust: 105.62%;
+  ascent-override: 92.78%;
+  descent-override: 20.83%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Geologica Fallback';
+  src: local('Arial');
+  size-adjust: 109.22%;
+  ascent-override: 89.27%;
+  descent-override: 25.18%;
   line-gap-override: 0%;
 }
 
@@ -36,7 +46,11 @@
   --color-danger: #dc2626;
 
   --font-sans:
-    'Inter Variable', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+    'Golos Text Variable', 'Golos Text Fallback', system-ui, -apple-system,
+    sans-serif;
+  --font-display:
+    'Geologica Variable', 'Geologica Fallback', system-ui, -apple-system,
+    sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -144,7 +158,8 @@
   h2,
   h3,
   h4 {
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-weight: 600;
     line-height: 1.15;
     letter-spacing: -0.025em;
     text-wrap: balance;

@@ -18,7 +18,7 @@ export function inline(text: string): ReactNode {
       )
     } else if (label !== undefined) {
       nodes.push(
-        href.startsWith('/') ? (
+        href.startsWith('/') || href.startsWith('#') ? (
           <Link key={m.index} to={href} className={LINK}>
             {label}
           </Link>

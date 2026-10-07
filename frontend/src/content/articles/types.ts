@@ -16,6 +16,7 @@ export interface Article {
   hero: Hero
   intro?: string
   sections: ArticleSection[]
+  sources?: string[]
   cta: {
     title: string
     body: string

@@ -30,7 +30,7 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section id={id} className="pb-10 sm:pb-14">
+    <section id={id} className="scroll-mt-20 pb-10 sm:pb-14">
       <Container>
         <Reveal>
           <h2 className="text-ink text-[clamp(26px,3.2vw,36px)]">{title}</h2>
@@ -79,28 +79,36 @@ function Block({ block, resolve }: { block: ArticleBlock; resolve: Resolve }) {
       )
     case 'qa':
       return (
-        <div className="mt-2 grid gap-4 lg:grid-cols-2">
+        <div className="mt-2 flex flex-col gap-3">
           {block.items.map((item) => (
-            <article
+            <details
               key={item.q}
-              className="border-line bg-card rounded-2xl border px-6 py-5"
+              className="group border-line bg-card open:border-line-hover rounded-xl border transition-colors"
             >
-              <h3 className="text-ink text-[18px] font-semibold tracking-[-0.01em]">
-                {item.q}
-              </h3>
-              <p className="text-muted mt-3 text-[15px] leading-relaxed">
-                <span className="text-dim font-semibold">
-                  Зачем спрашивают.{' '}
+              <summary className="text-ink flex cursor-pointer list-none items-center justify-between gap-4 px-5.5 py-4.5 text-[17px] font-semibold [&::-webkit-details-marker]:hidden">
+                <h3>{item.q}</h3>
+                <span
+                  aria-hidden
+                  className="text-indigo shrink-0 text-[22px] leading-none font-normal transition-transform duration-200 group-open:rotate-45"
+                >
+                  +
                 </span>
-                {inline(item.why)}
-              </p>
-              <p className="text-muted mt-2 text-[15px] leading-relaxed">
-                <span className="text-dim font-semibold">
-                  Что хотят услышать.{' '}
-                </span>
-                {inline(item.what)}
-              </p>
-            </article>
+              </summary>
+              <div className="px-5.5 pb-5">
+                <p className="text-muted text-[15px] leading-relaxed">
+                  <span className="text-dim font-semibold">
+                    Зачем спрашивают.{' '}
+                  </span>
+                  {inline(item.why)}
+                </p>
+                <p className="text-muted mt-2 text-[15px] leading-relaxed">
+                  <span className="text-dim font-semibold">
+                    Что хотят услышать.{' '}
+                  </span>
+                  {inline(item.what)}
+                </p>
+              </div>
+            </details>
           ))}
         </div>
       )
@@ -130,7 +138,7 @@ export function ArticlePage() {
   if (!data) return <NotFoundPage />
 
   const { published } = data.entry
-  const { hero, intro, sections, cta } = data.article
+  const { hero, intro, sections, sources, cta } = data.article
   const resolve: Resolve = (c) =>
     ctaLink(c, { start: '/app/training/new', isAuthenticated })
 
@@ -161,6 +169,28 @@ export function ArticlePage() {
           ))}
         </Section>
       ))}
+
+      {sources && (
+        <section className="pb-10 sm:pb-14">
+          <Container>
+            <aside className="border-line border-t pt-6">
+              <h2 className="text-dim text-[13px] font-semibold tracking-[0.08em] uppercase">
+                {blog.sources}
+              </h2>
+              <ul className="mt-3 flex flex-col gap-2">
+                {sources.map((item) => (
+                  <li
+                    key={item}
+                    className="text-dim text-[14px] leading-relaxed"
+                  >
+                    {inline(item)}
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </Container>
+        </section>
+      )}
 
       <section className="pb-10 sm:pb-16">
         <Container>

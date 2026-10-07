@@ -28,6 +28,12 @@ describe('inline', () => {
     )
   })
 
+  it('якорь # превращает в Link на текущую страницу', () => {
+    expect(html('[к зарплате](#payroll)')).toBe(
+      `${ROUTER_LINK('/#payroll')}к зарплате</a>`,
+    )
+  })
+
   it('mailto и https превращает в обычную ссылку', () => {
     expect(html('[пиши](mailto:support@workbit.ru)')).toBe(
       `<a href="mailto:support@workbit.ru" ${LINK}>пиши</a>`,

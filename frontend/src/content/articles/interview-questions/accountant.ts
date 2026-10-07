@@ -378,7 +378,7 @@ export const article: Article = {
     },
   ],
   sources: [
-    'Мы собрали самую актуальную информацию из специализированных источников, таких как [«Клерк»](https://www.klerk.ru/), [«Главбух»](https://www.glavbukh.ru/), [«БУХ.1С»](https://buh.ru/), [«Время Бухгалтера»](https://www.v2b.ru/), [Т—Ж](https://t-j.ru/) и [hh.ru](https://hh.ru/), и сверили с требованиями вакансий. Каждая тема подтверждена минимум двумя источниками.',
+    'Мы собрали самую актуальную информацию из специализированных источников, таких как [«Клерк»](https://www.klerk.ru/), [«Главбух»](https://www.glavbukh.ru/), [«БУХ.1С»](https://buh.ru/), [«Время Бухгалтера»](https://www.v2b.ru/) и [hh.ru](https://hh.ru/), и сверили с требованиями вакансий. Каждая тема подтверждена минимум двумя источниками.',
     'Нормы: [НК РФ, ст. 164](https://www.consultant.ru/document/cons_doc_LAW_28165/35cc6698564adc4507baa31c9cfdbb4f2516d068/), [НК РФ, ст. 224](https://www.consultant.ru/document/cons_doc_LAW_28165/3e4bbd6dd9fb5dd4e9394f447653506e1d6fa3a9/), [402-ФЗ, ст. 9](https://www.consultant.ru/document/cons_doc_LAW_122855/b24121ba7152f33673608559f2ca844ef5b6a74c/), [402-ФЗ, ст. 29](https://www.consultant.ru/document/cons_doc_LAW_122855/eb7eaf7415d317fa9daf978473137c9209c1e1d7/), [ТК РФ, ст. 70](https://www.consultant.ru/document/cons_doc_LAW_34683/cc065f088bd92d312b5fae714377b25f557ac44a/), [разъяснение УФНС по Москве о ставке НДС по авансам](https://www.nalog.gov.ru/rn77/about_fts/about_nalog/16594097/), [перечень ФСБУ Минфина](https://minfin.gov.ru/ru/perfomance/accounting/accounting/standart/positions/).',
   ],
   cta: {

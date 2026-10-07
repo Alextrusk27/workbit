@@ -7,6 +7,7 @@ export interface BlogContent {
   author: string
   empty: string
   minutes: string
+  sources: string
   search: {
     label: string
     placeholder: string
@@ -33,6 +34,7 @@ export const blog: BlogContent = {
   author: 'Команда Workbit',
   empty: 'В этой рубрике пока пусто, статьи появятся скоро.',
   minutes: 'мин',
+  sources: 'Источники',
   search: {
     label: 'Поиск по профессии',
     placeholder: 'Найти профессию',

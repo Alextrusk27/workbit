@@ -420,8 +420,7 @@ export function ArticlePage() {
                   })}
                 </time>{' '}
                 · {readingMinutes} {text.readTime}
-                {questions > 0 &&
-                  ` · ${questions} ${questionsWord(questions)} ${text.withAnswers}`}
+                {questions > 0 && ` · ${questions} ${questionsWord(questions)}`}
               </p>
               {intro && <p className={`${BODY} mt-5`}>{inline(intro)}</p>}
             </div>

@@ -7,8 +7,7 @@ export const interviewQuestions: ArticleEntry[] = [
   {
     slug: 'sales-manager',
     name: 'Менеджер по продажам',
-    published: '2026-09-15',
-    updated: '2026-10-08',
+    published: '2026-10-07',
     readingMinutes: readingMinutes(salesManager.article),
     teaser:
       'Узнай, о чём спрашивают менеджера по продажам, и подготовь ответы про план, возражения и «продай мне ручку»',
@@ -21,7 +20,7 @@ export const interviewQuestions: ArticleEntry[] = [
   {
     slug: 'accountant',
     name: 'Бухгалтер',
-    published: '2026-10-07',
+    published: '2026-10-08',
     readingMinutes: readingMinutes(accountant.article),
     teaser:
       'Узнай, о чём спрашивают бухгалтера и главбуха, и подготовь ответы про первичку, НДС и зарплату',

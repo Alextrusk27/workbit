@@ -39,7 +39,7 @@ export const article: Article = {
             'иногда пробный день с обычной рабочей рутиной. В одной B2B-компании кандидат за такой день звонит клиентам и выставляет в 1С три-пять счетов.',
           ],
         },
-        'Почти на любом этапе тебя спросят о цифрах: план, выручка, средний чек, число сделок. Общие слова вроде «продавал много» не сработают, интервьюер всё равно уточнит, сколько именно. Если не называешь сумм, спросят хотя бы, на сколько процентов выросла выручка. Так что к собеседованию готовь цифры.',
+        'Почти на любом этапе тебя могут спросить о цифрах: план, выручка, средний чек, число сделок. Если скажешь общими словами, вроде «продавал много», интервьюер может уточнить, сколько именно. Если не называешь сумм, могут спросить хотя бы, на сколько процентов выросла выручка. Так что к собеседованию готовь цифры.',
         {
           type: 'tip',
           text: 'Первый звонок из компании тоже часть отбора. Назови собеседника по имени и задай пару вопросов о вакансии. Так ты с первой минуты показываешь то, ради чего тебя нанимают.',
@@ -163,7 +163,7 @@ export const article: Article = {
             {
               q: 'Из чего складывалась твоя зарплата на прошлом месте?',
               why: 'По тому, из чего складывался доход, видно, насколько он зависел от продаж и какой у тебя реальный результат.',
-              what: 'Оклад, процент и от чего он считался. Скрывать цифры смысла нет, их всё равно сопоставят с тем, сколько ты хочешь получать здесь.',
+              what: 'Оклад, процент и от чего он считался. Скрывать цифры смысла нет, их могут сопоставить с тем, сколько ты хочешь получать здесь.',
             },
           ],
         },
@@ -404,8 +404,8 @@ export const article: Article = {
     },
   ],
   sources: [
-    'Статья опирается на материалы [Executive.ru](https://www.e-xecutive.ru/management/sales/1996923-kak-opredelit-horoshego-menedzhera-po-prodazham-na-sobesedovanii), [vc.ru](https://vc.ru/hr/1664236-voprosy-dlya-sobesedovaniya-menedzhera-po-prodazham-chto-sprosit-chtoby-ne-oshibitsya), [СберБизнес Live](https://sberbusiness.live/publications/menedzher-po-prodazham-zachem-on-vashemu-biznesu-i-skolko-emu-platit), [блог hh.ru](https://hh.ru/blog/kak-otklikatsya-na-vakansii), [Т-Ж](https://t-j.ru/list/best-sobes/), [RB.RU](https://rb.ru/stories/spin-prodazhi/), [Журнал Совкомбанка](https://journal.sovcombank.ru/rabota/kak-prodat-ruchku-na-sobesedovanii-etapi-prodazh-i-sposobi-zavershit-sdelku), [Кинжал](https://kinzhal.media/voprosy-rabotodatelyu-na-sobesedovanii/) и [Контур](https://kontur.ru/compass/spravka-compass/38549-motivirovat_menedzherov_po_prodazham), и сверена с требованиями вакансий на hh.ru.',
-    'Доли вакансий посчитаны по 2000 объявлениям для менеджеров по продажам на hh.ru по всей России, выгрузка 8 октября 2026 года.',
+    'Статья опирается на материалы таких ресурсов, как [Executive.ru](https://www.e-xecutive.ru/management/sales/1996923-kak-opredelit-horoshego-menedzhera-po-prodazham-na-sobesedovanii), [vc.ru](https://vc.ru/hr/1664236-voprosy-dlya-sobesedovaniya-menedzhera-po-prodazham-chto-sprosit-chtoby-ne-oshibitsya), [СберБизнес Live](https://sberbusiness.live/publications/menedzher-po-prodazham-zachem-on-vashemu-biznesu-i-skolko-emu-platit), [блог hh.ru](https://hh.ru/blog/kak-otklikatsya-na-vakansii), [Т-Ж](https://t-j.ru/list/best-sobes/), [RB.RU](https://rb.ru/stories/spin-prodazhi/), [Журнал Совкомбанка](https://journal.sovcombank.ru/rabota/kak-prodat-ruchku-na-sobesedovanii-etapi-prodazh-i-sposobi-zavershit-sdelku), [Кинжал](https://kinzhal.media/voprosy-rabotodatelyu-na-sobesedovanii/) и [Контур](https://kontur.ru/compass/spravka-compass/38549-motivirovat_menedzherov_po_prodazham). Факты проверены и актуальны на момент публикации, требования к кандидату сверены с вакансиями на hh.ru.',
+    'Доли вакансий посчитаны по 2000 объявлениям для менеджеров по продажам на hh.ru по всей России, выгрузка 7 октября 2026 года.',
   ],
   cta: {
     title: 'Поможем подготовиться',

@@ -11,6 +11,7 @@ export interface BlogContent {
   article: {
     toc: string
     readTime: string
+    updated: string
     why: string
     what: string
     mistake: string
@@ -48,6 +49,7 @@ export const blog: BlogContent = {
   article: {
     toc: 'Содержание',
     readTime: 'мин чтения',
+    updated: 'обновлено',
     why: 'Зачем спрашивают',
     what: 'Что хотят услышать',
     mistake: 'Частая ошибка',

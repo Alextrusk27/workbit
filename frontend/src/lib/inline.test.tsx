@@ -34,12 +34,15 @@ describe('inline', () => {
     )
   })
 
-  it('mailto и https превращает в обычную ссылку', () => {
+  it('mailto превращает в обычную ссылку', () => {
     expect(html('[пиши](mailto:support@workbit.ru)')).toBe(
       `<a href="mailto:support@workbit.ru" ${LINK}>пиши</a>`,
     )
+  })
+
+  it('https открывает в новой вкладке', () => {
     expect(html('[hh.ru](https://hh.ru/)')).toBe(
-      `<a href="https://hh.ru/" ${LINK}>hh.ru</a>`,
+      `<a href="https://hh.ru/" target="_blank" rel="noopener noreferrer" ${LINK}>hh.ru</a>`,
     )
   })
 

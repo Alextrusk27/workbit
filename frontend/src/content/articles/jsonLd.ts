@@ -25,6 +25,7 @@ export function articleJsonLd(
       headline: accent ? `${lead} ${accent}` : lead,
       description: entry.description,
       datePublished: entry.published,
+      dateModified: entry.updated ?? entry.published,
       inLanguage: 'ru',
       url,
       mainEntityOfPage: { '@type': 'WebPage', '@id': url },

@@ -16,6 +16,7 @@ import type {
 import { blog } from '@/content/pages/blog'
 import type { Cta } from '@/content/types'
 import { useAuth } from '@/features/auth/useAuth'
+import { cn } from '@/lib/cn'
 import { ctaLink, type CtaLink } from '@/lib/cta'
 import { inline } from '@/lib/inline'
 import { questionsWord } from '@/lib/plural'
@@ -212,38 +213,64 @@ function QaList({ items, start }: { items: QaItem[]; start: number }) {
 }
 
 function Table({ block }: { block: Extract<ArticleBlock, { type: 'table' }> }) {
+  const stack = block.head.length > 2
+  const cell = stack ? 'max-sm:block max-sm:py-1' : ''
   return (
     <figure className="mt-1">
       <div className="border-line overflow-x-auto rounded-xl border">
-        <table className="w-full table-fixed border-collapse text-left text-[15px] leading-snug">
-          <thead className="bg-surface">
+        <table
+          className={cn(
+            'w-full border-collapse text-left text-[15px] leading-snug',
+            stack && 'max-sm:block',
+          )}
+        >
+          <thead className={cn('bg-surface', stack && 'max-sm:hidden')}>
             <tr>
-              {block.head.map((h, i) => (
+              {block.head.map((h) => (
                 <th
                   key={h}
                   scope="col"
-                  className={`text-dim px-4 py-3 align-bottom ${LABEL} ${i === 0 ? 'w-2/5' : ''}`}
+                  className={`text-dim px-4 py-3 align-bottom ${LABEL}`}
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className={cn(stack && 'max-sm:block')}>
             {block.rows.map((row) => (
-              <tr key={row[0]} className="border-line border-t">
-                {row.map((cell, i) =>
+              <tr
+                key={row[0]}
+                className={cn(
+                  'border-line border-t',
+                  stack && 'max-sm:block max-sm:py-2 max-sm:first:border-t-0',
+                )}
+              >
+                {row.map((text, i) =>
                   i === 0 ? (
                     <th
                       key={i}
                       scope="row"
-                      className="text-ink px-4 py-3 align-top font-medium"
+                      className={cn(
+                        'text-ink px-4 py-3 align-top font-medium',
+                        cell,
+                      )}
                     >
-                      {inline(cell)}
+                      {inline(text)}
                     </th>
                   ) : (
-                    <td key={i} className="text-muted px-4 py-3 align-top">
-                      {inline(cell)}
+                    <td
+                      key={i}
+                      className={cn('text-muted px-4 py-3 align-top', cell)}
+                    >
+                      {stack && (
+                        <span
+                          className={`text-dim mb-0.5 block sm:hidden ${LABEL}`}
+                        >
+                          {block.head[i]}
+                        </span>
+                      )}
+                      {inline(text)}
                     </td>
                   ),
                 )}
@@ -357,7 +384,8 @@ export function ArticlePage() {
   const { isAuthenticated } = useAuth()
   if (!data) return <NotFoundPage />
 
-  const { published, readingMinutes } = data.entry
+  const { published, updated, readingMinutes } = data.entry
+  const date = updated ?? published
   const { hero, intro, sections, sources, cta } = data.article
   const resolve: Resolve = (c) =>
     ctaLink(c, { start: '/app/training/new', isAuthenticated })
@@ -408,9 +436,9 @@ export function ArticlePage() {
                 <HeroTitle hero={hero} />
               </h1>
               <p className="text-dim mt-5 text-[14.5px]">
-                {blog.author} ·{' '}
-                <time dateTime={published}>
-                  {new Date(published).toLocaleDateString('ru-RU', {
+                {blog.author} · {updated && `${text.updated} `}
+                <time dateTime={date}>
+                  {new Date(date).toLocaleDateString('ru-RU', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',

@@ -3,8 +3,17 @@ import type { Cta, Hero, PageSeo } from '@/content/types'
 export type ArticleBlock =
   | string
   | { type: 'list'; ordered?: boolean; items: string[] }
-  | { type: 'qa'; items: { q: string; why: string; what: string }[] }
+  | { type: 'qa'; items: QaItem[] }
+  | { type: 'table'; caption?: string; head: string[]; rows: string[][] }
+  | { type: 'tip'; text: string }
   | { type: 'cta'; text: string; action: Cta }
+
+export interface QaItem {
+  q: string
+  why: string
+  what: string
+  mistake?: string
+}
 
 export interface ArticleSection {
   id: string

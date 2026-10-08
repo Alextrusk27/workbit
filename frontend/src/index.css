@@ -447,6 +447,23 @@
   }
 }
 
+@keyframes read-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@utility read-progress {
+  display: none;
+  transform: scaleX(0);
+  transform-origin: left;
+  @supports (animation-timeline: scroll()) {
+    display: block;
+    animation: read-progress linear both;
+    animation-timeline: scroll(root);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

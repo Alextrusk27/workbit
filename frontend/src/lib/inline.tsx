@@ -22,6 +22,16 @@ export function inline(text: string): ReactNode {
           <Link key={m.index} to={href} className={LINK}>
             {label}
           </Link>
+        ) : href.startsWith('http') ? (
+          <a
+            key={m.index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={LINK}
+          >
+            {label}
+          </a>
         ) : (
           <a key={m.index} href={href} className={LINK}>
             {label}

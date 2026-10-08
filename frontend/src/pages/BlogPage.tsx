@@ -23,6 +23,7 @@ export function BlogPage() {
     .flatMap(([key, r]) =>
       r.entries.map((entry) => ({ rubric: key, label: r.label, ...entry })),
     )
+    .sort((a, b) => b.published.localeCompare(a.published))
 
   return (
     <>

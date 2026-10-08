@@ -56,6 +56,31 @@ describe('readingMinutes', () => {
     expect(readingMinutes(a)).toBe(3)
   })
 
+  it('считает слова в таблицах, советах и частых ошибках', () => {
+    const a = article({
+      sections: [
+        {
+          id: 's',
+          title: '',
+          blocks: [
+            {
+              type: 'table',
+              caption: words(20),
+              head: [words(10), words(10)],
+              rows: [[words(30), words(30)]],
+            },
+            { type: 'tip', text: words(40) },
+            {
+              type: 'qa',
+              items: [{ q: '', why: '', what: '', mistake: words(41) }],
+            },
+          ],
+        },
+      ],
+    })
+    expect(readingMinutes(a)).toBe(2)
+  })
+
   it('не считает словами знаки препинания и стрелки', () => {
     expect(readingMinutes(article({ intro: `${words(180)} → — ...` }))).toBe(1)
   })

@@ -8,6 +8,17 @@ export interface BlogContent {
   empty: string
   minutes: string
   sources: string
+  article: {
+    toc: string
+    readTime: string
+    updated: string
+    why: string
+    what: string
+    mistake: string
+    tip: string
+    expand: string
+    collapse: string
+  }
   search: {
     label: string
     placeholder: string
@@ -35,6 +46,17 @@ export const blog: BlogContent = {
   empty: 'В этой рубрике пока пусто, статьи появятся скоро.',
   minutes: 'мин',
   sources: 'Источники',
+  article: {
+    toc: 'Содержание',
+    readTime: 'мин чтения',
+    updated: 'обновлено',
+    why: 'Зачем спрашивают',
+    what: 'Что хотят услышать',
+    mistake: 'Частая ошибка',
+    tip: 'Совет',
+    expand: 'Раскрыть все',
+    collapse: 'Свернуть все',
+  },
   search: {
     label: 'Поиск по профессии',
     placeholder: 'Найти профессию',

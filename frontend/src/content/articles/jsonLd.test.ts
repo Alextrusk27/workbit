@@ -58,9 +58,23 @@ describe('articleJsonLd', () => {
       headline: 'Вопросы бухгалтеру',
       description: 'Описание статьи',
       datePublished: '2026-10-01',
+      dateModified: '2026-10-01',
       url: URL,
       image: `${SITE}/og-image.png`,
       publisher: { name: 'Workbit', logo: `${SITE}/favicon.png` },
+    })
+  })
+
+  it('dateModified берёт дату обновления, если она есть', () => {
+    const [ld] = articleJsonLd(
+      SITE,
+      URL,
+      { ...entry, updated: '2026-10-08' },
+      article,
+    )
+    expect(ld).toMatchObject({
+      datePublished: '2026-10-01',
+      dateModified: '2026-10-08',
     })
   })
 

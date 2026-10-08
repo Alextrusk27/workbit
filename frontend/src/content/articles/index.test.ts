@@ -17,6 +17,10 @@ describe('реестр статей', () => {
     for (const { entries } of Object.values(rubrics)) {
       for (const entry of entries) {
         expect(entry.published).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+        if (entry.updated) {
+          expect(entry.updated).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+          expect(entry.updated > entry.published).toBe(true)
+        }
         const { article } = await entry.load()
         expect(article.hero.lead).toBeTruthy()
       }

@@ -8,7 +8,16 @@ function blockText(block: ArticleBlock): string[] {
     case 'list':
       return block.items
     case 'qa':
-      return block.items.flatMap(({ q, why, what }) => [q, why, what])
+      return block.items.flatMap(({ q, why, what, mistake }) => [
+        q,
+        why,
+        what,
+        mistake ?? '',
+      ])
+    case 'table':
+      return [block.caption ?? '', ...block.head, ...block.rows.flat()]
+    case 'tip':
+      return [block.text]
     case 'cta':
       return [block.text]
   }

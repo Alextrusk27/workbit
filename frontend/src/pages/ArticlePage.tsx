@@ -25,7 +25,7 @@ type Resolve = (cta: Cta) => CtaLink
 
 const text = blog.article
 const GRID =
-  'grid grid-cols-[minmax(0,1fr)] gap-y-10 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-16'
+  'grid grid-cols-[minmax(0,1fr)] gap-y-10 lg:grid-cols-[220px_minmax(0,720px)] lg:justify-center lg:gap-x-16'
 const LABEL = 'text-[12px] font-semibold tracking-[0.08em] uppercase'
 const BODY = 'text-muted text-[17px] leading-[1.7]'
 
@@ -78,8 +78,8 @@ function Toc({ sections }: { sections: ArticleSection[] }) {
       aria-label={text.toc}
       className="border-line bg-card rounded-xl border p-5 lg:border-0 lg:bg-transparent lg:p-0"
     >
-      <p className={`text-dim ${LABEL}`}>{text.toc}</p>
-      <ol className="lg:border-line mt-3 flex flex-col gap-1 lg:mt-4 lg:border-l">
+      <p className={`text-dim ${LABEL} lg:hidden`}>{text.toc}</p>
+      <ol className="lg:border-line mt-3 flex flex-col gap-1 lg:mt-0 lg:border-l">
         {sections.map((s) => (
           <li key={s.id}>
             <Link
@@ -215,14 +215,14 @@ function Table({ block }: { block: Extract<ArticleBlock, { type: 'table' }> }) {
   return (
     <figure className="mt-1">
       <div className="border-line overflow-x-auto rounded-xl border">
-        <table className="w-full border-collapse text-left text-[15px] leading-snug">
+        <table className="w-full table-fixed border-collapse text-left text-[15px] leading-snug">
           <thead className="bg-surface">
             <tr>
-              {block.head.map((h) => (
+              {block.head.map((h, i) => (
                 <th
                   key={h}
                   scope="col"
-                  className={`text-dim px-4 py-3 align-bottom ${LABEL}`}
+                  className={`text-dim px-4 py-3 align-bottom ${LABEL} ${i === 0 ? 'w-2/5' : ''}`}
                 >
                   {h}
                 </th>
@@ -340,12 +340,10 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-24 pt-12 first:pt-0 sm:pt-16">
-      <Reveal>
-        <h2 className="text-ink text-[clamp(24px,2.6vw,30px)] leading-tight text-balance">
-          {title}
-        </h2>
-        <div className="mt-5 flex flex-col gap-4">{children}</div>
-      </Reveal>
+      <h2 className="text-ink text-[clamp(24px,2.6vw,30px)] leading-tight text-balance">
+        {title}
+      </h2>
+      <div className="mt-5 flex flex-col gap-4">{children}</div>
     </section>
   )
 }

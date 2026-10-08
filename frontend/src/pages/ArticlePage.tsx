@@ -5,6 +5,7 @@ import { Container } from '@/components/ui/Container'
 import { CtaPanel } from '@/components/marketing/CtaPanel'
 import { HeroTitle } from '@/components/marketing/HeroTitle'
 import { Reveal } from '@/components/marketing/Reveal'
+import { VacancyUrlForm } from '@/components/marketing/VacancyUrlForm'
 import { findRubric } from '@/content/articles'
 import type {
   Article,
@@ -495,27 +496,12 @@ export function ArticlePage() {
 
             <Reveal className="mt-12">
               <CtaPanel
+                compact
                 title={cta.title}
                 actions={
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="flex flex-wrap justify-center gap-3.5">
-                      <Link
-                        {...resolve(cta.primary)}
-                        className={buttonClasses({ className: 'px-7' })}
-                      >
-                        {cta.primary.label}
-                      </Link>
-                      {cta.secondary && (
-                        <Link
-                          {...resolve(cta.secondary)}
-                          className={buttonClasses({
-                            variant: 'secondary',
-                            className: 'px-7',
-                          })}
-                        >
-                          {cta.secondary.label}
-                        </Link>
-                      )}
+                  <div className="flex w-full flex-col items-center gap-4">
+                    <div className="w-full">
+                      <VacancyUrlForm />
                     </div>
                     {cta.note && (
                       <p className="text-dim text-[13.5px]">

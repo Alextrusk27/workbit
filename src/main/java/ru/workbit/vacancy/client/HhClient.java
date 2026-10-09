@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import ru.workbit.exception.NotFoundException;
 import ru.workbit.exception.VacancyFetchException;
 import ru.workbit.vacancy.dto.HhVacancyResponse;
@@ -22,6 +23,9 @@ public class HhClient {
                         throw new NotFoundException("Vacancy %s not found".formatted(vacancyId));
                     })
                     .body(HhVacancyResponse.class);
+        } catch (RestClientResponseException e) {
+            throw new VacancyFetchException("Failed to fetch vacancy %s from hh.ru: status %d"
+                    .formatted(vacancyId, e.getStatusCode().value()), e);
         } catch (RestClientException e) {
             throw new VacancyFetchException("Failed to fetch vacancy %s from hh.ru".formatted(vacancyId), e);
         }

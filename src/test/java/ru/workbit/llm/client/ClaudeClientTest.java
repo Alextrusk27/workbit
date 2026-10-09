@@ -10,6 +10,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.core.http.Headers;
@@ -31,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,13 +44,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import ru.workbit.exception.LlmException;
 import ru.workbit.llm.config.ClaudeProperties;
+import ru.workbit.llm.dto.LlmTrainingCaseReview;
 import ru.workbit.llm.dto.LlmTrainingReferenceAnswer;
+import ru.workbit.llm.dto.LlmTrainingReport;
+import tools.jackson.core.JacksonException;
 
 /**
  * Ответ модели стабится потоком настоящих SDK-чанков: текст, чанк с причиной остановки и чанк с
- * usage без choices. Текст ответа разбирает сам SDK.
+ * usage без choices. Текст ответа разбирает мапер самого ClaudeClient.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClaudeClientTest")
@@ -184,6 +193,25 @@ class ClaudeClientTest {
     @DisplayName("Converse")
     class Converse {
 
+        private final Logger clientLogger = (Logger) LoggerFactory.getLogger(ClaudeClient.class);
+        private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
+
+        @BeforeEach
+        void attachLogAppender() {
+            logEvents.start();
+            clientLogger.addAppender(logEvents);
+        }
+
+        @AfterEach
+        void detachLogAppender() {
+            clientLogger.detachAppender(logEvents);
+            logEvents.stop();
+        }
+
+        private List<ILoggingEvent> warnings() {
+            return logEvents.list.stream().filter(event -> event.getLevel() == Level.WARN).toList();
+        }
+
         @Test
         @DisplayName("Шлюз присылает finish_reason и usage одним чанком - ответ разбирается")
         void parsesAnswerWhenFinishReasonAndUsageComeInOneChunk() {
@@ -219,7 +247,7 @@ class ClaudeClientTest {
         }
 
         @Test
-        @DisplayName("Ответ не разбирается по схеме - LlmException с причиной от SDK, без повтора")
+        @DisplayName("Ответ не разбирается по схеме - LlmException с причиной от Jackson, без повтора")
         void throwsWithoutRetryWhenResponseIsNotParseable() {
             // given
             stubText("это вообще не json");
@@ -228,9 +256,93 @@ class ClaudeClientTest {
             assertThatThrownBy(ClaudeClientTest.this::converse)
                     .isInstanceOf(LlmException.class)
                     .hasMessage("LLM response is not parseable")
-                    .hasCauseInstanceOf(OpenAIInvalidDataException.class);
+                    .hasCauseInstanceOf(JacksonException.class);
             verify(completionService, times(1))
                     .createStreaming(ClaudeClientTest.<LlmTrainingReferenceAnswer>anyParams());
+        }
+
+        @Test
+        @DisplayName("Модель дописала поле вне схемы - ответ разбирается, лишнее поле игнорируется")
+        void ignoresFieldOutsideSchema() {
+            // given
+            var expected = new LlmTrainingReferenceAnswer("используйте индекс для поиска");
+            stubText("{\"answer\":\"используйте индекс для поиска\",\"hello\":null}");
+
+            // when
+            var result = converse();
+
+            // then
+            assertThat(result).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("Поле вне схемы пишется в WARN с моделью и путём /hello, значения поля в логе нет")
+        void warnsWithModelAndPathWhenFieldOutsideSchema() {
+            // given
+            stubText("{\"answer\":\"используйте индекс для поиска\",\"hello\":\"секретное-значение\"}");
+
+            // when
+            converse();
+
+            // then
+            assertThat(warnings()).singleElement().satisfies(event -> {
+                assertThat(event.getFormattedMessage())
+                        .isEqualTo("Claude response has field outside schema [model=claude-test-model]: /hello")
+                        .doesNotContain("секретное-значение");
+            });
+        }
+
+        @Test
+        @DisplayName("Поле вне схемы во вложенном объекте тоже не валит разбор, в WARN путь /cases/0/extra")
+        void ignoresFieldOutsideSchemaInNestedObject() {
+            // given
+            stubText("{\"cases\":[{\"evaluation\":\"верно\",\"extra\":\"секретное-значение\",\"index\":1,\"score\":4}],"
+                    + "\"hello\":null,\"overallFeedback\":\"хорошо\"}");
+
+            // when
+            var result = claudeClient.converse(PROMPT, List.of("вводная"), List.of(), null, LlmTrainingReport.class);
+
+            // then
+            assertThat(result).isEqualTo(new LlmTrainingReport(
+                    List.of(new LlmTrainingCaseReview(1, "верно", 4)), "хорошо"));
+            assertThat(warnings()).extracting(ILoggingEvent::getFormattedMessage)
+                    .containsExactlyInAnyOrder(
+                            "Claude response has field outside schema [model=claude-test-model]: /cases/0/extra",
+                            "Claude response has field outside schema [model=claude-test-model]: /hello");
+        }
+
+        @Test
+        @DisplayName("Ответ без лишних полей не пишет WARN")
+        void doesNotWarnWhenNoFieldOutsideSchema() {
+            // given
+            stubText(ANSWER_JSON);
+
+            // when
+            converse();
+
+            // then
+            assertThat(warnings()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Схема в запросе по-прежнему запрещает лишние поля: additionalProperties=false")
+        void sendsSchemaWithAdditionalPropertiesFalse() {
+            // given
+            stubText(ANSWER_JSON);
+
+            // when
+            converse();
+
+            // then
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<StructuredChatCompletionCreateParams<LlmTrainingReferenceAnswer>> paramsCaptor =
+                    ArgumentCaptor.forClass(StructuredChatCompletionCreateParams.class);
+            verify(completionService).createStreaming(paramsCaptor.capture());
+            var jsonSchema = paramsCaptor.getValue().rawParams().responseFormat().orElseThrow()
+                    .asJsonSchema().jsonSchema();
+            JsonValue schema = jsonSchema._schema().asUnknown().orElseThrow();
+            var schemaFields = (Map<?, ?>) schema.asObject().orElseThrow();
+            assertThat(schemaFields.get("additionalProperties")).isEqualTo(JsonValue.from(false));
         }
 
         @Test

@@ -4,9 +4,9 @@ import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.core.http.StreamResponse;
 import com.openai.errors.OpenAIException;
-import com.openai.errors.OpenAIInvalidDataException;
 import com.openai.errors.OpenAIServiceException;
 import com.openai.helpers.ChatCompletionAccumulator;
+import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletion.Choice.FinishReason;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
@@ -15,7 +15,6 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionMessageParam;
 import com.openai.models.chat.completions.ChatCompletionStreamOptions;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
-import com.openai.models.chat.completions.StructuredChatCompletion;
 import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import com.openai.models.completions.CompletionUsage;
 import java.util.ArrayList;
@@ -30,6 +29,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import ru.workbit.exception.LlmException;
 import ru.workbit.llm.config.ClaudeProperties;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.deser.DeserializationProblemHandler;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Клиент Claude-агентов через OpenAI-совместимый маршрут шлюза. */
 @Slf4j
@@ -43,10 +50,12 @@ public class ClaudeClient {
 
     private final OpenAIClient client;
     private final ClaudeProperties props;
+    private final ObjectMapper responseMapper;
 
     public ClaudeClient(@Qualifier("gatewayClaudeClient") OpenAIClient client, ClaudeProperties props) {
         this.client = client;
         this.props = props;
+        this.responseMapper = responseMapper(props.model());
     }
 
     /** Многоходовая беседа: ответ модели на последнюю реплику. */
@@ -85,18 +94,18 @@ public class ClaudeClient {
         ChatCompletionAccumulator accumulator = ChatCompletionAccumulator.create();
         Set<Long> finished = new HashSet<>();
 
-        StructuredChatCompletion<T> response = call(() -> {
+        ChatCompletion response = call(() -> {
             try (StreamResponse<ChatCompletionChunk> stream = client.chat().completions().createStreaming(params)) {
                 stream.stream().forEach(chunk -> accumulate(accumulator, finished, chunk));
             }
-            return accumulator.chatCompletion(responseType);
+            return accumulator.chatCompletion();
         });
 
         response.usage().ifPresent(this::logUsage);
-        return result(response);
+        return result(response, responseType);
     }
 
-    private <T> StructuredChatCompletion<T> call(Supplier<StructuredChatCompletion<T>> request) {
+    private ChatCompletion call(Supplier<ChatCompletion> request) {
         try {
             return request.get();
 
@@ -111,8 +120,9 @@ public class ClaudeClient {
         }
     }
 
-    private <T> T result(StructuredChatCompletion<T> response) {
-        StructuredChatCompletion.Choice<T> choice = response.choices().stream()
+    /** Достаёт из ответа модели объект нужного типа. */
+    private <T> T result(ChatCompletion response, Class<T> responseType) {
+        ChatCompletion.Choice choice = response.choices().stream()
                 .findFirst()
                 .orElseThrow(() -> new LlmException("Model not response"));
 
@@ -122,10 +132,11 @@ public class ClaudeClient {
             throw new LlmException("LLM stopped with reason " + finish);
         }
 
-        log.debug("Claude raw response [model={}]: {}", props.model(), choice.message().rawMessage().content());
+        String content = choice.message().content().orElseThrow(() -> new LlmException("Model not response"));
+        log.debug("Claude raw response [model={}]: {}", props.model(), content);
         try {
-            return choice.message().content().orElseThrow(() -> new LlmException("Model not response"));
-        } catch (OpenAIInvalidDataException e) {
+            return responseMapper.readValue(content, responseType);
+        } catch (JacksonException e) {
             log.error("Claude response is not parseable [model={}]", props.model(), e);
             throw new LlmException("LLM response is not parseable", e);
         }
@@ -140,6 +151,25 @@ public class ClaudeClient {
                 .streamOptions(WITH_USAGE)
                 .messages(messages)
                 .responseFormat(responseType)
+                .build();
+    }
+
+    /** Мапер ответов модели, который пропускает поля вне схемы с WARN. */
+    private static ObjectMapper responseMapper(String model) {
+        return JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES,
+                        DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .addHandler(new DeserializationProblemHandler() {
+                    @Override
+                    public boolean handleUnknownProperty(DeserializationContext ctxt, JsonParser p,
+                                                         ValueDeserializer<?> deserializer, Object beanOrClass,
+                                                         String propertyName) {
+                        log.warn("Claude response has field outside schema [model={}]: {}",
+                                model, p.streamReadContext().pathAsPointer());
+                        p.skipChildren();
+                        return true;
+                    }
+                })
                 .build();
     }
 
